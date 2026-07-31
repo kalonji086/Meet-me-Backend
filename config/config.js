@@ -10,7 +10,6 @@ const config = {
 
   // Database Configuration
   database: {
-    mongodbUri: process.env.MONGODB_URI,
     postgres: {
       url: process.env.DATABASE_URL,
       host: process.env.DB_HOST || 'aws-1-eu-west-2.pooler.supabase.com',
@@ -20,7 +19,7 @@ const config = {
       password: process.env.DB_PASSWORD,
     },
     supabaseUrl: process.env.SUPABASE_URL,
-    supabaseKey: process.env.SUPABASE_KEY,
+    supabaseKey: process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY,
   },
 
   // JWT Configuration
@@ -119,31 +118,16 @@ const config = {
 const validateConfig = () => {
   const requiredFields = [
     { field: config.jwt.secret, name: 'JWT_SECRET' },
-    { field: config.database.mongodbUri, name: 'MONGODB_URI' },
+    { field: config.database.postgres.url || config.database.postgres.password, name: 'DATABASE_URL/DB_PASSWORD' },
   ];
 
   const missingFields = requiredFields.filter(item => !item.field || item.field.includes('default'));
 
   if (missingFields.length > 0) {
-    console.warn('⚠️  Avertissement: Les configurations suivantes utilisent des valeurs par défaut :');
+    console.warn('⚠️  Avertissement: Les configurations suivantes sont manquantes ou par défaut :');
     missingFields.forEach(item => {
       console.warn(`   - ${item.name}`);
     });
-    console.warn('   Veuillez les configurer dans le fichier .env pour la production.');
-  }
-
-  if (config.server.nodeEnv === 'production') {
-    const productionRequired = [
-      { field: config.aws.accessKeyId, name: 'AWS_ACCESS_KEY_ID' },
-      { field: config.aws.secretAccessKey, name: 'AWS_SECRET_ACCESS_KEY' },
-      { field: config.aws.s3Bucket, name: 'AWS_S3_BUCKET' },
-    ];
-
-    const missingProduction = productionRequired.filter(item => !item.field);
-
-    if (missingProduction.length > 0) {
-      throw new Error(`Configuration de production manquante: ${missingProduction.map(item => item.name).join(', ')}`);
-    }
   }
 };
 

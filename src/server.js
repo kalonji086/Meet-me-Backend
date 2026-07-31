@@ -60,12 +60,6 @@ class Server {
       await this.pool.query('SELECT NOW()');
       logger.info('✅ Base de données Supabase (Postgres) connectée avec succès');
 
-      // Tentative de connexion MongoDB optionnelle si l'URL est fournie
-      if (config.database.mongodbUri) {
-        await mongoose.connect(config.database.mongodbUri, config.database.options);
-        logger.info('✅ Base de données MongoDB connectée');
-      }
-
       // Créer les dossiers d'uploads s'ils n'existent pas
       const uploadDirs = ['uploads', 'uploads/audio', 'uploads/images', 'uploads/videos', 'uploads/documents'];
       uploadDirs.forEach(dir => {
@@ -78,7 +72,7 @@ class Server {
 
     } catch (error) {
       logger.error('❌ Erreur de connexion à la base de données:', error);
-      // On ne process.exit(1) pas forcément si Postgres marche mais pas Mongo
+      process.exit(1);
     }
   }
 

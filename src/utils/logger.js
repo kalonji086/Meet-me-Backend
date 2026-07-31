@@ -43,20 +43,31 @@ const transports = [
   }),
 ];
 
-// Ajout du transport fichier en production
-if (config.server.nodeEnv === 'production') {
-  transports.push(
-    new winston.transports.File({
-      filename: path.join(__dirname, '..', '..', config.logging.file),
-      level: config.logging.level,
-      format: winston.format.combine(
-        winston.format.uncolorize(),
-        winston.format.json()
-      ),
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
+// Ajout du transport fichier si configuré (optionnel sur Render)
+if (config.server.nodeEnv === 'production' && config.logging.file) {
+  try {
+    const logFilePath = path.join(__dirname, '..', '..', config.logging.file);
+    const logDir = path.dirname(logFilePath);
+
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+
+    transports.push(
+      new winston.transports.File({
+        filename: logFilePath,
+        level: config.logging.level,
+        format: winston.format.combine(
+          winston.format.uncolorize(),
+          winston.format.json()
+        ),
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      })
+    );
+  } catch (error) {
+    console.error('Impossible d\'initialiser le logging fichier:', error.message);
+  }
 }
 
 // Création du logger
@@ -65,17 +76,16 @@ const logger = winston.createLogger({
   levels,
   format,
   transports,
-  exceptionHandlers: [
-    new winston.transports.File({
-      filename: path.join(__dirname, '..', '..', 'logs/exceptions.log'),
-    }),
-  ],
-  rejectionHandlers: [
-    new winston.transports.File({
-      filename: path.join(__dirname, '..', '..', 'logs/rejections.log'),
-    }),
-  ],
 });
+
+// Exception handlers (plus sûrs)
+if (config.server.nodeEnv === 'production') {
+  const excPath = path.join(__dirname, '..', '..', 'logs/exceptions.log');
+  if (fs.existsSync(path.dirname(excPath))) {
+    logger.exceptions.handle(new winston.transports.File({ filename: excPath }));
+    logger.rejections.handle(new winston.transports.File({ filename: excPath }));
+  }
+}
 
 // Stream pour Morgan (middleware de logging HTTP)
 logger.stream = {

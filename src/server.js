@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const mongoose = require('mongoose');
 const { Pool } = require('pg');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -65,23 +64,42 @@ class Server {
   // Initialisation de la base de données
   async initializeDatabase() {
     try {
+      // Vérification des variables critiques
+      if (!config.database.postgres.url && !config.database.postgres.password) {
+        throw new Error('DATABASE_URL ou DB_PASSWORD manquant dans les variables d\'environnement');
+      }
+
       // Test Postgres connection (Supabase)
-      await this.pool.query('SELECT NOW()');
-      logger.info('✅ Base de données Supabase (Postgres) connectée avec succès');
+      logger.info('⏳ Tentative de connexion à Supabase (Postgres)...');
+      const client = await this.pool.connect();
+      try {
+        await client.query('SELECT NOW()');
+        logger.info('✅ Base de données Supabase (Postgres) connectée avec succès');
+      } finally {
+        client.release();
+      }
 
       // Créer les dossiers d'uploads s'ils n'existent pas
       const uploadDirs = ['uploads', 'uploads/audio', 'uploads/images', 'uploads/videos', 'uploads/documents'];
       uploadDirs.forEach(dir => {
-        const dirPath = path.join(__dirname, '..', '..', dir);
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
-          logger.info(`📁 Dossier créé: ${dir}`);
+        try {
+          const dirPath = path.join(__dirname, '..', '..', dir);
+          if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
+            logger.info(`📁 Dossier créé: ${dir}`);
+          }
+        } catch (err) {
+          logger.warn(`Impossible de créer le dossier ${dir}: ${err.message}`);
         }
       });
 
     } catch (error) {
-      logger.error('❌ Erreur de connexion à la base de données:', error);
-      process.exit(1);
+      logger.error('❌ Erreur fatale lors de l\'initialisation de la base de données:');
+      logger.error(error.message);
+      if (error.stack) logger.debug(error.stack);
+
+      // En production sur Render, on veut voir l'erreur avant de quitter
+      setTimeout(() => process.exit(1), 1000);
     }
   }
 

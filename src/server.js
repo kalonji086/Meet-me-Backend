@@ -13,7 +13,16 @@ const fs = require('fs');
 const config = require('../config/config');
 const logger = require('./utils/logger');
 
-// ... (rest of imports)
+// Middlewares
+const { authenticate } = require('./middleware/auth.middleware');
+const { notFound, errorHandler } = require('./middleware/error.middleware');
+
+// Routes
+const authRoutes = require('./routes/auth.routes');
+const uploadRoutes = require('./routes/upload.routes');
+
+// Services
+const socketService = require('./services/socket.service');
 
 class Server {
   constructor() {
@@ -89,6 +98,12 @@ class Server {
     if (this.nodeEnv === 'development') {
       this.app.use(morgan('dev'));
     } else {
+      // S'assurer que le dossier logs existe
+      const logDir = path.join(__dirname, '..', '..', 'logs');
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+
       this.app.use(morgan('combined', {
         stream: fs.createWriteStream(
           path.join(__dirname, '..', '..', config.logging.file),
@@ -117,11 +132,11 @@ class Server {
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);
 
-    // Routes protégées
-    this.app.use('/api/users', authenticate, userRoutes);
-    this.app.use('/api/chats', authenticate, chatRoutes);
-    this.app.use('/api/messages', authenticate, messageRoutes);
-    this.app.use('/api/translate', authenticate, translationRoutes);
+    // Routes protégées - Placeholder pour les routes manquantes
+    // this.app.use('/api/users', authenticate, userRoutes);
+    // this.app.use('/api/chats', authenticate, chatRoutes);
+    // this.app.use('/api/messages', authenticate, messageRoutes);
+    // this.app.use('/api/translate', authenticate, translationRoutes);
 
     // Route de santé
     this.app.get('/api/health', (req, res) => {
@@ -143,34 +158,9 @@ class Server {
           auth: {
             login: 'POST /api/auth/login',
             register: 'POST /api/auth/register',
-            refresh: 'POST /api/auth/refresh',
-            logout: 'POST /api/auth/logout',
-            forgotPassword: 'POST /api/auth/forgot-password',
-            resetPassword: 'POST /api/auth/reset-password',
-          },
-          users: {
-            getProfile: 'GET /api/users/profile',
-            updateProfile: 'PUT /api/users/profile',
-            updateLanguage: 'PUT /api/users/language',
-            searchUsers: 'GET /api/users/search',
-          },
-          chats: {
-            getChats: 'GET /api/chats',
-            createChat: 'POST /api/chats',
-            getChat: 'GET /api/chats/:id',
-            updateChat: 'PUT /api/chats/:id',
-            deleteChat: 'DELETE /api/chats/:id',
-          },
-          messages: {
-            getMessages: 'GET /api/messages/:chatId',
-            sendMessage: 'POST /api/messages',
-            deleteMessage: 'DELETE /api/messages/:id',
-            translateMessage: 'POST /api/messages/:id/translate',
           },
           upload: {
             uploadFile: 'POST /api/upload',
-            uploadAudio: 'POST /api/upload/audio',
-            uploadImage: 'POST /api/upload/image',
           },
         },
       });
@@ -196,8 +186,6 @@ class Server {
       logger.info(`🌍 Environnement: ${this.nodeEnv}`);
       logger.info(`📡 CORS Origin: ${config.server.corsOrigin}`);
       logger.info(`🔗 Health Check: http://localhost:${this.port}/api/health`);
-      logger.info(`📚 Documentation: http://localhost:${this.port}/api/docs`);
-      logger.info(`💬 Socket.IO: ws://localhost:${this.port}`);
     });
 
     // Gestion des arrêts gracieux
@@ -217,10 +205,6 @@ class Server {
       // Fermer le serveur HTTP
       this.server.close();
       logger.info('✅ Serveur HTTP fermé');
-
-      // Fermer la connexion MongoDB
-      await mongoose.connection.close();
-      logger.info('✅ Connexion MongoDB fermée');
 
       logger.info('👋 Serveur arrêté avec succès');
       process.exit(0);

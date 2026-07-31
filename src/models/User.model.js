@@ -141,7 +141,6 @@ const userSchema = new mongoose.Schema({
 });
 
 // Index pour les recherches
-userSchema.index({ email: 1 });
 userSchema.index({ name: 'text', email: 'text' });
 userSchema.index({ status: 1, lastSeen: -1 });
 userSchema.index({ createdAt: -1 });

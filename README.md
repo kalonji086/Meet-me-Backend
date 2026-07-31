@@ -328,3 +328,5 @@ Pour le support, ouvrez une issue sur le repository ou contactez l'équipe de d�
 ---
 
 **Note:** Ce backend est conçu pour fonctionner avec le frontend React Native/Expo Meet Me. Assurez-vous que les deux projets sont correctement configurés et communiquent entre eux.
+
+# Meet-me-Backend

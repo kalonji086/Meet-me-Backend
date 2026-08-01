@@ -38,8 +38,9 @@ class MailService {
       await apiInstance.sendTransacEmail(sendSmtpEmail);
       logger.info(`Email de bienvenue envoyé à: ${email}`);
     } catch (error) {
-      logger.error(`Erreur lors de l'envoi de l'email de bienvenue à ${email}:`, error);
+      logger.error(`Erreur détaillée Brevo pour ${email}:`, error.response?.body || error);
     }
+  }
   }
 
   /**
@@ -70,7 +71,7 @@ class MailService {
       await apiInstance.sendTransacEmail(sendSmtpEmail);
       logger.info(`Email OTP envoyé à: ${email}`);
     } catch (error) {
-      logger.error(`Erreur lors de l'envoi de l'email OTP à ${email}:`, error);
+      logger.error(`Erreur détaillée Brevo pour ${email}:`, error.response?.body || error);
     }
   }
 }

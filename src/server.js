@@ -19,6 +19,10 @@ const { notFound, errorHandler } = require('./middleware/error.middleware');
 // Routes
 const authRoutes = require('./routes/auth.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const userRoutes = require('./routes/user.routes');
+const chatRoutes = require('./routes/chat.routes');
+const messageRoutes = require('./routes/message.routes');
+const statusRoutes = require('./routes/status.routes');
 
 // Services
 const socketService = require('./services/socket.service');
@@ -30,7 +34,7 @@ class Server {
     this.server = http.createServer(this.app);
     this.io = socketIo(this.server, {
       cors: {
-        origin: config.server.corsOrigin,
+        origin: '*',
         methods: ['GET', 'POST'],
         credentials: true,
       },
@@ -102,7 +106,7 @@ class Server {
     // Sécurité
     this.app.use(helmet());
     this.app.use(cors({
-      origin: config.server.corsOrigin,
+      origin: '*',
       credentials: true,
     }));
 
@@ -129,7 +133,7 @@ class Server {
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
     // Static files
-    this.app.use('/uploads', express.static(path.join(__dirname, '..', '..', 'uploads')));
+    this.app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
     // Request logging
     this.app.use((req, res, next) => {
@@ -153,11 +157,11 @@ class Server {
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);
 
-    // Routes protégées - Placeholder pour les routes manquantes
-    // this.app.use('/api/users', authenticate, userRoutes);
-    // this.app.use('/api/chats', authenticate, chatRoutes);
-    // this.app.use('/api/messages', authenticate, messageRoutes);
-    // this.app.use('/api/translate', authenticate, translationRoutes);
+    // Routes protégées
+    this.app.use('/api/users', userRoutes);
+    this.app.use('/api/chats', chatRoutes);
+    this.app.use('/api/messages', messageRoutes);
+    this.app.use('/api/statuses', statusRoutes);
 
     // Route de santé
     this.app.get('/api/health', (req, res) => {

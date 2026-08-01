@@ -1,3 +1,44 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Supprimer la contrainte de clé étrangère avec Supabase Auth si elle existe
+-- Cela permet au backend personnalisé de gérer ses propres IDs
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'profiles_id_fkey') THEN
+    ALTER TABLE public.profiles DROP CONSTRAINT profiles_id_fkey;
+  END IF;
+END $$;
+
+-- Assurer que les colonnes id ont bien le défaut gen_random_uuid()
+DO $$
+BEGIN
+  -- Profiles
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles' AND table_schema = 'public') THEN
+    ALTER TABLE public.profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
+  END IF;
+
+  -- Chats
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'chats' AND table_schema = 'public') THEN
+    ALTER TABLE public.chats ALTER COLUMN id SET DEFAULT gen_random_uuid();
+  END IF;
+
+  -- Messages
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'messages' AND table_schema = 'public') THEN
+    ALTER TABLE public.messages ALTER COLUMN id SET DEFAULT gen_random_uuid();
+  END IF;
+
+  -- AJOUT DES COLONNES MANQUANTES SI ELLES EXISTENT DÉJÀ
+  -- Profiles: phone_number
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='phone_number') THEN
+    ALTER TABLE public.profiles ADD COLUMN phone_number TEXT UNIQUE;
+  END IF;
+
+  -- Chat Participants: is_archived
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_participants' AND column_name='is_archived') THEN
+    ALTER TABLE public.chat_participants ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
+  END IF;
+END $$;
+
 -- ==========================================
 -- 1. TABLE DES PROFILS
 -- ==========================================
@@ -37,6 +78,7 @@ CREATE TABLE IF NOT EXISTS public.chat_participants (
   chat_id UUID REFERENCES public.chats(id) ON DELETE CASCADE,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_archived BOOLEAN DEFAULT FALSE,
   PRIMARY KEY (chat_id, user_id)
 );
 
@@ -51,11 +93,38 @@ CREATE TABLE IF NOT EXISTS public.messages (
   type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image', 'audio', 'video', 'file')),
   file_url TEXT, -- Si type != 'text'
   status TEXT DEFAULT 'sent' CHECK (status IN ('sent', 'delivered', 'read')),
+  translated_content JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ==========================================
--- 5. FONCTIONS ET TRIGGERS
+-- 5. TABLE DES STATUS (ACTUS)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.statuses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT, -- Texte du status ou légende de la photo
+  type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image')),
+  media_url TEXT, -- URL de l'image si type = 'image'
+  background_color TEXT DEFAULT '#128C7E', -- Pour les status texte
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+-- ==========================================
+-- 6. TABLE DES RÉACTIONS DE STATUS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.status_reactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT, -- Le commentaire, l'emoji ou l'identifiant du sticker
+  type TEXT DEFAULT 'emoji' CHECK (type IN ('emoji', 'comment', 'sticker', 'like')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==========================================
+-- 7. FONCTIONS ET TRIGGERS
 -- ==========================================
 
 -- Mise à jour automatique de last_message dans la table chats

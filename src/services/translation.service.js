@@ -1,5 +1,6 @@
 const axios = require('axios');
 const NodeCache = require('node-cache');
+const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
 
@@ -151,17 +152,20 @@ class TranslationService {
    */
   async translateMessage(messageId, targetLanguage) {
     try {
-      const Message = require('../models/Message.model');
-      const message = await Message.findById(messageId);
+      const result = await query(
+        'SELECT * FROM public.messages WHERE id = $1',
+        [messageId]
+      );
+      const message = result.rows[0];
 
       if (!message) {
         throw new Error('Message non trouvé');
       }
 
       // Vérifier si la traduction existe déjà
-      const existingTranslation = message.getTranslation(targetLanguage);
-      if (existingTranslation) {
-        return existingTranslation;
+      const translatedContent = message.translated_content || {};
+      if (translatedContent[targetLanguage]) {
+        return translatedContent[targetLanguage];
       }
 
       // Traduire le contenu
@@ -173,7 +177,11 @@ class TranslationService {
       const translatedText = await this.translate(textToTranslate, targetLanguage);
 
       // Sauvegarder la traduction dans le message
-      await message.addTranslation(targetLanguage, translatedText);
+      translatedContent[targetLanguage] = translatedText;
+      await query(
+        'UPDATE public.messages SET translated_content = $1 WHERE id = $2',
+        [JSON.stringify(translatedContent), messageId]
+      );
 
       logger.info(`Message ${messageId} traduit en ${targetLanguage}`);
 
@@ -198,16 +206,16 @@ class TranslationService {
             );
             
             return {
-              messageId: message._id,
+              messageId: message.id,
               originalText: message.content,
               translatedText,
               success: true,
             };
           } catch (error) {
-            logger.error(`Erreur lors de la traduction du message ${message._id}:`, error);
+            logger.error(`Erreur lors de la traduction du message ${message.id}:`, error);
             
             return {
-              messageId: message._id,
+              messageId: message.id,
               originalText: message.content,
               translatedText: null,
               success: false,

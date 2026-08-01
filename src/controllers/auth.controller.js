@@ -13,7 +13,7 @@ const { asyncHandler } = require('../middleware/error.middleware');
  * @access  Public
  */
 const register = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone_number } = req.body;
 
   // Validation basique
   if (!name || !email || !password) {
@@ -27,14 +27,14 @@ const register = asyncHandler(async (req, res) => {
 
   // Vérifier si l'utilisateur existe déjà
   const existingUser = await query(
-    'SELECT id FROM public.profiles WHERE email = $1',
-    [emailLower]
+    'SELECT id FROM public.profiles WHERE email = $1 OR (phone_number IS NOT NULL AND phone_number = $2)',
+    [emailLower, phone_number || null]
   );
   
   if (existingUser.rows.length > 0) {
     return res.status(400).json({
       success: false,
-      error: 'Un utilisateur avec cet email existe déjà',
+      error: 'Un utilisateur avec cet email ou ce numéro existe déjà',
     });
   }
 
@@ -43,12 +43,21 @@ const register = asyncHandler(async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, salt);
 
   // Créer l'utilisateur dans la table profiles
-  // Note: On utilise gen_random_uuid() si on n'utilise pas auth.users de Supabase
+  // Note: On génère un UUID ici par sécurité si le défaut DB ne fonctionne pas
+  const userId = crypto.randomUUID();
+
   const result = await query(
-    `INSERT INTO public.profiles (full_name, email, password, username)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, full_name, email, username, avatar_url, status`,
-    [name, emailLower, hashedPassword, emailLower.split('@')[0] + Math.floor(Math.random() * 1000)]
+    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number`,
+    [
+      userId,
+      name,
+      emailLower,
+      hashedPassword,
+      emailLower.split('@')[0] + Math.floor(Math.random() * 1000),
+      phone_number || null
+    ]
   );
 
   const user = result.rows[0];

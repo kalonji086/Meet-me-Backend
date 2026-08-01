@@ -31,7 +31,6 @@ const resetPasswordSchema = Joi.object({
   otp: Joi.string().length(6).required(),
   password: Joi.string().min(8).required(),
 });
-});
 
 const changePasswordSchema = Joi.object({
   currentPassword: Joi.string().required(),
@@ -107,39 +106,6 @@ router.post(
 );
 
 /**
- * @route   GET /api/auth/verify-email/:token
- * @desc    Vérification d'email
- * @access  Public
- */
-router.get(
-  '/verify-email/:token',
-  asyncHandler(authController.verifyEmail)
-);
-
-/**
- * @route   POST /api/auth/resend-verification
- * @desc    Renvoyer l'email de vérification
- * @access  Private
- */
-router.post(
-  '/resend-verification',
-  authenticate,
-  asyncHandler(authController.resendVerification)
-);
-
-/**
- * @route   POST /api/auth/change-password
- * @desc    Changer le mot de passe (utilisateur connecté)
- * @access  Private
- */
-router.post(
-  '/change-password',
-  authenticate,
-  validate(changePasswordSchema),
-  asyncHandler(authController.changePassword)
-);
-
-/**
  * @route   GET /api/auth/verify
  * @desc    Vérifier la validité du token
  * @access  Private
@@ -162,7 +128,7 @@ router.get(
     res.json({
       success: true,
       data: {
-        user: req.user.getFullProfile(),
+        user: req.user,
       },
     });
   })

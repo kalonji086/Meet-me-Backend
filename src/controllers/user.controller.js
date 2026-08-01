@@ -222,6 +222,47 @@ const updatePushToken = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Obtenir les compteurs de notifications (badges)
+ * @route   GET /api/users/badges
+ * @access  Private
+ */
+const getBadges = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+
+  // 1. Compter les messages non lus
+  const messagesResult = await query(
+    "SELECT COUNT(*) as count FROM public.messages WHERE chat_id IN (SELECT chat_id FROM public.chat_participants WHERE user_id = $1) AND sender_id != $1 AND status != 'read'",
+    [userId]
+  );
+
+  // 2. Compter les appels manqués
+  const callsResult = await query(
+    "SELECT COUNT(*) as count FROM public.calls WHERE receiver_id = $1 AND status = 'missed'",
+    [userId]
+  );
+
+  // 3. Compter les nouveaux status (non vus par l'utilisateur)
+  const statusResult = await query(
+    `SELECT COUNT(*) as count
+     FROM public.statuses s
+     WHERE s.user_id != $1
+     AND s.expires_at > NOW()
+     AND s.id NOT IN (SELECT status_id FROM public.status_views WHERE user_id = $1)`,
+    [userId]
+  );
+
+  res.json({
+    success: true,
+    data: {
+      messages: parseInt(messagesResult.rows[0].count),
+      calls: parseInt(callsResult.rows[0].count),
+      status: parseInt(statusResult.rows[0].count),
+      total: parseInt(messagesResult.rows[0].count) + parseInt(callsResult.rows[0].count)
+    }
+  });
+});
+
 module.exports = {
   searchUsers,
   getProfile,
@@ -230,4 +271,5 @@ module.exports = {
   updatePrivacySettings,
   deleteAccount,
   updatePushToken,
+  getBadges,
 };

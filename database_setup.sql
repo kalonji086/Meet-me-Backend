@@ -50,6 +50,29 @@ BEGIN
 END $$;
 
 -- ==========================================
+-- 8. TABLE DES APPELS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.calls (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  caller_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type TEXT DEFAULT 'audio' CHECK (type IN ('audio', 'video')),
+  status TEXT DEFAULT 'missed' CHECK (status IN ('missed', 'answered', 'rejected')),
+  duration INTEGER DEFAULT 0, -- en secondes
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==========================================
+-- 9. TABLE DES VUES DE STATUS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.status_views (
+  status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (status_id, user_id)
+);
+
+-- ==========================================
 -- 1. TABLE DES PROFILS
 -- ==========================================
 CREATE TABLE IF NOT EXISTS public.profiles (

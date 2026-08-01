@@ -23,6 +23,7 @@ class NotificationService {
       title: payload.title,
       body: payload.body,
       data: payload.data || {},
+      badge: payload.badge || 0,
       priority: 'high',
       channelId: 'default',
     }];

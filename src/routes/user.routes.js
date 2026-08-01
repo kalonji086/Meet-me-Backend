@@ -49,4 +49,9 @@ router.delete('/account', userController.deleteAccount);
  */
 router.put('/push-token', userController.updatePushToken);
 
+/**
+ * @route   GET /api/users/badges
+ */
+router.get('/badges', userController.getBadges);
+
 module.exports = router;

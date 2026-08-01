@@ -185,16 +185,23 @@ const sendMessage = asyncHandler(async (req, res) => {
   const senderResult = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
   const senderName = senderResult.rows[0]?.full_name || 'Nouveau message';
 
-  participantsResult.rows.forEach(row => {
+  for (const row of participantsResult.rows) {
     if (row.push_token) {
-      notificationService.sendNewMessageNotification(
-        row.push_token,
-        senderName,
-        type === 'text' ? content : `📷 Image`,
-        chatId
+      // Compter les messages non lus pour ce destinataire spécifique
+      const unreadResult = await query(
+        "SELECT COUNT(*) as count FROM public.messages WHERE chat_id IN (SELECT chat_id FROM public.chat_participants WHERE user_id = (SELECT id FROM public.profiles WHERE push_token = $1)) AND status != 'read' AND sender_id != (SELECT id FROM public.profiles WHERE push_token = $1)",
+        [row.push_token]
       );
+      const badgeCount = parseInt(unreadResult.rows[0].count);
+
+      notificationService.sendNotification(row.push_token, {
+        title: senderName,
+        body: type === 'text' ? content : `📷 Image`,
+        data: { chatId, type: 'new_message' },
+        badge: badgeCount
+      });
     }
-  });
+  }
 
   res.status(201).json({
     success: true,

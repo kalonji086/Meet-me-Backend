@@ -26,6 +26,12 @@ router.get('/', statusController.getStatuses);
 router.delete('/:id', statusController.deleteStatus);
 
 /**
+ * @route   POST /api/statuses/:id/view
+ * @desc    Marquer un status comme vu
+ */
+router.post('/:id/view', statusController.markAsViewed);
+
+/**
  * @route   POST /api/statuses/:statusId/reactions
  * @desc    Ajouter une réaction ou un commentaire
  */

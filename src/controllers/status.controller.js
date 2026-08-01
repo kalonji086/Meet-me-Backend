@@ -94,8 +94,25 @@ const deleteStatus = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Marquer un status comme vu
+ * @route   POST /api/statuses/:id/view
+ */
+const markAsViewed = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.userId;
+
+  await query(
+    'INSERT INTO public.status_views (status_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [id, userId]
+  );
+
+  res.json({ success: true, message: 'Status marqué comme vu' });
+});
+
 module.exports = {
   createStatus,
   getStatuses,
   deleteStatus,
+  markAsViewed,
 };

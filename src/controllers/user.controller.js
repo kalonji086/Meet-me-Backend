@@ -202,6 +202,26 @@ const deleteAccount = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Mettre à jour le push token pour les notifications
+ * @route   PUT /api/users/push-token
+ * @access  Private
+ */
+const updatePushToken = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { pushToken } = req.body;
+
+  await query(
+    'UPDATE public.profiles SET push_token = $1 WHERE id = $2',
+    [pushToken, userId]
+  );
+
+  res.json({
+    success: true,
+    message: 'Token de notification mis à jour'
+  });
+});
+
 module.exports = {
   searchUsers,
   getProfile,
@@ -209,4 +229,5 @@ module.exports = {
   syncContacts,
   updatePrivacySettings,
   deleteAccount,
+  updatePushToken,
 };

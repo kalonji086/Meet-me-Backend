@@ -44,4 +44,9 @@ router.put('/privacy', userController.updatePrivacySettings);
  */
 router.delete('/account', userController.deleteAccount);
 
+/**
+ * @route   PUT /api/users/push-token
+ */
+router.put('/push-token', userController.updatePushToken);
+
 module.exports = router;

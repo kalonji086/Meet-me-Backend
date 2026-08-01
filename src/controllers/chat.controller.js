@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const { asyncHandler } = require('../middleware/error.middleware');
+const notificationService = require('../services/notification.service');
 
 /**
  * @desc    Obtenir la liste des conversations
@@ -172,8 +173,28 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   const message = result.rows[0];
 
-  // Note: En temps réel, on utiliserait Socket.IO ici pour notifier les participants
-  // via socketService.io.to(chatId).emit('new_message', message);
+  // Envoyer une notification push aux autres participants
+  const participantsResult = await query(
+    `SELECT p.push_token, p.full_name as sender_name
+     FROM public.chat_participants cp
+     JOIN public.profiles p ON cp.user_id = p.id
+     WHERE cp.chat_id = $1 AND cp.user_id != $2`,
+    [chatId, userId]
+  );
+
+  const senderResult = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
+  const senderName = senderResult.rows[0]?.full_name || 'Nouveau message';
+
+  participantsResult.rows.forEach(row => {
+    if (row.push_token) {
+      notificationService.sendNewMessageNotification(
+        row.push_token,
+        senderName,
+        type === 'text' ? content : `📷 Image`,
+        chatId
+      );
+    }
+  });
 
   res.status(201).json({
     success: true,

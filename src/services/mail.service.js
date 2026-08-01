@@ -41,7 +41,6 @@ class MailService {
       logger.error(`Erreur détaillée Brevo pour ${email}:`, error.response?.body || error);
     }
   }
-  }
 
   /**
    * Envoyer un code OTP pour la réinitialisation du mot de passe

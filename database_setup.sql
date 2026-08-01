@@ -47,6 +47,16 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='push_token') THEN
     ALTER TABLE public.profiles ADD COLUMN push_token TEXT;
   END IF;
+
+  -- Chats: description
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chats' AND column_name='description') THEN
+    ALTER TABLE public.chats ADD COLUMN description TEXT;
+  END IF;
+
+  -- Chat Participants: role
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_participants' AND column_name='role') THEN
+    ALTER TABLE public.chat_participants ADD COLUMN role TEXT DEFAULT 'member' CHECK (role IN ('member', 'admin'));
+  END IF;
 END $$;
 
 -- ==========================================

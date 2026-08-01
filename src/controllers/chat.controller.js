@@ -63,7 +63,7 @@ const getChats = asyncHandler(async (req, res) => {
  */
 const createChat = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const { participants, type = 'private', name } = req.body;
+  const { participants, type = 'private', name, description, avatarUrl } = req.body;
 
   if (!participants || !Array.isArray(participants) || participants.length === 0) {
     return res.status(400).json({
@@ -98,20 +98,30 @@ const createChat = asyncHandler(async (req, res) => {
 
   // Créer la nouvelle conversation
   const chatResult = await query(
-    `INSERT INTO public.chats (name, type, created_by)
-     VALUES ($1, $2, $3)
+    `INSERT INTO public.chats (name, description, type, avatar_url, created_by)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id`,
-    [name || null, type, userId]
+    [name || null, description || null, type, avatarUrl || null, userId]
   );
 
   const chatId = chatResult.rows[0].id;
 
   // Ajouter les participants
-  const allParticipants = [userId, ...participants];
+  const allParticipants = [...new Set([userId, ...participants])];
   for (const pId of allParticipants) {
+    const role = pId === userId ? 'admin' : 'member';
     await query(
-      'INSERT INTO public.chat_participants (chat_id, user_id) VALUES ($1, $2)',
-      [chatId, pId]
+      'INSERT INTO public.chat_participants (chat_id, user_id, role) VALUES ($1, $2, $3)',
+      [chatId, pId, role]
+    );
+  }
+
+  // Si c'est un groupe, envoyer une notification système
+  if (type === 'group') {
+    await query(
+      `INSERT INTO public.messages (chat_id, sender_id, content, type)
+       VALUES ($1, $2, $3, 'text')`,
+      [chatId, userId, `📢 ${name} a été créé`]
     );
   }
 
@@ -322,6 +332,167 @@ const deleteMessage = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Obtenir les détails d'un groupe
+ * @route   GET /api/chats/:chatId
+ */
+const getChatDetails = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.userId;
+
+  // Récupérer les infos du chat
+  const chatResult = await query(
+    `SELECT c.*, cp.role as my_role
+     FROM public.chats c
+     JOIN public.chat_participants cp ON c.id = cp.chat_id
+     WHERE c.id = $1 AND cp.user_id = $2`,
+    [chatId, userId]
+  );
+
+  if (chatResult.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Discussion non trouvée' });
+  }
+
+  // Récupérer les participants
+  const participantsResult = await query(
+    `SELECT p.id, p.full_name, p.avatar_url, p.status, cp.role, cp.joined_at
+     FROM public.chat_participants cp
+     JOIN public.profiles p ON cp.user_id = p.id
+     WHERE cp.chat_id = $1
+     ORDER BY cp.role ASC, p.full_name ASC`,
+    [chatId]
+  );
+
+  res.json({
+    success: true,
+    data: {
+      ...chatResult.rows[0],
+      participants: participantsResult.rows
+    }
+  });
+});
+
+/**
+ * @desc    Mettre à jour les infos d'un groupe
+ * @route   PUT /api/chats/:chatId
+ */
+const updateChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.userId;
+  const { name, description, avatarUrl } = req.body;
+
+  // Vérifier si l'utilisateur est admin
+  const adminCheck = await query(
+    "SELECT role FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2",
+    [chatId, userId]
+  );
+
+  if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Seuls les admins peuvent modifier le groupe' });
+  }
+
+  const result = await query(
+    `UPDATE public.chats
+     SET name = COALESCE($1, name),
+         description = COALESCE($2, description),
+         avatar_url = COALESCE($3, avatar_url)
+     WHERE id = $4
+     RETURNING *`,
+    [name, description, avatarUrl, chatId]
+  );
+
+  res.json({
+    success: true,
+    data: result.rows[0],
+    message: 'Groupe mis à jour'
+  });
+});
+
+/**
+ * @desc    Ajouter des membres au groupe
+ * @route   POST /api/chats/:chatId/members
+ */
+const addMembers = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.userId;
+  const { userIds } = req.body;
+
+  // Vérifier admin
+  const adminCheck = await query(
+    "SELECT role FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2",
+    [chatId, userId]
+  );
+
+  if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Seuls les admins peuvent ajouter des membres' });
+  }
+
+  for (const targetId of userIds) {
+    await query(
+      "INSERT INTO public.chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+      [chatId, targetId]
+    );
+  }
+
+  res.json({ success: true, message: 'Membres ajoutés' });
+});
+
+/**
+ * @desc    Retirer un membre ou quitter le groupe
+ * @route   DELETE /api/chats/:chatId/members/:targetUserId
+ */
+const removeMember = asyncHandler(async (req, res) => {
+  const { chatId, targetUserId } = req.params;
+  const userId = req.userId;
+
+  // Si l'utilisateur se retire lui-même (Quitter le groupe)
+  if (userId === targetUserId) {
+    await query("DELETE FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2", [chatId, userId]);
+    return res.json({ success: true, message: 'Vous avez quitté le groupe' });
+  }
+
+  // Sinon, vérifier si l'utilisateur actuel est admin
+  const adminCheck = await query(
+    "SELECT role FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2",
+    [chatId, userId]
+  );
+
+  if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Seuls les admins peuvent retirer des membres' });
+  }
+
+  await query("DELETE FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2", [chatId, targetUserId]);
+
+  res.json({ success: true, message: 'Membre retiré' });
+});
+
+/**
+ * @desc    Changer le rôle d'un membre (Nommer admin)
+ * @route   PUT /api/chats/:chatId/members/:targetUserId/role
+ */
+const changeMemberRole = asyncHandler(async (req, res) => {
+  const { chatId, targetUserId } = req.params;
+  const userId = req.userId;
+  const { role } = req.body;
+
+  // Vérifier admin
+  const adminCheck = await query(
+    "SELECT role FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2",
+    [chatId, userId]
+  );
+
+  if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Seuls les admins peuvent changer les rôles' });
+  }
+
+  await query(
+    "UPDATE public.chat_participants SET role = $1 WHERE chat_id = $2 AND user_id = $3",
+    [role, chatId, targetUserId]
+  );
+
+  res.json({ success: true, message: 'Rôle mis à jour' });
+});
+
 module.exports = {
   getChats,
   createChat,
@@ -331,4 +502,9 @@ module.exports = {
   deleteChat,
   markAsRead,
   deleteMessage,
+  getChatDetails,
+  updateChat,
+  addMembers,
+  removeMember,
+  changeMemberRole,
 };

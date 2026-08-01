@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE TABLE IF NOT EXISTS public.chats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT, -- Nom pour les groupes
+  description TEXT, -- Description du groupe
   avatar_url TEXT, -- Image de groupe
   type TEXT DEFAULT 'private' CHECK (type IN ('private', 'group')),
   last_message TEXT,
@@ -110,6 +111,7 @@ CREATE TABLE IF NOT EXISTS public.chats (
 CREATE TABLE IF NOT EXISTS public.chat_participants (
   chat_id UUID REFERENCES public.chats(id) ON DELETE CASCADE,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'member' CHECK (role IN ('member', 'admin')),
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   is_archived BOOLEAN DEFAULT FALSE,
   PRIMARY KEY (chat_id, user_id)

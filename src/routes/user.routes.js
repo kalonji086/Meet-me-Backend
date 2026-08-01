@@ -34,4 +34,14 @@ router.put('/profile', userController.updateProfile);
  */
 router.post('/sync-contacts', userController.syncContacts);
 
+/**
+ * @route   PUT /api/users/privacy
+ */
+router.put('/privacy', userController.updatePrivacySettings);
+
+/**
+ * @route   DELETE /api/users/account
+ */
+router.delete('/account', userController.deleteAccount);
+
 module.exports = router;

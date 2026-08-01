@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const { asyncHandler } = require('../middleware/error.middleware');
+const bcrypt = require('bcryptjs');
 
 /**
  * @desc    Rechercher des utilisateurs
@@ -52,7 +53,7 @@ const getProfile = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   const result = await query(
-    'SELECT id, email, full_name, username, avatar_url, status, phone_number, last_seen FROM public.profiles WHERE id = $1',
+    'SELECT id, email, full_name, username, avatar_url, status, phone_number, last_seen, privacy_settings FROM public.profiles WHERE id = $1',
     [userId]
   );
 
@@ -140,9 +141,72 @@ const syncContacts = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Mettre à jour les paramètres de confidentialité
+ * @route   PUT /api/users/privacy
+ * @access  Private
+ */
+const updatePrivacySettings = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { privacySettings } = req.body;
+
+  if (!privacySettings) {
+    return res.status(400).json({ success: false, error: 'Données de confidentialité manquantes' });
+  }
+
+  // On récupère les paramètres actuels pour fusionner
+  const currentResult = await query('SELECT privacy_settings FROM public.profiles WHERE id = $1', [userId]);
+  const currentSettings = currentResult.rows[0].privacy_settings || {};
+  const newSettings = { ...currentSettings, ...privacySettings };
+
+  const result = await query(
+    'UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2 RETURNING privacy_settings',
+    [newSettings, userId]
+  );
+
+  res.json({
+    success: true,
+    data: result.rows[0].privacy_settings,
+    message: 'Paramètres de confidentialité mis à jour'
+  });
+});
+
+/**
+ * @desc    Supprimer son compte
+ * @route   DELETE /api/users/account
+ * @access  Private
+ */
+const deleteAccount = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ success: false, error: 'Mot de passe requis pour confirmer la suppression' });
+  }
+
+  // Vérifier le mot de passe
+  const result = await query('SELECT password FROM public.profiles WHERE id = $1', [userId]);
+  const user = result.rows[0];
+
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid) {
+    return res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
+  }
+
+  // Supprimer le profil (les cascades SQL s'occuperont du reste)
+  await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
+
+  res.json({
+    success: true,
+    message: 'Compte supprimé définitivement'
+  });
+});
+
 module.exports = {
   searchUsers,
   getProfile,
   updateProfile,
   syncContacts,
+  updatePrivacySettings,
+  deleteAccount,
 };

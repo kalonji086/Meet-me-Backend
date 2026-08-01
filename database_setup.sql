@@ -37,6 +37,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_participants' AND column_name='is_archived') THEN
     ALTER TABLE public.chat_participants ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
   END IF;
+
+  -- Profiles: privacy_settings
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='privacy_settings') THEN
+    ALTER TABLE public.profiles ADD COLUMN privacy_settings JSONB DEFAULT '{"last_seen": "everyone", "profile_photo": "everyone", "status": "everyone", "read_receipts": true}';
+  END IF;
 END $$;
 
 -- ==========================================

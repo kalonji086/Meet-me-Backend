@@ -511,12 +511,30 @@ class SocketService {
   /**
    * Notifier le changement de statut d'un utilisateur
    */
-  notifyUserStatusChange(userId, status) {
-    this.io.emit('user_status_changed', {
-      userId,
-      status,
-      lastSeen: new Date(),
-    });
+  async notifyUserStatusChange(userId, status) {
+    try {
+      // Vérifier les paramètres de confidentialité de l'utilisateur
+      const result = await query(
+        'SELECT privacy_settings FROM public.profiles WHERE id = $1',
+        [userId]
+      );
+
+      const settings = result.rows[0]?.privacy_settings || {};
+
+      // Si last_seen est sur "nobody", on ne diffuse pas le changement de statut
+      // (Optionnel: on pourrait affiner pour "contacts" uniquement)
+      if (settings.last_seen === 'nobody') {
+        return;
+      }
+
+      this.io.emit('user_status_changed', {
+        userId,
+        status,
+        lastSeen: new Date(),
+      });
+    } catch (error) {
+      logger.error('Erreur notifyUserStatusChange:', error);
+    }
   }
 
   /**

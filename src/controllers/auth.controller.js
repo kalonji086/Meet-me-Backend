@@ -393,6 +393,54 @@ const resetPassword = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Changer le mot de passe
+ * @route   PUT /api/auth/change-password
+ * @access  Private
+ */
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.userId;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: 'Veuillez fournir l\'ancien et le nouveau mot de passe',
+    });
+  }
+
+  // Trouver l'utilisateur
+  const result = await query(
+    'SELECT password FROM public.profiles WHERE id = $1',
+    [userId]
+  );
+  const user = result.rows[0];
+
+  // Vérifier le mot de passe actuel
+  const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+  if (!isPasswordValid) {
+    return res.status(401).json({
+      success: false,
+      error: 'Mot de passe actuel incorrect',
+    });
+  }
+
+  // Hasher le nouveau mot de passe
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+  // Mettre à jour
+  await query(
+    'UPDATE public.profiles SET password = $1 WHERE id = $2',
+    [hashedPassword, userId]
+  );
+
+  res.json({
+    success: true,
+    message: 'Mot de passe mis à jour avec succès',
+  });
+});
+
+/**
  * @desc    Vérifier le token (pour le frontend)
  * @route   GET /api/auth/verify
  * @access  Private
@@ -413,5 +461,6 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
+  changePassword,
   verifyToken,
 };

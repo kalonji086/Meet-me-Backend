@@ -106,6 +106,16 @@ router.post(
 );
 
 /**
+ * @route   PUT /api/auth/change-password
+ */
+router.put(
+  '/change-password',
+  authenticate,
+  validate(changePasswordSchema),
+  asyncHandler(authController.changePassword)
+);
+
+/**
  * @route   GET /api/auth/verify
  * @desc    Vérifier la validité du token
  * @access  Private

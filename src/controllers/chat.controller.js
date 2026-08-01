@@ -189,6 +189,18 @@ const markAsRead = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const userId = req.userId;
 
+  // Vérifier si l'utilisateur a désactivé les confirmations de lecture
+  const userResult = await query(
+    'SELECT privacy_settings FROM public.profiles WHERE id = $1',
+    [userId]
+  );
+
+  const settings = userResult.rows[0]?.privacy_settings || {};
+
+  if (settings.read_receipts === false) {
+    return res.json({ success: true, message: 'Lecture non marquée (confidentialité active)' });
+  }
+
   await query(
     `UPDATE public.messages
      SET status = 'read'
@@ -240,27 +252,46 @@ const deleteChat = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Supprimer un message définitivement
+ * @desc    Supprimer un message (Le marquer comme retiré)
  * @route   DELETE /api/messages/:messageId
  */
 const deleteMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
   const userId = req.userId;
 
-  // Vérifier si le message appartient à l'utilisateur
-  const messageCheck = await query('SELECT * FROM public.messages WHERE id = $1', [messageId]);
+  // Récupérer le message et les infos de l'expéditeur
+  const messageResult = await query(
+    `SELECT m.*, p.full_name as sender_name
+     FROM public.messages m
+     JOIN public.profiles p ON m.sender_id = p.id
+     WHERE m.id = $1`,
+    [messageId]
+  );
 
-  if (messageCheck.rows.length === 0) {
+  if (messageResult.rows.length === 0) {
     return res.status(404).json({ success: false, error: 'Message non trouvé' });
   }
 
-  if (messageCheck.rows[0].sender_id !== userId) {
+  const message = messageResult.rows[0];
+
+  if (message.sender_id !== userId) {
     return res.status(403).json({ success: false, error: 'Non autorisé à supprimer ce message' });
   }
 
-  await query('DELETE FROM public.messages WHERE id = $1', [messageId]);
+  // Au lieu de supprimer, on met à jour le contenu
+  const updatedMessage = await query(
+    `UPDATE public.messages
+     SET content = $1, type = 'text', file_url = NULL, status = 'read'
+     WHERE id = $2
+     RETURNING *`,
+    [`🚫 Ce message a été supprimé par ${message.sender_name}`, messageId]
+  );
 
-  res.json({ success: true, message: 'Message supprimé' });
+  res.json({
+    success: true,
+    message: 'Message retiré',
+    data: updatedMessage.rows[0]
+  });
 });
 
 module.exports = {

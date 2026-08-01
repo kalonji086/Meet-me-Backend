@@ -396,11 +396,14 @@ const uploadChatFile = asyncHandler(async (req, res) => {
   const file = req.file;
   const { messageType } = req.body;
 
-  // Vérifier que l'utilisateur fait partie de la conversation
-  const Chat = require('../models/Chat.model');
-  const chat = await Chat.findById(chatId);
+  // Vérifier que l'utilisateur fait partie de la conversation dans Postgres
+  const { query } = require('../config/db');
+  const participantResult = await query(
+    'SELECT 1 FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2',
+    [chatId, userId]
+  );
 
-  if (!chat || !chat.isParticipant(userId)) {
+  if (participantResult.rows.length === 0) {
     return res.status(403).json({
       success: false,
       error: 'Accès non autorisé à cette conversation',

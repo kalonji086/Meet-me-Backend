@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const { Pool } = require('pg');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -10,6 +9,7 @@ const fs = require('fs');
 
 // Configuration
 const config = require('../config/config');
+const { pool } = require('./config/db');
 const logger = require('./utils/logger');
 
 // Middlewares
@@ -22,6 +22,7 @@ const uploadRoutes = require('./routes/upload.routes');
 
 // Services
 const socketService = require('./services/socket.service');
+const { runMigrations } = require('./utils/migration');
 
 class Server {
   constructor() {
@@ -41,18 +42,8 @@ class Server {
     this.port = config.server.port;
     this.nodeEnv = config.server.nodeEnv;
 
-    // Postgres Pool for Supabase
-    this.pool = new Pool({
-      connectionString: config.database.postgres.url,
-      host: config.database.postgres.host,
-      port: config.database.postgres.port,
-      database: config.database.postgres.database,
-      user: config.database.postgres.user,
-      password: config.database.postgres.password,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    });
+    // Use Postgres Pool from db config
+    this.pool = pool;
 
     this.initializeDatabase();
     this.initializeMiddlewares();
@@ -75,6 +66,9 @@ class Server {
       try {
         await client.query('SELECT NOW()');
         logger.info('✅ Base de données Supabase (Postgres) connectée avec succès');
+
+        // Exécuter les migrations (création automatique des tables)
+        await runMigrations();
       } finally {
         client.release();
       }
@@ -146,6 +140,15 @@ class Server {
 
   // Initialisation des routes
   initializeRoutes() {
+    // Route racine (pour éviter les 404 sur les health checks par défaut)
+    this.app.get('/', (req, res) => {
+      res.json({
+        message: 'Bienvenue sur l\'API Meet Me',
+        status: 'online',
+        docs: '/api/docs'
+      });
+    });
+
     // Routes publiques
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);

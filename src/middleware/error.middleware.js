@@ -23,32 +23,35 @@ const errorHandler = (err, req, res, next) => {
     method: req.method,
     url: req.originalUrl,
     ip: req.ip,
-    user: req.user ? req.user._id : null,
+    user: req.user ? req.user.id : null,
     body: config.server.nodeEnv === 'development' ? req.body : undefined,
     params: config.server.nodeEnv === 'development' ? req.params : undefined,
     query: config.server.nodeEnv === 'development' ? req.query : undefined,
   });
 
-  // Erreurs Mongoose
-  if (err.name === 'CastError') {
-    const message = `Ressource non trouvée avec l'ID ${err.value}`;
-    error = new Error(message);
-    error.statusCode = 404;
-  }
-
-  // Erreur de validation Mongoose
-  if (err.name === 'ValidationError') {
-    const messages = Object.values(err.errors).map(val => val.message);
-    const message = `Validation échouée: ${messages.join(', ')}`;
+  // Erreurs Postgres (pg)
+  if (err.code === '23505') { // Unique violation
+    const detail = err.detail || '';
+    const match = detail.match(/Key \((.*)\)=\((.*)\) already exists/);
+    const message = match ? `La valeur '${match[2]}' pour le champ '${match[1]}' existe déjà` : 'Cette ressource existe déjà';
     error = new Error(message);
     error.statusCode = 400;
   }
 
-  // Erreur de duplication (clé unique)
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyPattern)[0];
-    const value = err.keyValue[field];
-    const message = `La valeur '${value}' pour le champ '${field}' existe déjà`;
+  if (err.code === '23503') { // Foreign key violation
+    const message = 'Référence invalide : la ressource liée n\'existe pas';
+    error = new Error(message);
+    error.statusCode = 400;
+  }
+
+  if (err.code === '22P02') { // Invalid input syntax (ex: bad UUID)
+    const message = 'Syntaxe d\'entrée invalide (ID incorrect)';
+    error = new Error(message);
+    error.statusCode = 400;
+  }
+
+  if (err.code === '23502') { // Not null violation
+    const message = `Le champ '${err.column}' ne peut pas être vide`;
     error = new Error(message);
     error.statusCode = 400;
   }

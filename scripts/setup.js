@@ -2,7 +2,7 @@
 
 /**
  * Script de configuration du backend Meet Me
- * Ce script vérifie les prérequis et configure l'environnement
+ * Ce script vérifie les prérequis et configure l'environnement pour Supabase (Postgres)
  */
 
 const { execSync } = require('child_process');
@@ -44,40 +44,17 @@ try {
   process.exit(1);
 }
 
-// Vérifier MongoDB
-console.log('\n🔍 Vérification de MongoDB...');
-try {
-  execSync('mongod --version', { stdio: 'pipe' });
-  console.log('✅ MongoDB détecté');
-} catch (error) {
-  console.warn('⚠️  MongoDB n\'est pas installé ou n\'est pas dans le PATH');
-  console.warn('Vous pouvez:');
-  console.warn('1. Installer MongoDB localement');
-  console.warn('2. Utiliser MongoDB Atlas (cloud)');
-  console.warn('3. Lancer sans MongoDB (pour le développement avec données mock)');
-  
-  rl.question('Voulez-vous continuer sans MongoDB? (oui/non): ', (answer) => {
-    if (answer.toLowerCase() !== 'oui' && answer.toLowerCase() !== 'o') {
-      console.log('❌ Installation annulée');
-      rl.close();
-      process.exit(1);
-    }
-    continueSetup();
-  });
-  
-  return;
-}
-
+// Note: On ne vérifie plus MongoDB mais on prépare Supabase
 continueSetup();
 
 function continueSetup() {
   console.log('\n📦 Installation des dépendances...');
   
   try {
-    execSync('npm install', { stdio: 'inherit', cwd: __dirname + '/..' });
+    execSync('npm install', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
     console.log('✅ Dépendances installées avec succès');
   } catch (error) {
-    console.error('❌ Erreur lors de l'installation des dépendances');
+    console.error('❌ Erreur lors de l\'installation des dépendances');
     process.exit(1);
   }
 
@@ -129,59 +106,26 @@ function continueSetup() {
     }
   });
 
-  // Configuration MongoDB
-  console.log('\n🗄️  Configuration MongoDB...');
+  // Configuration Supabase
+  console.log('\n🗄️  Configuration Supabase (Postgres)...');
   
-  rl.question('Utilisez-vous MongoDB local ou MongoDB Atlas? (local/atlas): ', (mongoType) => {
-    if (mongoType.toLowerCase() === 'atlas') {
-      configureMongoDBAtlas();
-    } else {
-      configureMongoDBLocal();
-    }
-  });
-}
+  rl.question('Entrez votre DATABASE_URL Supabase: ', (dbUrl) => {
+    if (dbUrl) {
+      updateEnvFile('DATABASE_URL', dbUrl);
 
-function configureMongoDBLocal() {
-  console.log('\n🔧 Configuration MongoDB local...');
-  
-  // Vérifier si MongoDB est en cours d'exécution
-  try {
-    execSync('mongo --eval "db.version()"', { stdio: 'pipe' });
-    console.log('✅ MongoDB est en cours d'exécution');
-  } catch (error) {
-    console.warn('⚠️  MongoDB ne semble pas être en cours d'exécution');
-    console.warn('Pour démarrer MongoDB:');
-    console.warn('  Windows: "net start MongoDB"');
-    console.warn('  macOS: "brew services start mongodb-community"');
-    console.warn('  Linux: "sudo systemctl start mongod"');
-  }
-
-  // Mettre à jour le fichier .env
-  updateEnvFile('MONGODB_URI', 'mongodb://localhost:27017/meetme');
-  
-  console.log('\n✅ Configuration MongoDB local terminée');
-  finishSetup();
-}
-
-function configureMongoDBAtlas() {
-  console.log('\n☁️  Configuration MongoDB Atlas...');
-  
-  console.log('\n📝 Instructions pour MongoDB Atlas:');
-  console.log('1. Allez sur https://www.mongodb.com/cloud/atlas');
-  console.log('2. Créez un cluster gratuit');
-  console.log('3. Créez un utilisateur de base de données');
-  console.log('4. Ajoutez votre IP à la whitelist');
-  console.log('5. Obtenez la chaîne de connexion');
-  
-  rl.question('\nEntrez votre URI MongoDB Atlas: ', (mongoUri) => {
-    if (!mongoUri) {
-      console.log('❌ URI MongoDB requis');
-      configureMongoDBAtlas();
-      return;
+      // Essayer d'extraire les infos pour les autres variables
+      try {
+        const url = new URL(dbUrl);
+        updateEnvFile('DB_HOST', url.hostname);
+        updateEnvFile('DB_PORT', url.port || '5432');
+        updateEnvFile('DB_USER', url.username);
+        updateEnvFile('DB_PASSWORD', url.password);
+        updateEnvFile('DB_NAME', url.pathname.substring(1));
+      } catch (e) {
+        console.warn('⚠️  Impossible d\'extraire tous les détails de l\'URL, veuillez les remplir manuellement dans .env');
+      }
     }
 
-    updateEnvFile('MONGODB_URI', mongoUri);
-    console.log('\n✅ Configuration MongoDB Atlas terminée');
     finishSetup();
   });
 }
@@ -222,19 +166,14 @@ function finishSetup() {
   console.log('  npm run dev');
   
   console.log('\n🔧 Prochaines étapes:');
-  console.log('1. Configurez vos clés API dans le fichier .env:');
+  console.log('1. Configurez vos clés API dans le fichier .env si ce n\'est pas fait:');
   console.log('   - GOOGLE_TRANSLATE_API_KEY ou DEEPL_API_KEY');
-  console.log('   - AWS_ACCESS_KEY_ID et AWS_SECRET_ACCESS_KEY (optionnel)');
-  console.log('   - FIREBASE_* (pour les notifications push)');
+  console.log('   - BREVO_API_KEY (pour les emails)');
   
-  console.log('\n2. Testez l'API:');
+  console.log('\n2. Testez l\'API:');
   console.log('   - http://localhost:3000/api/health');
   console.log('   - http://localhost:3000/api/docs');
-  
-  console.log('\n3. Connectez le frontend:');
-  console.log('   - Mettez à jour API_BASE_URL dans le frontend');
-  console.log('   - Configurez CORS_ORIGIN dans le backend');
-  
+
   console.log('\n📚 Documentation complète:');
   console.log('   - Voir README.md pour plus de détails');
   

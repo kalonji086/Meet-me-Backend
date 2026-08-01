@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const User = require('../models/User.model');
+const { query } = require('../config/db');
+const mailService = require('../services/mail.service');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
 const { asyncHandler } = require('../middleware/error.middleware');
@@ -21,36 +23,52 @@ const register = asyncHandler(async (req, res) => {
     });
   }
 
+  const emailLower = email.toLowerCase();
+
   // Vérifier si l'utilisateur existe déjà
-  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  const existingUser = await query(
+    'SELECT id FROM public.profiles WHERE email = $1',
+    [emailLower]
+  );
   
-  if (existingUser) {
+  if (existingUser.rows.length > 0) {
     return res.status(400).json({
       success: false,
       error: 'Un utilisateur avec cet email existe déjà',
     });
   }
 
-  // Créer l'utilisateur
-  const user = await User.create({
-    name,
-    email: email.toLowerCase(),
-    password,
-  });
+  // Hasher le mot de passe
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  // Créer l'utilisateur dans la table profiles
+  // Note: On utilise gen_random_uuid() si on n'utilise pas auth.users de Supabase
+  const result = await query(
+    `INSERT INTO public.profiles (full_name, email, password, username)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, full_name, email, username, avatar_url, status`,
+    [name, emailLower, hashedPassword, emailLower.split('@')[0] + Math.floor(Math.random() * 1000)]
+  );
+
+  const user = result.rows[0];
 
   // Générer le token JWT
   const token = jwt.sign(
-    { userId: user._id, email: user.email },
+    { userId: user.id, email: user.email },
     config.jwt.secret,
     { expiresIn: config.jwt.expire }
   );
 
   // Générer le refresh token
   const refreshToken = jwt.sign(
-    { userId: user._id },
+    { userId: user.id },
     config.jwt.refreshSecret,
     { expiresIn: config.jwt.refreshExpire }
   );
+
+  // Envoyer l'email de bienvenue
+  await mailService.sendWelcomeEmail(user.email, user.full_name);
 
   logger.info(`Nouvel utilisateur inscrit: ${user.email}`);
 
@@ -59,7 +77,14 @@ const register = asyncHandler(async (req, res) => {
     data: {
       token,
       refreshToken,
-      user: user.getFullProfile(),
+      user: {
+        id: user.id,
+        name: user.full_name,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar_url,
+        status: user.status
+      },
     },
     message: 'Inscription réussie',
   });
@@ -81,8 +106,15 @@ const login = asyncHandler(async (req, res) => {
     });
   }
 
-  // Trouver l'utilisateur avec le mot de passe
-  const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+  const emailLower = email.toLowerCase();
+
+  // Trouver l'utilisateur
+  const result = await query(
+    'SELECT * FROM public.profiles WHERE email = $1',
+    [emailLower]
+  );
+
+  const user = result.rows[0];
   
   if (!user) {
     return res.status(401).json({
@@ -92,7 +124,7 @@ const login = asyncHandler(async (req, res) => {
   }
 
   // Vérifier le mot de passe
-  const isPasswordValid = await user.comparePassword(password);
+  const isPasswordValid = await bcrypt.compare(password, user.password);
   
   if (!isPasswordValid) {
     return res.status(401).json({
@@ -101,27 +133,22 @@ const login = asyncHandler(async (req, res) => {
     });
   }
 
-  // Vérifier si le compte est actif
-  if (!user.isActive) {
-    return res.status(401).json({
-      success: false,
-      error: 'Compte désactivé. Contactez l\'administrateur.',
-    });
-  }
-
-  // Mettre à jour le statut
-  await user.updateStatus('online');
+  // Mettre à jour le statut et last_seen
+  await query(
+    "UPDATE public.profiles SET status = 'online', last_seen = NOW() WHERE id = $1",
+    [user.id]
+  );
 
   // Générer le token JWT
   const token = jwt.sign(
-    { userId: user._id, email: user.email },
+    { userId: user.id, email: user.email },
     config.jwt.secret,
     { expiresIn: config.jwt.expire }
   );
 
   // Générer le refresh token
   const refreshToken = jwt.sign(
-    { userId: user._id },
+    { userId: user.id },
     config.jwt.refreshSecret,
     { expiresIn: config.jwt.refreshExpire }
   );
@@ -133,7 +160,14 @@ const login = asyncHandler(async (req, res) => {
     data: {
       token,
       refreshToken,
-      user: user.getFullProfile(),
+      user: {
+        id: user.id,
+        name: user.full_name,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar_url,
+        status: 'online'
+      },
     },
     message: 'Connexion réussie',
   });
@@ -159,7 +193,11 @@ const refreshToken = asyncHandler(async (req, res) => {
     const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
     
     // Trouver l'utilisateur
-    const user = await User.findById(decoded.userId);
+    const result = await query(
+      'SELECT id, email, full_name, username, avatar_url, status FROM public.profiles WHERE id = $1',
+      [decoded.userId]
+    );
+    const user = result.rows[0];
 
     if (!user) {
       return res.status(401).json({
@@ -170,14 +208,14 @@ const refreshToken = asyncHandler(async (req, res) => {
 
     // Générer un nouveau token d'accès
     const newAccessToken = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       config.jwt.secret,
       { expiresIn: config.jwt.expire }
     );
 
     // Générer un nouveau refresh token
     const newRefreshToken = jwt.sign(
-      { userId: user._id },
+      { userId: user.id },
       config.jwt.refreshSecret,
       { expiresIn: config.jwt.refreshExpire }
     );
@@ -189,7 +227,14 @@ const refreshToken = asyncHandler(async (req, res) => {
       data: {
         token: newAccessToken,
         refreshToken: newRefreshToken,
-        user: user.getPublicProfile(),
+        user: {
+          id: user.id,
+          name: user.full_name,
+          email: user.email,
+          username: user.username,
+          avatar: user.avatar_url,
+          status: user.status
+        },
       },
     });
   } catch (error) {
@@ -217,12 +262,15 @@ const refreshToken = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const logout = asyncHandler(async (req, res) => {
-  const user = req.user;
+  const userId = req.user.id;
 
   // Mettre à jour le statut
-  await user.updateStatus('offline');
+  await query(
+    "UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1",
+    [userId]
+  );
 
-  logger.info(`Utilisateur déconnecté: ${user.email}`);
+  logger.info(`Utilisateur déconnecté: ${userId}`);
 
   res.json({
     success: true,
@@ -231,7 +279,7 @@ const logout = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Demande de réinitialisation de mot de passe
+ * @desc    Demande de réinitialisation de mot de passe (via OTP Brevo)
  * @route   POST /api/auth/forgot-password
  * @access  Public
  */
@@ -245,201 +293,93 @@ const forgotPassword = asyncHandler(async (req, res) => {
     });
   }
 
-  // Trouver l'utilisateur
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const emailLower = email.toLowerCase();
 
-  // Pour des raisons de sécurité, ne pas révéler si l'utilisateur existe ou non
+  // Trouver l'utilisateur
+  const result = await query(
+    'SELECT id, email FROM public.profiles WHERE email = $1',
+    [emailLower]
+  );
+  const user = result.rows[0];
+
   if (!user) {
-    logger.warn(`Tentative de réinitialisation pour un email inexistant: ${email}`);
-    
-    // Retourner une réponse générique pour éviter l'énumération d'emails
+    // Réponse générique pour la sécurité
     return res.json({
       success: true,
-      message: 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé',
+      message: 'Si un compte existe avec cet email, un code OTP a été envoyé',
     });
   }
 
-  // Générer le token de réinitialisation
-  const resetToken = user.createPasswordResetToken();
-  await user.save();
+  // Générer un code OTP à 6 chiffres
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  // Dans une application réelle, envoyer un email ici
-  // Pour l'instant, retourner le token dans la réponse (pour le développement)
-  const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
+  // Stocker l'OTP dans la base de données
+  await query(
+    'UPDATE public.profiles SET otp_code = $1, otp_expires_at = $2 WHERE id = $3',
+    [otp, otpExpires, user.id]
+  );
 
-  logger.info(`Demande de réinitialisation de mot de passe pour: ${user.email}`);
+  // Envoyer l'email via Brevo
+  await mailService.sendOTPEmail(user.email, otp);
+
+  logger.info(`Demande de réinitialisation (OTP) pour: ${user.email}`);
 
   res.json({
     success: true,
-    message: 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé',
-    // Ne retourner ces informations qu'en développement
-    ...(config.server.nodeEnv === 'development' && {
-      resetToken,
-      resetUrl,
-      userId: user._id,
-    }),
+    message: 'Si un compte existe avec cet email, un code OTP a été envoyé',
+    // En développement, on peut retourner l'OTP pour faciliter les tests
+    ...(config.server.nodeEnv === 'development' && { otp }),
   });
 });
 
 /**
- * @desc    Réinitialisation du mot de passe
- * @route   POST /api/auth/reset-password/:token
+ * @desc    Réinitialisation du mot de passe avec OTP
+ * @route   POST /api/auth/reset-password
  * @access  Public
  */
 const resetPassword = asyncHandler(async (req, res) => {
-  const { token } = req.params;
-  const { password } = req.body;
+  const { email, otp, newPassword } = req.body;
 
-  if (!password) {
+  if (!email || !otp || !newPassword) {
     return res.status(400).json({
       success: false,
-      error: 'Veuillez fournir un nouveau mot de passe',
+      error: 'Veuillez fournir l\'email, le code OTP et le nouveau mot de passe',
     });
   }
 
-  // Hasher le token pour le comparer avec celui stocké
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
+  const emailLower = email.toLowerCase();
 
-  // Trouver l'utilisateur avec un token valide et non expiré
-  const user = await User.findOne({
-    passwordResetToken: hashedToken,
-    passwordResetExpires: { $gt: Date.now() },
-  });
+  // Trouver l'utilisateur avec l'OTP valide
+  const result = await query(
+    'SELECT id FROM public.profiles WHERE email = $1 AND otp_code = $2 AND otp_expires_at > NOW()',
+    [emailLower, otp]
+  );
+  
+  const user = result.rows[0];
 
   if (!user) {
     return res.status(400).json({
       success: false,
-      error: 'Token invalide ou expiré',
+      error: 'Code OTP invalide ou expiré',
     });
   }
 
-  // Mettre à jour le mot de passe
-  user.password = password;
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  await user.save();
+  // Hasher le nouveau mot de passe
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-  logger.info(`Mot de passe réinitialisé pour: ${user.email}`);
+  // Mettre à jour le mot de passe et effacer l'OTP
+  await query(
+    'UPDATE public.profiles SET password = $1, otp_code = NULL, otp_expires_at = NULL WHERE id = $2',
+    [hashedPassword, user.id]
+  );
+
+  logger.info(`Mot de passe réinitialisé pour: ${emailLower}`);
 
   res.json({
     success: true,
     message: 'Mot de passe réinitialisé avec succès',
-  });
-});
-
-/**
- * @desc    Vérification d'email
- * @route   GET /api/auth/verify-email/:token
- * @access  Public
- */
-const verifyEmail = asyncHandler(async (req, res) => {
-  const { token } = req.params;
-
-  // Trouver l'utilisateur avec le token de vérification
-  const user = await User.findOne({
-    emailVerificationToken: token,
-  });
-
-  if (!user) {
-    return res.status(400).json({
-      success: false,
-      error: 'Token de vérification invalide',
-    });
-  }
-
-  // Marquer l'email comme vérifié
-  user.emailVerified = true;
-  user.emailVerificationToken = undefined;
-  await user.save();
-
-  logger.info(`Email vérifié pour: ${user.email}`);
-
-  res.json({
-    success: true,
-    message: 'Email vérifié avec succès',
-    user: user.getPublicProfile(),
-  });
-});
-
-/**
- * @desc    Renvoyer l'email de vérification
- * @route   POST /api/auth/resend-verification
- * @access  Private
- */
-const resendVerification = asyncHandler(async (req, res) => {
-  const user = req.user;
-
-  if (user.emailVerified) {
-    return res.status(400).json({
-      success: false,
-      error: 'Email déjà vérifié',
-    });
-  }
-
-  // Générer un nouveau token de vérification
-  const verificationToken = crypto.randomBytes(32).toString('hex');
-  
-  user.emailVerificationToken = crypto
-    .createHash('sha256')
-    .update(verificationToken)
-    .digest('hex');
-  
-  await user.save();
-
-  // Dans une application réelle, envoyer un email ici
-  const verificationUrl = `${req.protocol}://${req.get('host')}/api/auth/verify-email/${verificationToken}`;
-
-  logger.info(`Email de vérification renvoyé pour: ${user.email}`);
-
-  res.json({
-    success: true,
-    message: 'Email de vérification envoyé',
-    // Ne retourner ces informations qu'en développement
-    ...(config.server.nodeEnv === 'development' && {
-      verificationToken,
-      verificationUrl,
-    }),
-  });
-});
-
-/**
- * @desc    Changer le mot de passe (utilisateur connecté)
- * @route   POST /api/auth/change-password
- * @access  Private
- */
-const changePassword = asyncHandler(async (req, res) => {
-  const user = req.user;
-  const { currentPassword, newPassword } = req.body;
-
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({
-      success: false,
-      error: 'Veuillez fournir l\'ancien et le nouveau mot de passe',
-    });
-  }
-
-  // Vérifier l'ancien mot de passe
-  const isPasswordValid = await user.comparePassword(currentPassword);
-  
-  if (!isPasswordValid) {
-    return res.status(401).json({
-      success: false,
-      error: 'Ancien mot de passe incorrect',
-    });
-  }
-
-  // Mettre à jour le mot de passe
-  user.password = newPassword;
-  await user.save();
-
-  logger.info(`Mot de passe changé pour: ${user.email}`);
-
-  res.json({
-    success: true,
-    message: 'Mot de passe changé avec succès',
   });
 });
 
@@ -450,12 +390,9 @@ const changePassword = asyncHandler(async (req, res) => {
  */
 const verifyToken = asyncHandler(async (req, res) => {
   const user = req.user;
-
   res.json({
     success: true,
-    data: {
-      user: user.getFullProfile(),
-    },
+    data: { user },
     message: 'Token valide',
   });
 });
@@ -467,8 +404,5 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
-  verifyEmail,
-  resendVerification,
-  changePassword,
   verifyToken,
 };

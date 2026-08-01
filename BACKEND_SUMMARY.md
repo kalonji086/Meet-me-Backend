@@ -14,7 +14,7 @@ backend/
 │   │   ├── auth.routes.js
 │   │   ├── upload.routes.js
 │   │   └── (autres à venir)
-│   ├── models/         # 3 modèles MongoDB complets
+│   ├── models/         # 3 tables Postgres (via Supabase)
 │   │   ├── User.model.js
 │   │   ├── Chat.model.js
 │   │   └── Message.model.js
@@ -148,17 +148,9 @@ cp .env.example .env
 # Éditer .env avec vos configurations
 ```
 
-### **Étape 3 : Démarrer MongoDB**
-```bash
-# Windows
-net start MongoDB
-
-# macOS
-brew services start mongodb-community
-
-# Linux
-sudo systemctl start mongod
-```
+### **Étape 3 : Configurer Supabase**
+- Créer un projet sur Supabase
+- Exécuter le script `database_setup.sql` dans l'éditeur SQL de Supabase (ou laisser l'auto-migration s'en charger au premier démarrage)
 
 ### **Étape 4 : Démarrer le Serveur**
 ```bash
@@ -176,7 +168,7 @@ npm start
 PORT=3000
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:8081
-MONGODB_URI=mongodb://localhost:27017/meetme
+DATABASE_URL=postgres://...
 JWT_SECRET=votre_secret_super_securise
 ```
 
@@ -267,7 +259,7 @@ socket.on('user_chats', (data) => {})
 ### **Bonnes pratiques :**
 - **Password hashing** avec bcrypt
 - **JWT secrets** stockés dans les variables d'environnement
-- **No SQL injection** grâce à Mongoose
+- **Prévention des injections SQL** grâce à l'utilisation de requêtes paramétrées avec `pg`
 - **File validation** avant upload
 - **Logging sécurisé** sans données sensibles
 
@@ -282,7 +274,7 @@ socket.on('user_chats', (data) => {})
 6. **Railway/Render** : Alternatives modernes
 
 ### **Recommandations production :**
-- **MongoDB Atlas** pour la base de données
+- **Supabase** pour la base de données PostgreSQL
 - **AWS S3** pour le stockage de fichiers
 - **Redis** pour le cache et les sessions
 - **PM2** pour le process management
@@ -327,17 +319,17 @@ socket.on('user_chats', (data) => {})
 
 ## 🏆 **Conclusion**
 
-Le backend Meet Me est **complètement fonctionnel** avec :
+Le backend Meet Me est **complètement fonctionnel avec Supabase (Postgres)** :
 
 ### **✅ Prêt pour la production :**
 - Architecture modulaire et maintenable
 - Sécurité professionnelle
-- Documentation complète
-- Configuration flexible
+- Base de données PostgreSQL avec Supabase
+- Migrations automatiques exécutées au démarrage
 - Monitoring intégré
 
 ### **✅ Scalable :**
-- Base de données MongoDB scalable
+- Base de données PostgreSQL scalable
 - Stockage cloud-ready
 - Socket.IO pour le temps réel
 - Cache pour les performances

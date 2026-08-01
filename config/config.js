@@ -61,6 +61,7 @@ const config = {
     smtpUser: process.env.SMTP_USER,
     smtpPass: process.env.SMTP_PASS,
     emailFrom: process.env.EMAIL_FROM || 'noreply@meetme.com',
+    brevoApiKey: process.env.BREVO_API_KEY,
   },
 
   // Rate Limiting

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User.model');
+const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
 
@@ -24,7 +24,11 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, config.jwt.secret);
     
     // Trouver l'utilisateur
-    const user = await User.findById(decoded.userId).select('-password');
+    const result = await query(
+      'SELECT id, email, full_name, username, avatar_url, status FROM public.profiles WHERE id = $1',
+      [decoded.userId]
+    );
+    const user = result.rows[0];
     
     if (!user) {
       return res.status(401).json({
@@ -33,16 +37,9 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        error: 'Compte désactivé. Contactez l\'administrateur.',
-      });
-    }
-
     // Ajouter l'utilisateur à la requête
     req.user = user;
-    req.userId = user._id;
+    req.userId = user.id;
 
     // Log de l'authentification
     logger.debug(`Authentification réussie pour l'utilisateur: ${user.email}`);
@@ -98,16 +95,20 @@ const authorize = (...roles) => {
 };
 
 /**
- * Middleware pour vérifier la propriété
+ * Middleware pour vérifier la propriété (Version Postgres)
  */
-const checkOwnership = (model, paramName = 'id') => {
+const checkOwnership = (tableName, paramName = 'id', userIdField = 'sender_id') => {
   return async (req, res, next) => {
     try {
       const documentId = req.params[paramName];
       const userId = req.userId;
 
-      // Trouver le document
-      const document = await model.findById(documentId);
+      const result = await query(
+        `SELECT * FROM public.${tableName} WHERE id = $1`,
+        [documentId]
+      );
+
+      const document = result.rows[0];
 
       if (!document) {
         return res.status(404).json({
@@ -117,26 +118,13 @@ const checkOwnership = (model, paramName = 'id') => {
       }
 
       // Vérifier la propriété
-      let isOwner = false;
-
-      if (document.sender && document.sender.toString() === userId.toString()) {
-        isOwner = true;
-      } else if (document.user && document.user.toString() === userId.toString()) {
-        isOwner = true;
-      } else if (document.createdBy && document.createdBy.toString() === userId.toString()) {
-        isOwner = true;
-      } else if (document.participants && document.participants.includes(userId)) {
-        isOwner = true;
-      }
-
-      if (!isOwner && req.user.role !== 'admin') {
+      if (document[userIdField] !== userId && req.user.role !== 'admin') {
         return res.status(403).json({
           success: false,
           error: 'Accès interdit. Vous n\'êtes pas propriétaire de cette ressource.',
         });
       }
 
-      // Ajouter le document à la requête
       req.document = document;
       next();
     } catch (error) {
@@ -150,7 +138,7 @@ const checkOwnership = (model, paramName = 'id') => {
 };
 
 /**
- * Middleware pour vérifier la participation à une conversation
+ * Middleware pour vérifier la participation à une conversation (Version Postgres)
  */
 const checkChatParticipation = async (req, res, next) => {
   try {
@@ -161,24 +149,18 @@ const checkChatParticipation = async (req, res, next) => {
       return next();
     }
 
-    const Chat = require('../models/Chat.model');
-    const chat = await Chat.findById(chatId);
+    const result = await query(
+      'SELECT 1 FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2',
+      [chatId, userId]
+    );
 
-    if (!chat) {
-      return res.status(404).json({
-        success: false,
-        error: 'Conversation non trouvée.',
-      });
-    }
-
-    if (!chat.isParticipant(userId)) {
+    if (result.rows.length === 0) {
       return res.status(403).json({
         success: false,
         error: 'Accès interdit. Vous ne faites pas partie de cette conversation.',
       });
     }
 
-    req.chat = chat;
     next();
   } catch (error) {
     logger.error('Erreur de vérification de participation:', error);
@@ -190,7 +172,7 @@ const checkChatParticipation = async (req, res, next) => {
 };
 
 /**
- * Middleware pour générer un nouveau token d'accès
+ * Middleware pour générer un nouveau token d'accès (Version Postgres)
  */
 const refreshToken = async (req, res) => {
   try {
@@ -207,7 +189,11 @@ const refreshToken = async (req, res) => {
     const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
     
     // Trouver l'utilisateur
-    const user = await User.findById(decoded.userId);
+    const result = await query(
+      'SELECT id, email, full_name, username, avatar_url, status FROM public.profiles WHERE id = $1',
+      [decoded.userId]
+    );
+    const user = result.rows[0];
 
     if (!user) {
       return res.status(401).json({
@@ -218,14 +204,14 @@ const refreshToken = async (req, res) => {
 
     // Générer un nouveau token d'accès
     const accessToken = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       config.jwt.secret,
       { expiresIn: config.jwt.expire }
     );
 
     // Générer un nouveau refresh token
     const newRefreshToken = jwt.sign(
-      { userId: user._id },
+      { userId: user.id },
       config.jwt.refreshSecret,
       { expiresIn: config.jwt.refreshExpire }
     );
@@ -237,7 +223,14 @@ const refreshToken = async (req, res) => {
       data: {
         accessToken,
         refreshToken: newRefreshToken,
-        user: user.getPublicProfile(),
+        user: {
+          id: user.id,
+          name: user.full_name,
+          email: user.email,
+          username: user.username,
+          avatar: user.avatar_url,
+          status: user.status
+        },
       },
     });
   } catch (error) {

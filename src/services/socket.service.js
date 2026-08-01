@@ -1,7 +1,6 @@
 const logger = require('../utils/logger');
-const User = require('../models/User.model');
-const Chat = require('../models/Chat.model');
-const Message = require('../models/Message.model');
+const { query } = require('../config/db');
+const config = require('../../config/config');
 
 class SocketService {
   constructor() {
@@ -100,8 +99,13 @@ class SocketService {
         return;
       }
 
-      // Vérifier l'utilisateur
-      const user = await User.findById(userId);
+      // Vérifier l'utilisateur dans Postgres
+      const result = await query(
+        'SELECT id, full_name, email, avatar_url, status FROM public.profiles WHERE id = $1',
+        [userId]
+      );
+
+      const user = result.rows[0];
       
       if (!user) {
         socket.emit('authentication_error', { error: 'Utilisateur non trouvé' });
@@ -113,7 +117,10 @@ class SocketService {
       this.userSockets.set(userId.toString(), socket.id);
 
       // Mettre à jour le statut de l'utilisateur
-      await user.updateStatus('online', socket.id);
+      await query(
+        "UPDATE public.profiles SET status = 'online', last_seen = NOW() WHERE id = $1",
+        [userId]
+      );
 
       // Rejoindre la room de l'utilisateur
       socket.join(`user:${userId}`);
@@ -121,11 +128,18 @@ class SocketService {
       // Notifier les autres utilisateurs
       this.notifyUserStatusChange(userId, 'online');
 
-      logger.socket('authenticated', socket.id, { userId: user._id, email: user.email });
+      logger.socket('authenticated', socket.id, { userId: user.id, email: user.email });
 
       socket.emit('authenticated', {
         success: true,
-        user: user.getPublicProfile(),
+        user: {
+          id: user.id,
+          name: user.full_name,
+          email: user.email,
+          avatar: user.avatar_url,
+          status: 'online',
+          lastSeen: new Date()
+        },
       });
 
       // Envoyer la liste des conversations actives
@@ -179,57 +193,50 @@ class SocketService {
         return;
       }
 
-      const { chatId, content, type, replyTo, audioDuration, fileName, fileSize } = data;
+      const { chatId, content, type, fileUrl } = data;
 
-      // Vérifier la conversation
-      const chat = await Chat.findById(chatId);
+      // Vérifier la conversation et la participation
+      const participantResult = await query(
+        'SELECT 1 FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2',
+        [chatId, userId]
+      );
       
-      if (!chat) {
-        socket.emit('error', { error: 'Conversation non trouvée' });
+      if (participantResult.rows.length === 0) {
+        socket.emit('error', { error: 'Conversation non trouvée ou accès refusé' });
         return;
       }
 
-      if (!chat.isParticipant(userId)) {
-        socket.emit('error', { error: 'Vous ne faites pas partie de cette conversation' });
-        return;
-      }
+      // Créer le message dans Postgres
+      const messageResult = await query(
+        `INSERT INTO public.messages (chat_id, sender_id, content, type, file_url)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [chatId, userId, content || '', type || 'text', fileUrl || null]
+      );
 
-      // Créer le message
-      const messageData = {
-        chat: chatId,
-        sender: userId,
-        type: type || 'text',
-        content: content || '',
-        replyTo: replyTo || null,
+      const message = messageResult.rows[0];
+
+      // Récupérer les infos de l'expéditeur
+      const senderResult = await query(
+        'SELECT id, full_name, avatar_url FROM public.profiles WHERE id = $1',
+        [userId]
+      );
+      const sender = senderResult.rows[0];
+
+      const messageDataToSend = {
+        id: message.id,
+        chatId: message.chat_id,
+        content: message.content,
+        type: message.type,
+        fileUrl: message.file_url,
+        status: message.status,
+        createdAt: message.created_at,
+        sender: {
+          id: sender.id,
+          name: sender.full_name,
+          avatar: sender.avatar_url
+        }
       };
-
-      // Ajouter les données spécifiques au type
-      if (type === 'audio') {
-        messageData.audioDuration = audioDuration;
-      } else if (['image', 'video', 'file'].includes(type)) {
-        messageData.fileName = fileName;
-        messageData.fileSize = fileSize;
-      }
-
-      const message = new Message(messageData);
-      await message.save();
-
-      // Mettre à jour le dernier message de la conversation
-      await chat.updateLastMessage(message._id);
-
-      // Populer les données du message
-      await message.populate('sender', 'name avatar');
-      await message.populate({
-        path: 'replyTo',
-        select: 'content type sender createdAt',
-        populate: {
-          path: 'sender',
-          select: 'name avatar',
-        },
-      });
-
-      // Préparer les données du message pour l'envoi
-      const messageDataToSend = message.getMessageInfo();
 
       // Envoyer le message à tous les participants de la conversation
       this.io.to(`chat:${chatId}`).emit('new_message', {
@@ -237,33 +244,29 @@ class SocketService {
         message: messageDataToSend,
       });
 
-      // Marquer le message comme délivré pour l'expéditeur
-      await message.markAsDelivered(userId);
-
-      // Notifier les autres participants (hors expéditeur)
-      const otherParticipants = chat.participants.filter(p => 
-        p.toString() !== userId.toString()
+      // Notifier les autres participants pour les notifications push
+      const participantsResult = await query(
+        'SELECT user_id FROM public.chat_participants WHERE chat_id = $1 AND user_id != $2',
+        [chatId, userId]
       );
 
-      otherParticipants.forEach(participantId => {
+      participantsResult.rows.forEach(row => {
+        const participantId = row.user_id;
         const participantSocketId = this.userSockets.get(participantId.toString());
         
         if (participantSocketId) {
-          // Marquer comme délivré pour les utilisateurs en ligne
-          message.markAsDelivered(participantId);
-          
           // Envoyer une notification push (si configuré)
           this.sendPushNotification(participantId, {
-            title: message.sender.name,
+            title: sender.full_name,
             body: type === 'text' ? content : `Nouveau message ${type}`,
-            data: { chatId, messageId: message._id },
+            data: { chatId, messageId: message.id },
           });
         }
       });
 
       logger.socket('message_sent', socket.id, {
         chatId,
-        messageId: message._id,
+        messageId: message.id,
         type: message.type,
       });
 
@@ -293,30 +296,25 @@ class SocketService {
 
       const { messageId } = data;
 
-      const message = await Message.findById(messageId);
+      // Mettre à jour le statut du message
+      const result = await query(
+        "UPDATE public.messages SET status = 'read' WHERE id = $1 RETURNING sender_id, chat_id",
+        [messageId]
+      );
+
+      const message = result.rows[0];
       
       if (!message) {
         socket.emit('error', { error: 'Message non trouvé' });
         return;
       }
 
-      // Vérifier que l'utilisateur est dans la conversation
-      const chat = await Chat.findById(message.chat);
-      
-      if (!chat || !chat.isParticipant(userId)) {
-        socket.emit('error', { error: 'Accès non autorisé' });
-        return;
-      }
-
-      // Marquer comme lu
-      await message.markAsRead(userId);
-
       // Notifier l'expéditeur que son message a été lu
-      const senderSocketId = this.userSockets.get(message.sender.toString());
+      const senderSocketId = this.userSockets.get(message.sender_id.toString());
       
       if (senderSocketId && senderSocketId !== socket.id) {
         this.io.to(senderSocketId).emit('message_read', {
-          messageId: message._id,
+          messageId,
           readBy: userId,
           readAt: new Date(),
         });
@@ -324,7 +322,7 @@ class SocketService {
 
       socket.emit('marked_as_read', {
         success: true,
-        messageId: message._id,
+        messageId,
       });
 
     } catch (error) {
@@ -347,37 +345,28 @@ class SocketService {
 
       const { messageId } = data;
 
-      const message = await Message.findById(messageId);
+      const result = await query(
+        "UPDATE public.messages SET status = 'delivered' WHERE id = $1 AND status = 'sent' RETURNING sender_id",
+        [messageId]
+      );
       
-      if (!message) {
-        socket.emit('error', { error: 'Message non trouvé' });
-        return;
-      }
-
-      // Vérifier que l'utilisateur est dans la conversation
-      const chat = await Chat.findById(message.chat);
+      const message = result.rows[0];
       
-      if (!chat || !chat.isParticipant(userId)) {
-        socket.emit('error', { error: 'Accès non autorisé' });
-        return;
-      }
+      if (message) {
+        // Notifier l'expéditeur que son message a été délivré
+        const senderSocketId = this.userSockets.get(message.sender_id.toString());
 
-      // Marquer comme délivré
-      await message.markAsDelivered(userId);
-
-      // Notifier l'expéditeur que son message a été délivré
-      const senderSocketId = this.userSockets.get(message.sender.toString());
-      
-      if (senderSocketId && senderSocketId !== socket.id) {
-        this.io.to(senderSocketId).emit('message_delivered', {
-          messageId: message._id,
-          deliveredTo: userId,
-        });
+        if (senderSocketId && senderSocketId !== socket.id) {
+          this.io.to(senderSocketId).emit('message_delivered', {
+            messageId,
+            deliveredTo: userId,
+          });
+        }
       }
 
       socket.emit('marked_as_delivered', {
         success: true,
-        messageId: message._id,
+        messageId,
       });
 
     } catch (error) {
@@ -390,54 +379,19 @@ class SocketService {
    * Gérer les réactions aux messages
    */
   async handleReaction(socket, data) {
-    try {
-      const userId = this.connectedUsers.get(socket.id);
-      
-      if (!userId) {
-        socket.emit('error', { error: 'Non authentifié' });
-        return;
-      }
+    // Note: La table des réactions n'existe pas encore dans database_setup.sql
+    // On peut soit l'ignorer soit la stocker dans une colonne JSONB si on veut
+    // Pour l'instant, on émet juste l'événement
+    const userId = this.connectedUsers.get(socket.id);
+    const { messageId, emoji } = data;
 
-      const { messageId, emoji } = data;
-
-      const message = await Message.findById(messageId);
-      
-      if (!message) {
-        socket.emit('error', { error: 'Message non trouvé' });
-        return;
-      }
-
-      // Vérifier que l'utilisateur est dans la conversation
-      const chat = await Chat.findById(message.chat);
-      
-      if (!chat || !chat.isParticipant(userId)) {
-        socket.emit('error', { error: 'Accès non autorisé' });
-        return;
-      }
-
-      // Ajouter ou mettre à jour la réaction
-      await message.addReaction(userId, emoji);
-
-      // Notifier tous les participants de la conversation
-      this.io.to(`chat:${message.chat}`).emit('message_reaction', {
-        messageId: message._id,
-        reaction: {
-          user: userId,
-          emoji,
-        },
-        reactions: message.reactions,
-      });
-
-      socket.emit('reaction_added', {
-        success: true,
-        messageId: message._id,
+    this.io.emit('message_reaction', {
+      messageId,
+      reaction: {
+        user: userId,
         emoji,
-      });
-
-    } catch (error) {
-      logger.error('Erreur lors de l\'ajout de la réaction:', error);
-      socket.emit('error', { error: 'Erreur lors de l\'ajout de la réaction' });
-    }
+      }
+    });
   }
 
   /**
@@ -446,46 +400,23 @@ class SocketService {
   async handleEditMessage(socket, data) {
     try {
       const userId = this.connectedUsers.get(socket.id);
-      
-      if (!userId) {
-        socket.emit('error', { error: 'Non authentifié' });
-        return;
-      }
-
       const { messageId, newContent } = data;
 
-      const message = await Message.findById(messageId);
-      
-      if (!message) {
-        socket.emit('error', { error: 'Message non trouvé' });
-        return;
+      const result = await query(
+        'UPDATE public.messages SET content = $1 WHERE id = $2 AND sender_id = $3 RETURNING chat_id',
+        [newContent, messageId, userId]
+      );
+
+      if (result.rows.length > 0) {
+        const chatId = result.rows[0].chat_id;
+        this.io.to(`chat:${chatId}`).emit('message_edited', {
+          messageId,
+          newContent,
+          editedAt: new Date(),
+        });
       }
-
-      // Vérifier que l'utilisateur est l'expéditeur
-      if (message.sender.toString() !== userId.toString()) {
-        socket.emit('error', { error: 'Seul l\'expéditeur peut éditer le message' });
-        return;
-      }
-
-      // Éditer le message
-      await message.edit(newContent);
-
-      // Notifier tous les participants de la conversation
-      this.io.to(`chat:${message.chat}`).emit('message_edited', {
-        messageId: message._id,
-        newContent: message.content,
-        editedAt: message.editedAt,
-      });
-
-      socket.emit('message_edited', {
-        success: true,
-        messageId: message._id,
-        newContent: message.content,
-      });
-
     } catch (error) {
       logger.error('Erreur lors de l\'édition du message:', error);
-      socket.emit('error', { error: 'Erreur lors de l\'édition du message' });
     }
   }
 
@@ -495,49 +426,23 @@ class SocketService {
   async handleDeleteMessage(socket, data) {
     try {
       const userId = this.connectedUsers.get(socket.id);
-      
-      if (!userId) {
-        socket.emit('error', { error: 'Non authentifié' });
-        return;
-      }
-
       const { messageId } = data;
 
-      const message = await Message.findById(messageId);
-      
-      if (!message) {
-        socket.emit('error', { error: 'Message non trouvé' });
-        return;
+      const result = await query(
+        'DELETE FROM public.messages WHERE id = $1 AND sender_id = $2 RETURNING chat_id',
+        [messageId, userId]
+      );
+
+      if (result.rows.length > 0) {
+        const chatId = result.rows[0].chat_id;
+        this.io.to(`chat:${chatId}`).emit('message_deleted', {
+          messageId,
+          deletedBy: userId,
+          deletedAt: new Date(),
+        });
       }
-
-      // Vérifier les permissions (expéditeur ou admin)
-      const isSender = message.sender.toString() === userId.toString();
-      const user = await User.findById(userId);
-      const isAdmin = user.role === 'admin';
-
-      if (!isSender && !isAdmin) {
-        socket.emit('error', { error: 'Permissions insuffisantes' });
-        return;
-      }
-
-      // Supprimer le message (soft delete)
-      await message.softDelete(userId);
-
-      // Notifier tous les participants de la conversation
-      this.io.to(`chat:${message.chat}`).emit('message_deleted', {
-        messageId: message._id,
-        deletedBy: userId,
-        deletedAt: message.deletedAt,
-      });
-
-      socket.emit('message_deleted', {
-        success: true,
-        messageId: message._id,
-      });
-
     } catch (error) {
       logger.error('Erreur lors de la suppression du message:', error);
-      socket.emit('error', { error: 'Erreur lors de la suppression du message' });
     }
   }
 
@@ -547,36 +452,17 @@ class SocketService {
   async handleUpdateStatus(socket, data) {
     try {
       const userId = this.connectedUsers.get(socket.id);
-      
-      if (!userId) {
-        socket.emit('error', { error: 'Non authentifié' });
-        return;
-      }
+      if (!userId) return;
 
       const { status } = data;
+      await query(
+        "UPDATE public.profiles SET status = $1, last_seen = NOW() WHERE id = $2",
+        [status, userId]
+      );
 
-      const user = await User.findById(userId);
-      
-      if (!user) {
-        socket.emit('error', { error: 'Utilisateur non trouvé' });
-        return;
-      }
-
-      // Mettre à jour le statut
-      await user.updateStatus(status);
-
-      // Notifier les changements de statut
       this.notifyUserStatusChange(userId, status);
-
-      socket.emit('status_updated', {
-        success: true,
-        status,
-        lastSeen: user.lastSeen,
-      });
-
     } catch (error) {
       logger.error('Erreur lors de la mise à jour du statut:', error);
-      socket.emit('error', { error: 'Erreur lors de la mise à jour du statut' });
     }
   }
 
@@ -585,19 +471,8 @@ class SocketService {
    */
   handleTyping(socket, data) {
     const userId = this.connectedUsers.get(socket.id);
-    
-    if (!userId) {
-      socket.emit('error', { error: 'Non authentifié' });
-      return;
-    }
-
     const { chatId } = data;
-
-    // Envoyer à tous les autres participants de la conversation
-    socket.to(`chat:${chatId}`).emit('user_typing', {
-      chatId,
-      userId,
-    });
+    socket.to(`chat:${chatId}`).emit('user_typing', { chatId, userId });
   }
 
   /**
@@ -605,19 +480,8 @@ class SocketService {
    */
   handleStopTyping(socket, data) {
     const userId = this.connectedUsers.get(socket.id);
-    
-    if (!userId) {
-      socket.emit('error', { error: 'Non authentifié' });
-      return;
-    }
-
     const { chatId } = data;
-
-    // Envoyer à tous les autres participants de la conversation
-    socket.to(`chat:${chatId}`).emit('user_stopped_typing', {
-      chatId,
-      userId,
-    });
+    socket.to(`chat:${chatId}`).emit('user_stopped_typing', { chatId, userId });
   }
 
   /**
@@ -628,15 +492,12 @@ class SocketService {
       const userId = this.connectedUsers.get(socket.id);
       
       if (userId) {
-        // Mettre à jour le statut de l'utilisateur
-        const user = await User.findById(userId);
-        
-        if (user) {
-          await user.updateStatus('offline');
-          this.notifyUserStatusChange(userId, 'offline');
-        }
+        await query(
+          "UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1",
+          [userId]
+        );
+        this.notifyUserStatusChange(userId, 'offline');
 
-        // Nettoyer les mappings
         this.connectedUsers.delete(socket.id);
         this.userSockets.delete(userId.toString());
 
@@ -651,7 +512,6 @@ class SocketService {
    * Notifier le changement de statut d'un utilisateur
    */
   notifyUserStatusChange(userId, status) {
-    // Envoyer à tous les utilisateurs connectés
     this.io.emit('user_status_changed', {
       userId,
       status,
@@ -664,11 +524,17 @@ class SocketService {
    */
   async sendUserChats(socket, userId) {
     try {
-      const chats = await Chat.getUserChats(userId);
+      const result = await query(
+        `SELECT c.* FROM public.chats c
+         JOIN public.chat_participants cp ON c.id = cp.chat_id
+         WHERE cp.user_id = $1
+         ORDER BY c.last_message_at DESC`,
+        [userId]
+      );
       
       socket.emit('user_chats', {
         success: true,
-        chats,
+        chats: result.rows,
       });
     } catch (error) {
       logger.error('Erreur lors de l\'envoi des conversations:', error);

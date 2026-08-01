@@ -10,7 +10,7 @@ Backend Node.js/Express pour l'application de chat Meet Me avec traduction en te
 - **Messagerie en temps réel** (WebSocket avec Socket.IO)
 - **Traduction des messages** (Google Translate API / DeepL)
 - **Stockage des fichiers** (AWS S3 ou local)
-- **Base de données** (MongoDB avec Mongoose)
+- **Base de données** (Postgres via Supabase)
 - **API REST complète** avec documentation
 
 ### 🔄 En Cours
@@ -25,7 +25,7 @@ backend/
 ├── src/
 │   ├── controllers/     # Contrôleurs API
 │   ├── routes/         # Routes Express
-│   ├── models/         # Modèles MongoDB
+│   ├── models/         # Tables Postgres (Supabase)
 │   ├── middleware/     # Middleware Express
 │   ├── services/       # Services métier
 │   └── utils/          # Utilitaires
@@ -38,7 +38,7 @@ backend/
 
 ### 1. Prérequis
 - Node.js >= 18.0.0
-- MongoDB (local ou Atlas)
+- Supabase (Postgres)
 - Clés API (Google Translate, DeepL, AWS, Firebase)
 
 ### 2. Installation des dépendances
@@ -75,7 +75,7 @@ NODE_ENV=development
 CORS_ORIGIN=http://localhost:8081
 
 # Base de données
-MONGODB_URI=mongodb://localhost:27017/meetme
+DATABASE_URL=postgres://...
 
 # JWT
 JWT_SECRET=votre_secret_jwt
@@ -205,11 +205,11 @@ AWS_S3_BUCKET=votre_bucket
 
 ## 📊 Base de données
 
-### MongoDB Collections
-- `users` - Utilisateurs
+### Postgres (Supabase) Tables
+- `profiles` - Profils Utilisateurs
 - `chats` - Conversations
+- `chat_participants` - Participants aux conversations
 - `messages` - Messages
-- (Autres collections selon les besoins)
 
 ### Indexes
 - Index sur les champs fréquemment recherchés

@@ -27,7 +27,10 @@ const forgotPasswordSchema = Joi.object({
 });
 
 const resetPasswordSchema = Joi.object({
+  email: Joi.string().email().required(),
+  otp: Joi.string().length(6).required(),
   password: Joi.string().min(8).required(),
+});
 });
 
 const changePasswordSchema = Joi.object({
@@ -93,12 +96,12 @@ router.post(
 );
 
 /**
- * @route   POST /api/auth/reset-password/:token
- * @desc    Réinitialisation du mot de passe avec token
+ * @route   POST /api/auth/reset-password
+ * @desc    Réinitialisation du mot de passe avec OTP
  * @access  Public
  */
 router.post(
-  '/reset-password/:token',
+  '/reset-password',
   validate(resetPasswordSchema),
   asyncHandler(authController.resetPassword)
 );

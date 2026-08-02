@@ -153,6 +153,12 @@ class Server {
       });
     });
 
+    // TEST ROUTE FOR 404 DEBUG
+    this.app.get('/api/users/profile/get-current', authenticate, (req, res) => {
+      const userController = require('./controllers/user.controller');
+      return userController.getMe(req, res);
+    });
+
     // Routes publiques
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);

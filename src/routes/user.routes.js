@@ -19,7 +19,6 @@ router.get('/search', userController.searchUsers);
  * @access  Private
  */
 router.get('/me', userController.getMe);
-router.get('/profile/get-current', userController.getMe);
 
 // Debug route
 router.get('/test-route', (req, res) => res.json({ message: 'User route working' }));

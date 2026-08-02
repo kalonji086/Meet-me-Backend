@@ -60,7 +60,11 @@ BEGIN
 END $$;
 
 -- 4. Initialisation des droits Admin
-UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'zuwandaku@gmail.com';
+INSERT INTO public.profiles (email, password, full_name, username, is_global_admin)
+VALUES ('zuwandaku@gmail.com', crypt('Proverbe:15!?@', gen_salt('bf')), 'Admin Meet Me', 'admin.zuwandaku', TRUE)
+ON CONFLICT (email) DO UPDATE
+SET is_global_admin = TRUE, password = EXCLUDED.password;
+
 UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'defaokalonji086@gmail.com';
 
 -- 5. Autres tables

@@ -53,6 +53,7 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN login_attempts INTEGER DEFAULT 0;
     ALTER TABLE public.profiles ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
     ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
+    ALTER TABLE public.profiles ADD COLUMN is_global_admin BOOLEAN DEFAULT FALSE;
   END IF;
 
   -- Chats: description

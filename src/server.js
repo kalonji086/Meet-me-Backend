@@ -7,15 +7,12 @@ const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
 
-// Configuration
 const config = require('../config/config');
 const { pool } = require('./config/db');
 const logger = require('./utils/logger');
-
-// Middlewares
+const { authenticate } = require('./middleware/auth.middleware');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
-// Routes
 const authRoutes = require('./routes/auth.routes');
 const uploadRoutes = require('./routes/upload.routes');
 const userRoutes = require('./routes/user.routes');
@@ -24,7 +21,6 @@ const messageRoutes = require('./routes/message.routes');
 const statusRoutes = require('./routes/status.routes');
 const adminRoutes = require('./routes/admin.routes');
 
-// Services
 const socketService = require('./services/socket.service');
 const { runMigrations } = require('./utils/migration');
 
@@ -33,14 +29,9 @@ class Server {
     this.app = express();
     this.server = http.createServer(this.app);
     this.io = socketIo(this.server, {
-      cors: {
-        origin: '*',
-        methods: ['GET', 'POST'],
-        credentials: true,
-      },
+      cors: { origin: '*', methods: ['GET', 'POST'], credentials: true },
       pingTimeout: config.socket.pingTimeout,
       pingInterval: config.socket.pingInterval,
-      maxHttpBufferSize: config.socket.maxHttpBufferSize,
     });
 
     this.port = config.server.port;
@@ -56,10 +47,6 @@ class Server {
 
   async initializeDatabase() {
     try {
-      if (!config.database.postgres.url && !config.database.postgres.password) {
-        throw new Error('DATABASE_URL manquant');
-      }
-
       const client = await this.pool.connect();
       try {
         await client.query('SELECT NOW()');
@@ -68,13 +55,10 @@ class Server {
       } finally {
         client.release();
       }
-
-      // Dossiers d'uploads
       ['uploads', 'uploads/audio', 'uploads/images'].forEach(dir => {
         const p = path.join(__dirname, '..', '..', dir);
         if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
       });
-
     } catch (error) {
       logger.error('❌ DB Error:', error.message);
       setTimeout(() => process.exit(1), 1000);
@@ -94,6 +78,10 @@ class Server {
     this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me' }));
     this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '1.0.0' }));
 
+    // Global /api/me to avoid 404
+    const userController = require('./controllers/user.controller');
+    this.app.get('/api/me', authenticate, userController.getMe);
+
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);
     this.app.use('/api/users', userRoutes);
@@ -102,12 +90,9 @@ class Server {
     this.app.use('/api/statuses', statusRoutes);
     this.app.use('/api/admin', adminRoutes);
 
-    // Servir le Dashboard Admin (Web)
+    // Servir le Dashboard Admin
     const adminPath = path.join(__dirname, '..', 'admin-dashboard');
-    logger.info(`🌐 Serving Admin Dashboard from: ${adminPath}`);
     this.app.use('/admin-portal', express.static(adminPath));
-
-    // Route de repli pour le SPA admin
     this.app.get('/admin-portal*', (req, res) => {
       res.sendFile(path.join(adminPath, 'index.html'));
     });

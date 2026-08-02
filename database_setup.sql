@@ -114,12 +114,25 @@ CREATE TABLE IF NOT EXISTS public.messages (
 CREATE TABLE IF NOT EXISTS public.appeals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  contact_email TEXT, -- Pour les demandes hors connexion
+  type TEXT DEFAULT 'appeal' CHECK (type IN ('appeal', 'helpdesk', 'deletion')),
+  category TEXT DEFAULT 'other', -- ex: 'connection', 'bug', 'account', 'translation', 'other'
   reason TEXT NOT NULL,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved')),
   admin_reply TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   resolved_at TIMESTAMP WITH TIME ZONE
 );
+
+-- Migration des colonnes si la table existe déjà
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appeals' AND column_name='type') THEN
+    ALTER TABLE public.appeals ADD COLUMN type TEXT DEFAULT 'appeal';
+    ALTER TABLE public.appeals ADD COLUMN category TEXT DEFAULT 'other';
+    ALTER TABLE public.appeals ADD COLUMN contact_email TEXT;
+  END IF;
+END $$;
 
 -- 6. Triggers
 CREATE OR REPLACE FUNCTION update_last_message_at()

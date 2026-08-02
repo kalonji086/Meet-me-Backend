@@ -88,6 +88,12 @@ class Server {
     // Soumettre une contestation (Autorisé même si banni)
     this.app.post('/api/users/appeal', authenticateAllowLocked, appealController.submitAppeal);
 
+    // Helpdesk (Public ou Connecté)
+    this.app.post('/api/support/helpdesk', (req, res, next) => {
+      if (req.headers.authorization) return authenticateAllowLocked(req, res, next);
+      next();
+    }, appealController.submitHelpdesk);
+
     // Formulaire de suppression de compte (Public pour Google)
     this.app.post('/api/users/request-deletion', appealController.requestDeletion);
     this.app.get('/delete-account', (req, res) => {

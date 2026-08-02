@@ -1,7 +1,6 @@
 const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
-
 const bcrypt = require('bcryptjs');
 
 /**
@@ -10,35 +9,50 @@ const bcrypt = require('bcryptjs');
  */
 const submitAppeal = asyncHandler(async (req, res) => {
   const { reason } = req.body;
-  const userId = req.userId; // Récupéré par authenticate (même si banni)
+  const userId = req.userId;
 
   if (!reason) {
     return res.status(400).json({ success: false, error: 'Veuillez expliquer votre contestation.' });
   }
 
-  // Vérifier si une demande est déjà en cours
-  const existing = await query('SELECT id FROM public.appeals WHERE user_id = $1 AND status = \'pending\'', [userId]);
-  if (existing.rows.length > 0) {
-    return res.status(400).json({ success: false, error: 'Une demande de contestation est déjà en cours d\'examen.' });
-  }
-
   const result = await query(
-    'INSERT INTO public.appeals (user_id, reason) VALUES ($1, $2) RETURNING id',
+    'INSERT INTO public.appeals (user_id, reason, type) VALUES ($1, $2, \'appeal\') RETURNING id',
     [userId, reason]
   );
 
-  // Informer l'admin en temps réel
-  socketService.broadcast('admin_new_appeal', {
-    appealId: result.rows[0].id,
-    userId
-  });
-
-  res.json({ success: true, message: 'Votre demande a été envoyée. L\'équipe Meet Me l\'examinera sous peu.' });
+  socketService.broadcast('admin_new_appeal', { appealId: result.rows[0].id, userId });
+  res.json({ success: true, message: 'Votre demande a été envoyée.' });
 });
 
 /**
- * @desc    Demande de suppression de compte (Google Play Requirements)
- * @route   POST /api/users/request-deletion
+ * @desc    Soumettre une demande au Helpdesk (Public ou Privé)
+ * @route   POST /api/support/helpdesk
+ */
+const submitHelpdesk = asyncHandler(async (req, res) => {
+  const { category, reason, email } = req.body;
+  const userId = req.userId || null; // Optionnel si authentifié
+
+  if (!reason || !category) {
+    return res.status(400).json({ success: false, error: 'Catégorie et message requis.' });
+  }
+
+  // Si non connecté, l'email est obligatoire
+  if (!userId && !email) {
+    return res.status(400).json({ success: false, error: 'Veuillez fournir un email pour que nous puissions vous répondre.' });
+  }
+
+  const result = await query(
+    'INSERT INTO public.appeals (user_id, contact_email, category, reason, type) VALUES ($1, $2, $3, $4, \'helpdesk\') RETURNING id',
+    [userId, email || null, category, reason]
+  );
+
+  socketService.broadcast('admin_new_appeal', { appealId: result.rows[0].id, type: 'helpdesk' });
+
+  res.json({ success: true, message: 'Votre demande a été transmise au support technique.' });
+});
+
+/**
+ * @desc    Demande de suppression de compte
  */
 const requestDeletion = asyncHandler(async (req, res) => {
   const { email, password, reason } = req.body;
@@ -47,7 +61,6 @@ const requestDeletion = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Email et mot de passe requis.' });
   }
 
-  // 1. Vérifier les identifiants
   const userRes = await query('SELECT id, password FROM public.profiles WHERE email = $1', [email.toLowerCase()]);
   const user = userRes.rows[0];
 
@@ -55,21 +68,17 @@ const requestDeletion = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, error: 'Identifiants incorrects.' });
   }
 
-  // 2. Créer une entrée spéciale dans Support (Appeals)
-  const fullReason = `⚠️ DEMANDE DE SUPPRESSION DÉFINITIVE (Google Play)\nRaison: ${reason || 'Non précisée'}`;
+  const fullReason = `⚠️ DEMANDE DE SUPPRESSION DÉFINITIVE\nRaison: ${reason || 'Non précisée'}`;
 
   await query(
-    'INSERT INTO public.appeals (user_id, reason, status) VALUES ($1, $2, \'pending\')',
+    'INSERT INTO public.appeals (user_id, reason, type) VALUES ($1, $2, \'deletion\')',
     [user.id, fullReason]
   );
 
-  // 3. Bloquer le compte immédiatement pour sécurité
   await query('UPDATE public.profiles SET is_locked = TRUE WHERE id = $1', [user.id]);
-
-  // Informer l'admin
-  socketService.broadcast('admin_new_appeal', { userId: user.id });
+  socketService.broadcast('admin_new_appeal', { userId: user.id, type: 'deletion' });
 
   res.json({ success: true, message: 'Demande enregistrée.' });
 });
 
-module.exports = { submitAppeal, requestDeletion };
+module.exports = { submitAppeal, submitHelpdesk, requestDeletion };

@@ -19,6 +19,7 @@
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .meme-shadow { text-shadow: 2px 2px 0px #000; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
@@ -123,8 +124,8 @@
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center"><div class="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="hash" class="w-7 h-7 text-orange-600"></i></div><div><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Groupes</p><h4 id="stat-groups" class="text-3xl font-black">0</h4></div></div>
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="bg-white p-8 rounded-3xl border border-gray-100"><h3 class="text-xl font-bold mb-8">Croissance</h3><canvas id="growthChart" height="150"></canvas></div>
-                        <div class="bg-white p-8 rounded-3xl border border-gray-100"><h3 class="text-xl font-bold mb-8">Activité</h3><canvas id="activityChart" height="150"></canvas></div>
+                        <div class="bg-white p-8 rounded-3xl border border-gray-100"><h3 class="text-xl font-bold mb-8 text-gray-800">Croissance</h3><canvas id="growthChart" height="150"></canvas></div>
+                        <div class="bg-white p-8 rounded-3xl border border-gray-100"><h3 class="text-xl font-bold mb-8 text-gray-800">Activité</h3><canvas id="activityChart" height="150"></canvas></div>
                     </div>
                 </div>
 
@@ -148,11 +149,11 @@
                     </div>
                 </div>
 
-                <!-- Section Support (Appeals) -->
+                <!-- Section Support (Appeals + Helpdesk) -->
                 <div id="section-appeals" class="hidden animate-fade-in">
                     <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                         <table class="w-full text-left border-collapse">
-                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Utilisateur</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Message / Motif</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Date</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Action</th></tr></thead>
+                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Type / Utilisateur</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Catégorie / Message</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Date</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Action</th></tr></thead>
                             <tbody id="appeals-table-body"></tbody>
                         </table>
                     </div>
@@ -175,28 +176,24 @@
         </div>
     </div>
 
-    <!-- MODAL EXAMINER CONTESTATION -->
+    <!-- MODAL EXAMINER SUPPORT -->
     <div id="modal-appeal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[110] p-4 backdrop-blur-md">
         <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
             <div class="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
-                <h3 id="appeal-modal-title" class="text-2xl font-black text-gray-800">Examen Support</h3>
-                <button onclick="closeAppealModal()" class="p-2 hover:bg-gray-200 rounded-full transition-colors"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
+                <h3 id="appeal-modal-title" class="text-2xl font-black text-gray-800 tracking-tighter">Détails de la demande</h3>
+                <button onclick="closeAppealModal()" class="p-2 hover:bg-gray-200 rounded-full"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
             </div>
             <div class="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
-                <div id="appeal-user-info" class="flex items-center p-6 bg-gray-50 rounded-3xl border border-gray-100">
-                   <!-- Fill by JS -->
-                </div>
+                <div id="appeal-user-info" class="flex items-center p-6 bg-gray-50 rounded-3xl border border-gray-100"></div>
                 <div class="bg-purple-50 p-6 rounded-3xl border border-purple-100">
-                    <p class="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-3">Motivation de l'utilisateur :</p>
+                    <p id="appeal-type-tag" class="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-3"></p>
                     <p id="appeal-reason" class="text-gray-800 text-lg font-medium leading-relaxed italic"></p>
                 </div>
                 <div>
                     <label class="text-xs font-black text-gray-400 uppercase mb-3 block tracking-widest">Votre réponse par email (Amazon Template) :</label>
-                    <textarea id="admin-reply-content" rows="6" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-[1.5rem] focus:ring-4 focus:ring-purple-500/10 outline-none transition-all" placeholder="Écrivez votre décision..."></textarea>
+                    <textarea id="admin-reply-content" rows="6" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-[1.5rem] outline-none transition-all" placeholder="Écrivez votre réponse ici..."></textarea>
                 </div>
-                <div id="appeal-actions" class="flex space-x-4 pb-4">
-                    <!-- Dynamic buttons -->
-                </div>
+                <div id="appeal-actions" class="flex space-x-4 pb-4"></div>
             </div>
         </div>
     </div>
@@ -214,7 +211,7 @@
         <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in">
             <div id="impact-header" class="h-40 flex items-center justify-center relative overflow-hidden"><i id="impact-icon" data-lucide="alert-triangle" class="w-16 h-16 text-white"></i></div>
             <div class="p-10 text-center">
-                <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-4 uppercase tracking-tighter">ATTENTION !</h3>
+                <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-4 uppercase tracking-tighter tracking-tighter">ATTENTION !</h3>
                 <p id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-10"></p>
                 <div class="flex space-x-4"><button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-bold rounded-2xl">ANNULER</button><button id="impact-confirm-btn" class="flex-1 py-4 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all">CONFIRMER</button></div>
             </div>
@@ -305,7 +302,6 @@
                 body.innerHTML = '';
                 res.data.data.forEach(u => {
                     const dev = u.device_info || {};
-                    const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'Jamais';
                     const tr = document.createElement('tr');
                     tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
                     tr.innerHTML = `
@@ -332,12 +328,12 @@
                 if (pendingCount > 0) badge.classList.remove('hidden'); else badge.classList.add('hidden');
 
                 appeals_data.forEach(a => {
-                    const isDeletion = a.reason.includes('SUPPRESSION');
+                    const typeLabel = a.type === 'helpdesk' ? 'HELPDESK' : (a.type === 'deletion' ? 'SUPPRESSION' : 'CONTESTATION');
                     const tr = document.createElement('tr');
-                    tr.className = "border-b border-gray-50 hover:bg-gray-50";
+                    tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
                     tr.innerHTML = `
-                        <td class="px-8 py-5"><p class="font-bold text-gray-800">${a.full_name}</p><p class="text-xs text-gray-400 font-medium">${a.email}</p></td>
-                        <td class="px-8 py-5"><p class="text-sm font-bold ${isDeletion ? 'text-red-600' : 'text-gray-600'} italic line-clamp-1">${a.reason}</p></td>
+                        <td class="px-8 py-5"><p class="text-[9px] font-black text-purple-600 tracking-widest">${typeLabel}</p><p class="font-bold text-gray-800">${a.full_name || 'Utilisateur Anonyme'}</p><p class="text-xs text-gray-400 font-medium">${a.email || a.contact_email}</p></td>
+                        <td class="px-8 py-5"><p class="text-[9px] font-black text-gray-400 uppercase tracking-widest">${a.category || 'Général'}</p><p class="text-sm font-bold text-gray-600 italic line-clamp-1">${a.reason}</p></td>
                         <td class="px-8 py-5 text-xs text-gray-400 font-bold uppercase tracking-tighter">${new Date(a.created_at).toLocaleDateString()}</td>
                         <td class="px-8 py-5 text-right"><button onclick="examineAppeal('${a.id}')" class="px-5 py-2.5 bg-purple-600 text-white text-xs font-black rounded-xl hover:bg-purple-700 active:scale-95 transition-all shadow-lg shadow-purple-100">EXAMINER</button></td>
                     `;
@@ -351,31 +347,31 @@
             selectedAppeal = appeals_data.find(a => a.id === id);
             if (!selectedAppeal) return;
 
-            const isDeletion = selectedAppeal.reason.includes('SUPPRESSION');
+            const isDeletion = selectedAppeal.type === 'deletion';
+            const isHelpdesk = selectedAppeal.type === 'helpdesk';
 
-            document.getElementById('appeal-modal-title').innerText = isDeletion ? 'DEMANDE DE SUPPRESSION' : 'EXAMEN CONTESTATION';
+            document.getElementById('appeal-modal-title').innerText = isDeletion ? 'DEMANDE DE SUPPRESSION' : (isHelpdesk ? 'DEMANDE HELPDESK' : 'EXAMEN CONTESTATION');
+            document.getElementById('appeal-type-tag').innerText = `${selectedAppeal.type} | ${selectedAppeal.category || 'AUTRE'}`;
             document.getElementById('appeal-reason').innerText = selectedAppeal.reason;
             document.getElementById('admin-reply-content').value = "";
 
             const userInfo = document.getElementById('appeal-user-info');
+            const emailToShow = selectedAppeal.email || selectedAppeal.contact_email;
             userInfo.innerHTML = `
-                <img src="${selectedAppeal.avatar_url || 'https://ui-avatars.com/api/?name='+selectedAppeal.full_name}" class="w-14 h-14 rounded-2xl mr-4 border-2 border-white shadow-md">
+                <img src="${selectedAppeal.avatar_url || 'https://ui-avatars.com/api/?name='+(selectedAppeal.full_name || 'U')}" class="w-14 h-14 rounded-2xl mr-4 border-2 border-white shadow-md">
                 <div>
-                    <p class="text-lg font-black text-gray-800">${selectedAppeal.full_name}</p>
-                    <p class="text-xs font-bold text-purple-500">Email: ${selectedAppeal.email}</p>
-                    <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mt-1">ID: ${selectedAppeal.user_id}</p>
+                    <p class="text-lg font-black text-gray-800">${selectedAppeal.full_name || 'Utilisateur Anonyme'}</p>
+                    <p class="text-xs font-bold text-purple-500">Email: ${emailToShow}</p>
                 </div>
             `;
 
             const actions = document.getElementById('appeal-actions');
             if (isDeletion) {
-                actions.innerHTML = `
-                    <button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'delete_confirmed')" class="flex-1 py-5 bg-red-600 text-white font-black rounded-2xl shadow-xl shadow-red-100 hover:bg-red-700 active:scale-95 transition-all uppercase">SUPPRIMER & NOTIFIER PAR MAIL</button>
-                `;
+                actions.innerHTML = `<button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'delete_confirmed')" class="flex-1 py-5 bg-red-600 text-white font-black rounded-2xl shadow-xl shadow-red-100 hover:bg-red-700 active:scale-95 transition-all uppercase">SUPPRIMER & NOTIFIER PAR MAIL</button>`;
             } else {
                 actions.innerHTML = `
-                    <button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'resolved')" class="flex-1 py-5 bg-green-600 text-white font-black rounded-2xl shadow-xl shadow-green-100 hover:bg-green-700 active:scale-95 transition-all">RÉINTÉGRER</button>
-                    <button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'reviewed')" class="flex-1 py-5 bg-black text-white font-black rounded-2xl shadow-xl shadow-black/10 hover:bg-gray-900 active:scale-95 transition-all">REFUSER</button>
+                    <button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'resolved')" class="flex-1 py-5 bg-green-600 text-white font-black rounded-2xl shadow-xl shadow-green-100 hover:bg-green-700 active:scale-95 transition-all">RÉPONDRE (RÉSOLU)</button>
+                    <button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'reviewed')" class="flex-1 py-5 bg-black text-white font-black rounded-2xl shadow-xl shadow-black/10 hover:bg-gray-900 active:scale-95 transition-all">RÉPONDRE (MAINTENU)</button>
                 `;
             }
 
@@ -390,14 +386,10 @@
             if (!reply && action !== 'delete_confirmed') return alert("Veuillez saisir votre réponse.");
             try {
                 await axios.post(`${API_URL}/admin/appeals/${id}/reply`, { reply, action }, { headers: { Authorization: `Bearer ${token}` } });
-                closeImpactModal();
-                closeAppealModal();
-                alert("Action traitée avec succès !");
-                loadAppeals();
+                closeImpactModal(); closeAppealModal(); alert("Réponse envoyée !"); loadAppeals();
             } catch (e) { alert("Erreur."); }
         }
 
-        // --- IMPACT MODAL LOGIC (MEME STYLE) ---
         function showImpactModal(type, id, extra = null) {
             const modal = document.getElementById('impact-modal');
             const header = document.getElementById('impact-header');
@@ -409,30 +401,21 @@
             if (type === 'delete' || type === 'group_delete') {
                 header.className = "h-40 flex items-center justify-center bg-red-600";
                 icon.setAttribute('data-lucide', 'trash-2'); title.innerText = "SUPPRESSION TOTALE";
-                message.innerText = "Cette action est définitive. Toutes les données seront effacées.";
-                confirmBtn.onclick = () => type === 'delete' ? performDelete(id) : performGroupDelete(id);
+                message.innerText = "Désintégrer définitivement ?"; confirmBtn.onclick = () => type === 'delete' ? performDelete(id) : performGroupDelete(id);
                 confirmBtn.className = "flex-1 py-4 bg-red-600 text-white font-black rounded-2xl";
             } else if (type === 'lock' || type === 'group_ban') {
                 const isLocking = extra;
                 header.className = isLocking ? "h-40 flex items-center justify-center bg-black" : "h-40 flex items-center justify-center bg-green-500";
                 icon.setAttribute('data-lucide', isLocking ? 'lock' : 'unlock'); title.innerText = isLocking ? "BANNISSEMENT" : "RÉTABLISSEMENT";
-                message.innerText = isLocking ? "Voulez-vous révoquer l'accès immédiatement ?" : "Rétablir l'accès pour cet utilisateur ?";
-                confirmBtn.onclick = () => type === 'lock' ? performLock(id, isLocking) : performGroupBan(id, isLocking);
+                message.innerText = isLocking ? "Révoquer l'accès ?" : "Rétablir l'accès ?"; confirmBtn.onclick = () => type === 'lock' ? performLock(id, isLocking) : performGroupBan(id, isLocking);
                 confirmBtn.className = isLocking ? "flex-1 py-4 bg-black text-white font-black rounded-2xl" : "flex-1 py-4 bg-green-600 text-white font-black rounded-2xl";
             } else if (type === 'appeal_resolve') {
                 const action = extra;
-                if (action === 'delete_confirmed') {
-                    header.className = "h-40 flex items-center justify-center bg-red-900";
-                    icon.setAttribute('data-lucide', 'user-minus'); title.innerText = "SUPPRESSION FINALE";
-                    message.innerText = "Supprimer le compte ET envoyer l'e-mail de confirmation ?";
-                    confirmBtn.className = "flex-1 py-4 bg-red-900 text-white font-black rounded-2xl";
-                } else {
-                    header.className = action === 'resolved' ? "h-40 flex items-center justify-center bg-green-500" : "h-40 flex items-center justify-center bg-black";
-                    icon.setAttribute('data-lucide', 'mail-check'); title.innerText = "ENVOI RÉPONSE";
-                    message.innerText = action === 'resolved' ? "Envoyer le mail de réintégration ?" : "Envoyer le mail de maintien de sanction ?";
-                    confirmBtn.className = action === 'resolved' ? "flex-1 py-4 bg-green-600 text-white font-black rounded-2xl" : "flex-1 py-4 bg-black text-white font-black rounded-2xl";
-                }
+                header.className = action === 'resolved' ? "h-40 flex items-center justify-center bg-green-500" : (action === 'delete_confirmed' ? "h-40 flex items-center justify-center bg-red-900" : "h-40 flex items-center justify-center bg-black");
+                icon.setAttribute('data-lucide', 'mail'); title.innerText = "CONFIRMER L'ENVOI";
+                message.innerText = "Envoyer votre réponse par e-mail à l'utilisateur ?";
                 confirmBtn.onclick = () => submitAppealReply(id, action);
+                confirmBtn.className = "flex-1 py-4 bg-purple-600 text-white font-black rounded-2xl";
             }
             modal.classList.remove('hidden'); lucide.createIcons();
         }
@@ -443,7 +426,6 @@
         async function performGroupDelete(id) { await axios.delete(`${API_URL}/admin/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadGroups(); }
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }
         function closeModal() { document.getElementById('modal-members').classList.add('hidden'); }
-
         async function loadGroups() {
             try {
                 const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });

@@ -190,7 +190,7 @@
     </div>
 
     <script>
-        const API_URL = 'https://meet-me-backend-sg5c.onrender.com/api';
+        const API_URL = '/api'; // On utilise des chemins relatifs pour éviter les problèmes de domaine
         let token = localStorage.getItem('admin_token');
 
         window.onload = () => {
@@ -236,7 +236,8 @@
         function showDashboard() {
             document.getElementById('login-container').classList.add('hidden');
             document.getElementById('main-container').classList.remove('hidden');
-            document.getElementById('admin-name').innerText = JSON.parse(localStorage.getItem('admin_user')).name;
+            const adminUser = JSON.parse(localStorage.getItem('admin_user'));
+            document.getElementById('admin-name').innerText = adminUser ? adminUser.name : 'Admin';
             showSection('stats');
             lucide.createIcons();
         }
@@ -263,12 +264,12 @@
             try {
                 const res = await axios.get(`${API_URL}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data;
-                document.getElementById('stat-users').innerText = d.totalUsers;
-                document.getElementById('stat-online').innerText = d.onlineUsers;
-                document.getElementById('stat-messages').innerText = d.totalMessages;
-                document.getElementById('stat-groups').innerText = d.totalGroups;
-                renderChart(d.growth);
-            } catch (e) { console.error(e); }
+                document.getElementById('stat-users').innerText = d.totalUsers || 0;
+                document.getElementById('stat-online').innerText = d.onlineUsers || 0;
+                document.getElementById('stat-messages').innerText = d.totalMessages || 0;
+                document.getElementById('stat-groups').innerText = d.totalGroups || 0;
+                if (d.growth) renderChart(d.growth);
+            } catch (e) { console.error('Stats Error:', e); }
         }
 
         async function loadUsers() {
@@ -276,19 +277,23 @@
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
                 const body = document.getElementById('users-table-body');
                 body.innerHTML = '';
-                res.data.data.forEach(u => {
-                    const tr = document.createElement('tr');
-                    tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
-                    tr.innerHTML = `
-                        <td class="px-8 py-5"><div class="flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-10 h-10 rounded-xl mr-4"><div><p class="font-bold">${u.full_name}</p><p class="text-xs text-purple-500 font-bold">@${u.username}</p></div></div></td>
-                        <td class="px-8 py-5 text-sm"><p>${u.email}</p><p class="text-gray-400 font-bold">${u.phone_number || ''}</p></td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-xs font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
-                        <td class="px-8 py-5 text-right"><button onclick="toggleLock('${u.id}', ${!u.is_locked})" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button></td>
-                    `;
-                    body.appendChild(tr);
-                });
+                if (res.data.data && res.data.data.length > 0) {
+                    res.data.data.forEach(u => {
+                        const tr = document.createElement('tr');
+                        tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
+                        tr.innerHTML = `
+                            <td class="px-8 py-5"><div class="flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-10 h-10 rounded-xl mr-4"><div><p class="font-bold">${u.full_name}</p><p class="text-xs text-purple-500 font-bold">@${u.username}</p></div></div></td>
+                            <td class="px-8 py-5 text-sm"><p>${u.email}</p><p class="text-gray-400 font-bold">${u.phone_number || ''}</p></td>
+                            <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-xs font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
+                            <td class="px-8 py-5 text-right"><button onclick="toggleLock('${u.id}', ${!u.is_locked})" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button></td>
+                        `;
+                        body.appendChild(tr);
+                    });
+                } else {
+                    body.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-400 italic">Aucun utilisateur trouvé</td></tr>';
+                }
                 lucide.createIcons();
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error('Users Error:', e); }
         }
 
         async function loadGroups() {
@@ -296,35 +301,43 @@
                 const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
                 const body = document.getElementById('groups-table-body');
                 body.innerHTML = '';
-                res.data.data.forEach(g => {
-                    const tr = document.createElement('tr');
-                    tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
-                    tr.innerHTML = `
-                        <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-10 h-10 rounded-xl mr-4"><div><p class="font-bold">${g.name}</p><p class="text-xs text-gray-400">${g.description || ''}</p></div></div></td>
-                        <td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold">${g.members_count} membres</span></td>
-                        <td class="px-8 py-5 text-right text-xs text-gray-400">${new Date(g.created_at).toLocaleDateString()}</td>
-                    `;
-                    body.appendChild(tr);
-                });
+                if (res.data.data && res.data.data.length > 0) {
+                    res.data.data.forEach(g => {
+                        const tr = document.createElement('tr');
+                        tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
+                        tr.innerHTML = `
+                            <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-10 h-10 rounded-xl mr-4"><div><p class="font-bold">${g.name}</p><p class="text-xs text-gray-400">${g.description || ''}</p></div></div></td>
+                            <td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td>
+                            <td class="px-8 py-5"><span class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold">${g.members_count} membres</span></td>
+                            <td class="px-8 py-5 text-right text-xs text-gray-400">${new Date(g.created_at).toLocaleDateString()}</td>
+                        `;
+                        body.appendChild(tr);
+                    });
+                } else {
+                    body.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-400 italic">Aucun groupe trouvé</td></tr>';
+                }
                 lucide.createIcons();
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error('Groups Error:', e); }
         }
 
         async function toggleLock(id, isLocked) {
             if (!confirm("Voulez-vous modifier l'accès ?")) return;
-            await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } });
-            loadUsers();
+            try {
+                await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } });
+                loadUsers();
+            } catch (e) { alert("Erreur d'autorisation."); }
         }
 
         async function sendBroadcast() {
             const title = document.getElementById('bc-title').value;
             const content = document.getElementById('bc-content').value;
             if (!content) return;
-            await axios.post(`${API_URL}/admin/broadcast`, { title, content }, { headers: { Authorization: `Bearer ${token}` } });
-            alert("Diffusé !");
-            document.getElementById('bc-title').value = '';
-            document.getElementById('bc-content').value = '';
+            try {
+                await axios.post(`${API_URL}/admin/broadcast`, { title, content }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Diffusé !");
+                document.getElementById('bc-title').value = '';
+                document.getElementById('bc-content').value = '';
+            } catch (e) { alert("Erreur de diffusion."); }
         }
 
         let currentChart = null;

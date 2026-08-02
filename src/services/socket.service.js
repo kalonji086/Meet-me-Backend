@@ -577,9 +577,9 @@ class SocketService {
    */
   getConnectionStats() {
     return {
-      connectedUsers: this.connectedUsers.size,
-      userSockets: this.userSockets.size,
-      totalConnections: this.io.engine.clientsCount,
+      connectedUsers: this.connectedUsers ? this.connectedUsers.size : 0,
+      userSockets: this.userSockets ? this.userSockets.size : 0,
+      totalConnections: this.io ? this.io.engine.clientsCount : 0,
     };
   }
 

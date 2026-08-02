@@ -44,4 +44,27 @@ const rateLimitAuth = (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, isAdmin, rateLimitAuth };
+/**
+ * Middleware pour vérifier la participation à une conversation
+ */
+const checkChatParticipation = async (req, res, next) => {
+  try {
+    const chatId = req.params.chatId || req.body.chat;
+    const userId = req.userId;
+    if (!chatId) return next();
+
+    const result = await query(
+      'SELECT 1 FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2',
+      [chatId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'Accès interdit. Vous ne participez pas à ce chat.' });
+    }
+    next();
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Erreur de vérification.' });
+  }
+};
+
+module.exports = { authenticate, isAdmin, rateLimitAuth, checkChatParticipation };

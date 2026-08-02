@@ -8,20 +8,33 @@ const config = require('../../config/config');
 const { asyncHandler } = require('../middleware/error.middleware');
 
 /**
- * @desc    Vérifier si un email ou téléphone existe déjà
+ * @desc    Vérifier si un email, téléphone ou pseudo existe déjà
  * @route   GET /api/auth/check-availability
  */
 const checkAvailability = asyncHandler(async (req, res) => {
-  const { email, phone_number } = req.query;
+  const { email, phone_number, username } = req.query;
 
-  if (!email && !phone_number) {
-    return res.status(400).json({ success: false, error: 'Email ou téléphone requis' });
+  if (!email && !phone_number && !username) {
+    return res.status(400).json({ success: false, error: 'Identifiant requis' });
   }
 
-  const result = await query(
-    'SELECT id FROM public.profiles WHERE email = $1 OR (phone_number IS NOT NULL AND phone_number = $2)',
-    [email?.toLowerCase() || null, phone_number || null]
-  );
+  let sql = 'SELECT id FROM public.profiles WHERE 1=0';
+  const params = [];
+
+  if (email) {
+    sql += ' OR email = $1';
+    params.push(email.toLowerCase());
+  }
+  if (phone_number) {
+    sql += ` OR (phone_number IS NOT NULL AND phone_number = $${params.length + 1})`;
+    params.push(phone_number);
+  }
+  if (username) {
+    sql += ` OR (username IS NOT NULL AND LOWER(username) = $${params.length + 1})`;
+    params.push(username.toLowerCase());
+  }
+
+  const result = await query(sql, params);
 
   res.json({
     success: true,
@@ -35,7 +48,7 @@ const checkAvailability = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const register = asyncHandler(async (req, res) => {
-  const { name, email, password, phone_number } = req.body;
+  const { name, email, password, phone_number, username } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({
@@ -45,6 +58,18 @@ const register = asyncHandler(async (req, res) => {
   }
 
   const emailLower = email.toLowerCase();
+  const usernameLower = username ? username.toLowerCase().trim() : null;
+
+  // Vérifier si le pseudo est déjà pris (si fourni)
+  if (usernameLower) {
+    const existingUsername = await query('SELECT id FROM public.profiles WHERE LOWER(username) = $1', [usernameLower]);
+    if (existingUsername.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Identifiant non disponible. Veuillez en choisir un autre.',
+      });
+    }
+  }
 
   const existingUser = await query(
     'SELECT id FROM public.profiles WHERE email = $1 OR (phone_number IS NOT NULL AND phone_number = $2)',
@@ -62,6 +87,9 @@ const register = asyncHandler(async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, salt);
   const userId = crypto.randomUUID();
 
+  // Si pas de username, on en génère un par défaut
+  const finalUsername = usernameLower || (emailLower.split('@')[0] + Math.floor(1000 + Math.random() * 9000));
+
   const result = await query(
     `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at)
      VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -71,7 +99,7 @@ const register = asyncHandler(async (req, res) => {
       name,
       emailLower,
       hashedPassword,
-      emailLower.split('@')[0] + Math.floor(Math.random() * 1000),
+      finalUsername,
       phone_number || null
     ]
   );

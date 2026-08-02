@@ -1,41 +1,112 @@
 const { query } = require('../config/db');
-const logger = require('../utils/logger');
 const { asyncHandler } = require('../middleware/error.middleware');
-const bcrypt = require('bcryptjs');
+const logger = require('../utils/logger');
+
+/**
+ * @desc    Obtenir le profil de l'utilisateur actuel
+ * @route   GET /api/users/me
+ */
+const getMe = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+
+  const result = await query(
+    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at FROM public.profiles WHERE id = $1',
+    [userId]
+  );
+
+  const user = result.rows[0];
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      name: user.full_name,
+      avatar: user.avatar_url,
+      status: user.status,
+      phone_number: user.phone_number,
+      last_seen: user.last_seen,
+      privacy_settings: user.privacy_settings,
+      last_login_at: user.last_login_at
+    },
+  });
+});
+
+/**
+ * @desc    Mettre à jour le profil
+ * @route   PUT /api/users/profile
+ */
+const updateProfile = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { name, status, avatar_url, username } = req.body;
+
+  // Si on veut changer de pseudo, on vérifie la disponibilité
+  if (username) {
+    const usernameLower = username.toLowerCase().trim();
+
+    // Vérifier les caractères autorisés (lettres, chiffres, underscores, points)
+    if (!/^[a-z0-9_.]+$/.test(usernameLower)) {
+      return res.status(400).json({ success: false, error: 'Le pseudo contient des caractères non autorisés' });
+    }
+
+    const existing = await query(
+      'SELECT id FROM public.profiles WHERE LOWER(username) = $1 AND id != $2',
+      [usernameLower, userId]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ success: false, error: 'Ce pseudo n\'est pas disponible' });
+    }
+  }
+
+  const result = await query(
+    `UPDATE public.profiles
+     SET full_name = COALESCE($1, full_name),
+         status = COALESCE($2, status),
+         avatar_url = COALESCE($3, avatar_url),
+         username = COALESCE($4, username),
+         updated_at = NOW()
+     WHERE id = $5
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number`,
+    [name, status, avatar_url, username?.toLowerCase().trim(), userId]
+  );
+
+  res.json({
+    success: true,
+    data: result.rows[0],
+    message: 'Profil mis à jour avec succès',
+  });
+});
 
 /**
  * @desc    Rechercher des utilisateurs
  * @route   GET /api/users/search
- * @access  Private
  */
 const searchUsers = asyncHandler(async (req, res) => {
-  const { query: searchQuery, limit = 20 } = req.query;
+  const { query: searchQuery } = req.query;
   const userId = req.userId;
 
   if (!searchQuery) {
-    // Retourner tous les utilisateurs (sauf soi-même) si pas de recherche
-    const result = await query(
-      `SELECT id, email, full_name, username, avatar_url, status
-       FROM public.profiles
-       WHERE id != $1
-       LIMIT $2`,
-      [userId, limit]
-    );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
+    return res.json({ success: true, data: [] });
   }
 
-  const searchTerm = `%${searchQuery}%`;
+  const searchTerm = `%${searchQuery.toLowerCase()}%`;
 
   const result = await query(
-    `SELECT id, email, full_name, username, avatar_url, status
+    `SELECT id, full_name, avatar_url, status, username, phone_number
      FROM public.profiles
-     WHERE id != $1 AND (full_name ILIKE $2 OR username ILIKE $2 OR email ILIKE $2)
-     LIMIT $3`,
-    [userId, searchTerm, limit]
+     WHERE (LOWER(full_name) LIKE $1
+        OR LOWER(username) LIKE $1
+        OR phone_number LIKE $1
+        OR email LIKE $1)
+       AND id != $2
+     LIMIT 20`,
+    [searchTerm, userId]
   );
 
   res.json({
@@ -45,94 +116,22 @@ const searchUsers = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Obtenir le profil d'un utilisateur
- * @route   GET /api/users/profile
- * @access  Private
- */
-const getProfile = asyncHandler(async (req, res) => {
-  const userId = req.userId;
-
-  const result = await query(
-    'SELECT id, email, full_name, username, avatar_url, status, phone_number, last_seen, privacy_settings FROM public.profiles WHERE id = $1',
-    [userId]
-  );
-
-  const user = result.rows[0];
-
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: 'Utilisateur non trouvé',
-    });
-  }
-
-  res.json({
-    success: true,
-    data: user,
-  });
-});
-
-/**
- * @desc    Mettre à jour le profil
- * @route   PUT /api/users/profile
- * @access  Private
- */
-const updateProfile = asyncHandler(async (req, res) => {
-  const userId = req.userId;
-  const { name, username, avatar_url, status } = req.body;
-
-  const result = await query(
-    `UPDATE public.profiles
-     SET full_name = COALESCE($1, full_name),
-         username = COALESCE($2, username),
-         avatar_url = COALESCE($3, avatar_url),
-         status = COALESCE($4, status),
-         updated_at = NOW()
-     WHERE id = $5
-     RETURNING id, full_name, email, username, avatar_url, status`,
-    [name, username, avatar_url, status, userId]
-  );
-
-  const user = result.rows[0];
-
-  res.json({
-    success: true,
-    data: {
-      user: {
-        id: user.id,
-        name: user.full_name,
-        email: user.email,
-        username: user.username,
-        avatar: user.avatar_url,
-        status: user.status
-      },
-    },
-    message: 'Profil mis à jour avec succès',
-  });
-});
-
-/**
- * @desc    Synchroniser les contacts téléphoniques
+ * @desc    Synchroniser les contacts
  * @route   POST /api/users/sync-contacts
- * @access  Private
  */
 const syncContacts = asyncHandler(async (req, res) => {
   const { phoneNumbers } = req.body;
   const userId = req.userId;
 
   if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Veuillez fournir une liste de numéros de téléphone',
-    });
+    return res.status(400).json({ success: false, error: 'Liste de numéros requise' });
   }
 
-  // On cherche les profils qui correspondent à ces numéros
   const result = await query(
-    `SELECT id, full_name, username, avatar_url, status, phone_number
+    `SELECT id, full_name, avatar_url, status, phone_number, username
      FROM public.profiles
-     WHERE id != $1 AND phone_number = ANY($2)`,
-    [userId, phoneNumbers]
+     WHERE phone_number = ANY($1) AND id != $2`,
+    [phoneNumbers, userId]
   );
 
   res.json({
@@ -143,133 +142,62 @@ const syncContacts = asyncHandler(async (req, res) => {
 
 /**
  * @desc    Mettre à jour les paramètres de confidentialité
- * @route   PUT /api/users/privacy
- * @access  Private
  */
-const updatePrivacySettings = asyncHandler(async (req, res) => {
-  const userId = req.userId;
+const updatePrivacy = asyncHandler(async (req, res) => {
   const { privacySettings } = req.body;
+  const userId = req.userId;
 
-  if (!privacySettings) {
-    return res.status(400).json({ success: false, error: 'Données de confidentialité manquantes' });
-  }
-
-  // On récupère les paramètres actuels pour fusionner
-  const currentResult = await query('SELECT privacy_settings FROM public.profiles WHERE id = $1', [userId]);
-  const currentSettings = currentResult.rows[0].privacy_settings || {};
-  const newSettings = { ...currentSettings, ...privacySettings };
-
-  const result = await query(
-    'UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2 RETURNING privacy_settings',
-    [newSettings, userId]
+  await query(
+    'UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2',
+    [JSON.stringify(privacySettings), userId]
   );
 
-  res.json({
-    success: true,
-    data: result.rows[0].privacy_settings,
-    message: 'Paramètres de confidentialité mis à jour'
-  });
+  res.json({ success: true, message: 'Paramètres mis à jour' });
 });
 
 /**
- * @desc    Supprimer son compte
- * @route   DELETE /api/users/account
- * @access  Private
- */
-const deleteAccount = asyncHandler(async (req, res) => {
-  const userId = req.userId;
-  const { password } = req.body;
-
-  if (!password) {
-    return res.status(400).json({ success: false, error: 'Mot de passe requis pour confirmer la suppression' });
-  }
-
-  // Vérifier le mot de passe
-  const result = await query('SELECT password FROM public.profiles WHERE id = $1', [userId]);
-  const user = result.rows[0];
-
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) {
-    return res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
-  }
-
-  // Supprimer le profil (les cascades SQL s'occuperont du reste)
-  await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
-
-  res.json({
-    success: true,
-    message: 'Compte supprimé définitivement'
-  });
-});
-
-/**
- * @desc    Mettre à jour le push token pour les notifications
- * @route   PUT /api/users/push-token
- * @access  Private
+ * @desc    Mettre à jour le push token
  */
 const updatePushToken = asyncHandler(async (req, res) => {
-  const userId = req.userId;
   const { pushToken } = req.body;
+  const userId = req.userId;
 
   await query(
     'UPDATE public.profiles SET push_token = $1 WHERE id = $2',
     [pushToken, userId]
   );
 
-  res.json({
-    success: true,
-    message: 'Token de notification mis à jour'
-  });
+  res.json({ success: true });
 });
 
 /**
- * @desc    Obtenir les compteurs de notifications (badges)
- * @route   GET /api/users/badges
- * @access  Private
+ * @desc    Obtenir les badges (non lus)
  */
 const getBadges = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
-  // 1. Compter les messages non lus
-  const messagesResult = await query(
-    "SELECT COUNT(*) as count FROM public.messages WHERE chat_id IN (SELECT chat_id FROM public.chat_participants WHERE user_id = $1) AND sender_id != $1 AND status != 'read'",
-    [userId]
-  );
-
-  // 2. Compter les appels manqués
-  const callsResult = await query(
-    "SELECT COUNT(*) as count FROM public.calls WHERE receiver_id = $1 AND status = 'missed'",
-    [userId]
-  );
-
-  // 3. Compter les nouveaux status (non vus par l'utilisateur)
-  const statusResult = await query(
-    `SELECT COUNT(*) as count
-     FROM public.statuses s
-     WHERE s.user_id != $1
-     AND s.expires_at > NOW()
-     AND s.id NOT IN (SELECT status_id FROM public.status_views WHERE user_id = $1)`,
+  // Compter messages non lus
+  const msgRes = await query(
+    'SELECT COUNT(*) FROM public.messages m JOIN public.chat_participants cp ON m.chat_id = cp.chat_id WHERE cp.user_id = $1 AND m.sender_id != $1 AND m.status != \'read\'',
     [userId]
   );
 
   res.json({
     success: true,
     data: {
-      messages: parseInt(messagesResult.rows[0].count),
-      calls: parseInt(callsResult.rows[0].count),
-      status: parseInt(statusResult.rows[0].count),
-      total: parseInt(messagesResult.rows[0].count) + parseInt(callsResult.rows[0].count)
+      messages: parseInt(msgRes.rows[0].count),
+      calls: 0,
+      status: 0
     }
   });
 });
 
 module.exports = {
-  searchUsers,
-  getProfile,
+  getMe,
   updateProfile,
+  searchUsers,
   syncContacts,
-  updatePrivacySettings,
-  deleteAccount,
+  updatePrivacy,
   updatePushToken,
-  getBadges,
+  getBadges
 };

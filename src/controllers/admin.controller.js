@@ -94,6 +94,26 @@ const getGroups = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Bannir/Débannir un groupe
+ */
+const toggleGroupBan = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { isBanned } = req.body;
+
+  await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [isBanned, chatId]);
+  res.json({ success: true, message: `Groupe ${isBanned ? 'banni' : 'rétabli'}` });
+});
+
+/**
+ * @desc    Supprimer un groupe définitivement
+ */
+const deleteGroup = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  await query('DELETE FROM public.chats WHERE id = $1', [chatId]);
+  res.json({ success: true, message: 'Groupe supprimé définitivement' });
+});
+
+/**
  * @desc    Membres d'un groupe
  */
 const getGroupMembers = asyncHandler(async (req, res) => {

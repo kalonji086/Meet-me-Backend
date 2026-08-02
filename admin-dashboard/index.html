@@ -126,7 +126,7 @@
                         </div>
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
                             <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="zap" class="w-7 h-7 text-green-600"></i></div>
-                            <div><p class="text-gray-400 text-sm font-bold uppercase">En ligne</p><h4 id="stat-online" class="text-3xl font-black">0</h4></div>
+                            <div><p class="text-gray-400 text-sm font-bold uppercase">En ligne</p><h4 id="stat-online" class="text-3xl font-black text-green-600">0</h4></div>
                         </div>
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
                             <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="message-circle" class="w-7 h-7 text-blue-600"></i></div>
@@ -140,11 +140,11 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                            <h3 class="text-xl font-bold mb-8">Croissance des inscriptions</h3>
+                            <h3 class="text-xl font-bold mb-8 text-gray-800">Croissance des inscriptions</h3>
                             <canvas id="growthChart" height="150"></canvas>
                         </div>
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                            <h3 class="text-xl font-bold mb-8">Utilisateurs les plus actifs (Messages)</h3>
+                            <h3 class="text-xl font-bold mb-8 text-gray-800">Utilisateurs les plus actifs (Messages)</h3>
                             <canvas id="activityChart" height="150"></canvas>
                         </div>
                     </div>
@@ -175,8 +175,8 @@
                                 <tr>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Groupe</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Créateur</th>
-                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Membres</th>
-                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Date</th>
+                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Membres / État</th>
+                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="groups-table-body"></tbody>
@@ -389,15 +389,23 @@
                     const tr = document.createElement('tr');
                     tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
                     tr.innerHTML = `
-                        <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-11 h-11 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p></div></div></td>
+                        <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-10 h-10 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p><p class="text-xs text-gray-400">${g.description || ''}</p></div></div></td>
                         <td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td>
-                        <td class="px-8 py-5"><button onclick="viewMembers('${g.id}')" class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors">${g.members_count} membres</button></td>
-                        <td class="px-8 py-5 text-right text-xs text-gray-400 font-bold">${new Date(g.created_at).toLocaleDateString()}</td>
+                        <td class="px-8 py-5">
+                            <button onclick="viewMembers('${g.id}')" class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors mb-2 block">${g.members_count} membres</button>
+                            <span class="inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black tracking-widest ${g.is_banned ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">
+                                ${g.is_banned ? 'BANNI' : 'ACTIF'}
+                            </span>
+                        </td>
+                        <td class="px-8 py-5 text-right space-x-2">
+                             <button onclick="showImpactModal('group_ban', '${g.id}', ${!g.is_banned})" class="p-2 text-gray-400 hover:text-purple-600"><i data-lucide="${g.is_banned ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button>
+                             <button onclick="showImpactModal('group_delete', '${g.id}')" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                        </td>
                     `;
                     body.appendChild(tr);
                 });
                 lucide.createIcons();
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error('Groups Error:', e); }
         }
 
         // IMPACT MODAL LOGIC (MEME STYLE)
@@ -425,6 +433,23 @@
                 message.innerText = isLocking ? "L'utilisateur sera banni de l'application Meet Me instantanément." : "Voulez-vous lever les sanctions et autoriser à nouveau l'accès pour cet utilisateur ?";
                 confirmBtn.onclick = () => performLock(id, isLocking);
                 confirmBtn.className = isLocking ? "flex-1 py-4 bg-black text-white font-black rounded-2xl shadow-lg hover:bg-gray-900 transition-all active:scale-95" : "flex-1 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg hover:bg-green-700 transition-all active:scale-95";
+            } else if (type === 'group_ban') {
+                const isBanning = extra;
+                header.className = isBanning ? "h-40 flex items-center justify-center relative overflow-hidden bg-gray-800" : "h-40 flex items-center justify-center relative overflow-hidden bg-blue-500";
+                icon.setAttribute('data-lucide', isBanning ? 'slash' : 'check-circle');
+                title.innerText = isBanning ? "FERMETURE GROUPE" : "RÉOUVERTURE GROUPE";
+                title.className = isBanning ? "text-3xl font-black text-gray-900 mb-4 uppercase tracking-tighter" : "text-3xl font-black text-blue-600 mb-4 uppercase tracking-tighter";
+                message.innerText = isBanning ? "Les membres ne pourront plus envoyer ni voir de messages dans ce groupe." : "Souhaitez-vous restaurer les activités de ce groupe ?";
+                confirmBtn.onclick = () => performGroupBan(id, isBanning);
+                confirmBtn.className = isBanning ? "flex-1 py-4 bg-gray-900 text-white font-black rounded-2xl" : "flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl";
+            } else if (type === 'group_delete') {
+                header.className = "h-40 flex items-center justify-center relative overflow-hidden bg-red-900";
+                icon.setAttribute('data-lucide', 'trash');
+                title.innerText = "DISSOLUTION FINALE";
+                title.className = "text-3xl font-black text-red-900 mb-4 uppercase tracking-tighter";
+                message.innerText = "Supprimer définitivement ce groupe et tous les messages qu'il contient ?";
+                confirmBtn.onclick = () => performGroupDelete(id);
+                confirmBtn.className = "flex-1 py-4 bg-red-900 text-white font-black rounded-2xl";
             }
 
             modal.classList.remove('hidden');
@@ -434,19 +459,16 @@
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }
 
         async function performDelete(id) {
-            try {
-                await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-                closeImpactModal();
-                loadUsers();
-            } catch (e) { alert("Erreur."); }
+            try { await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadUsers(); } catch (e) { alert("Erreur."); }
         }
-
         async function performLock(id, isLocked) {
-            try {
-                await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } });
-                closeImpactModal();
-                loadUsers();
-            } catch (e) { alert("Erreur."); }
+            try { await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadUsers(); } catch (e) { alert("Erreur."); }
+        }
+        async function performGroupBan(id, isBanned) {
+            try { await axios.put(`${API_URL}/admin/groups/${id}/ban`, { isBanned }, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadGroups(); } catch (e) { alert("Erreur."); }
+        }
+        async function performGroupDelete(id) {
+            try { await axios.delete(`${API_URL}/admin/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadGroups(); } catch (e) { alert("Erreur."); }
         }
 
         async function viewMembers(chatId) {

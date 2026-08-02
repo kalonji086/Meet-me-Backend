@@ -13,6 +13,8 @@ router.put('/users/:userId/lock', adminController.toggleUserLock);
 
 router.get('/groups', adminController.getGroups);
 router.get('/groups/:chatId/members', adminController.getGroupMembers);
+router.put('/groups/:chatId/ban', adminController.toggleGroupBan);
+router.delete('/groups/:chatId', adminController.deleteGroup);
 
 router.post('/broadcast', adminController.broadcastMessage);
 

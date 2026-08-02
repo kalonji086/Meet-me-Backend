@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS public.chats (
   description TEXT,
   avatar_url TEXT,
   type TEXT DEFAULT 'private' CHECK (type IN ('private', 'group')),
+  is_banned BOOLEAN DEFAULT FALSE,
   last_message TEXT,
   last_message_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

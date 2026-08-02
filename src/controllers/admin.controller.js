@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
+const mailService = require('../services/mail.service');
 
 /**
  * @desc    Obtenir les statistiques globales
@@ -11,7 +12,6 @@ const getStats = asyncHandler(async (req, res) => {
   const chatsCount = await query('SELECT COUNT(*) FROM public.chats');
   const groupsCount = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
 
-  // Statistiques des 7 derniers jours (Inscriptions)
   const growth = await query(`
     SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as count
     FROM public.profiles
@@ -19,7 +19,6 @@ const getStats = asyncHandler(async (req, res) => {
     GROUP BY 1 ORDER BY 1 ASC
   `);
 
-  // Activité par utilisateur (Top 10 par nombre de messages)
   const userActivity = await query(`
     SELECT p.full_name as name, COUNT(m.id) as count
     FROM public.profiles p
@@ -45,7 +44,7 @@ const getStats = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Lister tous les utilisateurs réels (exclut les admins)
+ * @desc    Lister tous les utilisateurs réels
  */
 const getUsers = asyncHandler(async (req, res) => {
   const result = await query(`
@@ -59,39 +58,28 @@ const getUsers = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Supprimer un utilisateur définitivement
+ * @desc    Supprimer un utilisateur
  */
 const deleteUser = asyncHandler(async (req, res) => {
   const { userId } = req.params;
-
-  // Sécurité: Empêcher de se supprimer soi-même ou un autre admin global
   const target = await query('SELECT is_global_admin FROM public.profiles WHERE id = $1', [userId]);
-  if (target.rows[0]?.is_global_admin) {
-    return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
-  }
-
+  if (target.rows[0]?.is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un admin' });
   await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
-
-  res.json({ success: true, message: 'Utilisateur supprimé avec succès' });
+  res.json({ success: true, message: 'Supprimé' });
 });
 
 /**
- * @desc    Bloquer/Débloquer un utilisateur
+ * @desc    Bloquer/Débloquer
  */
 const toggleUserLock = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { isLocked } = req.body;
-
-  await query(
-    'UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3',
-    [isLocked, isLocked ? 3 : 0, userId]
-  );
-
-  res.json({ success: true, message: `Utilisateur ${isLocked ? 'bloqué' : 'débloqué'}` });
+  await query('UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3', [isLocked, isLocked ? 3 : 0, userId]);
+  res.json({ success: true });
 });
 
 /**
- * @desc    Lister tous les groupes
+ * @desc    Lister les groupes
  */
 const getGroups = asyncHandler(async (req, res) => {
   const result = await query(`
@@ -102,50 +90,60 @@ const getGroups = asyncHandler(async (req, res) => {
     WHERE c.type = 'group'
     ORDER BY c.created_at DESC
   `);
-
   res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Voir les membres d'un groupe
+ * @desc    Membres d'un groupe
  */
 const getGroupMembers = asyncHandler(async (req, res) => {
-  const { chatId } = req.params;
-
   const result = await query(`
     SELECT p.full_name, p.username, p.email, p.avatar_url, cp.role, cp.joined_at
     FROM public.chat_participants cp
     JOIN public.profiles p ON cp.user_id = p.id
     WHERE cp.chat_id = $1
     ORDER BY cp.role ASC, p.full_name ASC
-  `, [chatId]);
-
+  `, [req.params.chatId]);
   res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Envoyer un message à tous les utilisateurs (Broadcast)
+ * @desc    Diffusion (Email + Push)
  */
 const broadcastMessage = asyncHandler(async (req, res) => {
-  const { content, title } = req.body;
+  const { content, title, target = 'all', specificEmail } = req.body;
 
-  if (!content) return res.status(400).json({ success: false, error: 'Message vide' });
+  if (!content || !title) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
 
-  socketService.broadcast('push_notification', {
-    title: title || 'Message de l\'équipe Meet Me',
-    body: content,
-    type: 'system'
-  });
+  if (target === 'all') {
+    // 1. Envoyer Push à tous via Socket.IO
+    socketService.broadcast('push_notification', { title, body: content, type: 'system' });
 
-  res.json({ success: true, message: 'Message diffusé à tous les utilisateurs' });
+    // 2. Récupérer tous les emails des utilisateurs réels
+    const users = await query('SELECT email FROM public.profiles WHERE is_global_admin = FALSE');
+
+    // 3. Envoyer emails en série (ou parallèle limité pour Brevo)
+    for (const user of users.rows) {
+      await mailService.sendSystemEmail(user.email, title, content);
+    }
+
+    res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
+  } else {
+    // Cible spécifique
+    if (!specificEmail) return res.status(400).json({ success: false, error: 'Email cible requis' });
+
+    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [specificEmail]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Destinataire introuvable' });
+
+    // Envoi Push si connecté
+    socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
+
+    // Envoi Email
+    const sent = await mailService.sendSystemEmail(specificEmail, title, content);
+
+    if (sent) res.json({ success: true, message: 'Message envoyé personnellement par email.' });
+    else res.status(500).json({ success: false, error: 'Échec de l\'envoi de l\'email.' });
+  }
 });
 
-module.exports = {
-  getStats,
-  getUsers,
-  deleteUser,
-  toggleUserLock,
-  getGroups,
-  getGroupMembers,
-  broadcastMessage
-};
+module.exports = { getStats, getUsers, deleteUser, toggleUserLock, getGroups, getGroupMembers, broadcastMessage };

@@ -143,6 +143,25 @@ class MailService {
       logger.error(`Erreur Brevo OTP pour ${email}:`, error.response?.body || error);
     }
   }
+
+  /**
+   * Envoyer un email de diffusion (Broadcast)
+   */
+  async sendSystemEmail(email, title, body) {
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = title;
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, `<p>${body.replace(/\n/g, '<br>')}</p>`, title);
+    sendSmtpEmail.sender = { name: "Meet Me Official", email: config.email.emailFrom };
+    sendSmtpEmail.to = [{ email: email }];
+
+    try {
+      await apiInstance.sendTransacEmail(sendSmtpEmail);
+      return true;
+    } catch (error) {
+      logger.error(`Erreur Broadcast Email pour ${email}:`, error.response?.body || error);
+      return false;
+    }
+  }
 }
 
 module.exports = new MailService();

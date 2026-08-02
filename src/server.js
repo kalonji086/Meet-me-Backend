@@ -101,6 +101,12 @@ class Server {
     this.app.use('/api/messages', messageRoutes);
     this.app.use('/api/statuses', statusRoutes);
     this.app.use('/api/admin', adminRoutes);
+
+    // Servir le Dashboard Admin (Web)
+    this.app.use('/admin-portal', express.static(path.join(__dirname, '..', 'admin-dashboard')));
+    this.app.get('/admin-portal/*', (req, res) => {
+      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'index.html'));
+    });
   }
 
   initializeSocketIO() {

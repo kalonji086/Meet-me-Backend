@@ -56,6 +56,9 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN is_global_admin BOOLEAN DEFAULT FALSE;
   END IF;
 
+-- Définir l'administrateur principal
+UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'defaokalonji086@gmail.com';
+
   -- Chats: description
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chats' AND column_name='description') THEN
     ALTER TABLE public.chats ADD COLUMN description TEXT;

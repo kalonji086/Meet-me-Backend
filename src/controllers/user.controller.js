@@ -5,13 +5,13 @@ const socketService = require('../services/socket.service');
 
 /**
  * @desc    Obtenir le profil de l'utilisateur actuel
- * @route   GET /api/users/me
+ * @route   GET /api/me (Route globale consolidée)
  */
 const getMe = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   const result = await query(
-    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at FROM public.profiles WHERE id = $1',
+    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin FROM public.profiles WHERE id = $1',
     [userId]
   );
 
@@ -33,7 +33,8 @@ const getMe = asyncHandler(async (req, res) => {
       phone_number: user.phone_number,
       last_seen: user.last_seen,
       privacy_settings: user.privacy_settings,
-      last_login_at: user.last_login_at
+      last_login_at: user.last_login_at,
+      is_global_admin: user.is_global_admin
     },
   });
 });
@@ -73,7 +74,7 @@ const updateProfile = asyncHandler(async (req, res) => {
          username = COALESCE($4, username),
          updated_at = NOW()
      WHERE id = $5
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number`,
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin`,
     [name, status, avatar_url, username?.toLowerCase().trim(), userId]
   );
 
@@ -91,7 +92,11 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    data: updatedUser,
+    data: {
+      ...updatedUser,
+      name: updatedUser.full_name,
+      avatar: updatedUser.avatar_url
+    },
     message: 'Profil mis à jour avec succès',
   });
 });

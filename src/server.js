@@ -103,9 +103,13 @@ class Server {
     this.app.use('/api/admin', adminRoutes);
 
     // Servir le Dashboard Admin (Web)
-    this.app.use('/admin-portal', express.static(path.join(__dirname, '..', 'admin-dashboard')));
-    this.app.get('/admin-portal/*', (req, res) => {
-      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'index.html'));
+    const adminPath = path.join(__dirname, '..', 'admin-dashboard');
+    logger.info(`🌐 Serving Admin Dashboard from: ${adminPath}`);
+    this.app.use('/admin-portal', express.static(adminPath));
+
+    // Route de repli pour le SPA admin
+    this.app.get('/admin-portal*', (req, res) => {
+      res.sendFile(path.join(adminPath, 'index.html'));
     });
   }
 

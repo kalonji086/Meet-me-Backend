@@ -19,6 +19,10 @@
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #673AB7; }
     </style>
 </head>
 <body class="bg-gray-50 flex h-screen overflow-hidden">
@@ -172,13 +176,13 @@
     </div>
 
     <!-- MODAL EXAMINER CONTESTATION -->
-    <div id="modal-appeal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[110] p-6 backdrop-blur-md">
-        <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in">
-            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
+    <div id="modal-appeal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[110] p-4 backdrop-blur-md">
+        <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
+            <div class="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
                 <h3 id="appeal-modal-title" class="text-2xl font-black text-gray-800">Examen Support</h3>
                 <button onclick="closeAppealModal()" class="p-2 hover:bg-gray-200 rounded-full transition-colors"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
             </div>
-            <div class="p-10 space-y-8">
+            <div class="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
                 <div id="appeal-user-info" class="flex items-center p-6 bg-gray-50 rounded-3xl border border-gray-100">
                    <!-- Fill by JS -->
                 </div>
@@ -190,7 +194,7 @@
                     <label class="text-xs font-black text-gray-400 uppercase mb-3 block tracking-widest">Votre réponse par email (Amazon Template) :</label>
                     <textarea id="admin-reply-content" rows="6" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-[1.5rem] focus:ring-4 focus:ring-purple-500/10 outline-none transition-all" placeholder="Écrivez votre décision..."></textarea>
                 </div>
-                <div id="appeal-actions" class="flex space-x-4">
+                <div id="appeal-actions" class="flex space-x-4 pb-4">
                     <!-- Dynamic buttons -->
                 </div>
             </div>

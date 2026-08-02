@@ -8,14 +8,14 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Création des tables de base (Si elles n'existent pas)
+-- 2. Création des tables de base
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL
 );
 
--- 3. Migration progressive de la table Profiles (Ajout des colonnes manquantes)
+-- 3. Migration progressive Profiles
 DO $$
 BEGIN
   -- username
@@ -48,11 +48,6 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN phone_number TEXT UNIQUE;
   END IF;
 
-  -- otp_code
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='otp_code') THEN
-    ALTER TABLE public.profiles ADD COLUMN otp_code TEXT;
-  END IF;
-
   -- login_attempts
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='login_attempts') THEN
     ALTER TABLE public.profiles ADD COLUMN login_attempts INTEGER DEFAULT 0;
@@ -63,19 +58,9 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
   END IF;
 
-  -- last_login_at
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_login_at') THEN
-    ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
-  END IF;
-
   -- is_global_admin
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_global_admin') THEN
     ALTER TABLE public.profiles ADD COLUMN is_global_admin BOOLEAN DEFAULT FALSE;
-  END IF;
-
-  -- privacy_settings
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='privacy_settings') THEN
-    ALTER TABLE public.profiles ADD COLUMN privacy_settings JSONB DEFAULT '{"last_seen": "everyone", "profile_photo": "everyone", "status": "everyone", "read_receipts": true}';
   END IF;
 
   -- created_at
@@ -83,21 +68,16 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
   END IF;
 
-  -- updated_at
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='updated_at') THEN
-    ALTER TABLE public.profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-  END IF;
-
-  -- device_info
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='device_info') THEN
-    ALTER TABLE public.profiles ADD COLUMN device_info JSONB DEFAULT '{}';
+  -- last_login_at
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_login_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
   END IF;
 END $$;
 
 -- 4. Droits Administrateurs
 UPDATE public.profiles SET is_global_admin = TRUE WHERE email IN ('wecanconcept@gmail.com', 'zuwandaku@gmail.com', 'defaokalonji086@gmail.com');
 
--- 5. Autres tables (Migration unitaire)
+-- 5. Autres tables avec CASCADE
 CREATE TABLE IF NOT EXISTS public.chats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT,
@@ -108,7 +88,7 @@ CREATE TABLE IF NOT EXISTS public.chats (
   last_message TEXT,
   last_message_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES public.profiles(id)
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.chat_participants (
@@ -131,7 +111,6 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. TABLE DES RÉCLAMATIONS (APPEALS)
 CREATE TABLE IF NOT EXISTS public.appeals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -142,7 +121,7 @@ CREATE TABLE IF NOT EXISTS public.appeals (
   resolved_at TIMESTAMP WITH TIME ZONE
 );
 
--- 7. Fonctions et Triggers
+-- 6. Triggers
 CREATE OR REPLACE FUNCTION update_last_message_at()
 RETURNS TRIGGER AS $$
 BEGIN

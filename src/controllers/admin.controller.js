@@ -48,7 +48,7 @@ const getStats = asyncHandler(async (req, res) => {
  */
 const getUsers = asyncHandler(async (req, res) => {
   const result = await query(`
-    SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked, login_attempts, created_at, is_global_admin, device_info, last_login_at
+    SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked, login_attempts, created_at, is_global_admin, last_login_at
     FROM public.profiles
     WHERE is_global_admin = FALSE
     ORDER BY last_login_at DESC NULLS LAST
@@ -65,7 +65,7 @@ const deleteUser = asyncHandler(async (req, res) => {
   const target = await query('SELECT is_global_admin FROM public.profiles WHERE id = $1', [userId]);
   if (target.rows[0]?.is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un admin' });
   await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
-  res.json({ success: true, message: 'Supprimé' });
+  res.json({ success: true, message: 'Utilisateur supprimé définitivement' });
 });
 
 /**
@@ -99,18 +99,17 @@ const getGroups = asyncHandler(async (req, res) => {
 const toggleGroupBan = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const { isBanned } = req.body;
-
   await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [isBanned, chatId]);
-  res.json({ success: true, message: `Groupe ${isBanned ? 'banni' : 'rétabli'}` });
+  res.json({ success: true });
 });
 
 /**
- * @desc    Supprimer un groupe définitivement
+ * @desc    Supprimer un groupe
  */
 const deleteGroup = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   await query('DELETE FROM public.chats WHERE id = $1', [chatId]);
-  res.json({ success: true, message: 'Groupe supprimé définitivement' });
+  res.json({ success: true });
 });
 
 /**
@@ -128,45 +127,6 @@ const getGroupMembers = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Diffusion (Email + Push)
- */
-const broadcastMessage = asyncHandler(async (req, res) => {
-  const { content, title, target = 'all', specificEmail } = req.body;
-
-  if (!content || !title) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
-
-  if (target === 'all') {
-    // 1. Envoyer Push à tous via Socket.IO
-    socketService.broadcast('push_notification', { title, body: content, type: 'system' });
-
-    // 2. Récupérer tous les emails des utilisateurs réels
-    const users = await query('SELECT email FROM public.profiles WHERE is_global_admin = FALSE');
-
-    // 3. Envoyer emails en série (ou parallèle limité pour Brevo)
-    for (const user of users.rows) {
-      await mailService.sendSystemEmail(user.email, title, content);
-    }
-
-    res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
-  } else {
-    // Cible spécifique
-    if (!specificEmail) return res.status(400).json({ success: false, error: 'Email cible requis' });
-
-    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [specificEmail]);
-    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Destinataire introuvable' });
-
-    // Envoi Push si connecté
-    socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
-
-    // Envoi Email
-    const sent = await mailService.sendSystemEmail(specificEmail, title, content);
-
-    if (sent) res.json({ success: true, message: 'Message envoyé personnellement par email.' });
-    else res.status(500).json({ success: false, error: 'Échec de l\'envoi de l\'email.' });
-  }
-});
-
-/**
  * @desc    Lister les contestations
  */
 const getAppeals = asyncHandler(async (req, res) => {
@@ -174,47 +134,68 @@ const getAppeals = asyncHandler(async (req, res) => {
     SELECT a.*, p.full_name, p.email, p.username, p.avatar_url
     FROM public.appeals a
     JOIN public.profiles p ON a.user_id = p.id
-    ORDER BY a.created_at DESC
+    ORDER BY a.status ASC, a.created_at DESC
   `);
   res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Répondre à une contestation
+ * @desc    Répondre à une contestation (Inclut la suppression définitive)
  */
 const replyToAppeal = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { reply, action } = req.body; // action: 'resolved' ou 'reviewed'
+  const { reply, action } = req.body; // action: 'resolved', 'reviewed', 'delete_confirmed'
 
-  const appealRes = await query('SELECT user_id FROM public.appeals WHERE id = $1', [id]);
+  const appealRes = await query('SELECT user_id, reason FROM public.appeals WHERE id = $1', [id]);
   if (appealRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
 
   const userId = appealRes.rows[0].user_id;
   const userRes = await query('SELECT email, full_name FROM public.profiles WHERE id = $1', [userId]);
   const user = userRes.rows[0];
 
-  // Mettre à jour l'appel
+  if (action === 'delete_confirmed') {
+    // 1. Envoyer le mail de confirmation de suppression (Template Amazon)
+    const finalReply = reply || "Votre demande de suppression de compte Meet Me a été traitée. Toutes vos données ont été effacées de nos serveurs conformément aux politiques de Google Play.";
+    await mailService.sendSystemEmail(user.email, "Confirmation de suppression de votre compte Meet Me", finalReply);
+
+    // 2. Supprimer définitivement l'utilisateur (CASCADE supprimera l'appel et tout le reste)
+    await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
+
+    return res.json({ success: true, message: 'Compte supprimé et utilisateur notifié par e-mail.' });
+  }
+
+  // Action standard (Maintenir ou Réintégrer)
   await query(
     'UPDATE public.appeals SET admin_reply = $1, status = $2, resolved_at = NOW() WHERE id = $3',
-    [reply, action || 'resolved', id]
+    [reply, action === 'resolved' ? 'resolved' : 'reviewed', id]
   );
 
-  // Envoyer l'email de réponse (Amazon style)
   await mailService.sendSystemEmail(user.email, "Réponse à votre contestation Meet Me", reply);
 
-  res.json({ success: true, message: 'Réponse envoyée par email.' });
+  res.json({ success: true, message: 'Réponse envoyée par e-mail.' });
 });
 
-module.exports = {
-  getStats,
-  getUsers,
-  deleteUser,
-  toggleUserLock,
-  getGroups,
-  getGroupMembers,
-  toggleGroupBan,
-  deleteGroup,
-  broadcastMessage,
-  getAppeals,
-  replyToAppeal
-};
+/**
+ * @desc    Diffusion (Email + Push)
+ */
+const broadcastMessage = asyncHandler(async (req, res) => {
+  const { content, title, target = 'all', specificEmail } = req.body;
+  if (!content || !title) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
+
+  if (target === 'all') {
+    socketService.broadcast('push_notification', { title, body: content, type: 'system' });
+    const users = await query('SELECT email FROM public.profiles WHERE is_global_admin = FALSE');
+    for (const user of users.rows) {
+      await mailService.sendSystemEmail(user.email, title, content);
+    }
+    res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
+  } else {
+    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [specificEmail]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Destinataire introuvable' });
+    socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
+    await mailService.sendSystemEmail(specificEmail, title, content);
+    res.json({ success: true, message: 'Message envoyé.' });
+  }
+});
+
+module.exports = { getStats, getUsers, deleteUser, toggleUserLock, getGroups, getGroupMembers, toggleGroupBan, deleteGroup, broadcastMessage, getAppeals, replyToAppeal };

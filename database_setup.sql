@@ -59,7 +59,8 @@ BEGIN
   END IF;
 END $$;
 
--- 4. Initialisation des droits Admin (Séparé du bloc DO pour éviter les erreurs de parsing)
+-- 4. Initialisation des droits Admin
+UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'zuwandaku@gmail.com';
 UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'defaokalonji086@gmail.com';
 
 -- 5. Autres tables

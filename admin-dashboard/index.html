@@ -5,103 +5,194 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meet Me Admin - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/axios/1.6.2/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        .sidebar-item:hover { background-color: rgba(255,255,255,0.1); }
-        .sidebar-item.active { background-color: #673AB7; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-item:hover { background-color: rgba(255,255,255,0.05); }
+        .sidebar-item.active { background-color: #673AB7; color: white !important; }
         .amazon-orange { color: #FF9900; }
-        .amazon-bg { background-color: #232f3e; }
+        .amazon-bg { background-color: #1a222f; }
+        .card-stats { transition: transform 0.2s; }
+        .card-stats:hover { transform: translateY(-5px); }
     </style>
 </head>
-<body class="bg-gray-100 flex h-screen font-sans">
+<body class="bg-gray-50 flex h-screen overflow-hidden">
 
     <!-- Sidebar -->
-    <div class="w-64 amazon-bg text-white flex flex-col">
-        <div class="p-6 text-center border-b border-gray-700">
-            <h1 class="text-2xl font-bold text-purple-400">Meet Me Admin</h1>
+    <div class="w-72 amazon-bg text-gray-300 flex flex-col shadow-2xl">
+        <div class="p-8 text-center border-b border-gray-800">
+            <div class="flex items-center justify-center mb-2">
+                <i data-lucide="message-square" class="w-8 h-8 text-purple-500 mr-2"></i>
+                <h1 class="text-2xl font-bold text-white tracking-tight">Meet Me</h1>
+            </div>
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-semibold">Administration</p>
         </div>
-        <nav class="flex-1 mt-6">
-            <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-6 py-3 transition-colors">
-                <span class="mr-3">📊</span> Vue d'ensemble
+
+        <nav class="flex-1 mt-8 px-4">
+            <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 mr-4"></i>
+                <span class="font-medium">Vue d'ensemble</span>
             </a>
-            <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-6 py-3 transition-colors">
-                <span class="mr-3">👥</span> Utilisateurs
+            <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                <i data-lucide="users" class="w-5 h-5 mr-4"></i>
+                <span class="font-medium">Utilisateurs</span>
             </a>
-            <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-6 py-3 transition-colors">
-                <span class="mr-3">💬</span> Groupes
+            <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                <i data-lucide="users-2" class="w-5 h-5 mr-4"></i>
+                <span class="font-medium">Groupes</span>
             </a>
-            <a href="#" onclick="showSection('broadcast')" id="nav-broadcast" class="sidebar-item flex items-center px-6 py-3 transition-colors">
-                <span class="mr-3">📣</span> Diffusion (Broadcast)
+            <a href="#" onclick="showSection('broadcast')" id="nav-broadcast" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                <i data-lucide="megaphone" class="w-5 h-5 mr-4"></i>
+                <span class="font-medium">Diffusion</span>
             </a>
         </nav>
-        <div class="p-6 border-t border-gray-700">
-            <button onclick="logout()" class="w-full bg-red-600 hover:bg-red-700 py-2 rounded font-bold">Déconnexion</button>
+
+        <div class="p-6 border-t border-gray-800">
+            <button onclick="logout()" class="w-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-3 rounded-xl font-bold transition-all">
+                <i data-lucide="log-out" class="w-5 h-5 mr-2"></i>
+                Déconnexion
+            </button>
         </div>
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="flex-1 flex flex-col overflow-hidden bg-gray-50">
         <!-- Header -->
-        <header class="bg-white shadow px-8 py-4 flex justify-between items-center">
-            <h2 id="section-title" class="text-xl font-semibold text-gray-800">Tableau de bord</h2>
+        <header class="bg-white border-b border-gray-200 px-8 py-5 flex justify-between items-center shadow-sm">
             <div class="flex items-center">
-                <span id="admin-name" class="mr-4 text-gray-600">Chargement...</span>
-                <div class="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold">A</div>
+                <i data-lucide="menu" class="w-6 h-6 text-gray-400 mr-4 lg:hidden"></i>
+                <h2 id="section-title" class="text-xl font-bold text-gray-800">Tableau de bord</h2>
+            </div>
+            <div class="flex items-center space-x-6">
+                <div class="flex items-center space-x-2">
+                    <div class="relative">
+                        <i data-lucide="bell" class="w-6 h-6 text-gray-400"></i>
+                        <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                    </div>
+                </div>
+                <div class="h-8 w-px bg-gray-200"></div>
+                <div class="flex items-center cursor-pointer group">
+                    <div class="text-right mr-3">
+                        <p id="admin-name" class="text-sm font-bold text-gray-800 group-hover:text-purple-600 transition-colors">Chargement...</p>
+                        <p class="text-xs text-green-500 font-medium flex items-center justify-end">
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></span> En ligne
+                        </p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-200">
+                        <i data-lucide="user" class="w-5 h-5"></i>
+                    </div>
+                </div>
             </div>
         </header>
 
         <!-- Dynamic Content -->
         <main class="flex-1 overflow-y-auto p-8">
 
-            <!-- Section Login (Visible par défaut) -->
-            <div id="section-login" class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg mt-20">
-                <h3 class="text-2xl font-bold mb-6 text-center">Accès Administrateur</h3>
-                <input type="email" id="email" placeholder="Email" class="w-full mb-4 p-3 border rounded focus:ring-2 focus:ring-purple-500">
-                <input type="password" id="password" placeholder="Mot de passe" class="w-full mb-6 p-3 border rounded focus:ring-2 focus:ring-purple-500">
-                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition">SE CONNECTER</button>
+            <!-- Section Login -->
+            <div id="section-login" class="max-w-md mx-auto bg-white p-10 rounded-3xl shadow-2xl mt-20 border border-gray-100">
+                <div class="text-center mb-10">
+                    <div class="w-20 h-20 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="shield-check" class="w-10 h-10 text-purple-600"></i>
+                    </div>
+                    <h3 class="text-3xl font-extrabold text-gray-900">Meet Me Admin</h3>
+                    <p class="text-gray-500 mt-2">Veuillez vous authentifier pour accéder à la gestion globale.</p>
+                </div>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="text-xs font-bold text-gray-400 uppercase mb-2 block">Adresse Email</label>
+                        <div class="relative">
+                            <i data-lucide="mail" class="absolute left-4 top-3.5 w-5 h-5 text-gray-400"></i>
+                            <input type="email" id="email" value="zuwandaku@gmail.com" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-400 uppercase mb-2 block">Mot de passe</label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-4 top-3.5 w-5 h-5 text-gray-400"></i>
+                            <input type="password" id="password" value="Proverbe:15!?@" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold shadow-xl shadow-purple-200 transition-all active:scale-95">SE CONNECTER</button>
+                </div>
             </div>
 
             <!-- Section Stats -->
-            <div id="section-stats" class="hidden">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500">
-                        <p class="text-gray-500 text-sm uppercase font-bold">Utilisateurs</p>
-                        <h4 id="stat-users" class="text-3xl font-bold">0</h4>
+            <div id="section-stats" class="hidden animate-fade-in">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+                    <div class="card-stats bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
+                        <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5">
+                            <i data-lucide="users" class="w-7 h-7 text-purple-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm font-bold uppercase tracking-wide">Utilisateurs</p>
+                            <h4 id="stat-users" class="text-3xl font-black text-gray-800">0</h4>
+                        </div>
                     </div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
-                        <p class="text-gray-500 text-sm uppercase font-bold">En ligne</p>
-                        <h4 id="stat-online" class="text-3xl font-bold">0</h4>
+                    <div class="card-stats bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
+                        <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mr-5">
+                            <i data-lucide="zap" class="w-7 h-7 text-green-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm font-bold uppercase tracking-wide">En ligne</p>
+                            <h4 id="stat-online" class="text-3xl font-black text-gray-800">0</h4>
+                        </div>
                     </div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
-                        <p class="text-gray-500 text-sm uppercase font-bold">Messages</p>
-                        <h4 id="stat-messages" class="text-3xl font-bold">0</h4>
+                    <div class="card-stats bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
+                        <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mr-5">
+                            <i data-lucide="message-circle" class="w-7 h-7 text-blue-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm font-bold uppercase tracking-wide">Messages</p>
+                            <h4 id="stat-messages" class="text-3xl font-black text-gray-800">0</h4>
+                        </div>
                     </div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-yellow-500">
-                        <p class="text-gray-500 text-sm uppercase font-bold">Groupes</p>
-                        <h4 id="stat-groups" class="text-3xl font-bold">0</h4>
+                    <div class="card-stats bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
+                        <div class="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mr-5">
+                            <i data-lucide="hash" class="w-7 h-7 text-orange-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm font-bold uppercase tracking-wide">Groupes</p>
+                            <h4 id="stat-groups" class="text-3xl font-black text-gray-800">0</h4>
+                        </div>
                     </div>
                 </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm">
-                    <h3 class="text-lg font-bold mb-4">Croissance (7 derniers jours)</h3>
+
+                <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="text-xl font-bold text-gray-800">Courbe de croissance</h3>
+                        <div class="flex space-x-2">
+                            <span class="px-3 py-1 bg-purple-50 text-purple-600 text-xs font-bold rounded-full">7 Derniers jours</span>
+                        </div>
+                    </div>
                     <canvas id="growthChart" height="100"></canvas>
                 </div>
             </div>
 
             <!-- Section Users -->
             <div id="section-users" class="hidden">
-                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-gray-800">Répertoire des utilisateurs</h3>
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                            <input type="text" placeholder="Rechercher..." class="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                        </div>
+                    </div>
                     <table class="w-full text-left border-collapse">
-                        <thead class="bg-gray-50 border-b">
+                        <thead class="bg-gray-50/50">
                             <tr>
-                                <th class="px-6 py-4 font-bold text-gray-700">Utilisateur</th>
-                                <th class="px-6 py-4 font-bold text-gray-700">Email / Tel</th>
-                                <th class="px-6 py-4 font-bold text-gray-700">État</th>
-                                <th class="px-6 py-4 font-bold text-gray-700">Actions</th>
+                                <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Identité</th>
+                                <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Coordonnées</th>
+                                <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Sécurité</th>
+                                <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="users-table-body">
-                            <!-- JS will fill this -->
+                            <!-- JS fill -->
                         </tbody>
                     </table>
                 </div>
@@ -109,12 +200,27 @@
 
             <!-- Section Broadcast -->
             <div id="section-broadcast" class="hidden max-w-2xl mx-auto">
-                <div class="bg-white p-8 rounded-xl shadow-sm">
-                    <h3 class="text-xl font-bold mb-6">Diffuser un message système</h3>
-                    <p class="text-gray-600 mb-6 text-sm">Ce message sera envoyé en temps réel à TOUS les utilisateurs actuellement connectés sur l'application.</p>
-                    <input type="text" id="bc-title" placeholder="Titre du message (ex: Maintenance)" class="w-full mb-4 p-3 border rounded">
-                    <textarea id="bc-content" rows="5" placeholder="Contenu du message..." class="w-full mb-6 p-3 border rounded"></textarea>
-                    <button onclick="sendBroadcast()" class="w-full bg-amazon-orange text-white py-3 rounded font-bold hover:opacity-90">ENVOYER À TOUT LE MONDE</button>
+                <div class="bg-white p-10 rounded-3xl shadow-sm border border-gray-100">
+                    <div class="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="megaphone" class="w-8 h-8 text-purple-600"></i>
+                    </div>
+                    <h3 class="text-2xl font-black text-gray-800 mb-2">Message Global</h3>
+                    <p class="text-gray-500 mb-8">Informez instantanément l'ensemble de votre communauté via une notification système.</p>
+
+                    <div class="space-y-6">
+                        <div>
+                            <label class="text-xs font-bold text-gray-400 uppercase mb-2 block">Sujet de l'annonce</label>
+                            <input type="text" id="bc-title" placeholder="Ex: Maintenance programmée" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-400 uppercase mb-2 block">Contenu du message</label>
+                            <textarea id="bc-content" rows="6" placeholder="Écrivez votre message ici..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none"></textarea>
+                        </div>
+                        <button onclick="sendBroadcast()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-orange-100 transition-all flex items-center justify-center">
+                            <i data-lucide="send" class="w-5 h-5 mr-2"></i>
+                            DIFFUSER MAINTENANT
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -125,11 +231,9 @@
         const API_URL = 'https://meet-me-backend-sg5c.onrender.com/api';
         let token = localStorage.getItem('admin_token');
 
-        // Initialisation
         window.onload = () => {
-            if (token) {
-                showDashboard();
-            }
+            lucide.createIcons();
+            if (token) showDashboard();
         };
 
         async function login() {
@@ -138,11 +242,12 @@
             const btn = document.getElementById('login-btn');
 
             try {
-                btn.innerText = 'Vérification...';
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
+                lucide.createIcons();
+
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
 
-                if (res.data.success && res.data.data.user.id) {
-                    // On vérifie si c'est un admin (il faut appeler le profil pour être sûr car login cache ce champ)
+                if (res.data.success) {
                     const tempToken = res.data.data.token;
                     const profileRes = await axios.get(`${API_URL}/me`, {
                         headers: { Authorization: `Bearer ${tempToken}` }
@@ -154,11 +259,11 @@
                         localStorage.setItem('admin_user', JSON.stringify(profileRes.data.data));
                         showDashboard();
                     } else {
-                        alert("Accès refusé. Vous n'avez pas les droits administrateur.");
+                        alert("Accès refusé. Droits insuffisants.");
                     }
                 }
             } catch (e) {
-                alert("Identifiants incorrects ou erreur serveur.");
+                alert("Identifiants incorrects.");
             } finally {
                 btn.innerText = 'SE CONNECTER';
             }
@@ -173,8 +278,10 @@
         function showSection(name) {
             const sections = ['stats', 'users', 'groups', 'broadcast'];
             sections.forEach(s => {
-                document.getElementById(`section-${s}`).classList.add('hidden');
-                document.getElementById(`nav-${s}`).classList.remove('active');
+                const el = document.getElementById(`section-${s}`);
+                const nav = document.getElementById(`nav-${s}`);
+                if (el) el.classList.add('hidden');
+                if (nav) nav.classList.remove('active');
             });
 
             document.getElementById(`section-${name}`).classList.remove('hidden');
@@ -183,6 +290,7 @@
 
             if (name === 'stats') loadStats();
             if (name === 'users') loadUsers();
+            lucide.createIcons();
         }
 
         async function loadStats() {
@@ -195,7 +303,6 @@
                 document.getElementById('stat-online').innerText = d.onlineUsers;
                 document.getElementById('stat-messages').innerText = d.totalMessages;
                 document.getElementById('stat-groups').innerText = d.totalGroups;
-
                 renderChart(d.growth);
             } catch (e) { console.error(e); }
         }
@@ -211,76 +318,102 @@
 
                 users.forEach(u => {
                     const tr = document.createElement('tr');
-                    tr.className = "border-b hover:bg-gray-50";
+                    tr.className = "border-b border-gray-50 hover:bg-gray-50/50 transition-colors";
                     tr.innerHTML = `
-                        <td class="px-6 py-4 flex items-center">
-                            <img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-8 h-8 rounded-full mr-3">
-                            <div>
-                                <p class="font-bold text-gray-800">${u.full_name}</p>
-                                <p class="text-xs text-gray-500">@${u.username}</p>
+                        <td class="px-8 py-5">
+                            <div class="flex items-center">
+                                <img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name+'&background=random'}" class="w-11 h-11 rounded-2xl mr-4 shadow-sm">
+                                <div>
+                                    <p class="font-bold text-gray-800">${u.full_name}</p>
+                                    <p class="text-xs text-purple-500 font-bold tracking-tight">@${u.username}</p>
+                                </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-sm">
-                            <p>${u.email}</p>
-                            <p class="text-gray-400 text-xs">${u.phone_number || ''}</p>
+                        <td class="px-8 py-5">
+                            <div class="text-sm">
+                                <p class="text-gray-700 font-medium">${u.email}</p>
+                                <p class="text-gray-400 text-xs mt-1 font-bold">${u.phone_number || 'SANS NUMÉRO'}</p>
+                            </div>
                         </td>
-                        <td class="px-6 py-4">
-                            <span class="px-2 py-1 rounded-full text-xs font-bold ${u.is_locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
+                        <td class="px-8 py-5">
+                            <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-black tracking-widest ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-2 ${u.is_locked ? 'bg-red-500' : 'bg-green-500'}"></span>
                                 ${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}
                             </span>
                         </td>
-                        <td class="px-6 py-4">
-                            <button onclick="toggleLock('${u.id}', ${!u.is_locked})" class="text-sm font-bold ${u.is_locked ? 'text-green-600' : 'text-red-600'} hover:underline">
-                                ${u.is_locked ? 'DÉBLOQUER' : 'BLOQUER'}
+                        <td class="px-8 py-5 text-right">
+                            <button onclick="toggleLock('${u.id}', ${!u.is_locked})" class="p-2 rounded-xl border border-gray-200 hover:bg-white hover:shadow-md transition-all text-gray-600 hover:text-red-500">
+                                <i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-5 h-5"></i>
                             </button>
                         </td>
                     `;
                     body.appendChild(tr);
                 });
+                lucide.createIcons();
             } catch (e) { console.error(e); }
         }
 
         async function toggleLock(userId, isLocked) {
-            if (!confirm(`Voulez-vous vraiment ${isLocked ? 'bloquer' : 'débloquer'} cet utilisateur ?`)) return;
+            if (!confirm(`Souhaitez-vous vraiment ${isLocked ? 'verrouiller' : 'libérer'} cet accès ?`)) return;
             try {
-                await axios.put(`${API_URL}/admin/users/${userId}/lock`, { isLocked }, {
+                await axios.put(`${API_URL}/admin/admin/users/${userId}/lock`, { isLocked }, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 loadUsers();
-            } catch (e) { alert("Erreur lors de l'action."); }
+            } catch (e) { alert("Erreur d'autorisation."); }
         }
 
         async function sendBroadcast() {
             const title = document.getElementById('bc-title').value;
             const content = document.getElementById('bc-content').value;
-            if (!content) return alert("Le message est vide.");
+            if (!content) return;
 
             try {
                 await axios.post(`${API_URL}/admin/broadcast`, { title, content }, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                alert("Message diffusé avec succès !");
+                alert("Diffusion instantanée réussie !");
                 document.getElementById('bc-title').value = '';
                 document.getElementById('bc-content').value = '';
-            } catch (e) { alert("Erreur de diffusion."); }
+            } catch (e) { alert("Erreur lors de la diffusion."); }
         }
 
+        let currentChart = null;
         function renderChart(data) {
             const ctx = document.getElementById('growthChart').getContext('2d');
-            new Chart(ctx, {
+            if (currentChart) currentChart.destroy();
+
+            currentChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: data.map(i => new Date(i.date).toLocaleDateString()),
+                    labels: data.map(i => new Date(i.date).toLocaleDateString('fr-FR', { weekday: 'short' })),
                     datasets: [{
-                        label: 'Nouveaux inscrits',
+                        label: 'Inscriptions',
                         data: data.map(i => i.count),
                         borderColor: '#673AB7',
-                        backgroundColor: 'rgba(103, 58, 183, 0.1)',
+                        borderWidth: 4,
+                        backgroundColor: (context) => {
+                            const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 400);
+                            gradient.addColorStop(0, 'rgba(103, 58, 183, 0.2)');
+                            gradient.addColorStop(1, 'rgba(103, 58, 183, 0)');
+                            return gradient;
+                        },
                         fill: true,
-                        tension: 0.4
+                        tension: 0.4,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#673AB7',
+                        pointBorderWidth: 2
                     }]
                 },
-                options: { responsive: true, scales: { y: { beginAtZero: true, stepSize: 1 } } }
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                        x: { grid: { display: false } }
+                    }
+                }
             });
         }
 

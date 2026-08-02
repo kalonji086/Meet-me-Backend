@@ -48,7 +48,7 @@ const checkAvailability = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const register = asyncHandler(async (req, res) => {
-  const { name, email, password, phone_number, username } = req.body;
+  const { name, email, password, phone_number, username, device_info } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({
@@ -91,8 +91,8 @@ const register = asyncHandler(async (req, res) => {
   const finalUsername = usernameLower || (emailLower.split('@')[0] + Math.floor(1000 + Math.random() * 9000));
 
   const result = await query(
-    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at, device_info)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
      RETURNING id, full_name, email, username, avatar_url, status, phone_number`,
     [
       userId,
@@ -100,11 +100,26 @@ const register = asyncHandler(async (req, res) => {
       emailLower,
       hashedPassword,
       finalUsername,
-      phone_number || null
+      phone_number || null,
+      JSON.stringify(device_info || {})
     ]
   );
 
   const user = result.rows[0];
+
+  // Informer l'admin qu'un nouvel utilisateur s'est inscrit
+  const socketService = require('../services/socket.service');
+  socketService.broadcast('admin_new_user', {
+    user: {
+      id: user.id,
+      name: user.full_name,
+      email: user.email,
+      username: user.username,
+      avatar: user.avatar_url,
+      phone_number: user.phone_number,
+      created_at: new Date()
+    }
+  });
 
   const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
   const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
@@ -135,7 +150,7 @@ const register = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const login = asyncHandler(async (req, res) => {
-  const { email, password, isReauth = false } = req.body;
+  const { email, password, isReauth = false, device_info } = req.body;
 
   if (!password || (!email && !isReauth)) {
     return res.status(400).json({ success: false, error: 'Identifiants requis' });
@@ -194,10 +209,10 @@ const login = asyncHandler(async (req, res) => {
     });
   }
 
-  // 4. Succès: Réinitialiser les tentatives et mettre à jour last_login_at
+  // 4. Succès: Réinitialiser les tentatives et mettre à jour last_login_at et device_info
   await query(
-    "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW() WHERE id = $1",
-    [user.id]
+    "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(), device_info = $1 WHERE id = $2",
+    [JSON.stringify(device_info || user.device_info || {}), user.id]
   );
 
   const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });

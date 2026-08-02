@@ -87,6 +87,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='updated_at') THEN
     ALTER TABLE public.profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
   END IF;
+
+  -- device_info
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='device_info') THEN
+    ALTER TABLE public.profiles ADD COLUMN device_info JSONB DEFAULT '{}';
+  END IF;
 END $$;
 
 -- 4. Droits Administrateurs

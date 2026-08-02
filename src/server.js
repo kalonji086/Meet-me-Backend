@@ -13,7 +13,6 @@ const { pool } = require('./config/db');
 const logger = require('./utils/logger');
 
 // Middlewares
-const { authenticate } = require('./middleware/auth.middleware');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 // Routes
@@ -45,8 +44,6 @@ class Server {
 
     this.port = config.server.port;
     this.nodeEnv = config.server.nodeEnv;
-
-    // Use Postgres Pool from db config
     this.pool = pool;
 
     this.initializeDatabase();
@@ -56,197 +53,71 @@ class Server {
     this.initializeErrorHandling();
   }
 
-  // Initialisation de la base de données
   async initializeDatabase() {
     try {
-      // Vérification des variables critiques
       if (!config.database.postgres.url && !config.database.postgres.password) {
-        throw new Error('DATABASE_URL ou DB_PASSWORD manquant dans les variables d\'environnement');
+        throw new Error('DATABASE_URL manquant');
       }
 
-      // Test Postgres connection (Supabase)
-      logger.info('⏳ Tentative de connexion à Supabase (Postgres)...');
       const client = await this.pool.connect();
       try {
         await client.query('SELECT NOW()');
-        logger.info('✅ Base de données Supabase (Postgres) connectée avec succès');
-
-        // Exécuter les migrations (création automatique des tables)
+        logger.info('✅ Database connected');
         await runMigrations();
       } finally {
         client.release();
       }
 
-      // Créer les dossiers d'uploads s'ils n'existent pas
-      const uploadDirs = ['uploads', 'uploads/audio', 'uploads/images', 'uploads/videos', 'uploads/documents'];
-      uploadDirs.forEach(dir => {
-        try {
-          const dirPath = path.join(__dirname, '..', '..', dir);
-          if (!fs.existsSync(dirPath)) {
-            fs.mkdirSync(dirPath, { recursive: true });
-            logger.info(`📁 Dossier créé: ${dir}`);
-          }
-        } catch (err) {
-          logger.warn(`Impossible de créer le dossier ${dir}: ${err.message}`);
-        }
+      // Dossiers d'uploads
+      ['uploads', 'uploads/audio', 'uploads/images'].forEach(dir => {
+        const p = path.join(__dirname, '..', '..', dir);
+        if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
       });
 
     } catch (error) {
-      logger.error('❌ Erreur fatale lors de l\'initialisation de la base de données:');
-      logger.error(error.message);
-      if (error.stack) logger.debug(error.stack);
-
-      // En production sur Render, on veut voir l'erreur avant de quitter
+      logger.error('❌ DB Error:', error.message);
       setTimeout(() => process.exit(1), 1000);
     }
   }
 
-  // Initialisation des middlewares
   initializeMiddlewares() {
-    // Sécurité
-    this.app.use(helmet());
-    this.app.use(cors({
-      origin: '*',
-      credentials: true,
-    }));
-
-    // Logging
-    if (this.nodeEnv === 'development') {
-      this.app.use(morgan('dev'));
-    } else {
-      // S'assurer que le dossier logs existe
-      const logDir = path.join(__dirname, '..', '..', 'logs');
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-      }
-
-      this.app.use(morgan('combined', {
-        stream: fs.createWriteStream(
-          path.join(__dirname, '..', '..', config.logging.file),
-          { flags: 'a' }
-        ),
-      }));
-    }
-
-    // Body parsing
+    this.app.use(helmet({ contentSecurityPolicy: false }));
+    this.app.use(cors({ origin: '*', credentials: true }));
+    this.app.use(morgan(this.nodeEnv === 'development' ? 'dev' : 'combined'));
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-    // Static files
-    this.app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
-
-    // Request logging
-    this.app.use((req, res, next) => {
-      logger.debug(`${req.method} ${req.url}`);
-      next();
-    });
+    this.app.use('/uploads', express.static(path.join(__dirname, '..', '..', 'uploads')));
   }
 
-  // Initialisation des routes
   initializeRoutes() {
-    // Route racine (pour éviter les 404 sur les health checks par défaut)
-    this.app.get('/', (req, res) => {
-      res.json({
-        message: 'Bienvenue sur l\'API Meet Me',
-        status: 'online',
-        docs: '/api/docs'
-      });
-    });
+    this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me' }));
+    this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '1.0.0' }));
 
-    // Routes publiques
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);
-
-    // GLOBAL PROFILE ROUTE (To avoid any 404 from route nesting)
-    const userController = require('./controllers/user.controller');
-    this.app.get('/api/me', authenticate, userController.getMe);
-
-    // Routes protégées
     this.app.use('/api/users', userRoutes);
     this.app.use('/api/chats', chatRoutes);
     this.app.use('/api/messages', messageRoutes);
     this.app.use('/api/statuses', statusRoutes);
-
-    // Route de santé
-    this.app.get('/api/health', (req, res) => {
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: this.nodeEnv,
-        version: config.constants.appVersion,
-      });
-    });
-
-    // Documentation API
-    this.app.get('/api/docs', (req, res) => {
-      res.json({
-        name: config.constants.appName,
-        version: config.constants.appVersion,
-        endpoints: {
-          auth: {
-            login: 'POST /api/auth/login',
-            register: 'POST /api/auth/register',
-          },
-          upload: {
-            uploadFile: 'POST /api/upload',
-          },
-        },
-      });
-    });
   }
 
-  // Initialisation de Socket.IO
   initializeSocketIO() {
     socketService.initialize(this.io);
-    logger.info('✅ Socket.IO initialisé');
+    logger.info('✅ Socket.IO connected');
   }
 
-  // Initialisation de la gestion des erreurs
   initializeErrorHandling() {
     this.app.use(notFound);
     this.app.use(errorHandler);
   }
 
-  // Démarrage du serveur
   start() {
     this.server.listen(this.port, () => {
-      logger.info(`🚀 Serveur Meet Me démarré sur le port ${this.port}`);
-      logger.info(`🌍 Environnement: ${this.nodeEnv}`);
-      logger.info(`📡 CORS Origin: ${config.server.corsOrigin}`);
-      logger.info(`🔗 Health Check: http://localhost:${this.port}/api/health`);
+      logger.info(`🚀 Server on port ${this.port}`);
     });
-
-    // Gestion des arrêts gracieux
-    process.on('SIGTERM', () => this.shutdown());
-    process.on('SIGINT', () => this.shutdown());
-  }
-
-  // Arrêt gracieux du serveur
-  async shutdown() {
-    logger.info('🛑 Arrêt gracieux du serveur...');
-
-    try {
-      // Fermer Socket.IO
-      this.io.close();
-      logger.info('✅ Socket.IO fermé');
-
-      // Fermer le serveur HTTP
-      this.server.close();
-      logger.info('✅ Serveur HTTP fermé');
-
-      logger.info('👋 Serveur arrêté avec succès');
-      process.exit(0);
-    } catch (error) {
-      logger.error('❌ Erreur lors de l\'arrêt gracieux:', error);
-      process.exit(1);
-    }
   }
 }
 
-// Création et démarrage du serveur
 const server = new Server();
 server.start();
-
-// Export pour les tests
 module.exports = { app: server.app, server: server.server };

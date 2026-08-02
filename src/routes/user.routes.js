@@ -7,35 +7,29 @@ const { authenticate } = require('../middleware/auth.middleware');
 router.use(authenticate);
 
 /**
+ * @route   GET /api/users/profile/current
+ */
+router.get('/profile/current', userController.getMe);
+
+/**
  * @route   GET /api/users/search
- * @desc    Rechercher des utilisateurs
- * @access  Private
  */
 router.get('/search', userController.searchUsers);
 
 /**
  * @route   PUT /api/users/profile
- * @desc    Mettre à jour son profil
- * @access  Private
  */
 router.put('/profile', userController.updateProfile);
 
 /**
  * @route   POST /api/users/sync-contacts
- * @desc    Synchroniser les contacts téléphoniques
- * @access  Private
  */
 router.post('/sync-contacts', userController.syncContacts);
 
 /**
  * @route   PUT /api/users/privacy
  */
-router.put('/privacy', userController.updatePrivacySettings);
-
-/**
- * @route   DELETE /api/users/account
- */
-router.delete('/account', userController.deleteAccount);
+router.put('/privacy', userController.updatePrivacy);
 
 /**
  * @route   PUT /api/users/push-token

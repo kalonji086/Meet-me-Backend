@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suppression de compte - Meet Me</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-6">
+
+    <div class="max-w-xl w-full bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden">
+        <!-- Header -->
+        <div class="bg-red-600 p-10 text-center text-white relative overflow-hidden">
+            <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+            <i data-lucide="trash-2" class="w-16 h-16 mx-auto mb-4 relative z-10"></i>
+            <h1 class="text-3xl font-black relative z-10">Suppression de compte</h1>
+            <p class="text-red-100 mt-2 relative z-10">Conforme aux exigences Google Play Store</p>
+        </div>
+
+        <!-- Form Content -->
+        <div class="p-10" id="form-container">
+            <div class="mb-8 bg-red-50 p-6 rounded-3xl border border-red-100">
+                <h3 class="text-red-700 font-bold mb-2 flex items-center italic">
+                    <i data-lucide="info" class="w-4 h-4 mr-2"></i> Important
+                </h3>
+                <p class="text-red-600 text-sm leading-relaxed">
+                    La suppression de votre compte est <strong>définitive</strong>. Toutes vos données (profil, messages, photos, groupes) seront effacées de nos serveurs sous 30 jours, conformément à notre politique de confidentialité.
+                </p>
+            </div>
+
+            <form id="delete-form" onsubmit="handleDelete(event)" class="space-y-6">
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Identifiants du compte</label>
+                    <input type="email" id="email" required placeholder="Votre adresse e-mail Meet Me" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-red-500/10 outline-none transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Mot de passe pour confirmation</label>
+                    <input type="password" id="password" required placeholder="Votre mot de passe" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-red-500/10 outline-none transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Raison du départ (Optionnel)</label>
+                    <select id="reason" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none mb-4">
+                        <option value="privacy">Préoccupations liées à la vie privée</option>
+                        <option value="technical">Problèmes techniques</option>
+                        <option value="no-use">Je n'utilise plus l'application</option>
+                        <option value="other">Autre raison</option>
+                    </select>
+                </div>
+
+                <div class="flex items-start p-4 bg-gray-50 rounded-2xl">
+                    <input type="checkbox" id="confirm-check" required class="mt-1 w-5 h-5 rounded-lg text-red-600">
+                    <label for="confirm-check" class="ml-3 text-sm text-gray-500 font-medium leading-relaxed">
+                        Je confirme vouloir supprimer mon compte Meet Me et toutes les données associées de manière irréversible.
+                    </label>
+                </div>
+
+                <button type="submit" id="submit-btn" class="w-full bg-red-600 hover:bg-red-700 text-white py-5 rounded-[1.5rem] font-black shadow-xl shadow-red-100 transition-all flex items-center justify-center active:scale-95">
+                    SUPPRIMER MON COMPTE DÉFINITIVEMENT
+                </button>
+            </form>
+        </div>
+
+        <!-- Success View (Hidden by default) -->
+        <div id="success-view" class="hidden p-12 text-center animate-fade-in">
+            <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8">
+                <i data-lucide="check-circle" class="w-10 h-10"></i>
+            </div>
+            <h2 class="text-3xl font-black text-gray-900 mb-4 tracking-tighter">Demande reçue</h2>
+            <p class="text-gray-500 leading-relaxed mb-8">
+                Votre demande de suppression a été transmise à notre équipe de support. Votre compte sera désactivé immédiatement et vos données supprimées définitivement dans un délai de 30 jours.
+            </p>
+            <p class="text-gray-400 text-xs font-medium">Vous pouvez maintenant fermer cette fenêtre.</p>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-8 border-t border-gray-100 text-center">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-widest tracking-tighter">© 2026 Meet Me Security Team</p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        async function handleDelete(event) {
+            event.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const reason = document.getElementById('reason').value;
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mr-2"></i> TRAITEMENT...';
+                lucide.createIcons();
+
+                // On envoie la demande au module Support (Appeal Controller)
+                const res = await axios.post('/api/users/request-deletion', { email, password, reason });
+
+                if (res.data.success) {
+                    document.getElementById('form-container').classList.add('hidden');
+                    document.getElementById('success-view').classList.remove('hidden');
+                    lucide.createIcons();
+                } else {
+                    alert(res.data.error || "Erreur de vérification.");
+                    btn.disabled = false;
+                    btn.innerText = 'SUPPRIMER MON COMPTE DÉFINITIVEMENT';
+                }
+            } catch (e) {
+                alert("Identifiants incorrects ou problème serveur.");
+                btn.disabled = false;
+                btn.innerText = 'SUPPRIMER MON COMPTE DÉFINITIVEMENT';
+            }
+        }
+    </script>
+
+    <style>
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</body>
+</html>

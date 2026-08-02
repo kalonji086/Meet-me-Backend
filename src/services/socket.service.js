@@ -573,12 +573,12 @@ class SocketService {
   }
 
   /**
-   * Obtenir les statistiques de connexion
+   * Obtenir les statistiques de connexion (Utilisateurs uniques)
    */
   getConnectionStats() {
     return {
-      connectedUsers: this.connectedUsers ? this.connectedUsers.size : 0,
-      userSockets: this.userSockets ? this.userSockets.size : 0,
+      connectedUsers: this.userSockets ? this.userSockets.size : 0,
+      totalSockets: this.connectedUsers ? this.connectedUsers.size : 0,
       totalConnections: this.io ? this.io.engine.clientsCount : 0,
     };
   }

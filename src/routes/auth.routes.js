@@ -38,6 +38,11 @@ const changePasswordSchema = Joi.object({
 });
 
 /**
+ * @route   GET /api/auth/check-availability
+ */
+router.get('/check-availability', authController.checkAvailability);
+
+/**
  * @route   POST /api/auth/register
  * @desc    Inscription d'un nouvel utilisateur
  * @access  Public

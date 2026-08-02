@@ -48,6 +48,13 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN push_token TEXT;
   END IF;
 
+  -- Profiles: security_stats
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='login_attempts') THEN
+    ALTER TABLE public.profiles ADD COLUMN login_attempts INTEGER DEFAULT 0;
+    ALTER TABLE public.profiles ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
+    ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+
   -- Chats: description
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chats' AND column_name='description') THEN
     ALTER TABLE public.chats ADD COLUMN description TEXT;

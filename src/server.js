@@ -157,6 +157,10 @@ class Server {
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);
 
+    // GLOBAL PROFILE ROUTE (To avoid any 404 from route nesting)
+    const userController = require('./controllers/user.controller');
+    this.app.get('/api/me', authenticate, userController.getMe);
+
     // Routes protégées
     this.app.use('/api/users', userRoutes);
     this.app.use('/api/chats', chatRoutes);

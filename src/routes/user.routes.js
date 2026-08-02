@@ -14,13 +14,6 @@ router.use(authenticate);
 router.get('/search', userController.searchUsers);
 
 /**
- * @route   GET /api/users/profile/get-current
- * @desc    Obtenir son propre profil
- * @access  Private
- */
-router.get('/profile/get-current', userController.getMe);
-
-/**
  * @route   PUT /api/users/profile
  * @desc    Mettre à jour son profil
  * @access  Private

@@ -14,11 +14,11 @@ router.use(authenticate);
 router.get('/search', userController.searchUsers);
 
 /**
- * @route   GET /api/users/profile
+ * @route   GET /api/users/me
  * @desc    Obtenir son propre profil
  * @access  Private
  */
-router.get('/profile', userController.getProfile);
+router.get('/me', userController.getMe);
 
 /**
  * @route   PUT /api/users/profile

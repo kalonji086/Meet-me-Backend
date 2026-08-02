@@ -14,14 +14,11 @@ router.use(authenticate);
 router.get('/search', userController.searchUsers);
 
 /**
- * @route   GET /api/users/me
- * @desc    Obtenir son propre profil (V2)
+ * @route   GET /api/users/profile/get-current
+ * @desc    Obtenir son propre profil
  * @access  Private
  */
-router.get('/me', userController.getMe);
-
-// Debug route
-router.get('/test-route', (req, res) => res.json({ message: 'User route working' }));
+router.get('/profile/get-current', userController.getMe);
 
 /**
  * @route   PUT /api/users/profile

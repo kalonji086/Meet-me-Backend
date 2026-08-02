@@ -15,7 +15,7 @@ router.get('/search', userController.searchUsers);
 
 /**
  * @route   GET /api/users/me
- * @desc    Obtenir son propre profil
+ * @desc    Obtenir son propre profil (V2)
  * @access  Private
  */
 router.get('/me', userController.getMe);

@@ -6,7 +6,7 @@ const socketService = require('../services/socket.service');
  * @desc    Obtenir les statistiques globales
  */
 const getStats = asyncHandler(async (req, res) => {
-  const usersCount = await query('SELECT COUNT(*) FROM public.profiles');
+  const usersCount = await query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE');
   const messagesCount = await query('SELECT COUNT(*) FROM public.messages');
   const chatsCount = await query('SELECT COUNT(*) FROM public.chats');
   const groupsCount = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
@@ -15,7 +15,7 @@ const getStats = asyncHandler(async (req, res) => {
   const growth = await query(`
     SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as count
     FROM public.profiles
-    WHERE created_at > NOW() - INTERVAL '7 days'
+    WHERE created_at > NOW() - INTERVAL '7 days' AND is_global_admin = FALSE
     GROUP BY 1 ORDER BY 1 ASC
   `);
 
@@ -24,6 +24,7 @@ const getStats = asyncHandler(async (req, res) => {
     SELECT p.full_name as name, COUNT(m.id) as count
     FROM public.profiles p
     LEFT JOIN public.messages m ON p.id = m.sender_id
+    WHERE p.is_global_admin = FALSE
     GROUP BY p.id, p.full_name
     ORDER BY count DESC
     LIMIT 10
@@ -44,12 +45,13 @@ const getStats = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Lister tous les utilisateurs avec info appareil
+ * @desc    Lister tous les utilisateurs réels (exclut les admins)
  */
 const getUsers = asyncHandler(async (req, res) => {
   const result = await query(`
     SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked, login_attempts, created_at, is_global_admin, device_info, last_login_at
     FROM public.profiles
+    WHERE is_global_admin = FALSE
     ORDER BY last_login_at DESC NULLS LAST
   `);
 

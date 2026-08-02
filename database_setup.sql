@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 1. Nettoyage
+-- 1. Nettoyage initial
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'profiles_id_fkey') THEN
@@ -8,35 +8,91 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Création des tables
+-- 2. Création des tables de base (Si elles n'existent pas)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  username TEXT UNIQUE,
-  full_name TEXT,
-  avatar_url TEXT,
-  status TEXT DEFAULT 'Disponible',
-  last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  phone_number TEXT UNIQUE,
-  otp_code TEXT,
-  otp_expires_at TIMESTAMP WITH TIME ZONE,
-  login_attempts INTEGER DEFAULT 0,
-  is_locked BOOLEAN DEFAULT FALSE,
-  last_login_at TIMESTAMP WITH TIME ZONE,
-  is_global_admin BOOLEAN DEFAULT FALSE,
-  privacy_settings JSONB DEFAULT '{"last_seen": "everyone", "profile_photo": "everyone", "status": "everyone", "read_receipts": true}',
-  push_token TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  password TEXT NOT NULL
 );
 
--- 3. GARANTIE ADMIN MASTER (Crucial)
-UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'wecanconcept@gmail.com';
-UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'zuwandaku@gmail.com';
-UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'defaokalonji086@gmail.com';
+-- 3. Migration progressive de la table Profiles (Ajout des colonnes manquantes)
+DO $$
+BEGIN
+  -- username
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='username') THEN
+    ALTER TABLE public.profiles ADD COLUMN username TEXT UNIQUE;
+  END IF;
 
--- 4. Autres tables
+  -- full_name
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='full_name') THEN
+    ALTER TABLE public.profiles ADD COLUMN full_name TEXT;
+  END IF;
+
+  -- avatar_url
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='avatar_url') THEN
+    ALTER TABLE public.profiles ADD COLUMN avatar_url TEXT;
+  END IF;
+
+  -- status
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='status') THEN
+    ALTER TABLE public.profiles ADD COLUMN status TEXT DEFAULT 'Disponible';
+  END IF;
+
+  -- last_seen
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_seen') THEN
+    ALTER TABLE public.profiles ADD COLUMN last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+  END IF;
+
+  -- phone_number
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='phone_number') THEN
+    ALTER TABLE public.profiles ADD COLUMN phone_number TEXT UNIQUE;
+  END IF;
+
+  -- otp_code
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='otp_code') THEN
+    ALTER TABLE public.profiles ADD COLUMN otp_code TEXT;
+  END IF;
+
+  -- login_attempts
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='login_attempts') THEN
+    ALTER TABLE public.profiles ADD COLUMN login_attempts INTEGER DEFAULT 0;
+  END IF;
+
+  -- is_locked
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_locked') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  -- last_login_at
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_login_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+
+  -- is_global_admin
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_global_admin') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_global_admin BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  -- privacy_settings
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='privacy_settings') THEN
+    ALTER TABLE public.profiles ADD COLUMN privacy_settings JSONB DEFAULT '{"last_seen": "everyone", "profile_photo": "everyone", "status": "everyone", "read_receipts": true}';
+  END IF;
+
+  -- created_at
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='created_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+  END IF;
+
+  -- updated_at
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='updated_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+  END IF;
+END $$;
+
+-- 4. Droits Administrateurs
+UPDATE public.profiles SET is_global_admin = TRUE WHERE email IN ('wecanconcept@gmail.com', 'zuwandaku@gmail.com', 'defaokalonji086@gmail.com');
+
+-- 5. Autres tables (Migration unitaire)
 CREATE TABLE IF NOT EXISTS public.chats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT,
@@ -69,7 +125,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. Triggers
+-- 6. Fonctions et Triggers
 CREATE OR REPLACE FUNCTION update_last_message_at()
 RETURNS TRIGGER AS $$
 BEGIN

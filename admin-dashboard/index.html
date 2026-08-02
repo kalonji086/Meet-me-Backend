@@ -189,8 +189,8 @@
                     <textarea id="admin-reply-content" rows="6" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-[1.5rem] focus:ring-4 focus:ring-purple-500/10 outline-none transition-all" placeholder="Écrivez votre décision..."></textarea>
                 </div>
                 <div class="flex space-x-4">
-                    <button onclick="submitAppealReply('resolved')" class="flex-1 py-5 bg-green-600 text-white font-black rounded-2xl shadow-xl shadow-green-100 hover:bg-green-700 active:scale-95 transition-all">ACCÉDER & RÉPONDRE</button>
-                    <button onclick="submitAppealReply('reviewed')" class="flex-1 py-5 bg-black text-white font-black rounded-2xl shadow-xl shadow-black/10 hover:bg-gray-900 active:scale-95 transition-all">MAINTENIR & RÉPONDRE</button>
+                    <button onclick="showImpactModal('appeal_resolve', selectedAppealId, 'resolved')" class="flex-1 py-5 bg-green-600 text-white font-black rounded-2xl shadow-xl shadow-green-100 hover:bg-green-700 active:scale-95 transition-all">ACCÉDER & RÉPONDRE</button>
+                    <button onclick="showImpactModal('appeal_resolve', selectedAppealId, 'reviewed')" class="flex-1 py-5 bg-black text-white font-black rounded-2xl shadow-xl shadow-black/10 hover:bg-gray-900 active:scale-95 transition-all">MAINTENIR & RÉPONDRE</button>
                 </div>
             </div>
         </div>
@@ -204,8 +204,8 @@
         </div>
     </div>
 
-    <!-- IMPACT MODAL -->
-    <div id="impact-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[150] p-6 backdrop-blur-md">
+    <!-- IMPACT MODAL (MEME STYLE) -->
+    <div id="impact-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[200] p-6 backdrop-blur-md">
         <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in">
             <div id="impact-header" class="h-40 flex items-center justify-center relative overflow-hidden"><i id="impact-icon" data-lucide="alert-triangle" class="w-16 h-16 text-white"></i></div>
             <div class="p-10 text-center">
@@ -325,12 +325,12 @@
 
                 res.data.data.forEach(a => {
                     const tr = document.createElement('tr');
-                    tr.className = "border-b border-gray-50 hover:bg-gray-50";
+                    tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
                     tr.innerHTML = `
-                        <td class="px-8 py-5"><p class="font-bold">${a.full_name}</p><p class="text-xs text-gray-400">${a.email}</p></td>
-                        <td class="px-8 py-5"><p class="text-sm italic text-gray-600 line-clamp-1">${a.reason}</p></td>
-                        <td class="px-8 py-5 text-xs text-gray-400 font-bold">${new Date(a.created_at).toLocaleDateString()}</td>
-                        <td class="px-8 py-5 text-right"><button onclick="examineAppeal('${a.id}', '${a.reason.replace(/'/g, "\\'")}')" class="px-4 py-2 bg-purple-600 text-white text-xs font-black rounded-xl hover:bg-purple-700 transition-all">${a.status === 'pending' ? 'EXAMINER' : 'GÉRÉ'}</button></td>
+                        <td class="px-8 py-5"><p class="font-bold text-gray-800">${a.full_name}</p><p class="text-xs text-gray-400 font-medium">${a.email}</p></td>
+                        <td class="px-8 py-5"><p class="text-sm italic text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100">${a.reason}</p></td>
+                        <td class="px-8 py-5 text-xs text-gray-400 font-bold uppercase tracking-tighter">${new Date(a.created_at).toLocaleDateString()}</td>
+                        <td class="px-8 py-5 text-right"><button onclick="examineAppeal('${a.id}', '${a.reason.replace(/'/g, "\\'")}')" class="px-5 py-2.5 bg-purple-600 text-white text-xs font-black rounded-xl hover:bg-purple-700 active:scale-95 transition-all shadow-lg shadow-purple-100">${a.status === 'pending' ? 'EXAMINER' : 'GÉRÉ'}</button></td>
                     `;
                     body.appendChild(tr);
                 });
@@ -341,6 +341,7 @@
         function examineAppeal(id, reason) {
             selectedAppealId = id;
             document.getElementById('appeal-reason').innerText = reason;
+            document.getElementById('admin-reply-content').value = "";
             document.getElementById('modal-appeal').classList.remove('hidden');
             lucide.createIcons();
         }
@@ -352,13 +353,14 @@
             if (!reply) return alert("Veuillez saisir votre réponse.");
             try {
                 await axios.post(`${API_URL}/admin/appeals/${selectedAppealId}/reply`, { reply, action }, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Réponse envoyée par email !");
+                closeImpactModal();
                 closeAppealModal();
+                alert("Réponse envoyée avec succès !");
                 loadAppeals();
             } catch (e) { alert("Erreur."); }
         }
 
-        // --- Standard Dash Functions (Lock/Delete/etc) ---
+        // --- IMPACT MODAL LOGIC (MEME STYLE) ---
         function showImpactModal(type, id, extra = null) {
             const modal = document.getElementById('impact-modal');
             const header = document.getElementById('impact-header');
@@ -378,31 +380,51 @@
                 icon.setAttribute('data-lucide', isLocking ? 'lock' : 'unlock'); title.innerText = isLocking ? "BANNISSEMENT" : "RÉTABLISSEMENT";
                 message.innerText = isLocking ? "Bannir cet utilisateur ?" : "Rétablir l'accès ?"; confirmBtn.onclick = () => performLock(id, isLocking);
                 confirmBtn.className = isLocking ? "flex-1 py-4 bg-black text-white font-black rounded-2xl" : "flex-1 py-4 bg-green-600 text-white font-black rounded-2xl";
+            } else if (type === 'group_ban') {
+                const isBanning = extra;
+                header.className = isBanning ? "h-40 flex items-center justify-center bg-gray-900" : "h-40 flex items-center justify-center bg-blue-500";
+                icon.setAttribute('data-lucide', isBanning ? 'slash' : 'check-circle'); title.innerText = isBanning ? "FERMETURE GROUPE" : "RÉOUVERTURE";
+                message.innerText = isBanning ? "Bloquer toute activité dans ce groupe ?" : "Restaurer le groupe ?"; confirmBtn.onclick = () => performGroupBan(id, isBanning);
+                confirmBtn.className = isBanning ? "flex-1 py-4 bg-gray-900 text-white font-black rounded-2xl" : "flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl";
+            } else if (type === 'group_delete') {
+                header.className = "h-40 flex items-center justify-center bg-red-900";
+                icon.setAttribute('data-lucide', 'trash'); title.innerText = "DISSOLUTION FINALE";
+                message.innerText = "Supprimer ce groupe et tous ses messages ?"; confirmBtn.onclick = () => performGroupDelete(id);
+                confirmBtn.className = "flex-1 py-4 bg-red-900 text-white font-black rounded-2xl";
+            } else if (type === 'appeal_resolve') {
+                const action = extra;
+                header.className = action === 'resolved' ? "h-40 flex items-center justify-center bg-green-500" : "h-40 flex items-center justify-center bg-black";
+                icon.setAttribute('data-lucide', 'mail-check'); title.innerText = "ENVOI DÉCISION";
+                message.innerText = action === 'resolved' ? "Valider cette demande et informer l'utilisateur de sa réintégration ?" : "Maintenir la sanction et envoyer l'e-mail de confirmation ?";
+                confirmBtn.onclick = () => submitAppealReply(action);
+                confirmBtn.className = action === 'resolved' ? "flex-1 py-4 bg-green-600 text-white font-black rounded-2xl" : "flex-1 py-4 bg-black text-white font-black rounded-2xl";
             }
             modal.classList.remove('hidden'); lucide.createIcons();
         }
 
         async function performDelete(id) { await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadUsers(); }
         async function performLock(id, isLocked) { await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadUsers(); }
+        async function performGroupBan(id, isBanned) { await axios.put(`${API_URL}/admin/groups/${id}/ban`, { isBanned }, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadGroups(); }
+        async function performGroupDelete(id) { await axios.delete(`${API_URL}/admin/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } }); closeImpactModal(); loadGroups(); }
+
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }
         function closeModal() { document.getElementById('modal-members').classList.add('hidden'); }
+
         async function loadGroups() {
             try {
                 const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
-                const body = document.getElementById('groups-table-body');
-                body.innerHTML = '';
+                const body = document.getElementById('groups-table-body'); body.innerHTML = '';
                 res.data.data.forEach(g => {
                     const tr = document.createElement('tr'); tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
-                    tr.innerHTML = `<td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-11 h-11 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p></div></div></td><td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td><td class="px-8 py-5"><button onclick="viewMembers('${g.id}')" class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors mb-2 block">${g.members_count} membres</button><span class="text-[10px] font-black ${g.is_banned ? 'text-red-500' : 'text-green-500'}">${g.is_banned ? 'BANNI' : 'ACTIF'}</span></td><td class="px-8 py-5 text-right space-x-2"><button onclick="showImpactModal('group_ban', '${g.id}', ${!g.is_banned})" class="p-2 text-gray-400 hover:text-purple-600"><i data-lucide="${g.is_banned ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button></td>`;
+                    tr.innerHTML = `<td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-11 h-11 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p></div></div></td><td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td><td class="px-8 py-5"><button onclick="viewMembers('${g.id}')" class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors mb-2 block">${g.members_count} membres</button><span class="text-[10px] font-black ${g.is_banned ? 'text-red-500' : 'text-green-500'}">${g.is_banned ? 'BANNI' : 'ACTIF'}</span></td><td class="px-8 py-5 text-right space-x-2"><button onclick="showImpactModal('group_ban', '${g.id}', ${!g.is_banned})" class="p-2 text-gray-400 hover:text-purple-600"><i data-lucide="${g.is_banned ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button><button onclick="showImpactModal('group_delete', '${g.id}')" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="trash-2" class="w-5 h-5"></i></button></td>`;
                     body.appendChild(tr);
-                });
-                lucide.createIcons();
+                }); lucide.createIcons();
             } catch (e) {}
         }
         async function viewMembers(chatId) {
             const res = await axios.get(`${API_URL}/admin/groups/${chatId}/members`, { headers: { Authorization: `Bearer ${token}` } });
             const list = document.getElementById('members-list'); list.innerHTML = '';
-            res.data.data.forEach(m => { const div = document.createElement('div'); div.className = "flex items-center p-3 bg-gray-50 rounded-2xl"; div.innerHTML = `<img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+m.full_name}" class="w-10 h-10 rounded-full mr-4"><div class="flex-1"><p class="font-bold text-gray-800">${m.full_name}</p><p class="text-xs text-gray-500">@${m.username || 'n/a'}</p></div>`; list.appendChild(div); });
+            res.data.data.forEach(m => { const div = document.createElement('div'); div.className = "flex items-center p-3 bg-gray-50 rounded-2xl"; div.innerHTML = `<img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+m.full_name}" class="w-10 h-10 rounded-full mr-4"><div class="flex-1"><p class="font-bold text-gray-800">${m.full_name} ${m.role === 'admin' ? '<span class="text-[9px] bg-purple-600 text-white px-1.5 py-0.5 rounded ml-2">ADMIN</span>' : ''}</p><p class="text-xs text-gray-500">@${m.username || 'n/a'}</p></div>`; list.appendChild(div); });
             document.getElementById('modal-members').classList.remove('hidden'); lucide.createIcons();
         }
         async function sendBroadcast() {

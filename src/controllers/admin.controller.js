@@ -205,4 +205,16 @@ const replyToAppeal = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Réponse envoyée par email.' });
 });
 
-module.exports = { getStats, getUsers, deleteUser, toggleUserLock, getGroups, getGroupMembers, broadcastMessage, getAppeals, replyToAppeal };
+module.exports = {
+  getStats,
+  getUsers,
+  deleteUser,
+  toggleUserLock,
+  getGroups,
+  getGroupMembers,
+  toggleGroupBan,
+  deleteGroup,
+  broadcastMessage,
+  getAppeals,
+  replyToAppeal
+};

@@ -20,6 +20,7 @@ const chatRoutes = require('./routes/chat.routes');
 const messageRoutes = require('./routes/message.routes');
 const statusRoutes = require('./routes/status.routes');
 const adminRoutes = require('./routes/admin.routes');
+const callRoutes = require('./routes/call.routes');
 
 // Controllers pour routes directes
 const userController = require('./controllers/user.controller');
@@ -107,6 +108,7 @@ class Server {
     this.app.use('/api/messages', messageRoutes);
     this.app.use('/api/statuses', statusRoutes);
     this.app.use('/api/admin', adminRoutes);
+    this.app.use('/api/calls', callRoutes);
 
     // Servir le Dashboard Admin
     const adminPath = path.join(__dirname, '..', 'admin-dashboard');

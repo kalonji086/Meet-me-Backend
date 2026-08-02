@@ -1,7 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Supprimer la contrainte de clé étrangère avec Supabase Auth si elle existe
--- Cela permet au backend personnalisé de gérer ses propres IDs
+-- 1. Nettoyage et initialisation des types
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'profiles_id_fkey') THEN
@@ -9,93 +8,7 @@ BEGIN
   END IF;
 END $$;
 
--- Assurer que les colonnes id ont bien le défaut gen_random_uuid()
-DO $$
-BEGIN
-  -- Profiles
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles' AND table_schema = 'public') THEN
-    ALTER TABLE public.profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
-  END IF;
-
-  -- Chats
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'chats' AND table_schema = 'public') THEN
-    ALTER TABLE public.chats ALTER COLUMN id SET DEFAULT gen_random_uuid();
-  END IF;
-
-  -- Messages
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'messages' AND table_schema = 'public') THEN
-    ALTER TABLE public.messages ALTER COLUMN id SET DEFAULT gen_random_uuid();
-  END IF;
-
-  -- AJOUT DES COLONNES MANQUANTES SI ELLES EXISTENT DÉJÀ
-  -- Profiles: phone_number
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='phone_number') THEN
-    ALTER TABLE public.profiles ADD COLUMN phone_number TEXT UNIQUE;
-  END IF;
-
-  -- Chat Participants: is_archived
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_participants' AND column_name='is_archived') THEN
-    ALTER TABLE public.chat_participants ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
-  END IF;
-
-  -- Profiles: privacy_settings
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='privacy_settings') THEN
-    ALTER TABLE public.profiles ADD COLUMN privacy_settings JSONB DEFAULT '{"last_seen": "everyone", "profile_photo": "everyone", "status": "everyone", "read_receipts": true}';
-  END IF;
-
-  -- Profiles: push_token
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='push_token') THEN
-    ALTER TABLE public.profiles ADD COLUMN push_token TEXT;
-  END IF;
-
-  -- Profiles: security_stats
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='login_attempts') THEN
-    ALTER TABLE public.profiles ADD COLUMN login_attempts INTEGER DEFAULT 0;
-    ALTER TABLE public.profiles ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
-    ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
-    ALTER TABLE public.profiles ADD COLUMN is_global_admin BOOLEAN DEFAULT FALSE;
-  END IF;
-
--- Définir l'administrateur principal
-UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'defaokalonji086@gmail.com';
-
-  -- Chats: description
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chats' AND column_name='description') THEN
-    ALTER TABLE public.chats ADD COLUMN description TEXT;
-  END IF;
-
-  -- Chat Participants: role
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_participants' AND column_name='role') THEN
-    ALTER TABLE public.chat_participants ADD COLUMN role TEXT DEFAULT 'member' CHECK (role IN ('member', 'admin'));
-  END IF;
-END $$;
-
--- ==========================================
--- 8. TABLE DES APPELS
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.calls (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  caller_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  type TEXT DEFAULT 'audio' CHECK (type IN ('audio', 'video')),
-  status TEXT DEFAULT 'missed' CHECK (status IN ('missed', 'answered', 'rejected')),
-  duration INTEGER DEFAULT 0, -- en secondes
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ==========================================
--- 9. TABLE DES VUES DE STATUS
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.status_views (
-  status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  PRIMARY KEY (status_id, user_id)
-);
-
--- ==========================================
--- 1. TABLE DES PROFILS
--- ==========================================
+-- 2. Création des tables si elles n'existent pas
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
@@ -108,17 +21,53 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   phone_number TEXT UNIQUE,
   otp_code TEXT,
   otp_expires_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ==========================================
--- 2. TABLE DES CONVERSATIONS (CHATS)
--- ==========================================
+-- 3. Mise à jour des colonnes une par une (Sécurité et Admin)
+DO $$
+BEGIN
+  -- login_attempts
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='login_attempts') THEN
+    ALTER TABLE public.profiles ADD COLUMN login_attempts INTEGER DEFAULT 0;
+  END IF;
+
+  -- is_locked
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_locked') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  -- last_login_at
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_login_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+
+  -- is_global_admin
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_global_admin') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_global_admin BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  -- privacy_settings
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='privacy_settings') THEN
+    ALTER TABLE public.profiles ADD COLUMN privacy_settings JSONB DEFAULT '{"last_seen": "everyone", "profile_photo": "everyone", "status": "everyone", "read_receipts": true}';
+  END IF;
+
+  -- push_token
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='push_token') THEN
+    ALTER TABLE public.profiles ADD COLUMN push_token TEXT;
+  END IF;
+END $$;
+
+-- 4. Initialisation des droits Admin (Séparé du bloc DO pour éviter les erreurs de parsing)
+UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'defaokalonji086@gmail.com';
+
+-- 5. Autres tables
 CREATE TABLE IF NOT EXISTS public.chats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT, -- Nom pour les groupes
-  description TEXT, -- Description du groupe
-  avatar_url TEXT, -- Image de groupe
+  name TEXT,
+  description TEXT,
+  avatar_url TEXT,
   type TEXT DEFAULT 'private' CHECK (type IN ('private', 'group')),
   last_message TEXT,
   last_message_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -126,9 +75,6 @@ CREATE TABLE IF NOT EXISTS public.chats (
   created_by UUID REFERENCES public.profiles(id)
 );
 
--- ==========================================
--- 3. TABLE DES PARTICIPANTS
--- ==========================================
 CREATE TABLE IF NOT EXISTS public.chat_participants (
   chat_id UUID REFERENCES public.chats(id) ON DELETE CASCADE,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -138,52 +84,39 @@ CREATE TABLE IF NOT EXISTS public.chat_participants (
   PRIMARY KEY (chat_id, user_id)
 );
 
--- ==========================================
--- 4. TABLE DES MESSAGES
--- ==========================================
 CREATE TABLE IF NOT EXISTS public.messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chat_id UUID REFERENCES public.chats(id) ON DELETE CASCADE,
   sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image', 'audio', 'video', 'file')),
-  file_url TEXT, -- Si type != 'text'
+  file_url TEXT,
   status TEXT DEFAULT 'sent' CHECK (status IN ('sent', 'delivered', 'read')),
-  translated_content JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ==========================================
--- 5. TABLE DES STATUS (ACTUS)
--- ==========================================
+CREATE TABLE IF NOT EXISTS public.calls (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  caller_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type TEXT DEFAULT 'audio' CHECK (type IN ('audio', 'video')),
+  status TEXT DEFAULT 'missed' CHECK (status IN ('missed', 'answered', 'rejected')),
+  duration INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.statuses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  content TEXT, -- Texte du status ou légende de la photo
+  content TEXT,
   type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image')),
-  media_url TEXT, -- URL de l'image si type = 'image'
-  background_color TEXT DEFAULT '#128C7E', -- Pour les status texte
+  media_url TEXT,
+  background_color TEXT DEFAULT '#128C7E',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours')
 );
 
--- ==========================================
--- 6. TABLE DES RÉACTIONS DE STATUS
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.status_reactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  content TEXT, -- Le commentaire, l'emoji ou l'identifiant du sticker
-  type TEXT DEFAULT 'emoji' CHECK (type IN ('emoji', 'comment', 'sticker', 'like')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ==========================================
--- 7. FONCTIONS ET TRIGGERS
--- ==========================================
-
--- Mise à jour automatique de last_message dans la table chats
+-- 6. Fonctions et Triggers
 CREATE OR REPLACE FUNCTION update_last_message_at()
 RETURNS TRIGGER AS $$
 BEGIN

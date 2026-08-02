@@ -5,13 +5,12 @@ const socketService = require('../services/socket.service');
 
 /**
  * @desc    Obtenir le profil de l'utilisateur actuel
- * @route   GET /api/me (Route globale consolidée)
  */
 const getMe = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   const result = await query(
-    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin FROM public.profiles WHERE id = $1',
+    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin, is_locked FROM public.profiles WHERE id = $1',
     [userId]
   );
 
@@ -21,46 +20,42 @@ const getMe = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
   }
 
+  // Vérification immédiate du blocage
+  if (user.is_locked) {
+    return res.status(403).json({
+      success: false,
+      error: 'Compte banni',
+      isLocked: true,
+      message: 'Votre compte a été suspendu pour non-respect de nos conditions d\'utilisation.'
+    });
+  }
+
   res.json({
     success: true,
     data: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
+      ...user,
       name: user.full_name,
-      avatar: user.avatar_url,
-      status: user.status,
-      phone_number: user.phone_number,
-      last_seen: user.last_seen,
-      privacy_settings: user.privacy_settings,
-      last_login_at: user.last_login_at,
-      is_global_admin: user.is_global_admin
+      avatar: user.avatar_url
     },
   });
 });
 
 /**
  * @desc    Mettre à jour le profil
- * @route   PUT /api/users/profile
  */
 const updateProfile = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const { name, status, avatar_url, username } = req.body;
 
-  // Si on veut changer de pseudo, on vérifie la disponibilité
   if (username) {
     const usernameLower = username.toLowerCase().trim();
-
-    // Vérifier les caractères autorisés (lettres, chiffres, underscores, points)
     if (!/^[a-z0-9_.]+$/.test(usernameLower)) {
       return res.status(400).json({ success: false, error: 'Le pseudo contient des caractères non autorisés' });
     }
-
     const existing = await query(
       'SELECT id FROM public.profiles WHERE LOWER(username) = $1 AND id != $2',
       [usernameLower, userId]
     );
-
     if (existing.rows.length > 0) {
       return res.status(400).json({ success: false, error: 'Ce pseudo n\'est pas disponible' });
     }
@@ -79,143 +74,89 @@ const updateProfile = asyncHandler(async (req, res) => {
   );
 
   const updatedUser = result.rows[0];
-
-  // Diffuser le changement via Socket.IO
   socketService.notifyUserStatusChange(userId, updatedUser.status);
-  socketService.broadcast('user_profile_updated', {
-    userId,
-    name: updatedUser.full_name,
-    username: updatedUser.username,
-    avatar: updatedUser.avatar_url,
-    status: updatedUser.status
-  });
 
   res.json({
     success: true,
-    data: {
-      ...updatedUser,
-      name: updatedUser.full_name,
-      avatar: updatedUser.avatar_url
-    },
-    message: 'Profil mis à jour avec succès',
+    data: { ...updatedUser, name: updatedUser.full_name, avatar: updatedUser.avatar_url },
+    message: 'Profil mis à jour',
   });
 });
 
 /**
- * @desc    Rechercher des utilisateurs
- * @route   GET /api/users/search
+ * @desc    Rechercher des utilisateurs (Exclut les bannis)
  */
 const searchUsers = asyncHandler(async (req, res) => {
   const { query: searchQuery } = req.query;
   const userId = req.userId;
 
-  if (!searchQuery) {
-    return res.json({ success: true, data: [] });
-  }
+  if (!searchQuery) return res.json({ success: true, data: [] });
 
   const searchTerm = `%${searchQuery.toLowerCase()}%`;
 
   const result = await query(
-    `SELECT id, full_name, avatar_url, status, username, phone_number
+    `SELECT id, full_name, avatar_url, status, username
      FROM public.profiles
-     WHERE (LOWER(full_name) LIKE $1
-        OR LOWER(username) LIKE $1
-        OR phone_number LIKE $1
-        OR email LIKE $1)
+     WHERE (LOWER(full_name) LIKE $1 OR LOWER(username) LIKE $1 OR phone_number LIKE $1)
        AND id != $2
+       AND is_locked = FALSE
+       AND is_global_admin = FALSE
      LIMIT 20`,
     [searchTerm, userId]
   );
 
-  res.json({
-    success: true,
-    data: result.rows,
-  });
+  res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Synchroniser les contacts
- * @route   POST /api/users/sync-contacts
+ * @desc    Synchroniser les contacts (Exclut les bannis)
  */
 const syncContacts = asyncHandler(async (req, res) => {
   const { phoneNumbers } = req.body;
   const userId = req.userId;
 
   if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
-    return res.status(400).json({ success: false, error: 'Liste de numéros requise' });
+    return res.status(400).json({ success: false, error: 'Liste requise' });
   }
 
   const result = await query(
     `SELECT id, full_name, avatar_url, status, phone_number, username
      FROM public.profiles
-     WHERE phone_number = ANY($1) AND id != $2`,
+     WHERE phone_number = ANY($1)
+       AND id != $2
+       AND is_locked = FALSE
+       AND is_global_admin = FALSE`,
     [phoneNumbers, userId]
   );
 
-  res.json({
-    success: true,
-    data: result.rows,
-  });
+  res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Mettre à jour les paramètres de confidentialité
+ * @desc    Mettre à jour la confidentialité
  */
 const updatePrivacy = asyncHandler(async (req, res) => {
-  const { privacySettings } = req.body;
-  const userId = req.userId;
-
-  await query(
-    'UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2',
-    [JSON.stringify(privacySettings), userId]
-  );
-
-  res.json({ success: true, message: 'Paramètres mis à jour' });
-});
-
-/**
- * @desc    Mettre à jour le push token
- */
-const updatePushToken = asyncHandler(async (req, res) => {
-  const { pushToken } = req.body;
-  const userId = req.userId;
-
-  await query(
-    'UPDATE public.profiles SET push_token = $1 WHERE id = $2',
-    [pushToken, userId]
-  );
-
+  await query('UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2', [JSON.stringify(req.body.privacySettings), req.userId]);
   res.json({ success: true });
 });
 
 /**
- * @desc    Obtenir les badges (non lus)
+ * @desc    Push token
  */
-const getBadges = asyncHandler(async (req, res) => {
-  const userId = req.userId;
-
-  // Compter messages non lus
-  const msgRes = await query(
-    'SELECT COUNT(*) FROM public.messages m JOIN public.chat_participants cp ON m.chat_id = cp.chat_id WHERE cp.user_id = $1 AND m.sender_id != $1 AND m.status != \'read\'',
-    [userId]
-  );
-
-  res.json({
-    success: true,
-    data: {
-      messages: parseInt(msgRes.rows[0].count),
-      calls: 0,
-      status: 0
-    }
-  });
+const updatePushToken = asyncHandler(async (req, res) => {
+  await query('UPDATE public.profiles SET push_token = $1 WHERE id = $2', [req.body.pushToken, req.userId]);
+  res.json({ success: true });
 });
 
-module.exports = {
-  getMe,
-  updateProfile,
-  searchUsers,
-  syncContacts,
-  updatePrivacy,
-  updatePushToken,
-  getBadges
-};
+/**
+ * @desc    Badges
+ */
+const getBadges = asyncHandler(async (req, res) => {
+  const msgRes = await query(
+    'SELECT COUNT(*) FROM public.messages m JOIN public.chat_participants cp ON m.chat_id = cp.chat_id WHERE cp.user_id = $1 AND m.sender_id != $1 AND m.status != \'read\'',
+    [req.userId]
+  );
+  res.json({ success: true, data: { messages: parseInt(msgRes.rows[0].count), calls: 0, status: 0 } });
+});
+
+module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges };

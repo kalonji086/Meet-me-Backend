@@ -10,13 +10,16 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .sidebar-item:hover { background-color: rgba(255,255,255,0.05); }
         .sidebar-item.active { background-color: #673AB7; color: white !important; }
         .amazon-bg { background-color: #1a222f; }
         .animate-fade-in { animation: fadeIn 0.3s ease-in; }
+        .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .meme-shadow { text-shadow: 2px 2px 0px #000; }
     </style>
 </head>
 <body class="bg-gray-50 flex h-screen overflow-hidden">
@@ -123,7 +126,7 @@
                         </div>
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
                             <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="zap" class="w-7 h-7 text-green-600"></i></div>
-                            <div><p class="text-gray-400 text-sm font-bold uppercase">En ligne</p><h4 id="stat-online" class="text-3xl font-black text-green-600">0</h4></div>
+                            <div><p class="text-gray-400 text-sm font-bold uppercase">En ligne</p><h4 id="stat-online" class="text-3xl font-black">0</h4></div>
                         </div>
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center">
                             <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="message-circle" class="w-7 h-7 text-blue-600"></i></div>
@@ -141,7 +144,7 @@
                             <canvas id="growthChart" height="150"></canvas>
                         </div>
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                            <h3 class="text-xl font-bold mb-8">Activité Utilisateurs (Messages)</h3>
+                            <h3 class="text-xl font-bold mb-8">Utilisateurs les plus actifs (Messages)</h3>
                             <canvas id="activityChart" height="150"></canvas>
                         </div>
                     </div>
@@ -173,7 +176,7 @@
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Groupe</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Créateur</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Membres</th>
-                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
+                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Date</th>
                                 </tr>
                             </thead>
                             <tbody id="groups-table-body"></tbody>
@@ -232,6 +235,27 @@
                 </button>
             </div>
             <div id="members-list" class="max-h-[60vh] overflow-y-auto p-4 space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- CUSTOM IMPACT MODAL (MEME STYLE) -->
+    <div id="impact-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-6 backdrop-blur-md">
+        <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-[0_0_50px_rgba(255,0,0,0.3)] overflow-hidden animate-pop-in">
+            <div id="impact-header" class="h-40 flex items-center justify-center relative overflow-hidden">
+                <div id="impact-bg-pattern" class="absolute inset-0 opacity-20"></div>
+                <div class="relative z-10 p-4 bg-white/20 rounded-full backdrop-blur-sm border border-white/30">
+                    <i id="impact-icon" data-lucide="alert-triangle" class="w-16 h-16 text-white"></i>
+                </div>
+            </div>
+            <div class="p-10 text-center">
+                <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-4 uppercase tracking-tighter meme-shadow">ATTENTION !</h3>
+                <p id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-10">Êtes-vous absolument sûr de vouloir effectuer cette action irréversible ?</p>
+
+                <div class="flex space-x-4">
+                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition-all">ANNULER</button>
+                    <button id="impact-confirm-btn" class="flex-1 py-4 bg-red-600 text-white font-black rounded-2xl shadow-lg shadow-red-200 hover:bg-red-700 transition-all active:scale-95">CONFIRMER</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -337,28 +361,23 @@
                         <td class="px-8 py-5">
                             <div class="flex items-center">
                                 <img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-11 h-11 rounded-xl mr-4 shadow-sm">
-                                <div><p class="font-bold">${u.full_name}</p><p class="text-[10px] text-blue-500 font-bold uppercase">${dev.brand || 'Appareil'} ${dev.model || ''}</p></div>
+                                <div>
+                                    <p class="font-bold">${u.full_name}</p>
+                                    <p class="text-[10px] text-blue-500 font-bold uppercase">${dev.brand || 'Appareil'} ${dev.model || ''}</p>
+                                </div>
                             </div>
                         </td>
                         <td class="px-8 py-5 text-sm"><p class="font-medium text-gray-700">${u.email}</p><p class="text-gray-400 text-xs font-bold tracking-tighter">${u.phone_number || ''}</p></td>
                         <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-xs font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span><p class="text-[9px] text-gray-400 mt-1 uppercase font-bold">Vu: ${lastLogin}</p></td>
                         <td class="px-8 py-5 text-right space-x-2">
-                            <button onclick="toggleLock('${u.id}', ${!u.is_locked})" class="p-2 text-gray-400 hover:text-purple-600"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button>
-                            <button onclick="deleteUser('${u.id}')" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                            <button onclick="showImpactModal('lock', '${u.id}', ${!u.is_locked})" class="p-2 text-gray-400 hover:text-purple-600"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button>
+                            <button onclick="showImpactModal('delete', '${u.id}')" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
                         </td>
                     `;
                     body.appendChild(tr);
                 });
                 lucide.createIcons();
             } catch (e) { console.error('Users Error:', e); }
-        }
-
-        async function deleteUser(id) {
-            if (!confirm("Supprimer définitivement ce compte ?")) return;
-            try {
-                await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-                loadUsers();
-            } catch (e) { alert("Erreur."); }
         }
 
         async function loadGroups() {
@@ -370,15 +389,64 @@
                     const tr = document.createElement('tr');
                     tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
                     tr.innerHTML = `
-                        <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-10 h-10 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p></div></div></td>
-                        <td class="px-8 py-5 text-sm">${g.creator_name || 'Système'}</td>
+                        <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-11 h-11 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p></div></div></td>
+                        <td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td>
                         <td class="px-8 py-5"><button onclick="viewMembers('${g.id}')" class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors">${g.members_count} membres</button></td>
                         <td class="px-8 py-5 text-right text-xs text-gray-400 font-bold">${new Date(g.created_at).toLocaleDateString()}</td>
                     `;
                     body.appendChild(tr);
                 });
                 lucide.createIcons();
-            } catch (e) { console.error('Groups Error:', e); }
+            } catch (e) { console.error(e); }
+        }
+
+        // IMPACT MODAL LOGIC (MEME STYLE)
+        function showImpactModal(type, id, extra = null) {
+            const modal = document.getElementById('impact-modal');
+            const header = document.getElementById('impact-header');
+            const icon = document.getElementById('impact-icon');
+            const title = document.getElementById('impact-title');
+            const message = document.getElementById('impact-message');
+            const confirmBtn = document.getElementById('impact-confirm-btn');
+
+            if (type === 'delete') {
+                header.className = "h-40 flex items-center justify-center relative overflow-hidden bg-red-600";
+                icon.setAttribute('data-lucide', 'trash-2');
+                title.innerText = "SUPPRESSION TOTALE";
+                title.className = "text-3xl font-black text-red-600 mb-4 uppercase tracking-tighter meme-shadow";
+                message.innerText = "Voulez-vous vraiment désintégrer ce compte ? Cette action est irréversible et toutes les données seront perdues.";
+                confirmBtn.onclick = () => performDelete(id);
+            } else if (type === 'lock') {
+                const isLocking = extra;
+                header.className = isLocking ? "h-40 flex items-center justify-center relative overflow-hidden bg-black" : "h-40 flex items-center justify-center relative overflow-hidden bg-green-500";
+                icon.setAttribute('data-lucide', isLocking ? 'lock' : 'unlock');
+                title.innerText = isLocking ? "BANISSEMENT IMMÉDIAT" : "RÉTABLISSEMENT ACCÈS";
+                title.className = isLocking ? "text-3xl font-black text-black mb-4 uppercase tracking-tighter" : "text-3xl font-black text-green-600 mb-4 uppercase tracking-tighter";
+                message.innerText = isLocking ? "L'utilisateur sera banni de l'application Meet Me instantanément." : "Voulez-vous lever les sanctions et autoriser à nouveau l'accès pour cet utilisateur ?";
+                confirmBtn.onclick = () => performLock(id, isLocking);
+                confirmBtn.className = isLocking ? "flex-1 py-4 bg-black text-white font-black rounded-2xl shadow-lg hover:bg-gray-900 transition-all active:scale-95" : "flex-1 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg hover:bg-green-700 transition-all active:scale-95";
+            }
+
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }
+
+        async function performDelete(id) {
+            try {
+                await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                closeImpactModal();
+                loadUsers();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function performLock(id, isLocked) {
+            try {
+                await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } });
+                closeImpactModal();
+                loadUsers();
+            } catch (e) { alert("Erreur."); }
         }
 
         async function viewMembers(chatId) {
@@ -398,11 +466,6 @@
         }
 
         function closeModal() { document.getElementById('modal-members').classList.add('hidden'); }
-
-        async function toggleLock(id, isLocked) {
-            await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } });
-            loadUsers();
-        }
 
         function toggleSpecificEmail() {
             const target = document.getElementById('bc-target').value;

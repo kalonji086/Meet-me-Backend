@@ -19,6 +19,16 @@ const getStats = asyncHandler(async (req, res) => {
     GROUP BY 1 ORDER BY 1 ASC
   `);
 
+  // Activité par utilisateur (Top 10 par nombre de messages)
+  const userActivity = await query(`
+    SELECT p.full_name as name, COUNT(m.id) as count
+    FROM public.profiles p
+    LEFT JOIN public.messages m ON p.id = m.sender_id
+    GROUP BY p.id, p.full_name
+    ORDER BY count DESC
+    LIMIT 10
+  `);
+
   res.json({
     success: true,
     data: {
@@ -27,6 +37,7 @@ const getStats = asyncHandler(async (req, res) => {
       totalChats: parseInt(chatsCount.rows[0].count),
       totalGroups: parseInt(groupsCount.rows[0].count),
       growth: growth.rows,
+      userActivity: userActivity.rows,
       onlineUsers: socketService.getConnectionStats().connectedUsers
     }
   });

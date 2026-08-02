@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const logger = require('../utils/logger');
+const socketService = require('../services/socket.service');
 
 /**
  * @desc    Obtenir le profil de l'utilisateur actuel
@@ -76,9 +77,21 @@ const updateProfile = asyncHandler(async (req, res) => {
     [name, status, avatar_url, username?.toLowerCase().trim(), userId]
   );
 
+  const updatedUser = result.rows[0];
+
+  // Diffuser le changement via Socket.IO
+  socketService.notifyUserStatusChange(userId, updatedUser.status);
+  socketService.broadcast('user_profile_updated', {
+    userId,
+    name: updatedUser.full_name,
+    username: updatedUser.username,
+    avatar: updatedUser.avatar_url,
+    status: updatedUser.status
+  });
+
   res.json({
     success: true,
-    data: result.rows[0],
+    data: updatedUser,
     message: 'Profil mis à jour avec succès',
   });
 });

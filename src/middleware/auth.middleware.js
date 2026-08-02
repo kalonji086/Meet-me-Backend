@@ -79,4 +79,32 @@ const rateLimitAuth = (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, isAdmin, rateLimitAuth, checkChatParticipation };
+/**
+ * Middleware d'authentification minimale (Permet aux bannis de contester)
+ */
+const authenticateAllowLocked = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: 'Token manquant.' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, config.jwt.secret);
+
+    const result = await query(
+      'SELECT id, email, is_global_admin, is_locked FROM public.profiles WHERE id = $1',
+      [decoded.userId]
+    );
+
+    const user = result.rows[0];
+    if (!user) return res.status(401).json({ success: false, error: 'Utilisateur non trouvé.' });
+
+    req.user = user;
+    req.userId = user.id;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, error: 'Session invalide.' });
+  }
+};
+
+module.exports = { authenticate, authenticateAllowLocked, isAdmin, rateLimitAuth, checkChatParticipation };

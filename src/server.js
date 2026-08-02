@@ -10,7 +10,7 @@ const fs = require('fs');
 const config = require('../config/config');
 const { pool } = require('./config/db');
 const logger = require('./utils/logger');
-const { authenticate } = require('./middleware/auth.middleware');
+const { authenticate, authenticateAllowLocked } = require('./middleware/auth.middleware');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 const authRoutes = require('./routes/auth.routes');
@@ -85,8 +85,8 @@ class Server {
     // Global /api/me to avoid 404
     this.app.get('/api/me', authenticate, userController.getMe);
 
-    // Soumettre une contestation
-    this.app.post('/api/users/appeal', authenticate, appealController.submitAppeal);
+    // Soumettre une contestation (Autorisé même si banni)
+    this.app.post('/api/users/appeal', authenticateAllowLocked, appealController.submitAppeal);
 
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);

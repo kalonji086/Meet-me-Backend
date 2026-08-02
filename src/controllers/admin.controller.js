@@ -166,4 +166,43 @@ const broadcastMessage = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { getStats, getUsers, deleteUser, toggleUserLock, getGroups, getGroupMembers, broadcastMessage };
+/**
+ * @desc    Lister les contestations
+ */
+const getAppeals = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT a.*, p.full_name, p.email, p.username, p.avatar_url
+    FROM public.appeals a
+    JOIN public.profiles p ON a.user_id = p.id
+    ORDER BY a.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Répondre à une contestation
+ */
+const replyToAppeal = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reply, action } = req.body; // action: 'resolved' ou 'reviewed'
+
+  const appealRes = await query('SELECT user_id FROM public.appeals WHERE id = $1', [id]);
+  if (appealRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
+
+  const userId = appealRes.rows[0].user_id;
+  const userRes = await query('SELECT email, full_name FROM public.profiles WHERE id = $1', [userId]);
+  const user = userRes.rows[0];
+
+  // Mettre à jour l'appel
+  await query(
+    'UPDATE public.appeals SET admin_reply = $1, status = $2, resolved_at = NOW() WHERE id = $3',
+    [reply, action || 'resolved', id]
+  );
+
+  // Envoyer l'email de réponse (Amazon style)
+  await mailService.sendSystemEmail(user.email, "Réponse à votre contestation Meet Me", reply);
+
+  res.json({ success: true, message: 'Réponse envoyée par email.' });
+});
+
+module.exports = { getStats, getUsers, deleteUser, toggleUserLock, getGroups, getGroupMembers, broadcastMessage, getAppeals, replyToAppeal };

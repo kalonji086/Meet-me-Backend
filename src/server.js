@@ -21,6 +21,10 @@ const messageRoutes = require('./routes/message.routes');
 const statusRoutes = require('./routes/status.routes');
 const adminRoutes = require('./routes/admin.routes');
 
+// Controllers pour routes directes
+const userController = require('./controllers/user.controller');
+const appealController = require('./controllers/appeal.controller');
+
 const socketService = require('./services/socket.service');
 const { runMigrations } = require('./utils/migration');
 
@@ -79,8 +83,10 @@ class Server {
     this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '1.0.0' }));
 
     // Global /api/me to avoid 404
-    const userController = require('./controllers/user.controller');
     this.app.get('/api/me', authenticate, userController.getMe);
+
+    // Soumettre une contestation
+    this.app.post('/api/users/appeal', authenticate, appealController.submitAppeal);
 
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);

@@ -131,7 +131,18 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. Fonctions et Triggers
+-- 6. TABLE DES RÉCLAMATIONS (APPEALS)
+CREATE TABLE IF NOT EXISTS public.appeals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved')),
+  admin_reply TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 7. Fonctions et Triggers
 CREATE OR REPLACE FUNCTION update_last_message_at()
 RETURNS TRIGGER AS $$
 BEGIN

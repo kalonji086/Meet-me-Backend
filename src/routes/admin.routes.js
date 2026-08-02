@@ -16,6 +16,9 @@ router.get('/groups/:chatId/members', adminController.getGroupMembers);
 router.put('/groups/:chatId/ban', adminController.toggleGroupBan);
 router.delete('/groups/:chatId', adminController.deleteGroup);
 
+router.get('/appeals', adminController.getAppeals);
+router.post('/appeals/:id/reply', adminController.replyToAppeal);
+
 router.post('/broadcast', adminController.broadcastMessage);
 
 module.exports = router;

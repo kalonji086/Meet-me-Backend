@@ -20,6 +20,9 @@ router.get('/search', userController.searchUsers);
  */
 router.get('/me', userController.getMe);
 
+// Debug route
+router.get('/test-route', (req, res) => res.json({ message: 'User route working' }));
+
 /**
  * @route   PUT /api/users/profile
  * @desc    Mettre à jour son profil

@@ -44,16 +44,33 @@ const getStats = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Lister tous les utilisateurs
+ * @desc    Lister tous les utilisateurs avec info appareil
  */
 const getUsers = asyncHandler(async (req, res) => {
   const result = await query(`
-    SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked, login_attempts, created_at, is_global_admin
+    SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked, login_attempts, created_at, is_global_admin, device_info, last_login_at
     FROM public.profiles
-    ORDER BY created_at DESC
+    ORDER BY last_login_at DESC NULLS LAST
   `);
 
   res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Supprimer un utilisateur définitivement
+ */
+const deleteUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  // Sécurité: Empêcher de se supprimer soi-même ou un autre admin global
+  const target = await query('SELECT is_global_admin FROM public.profiles WHERE id = $1', [userId]);
+  if (target.rows[0]?.is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
+  }
+
+  await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
+
+  res.json({ success: true, message: 'Utilisateur supprimé avec succès' });
 });
 
 /**
@@ -72,24 +89,6 @@ const toggleUserLock = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Envoyer un message à tous les utilisateurs (Broadcast)
- */
-const broadcastMessage = asyncHandler(async (req, res) => {
-  const { content, title } = req.body;
-
-  if (!content) return res.status(400).json({ success: false, error: 'Message vide' });
-
-  // Envoyer via Socket.IO à tous les connectés
-  socketService.broadcast('push_notification', {
-    title: title || 'Message de l\'équipe Meet Me',
-    body: content,
-    type: 'system'
-  });
-
-  res.json({ success: true, message: 'Message diffusé à tous les utilisateurs' });
-});
-
-/**
  * @desc    Lister tous les groupes
  */
 const getGroups = asyncHandler(async (req, res) => {
@@ -105,10 +104,46 @@ const getGroups = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Voir les membres d'un groupe
+ */
+const getGroupMembers = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+
+  const result = await query(`
+    SELECT p.full_name, p.username, p.email, p.avatar_url, cp.role, cp.joined_at
+    FROM public.chat_participants cp
+    JOIN public.profiles p ON cp.user_id = p.id
+    WHERE cp.chat_id = $1
+    ORDER BY cp.role ASC, p.full_name ASC
+  `, [chatId]);
+
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Envoyer un message à tous les utilisateurs (Broadcast)
+ */
+const broadcastMessage = asyncHandler(async (req, res) => {
+  const { content, title } = req.body;
+
+  if (!content) return res.status(400).json({ success: false, error: 'Message vide' });
+
+  socketService.broadcast('push_notification', {
+    title: title || 'Message de l\'équipe Meet Me',
+    body: content,
+    type: 'system'
+  });
+
+  res.json({ success: true, message: 'Message diffusé à tous les utilisateurs' });
+});
+
 module.exports = {
   getStats,
   getUsers,
+  deleteUser,
   toggleUserLock,
-  broadcastMessage,
-  getGroups
+  getGroups,
+  getGroupMembers,
+  broadcastMessage
 };

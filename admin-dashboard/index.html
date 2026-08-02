@@ -140,7 +140,7 @@
                             <canvas id="growthChart" height="150"></canvas>
                         </div>
                         <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                            <h3 class="text-xl font-bold mb-8">Utilisateurs les plus actifs (Messages)</h3>
+                            <h3 class="text-xl font-bold mb-8">Activité Utilisateurs (Messages)</h3>
                             <canvas id="activityChart" height="150"></canvas>
                         </div>
                     </div>
@@ -152,7 +152,7 @@
                         <table class="w-full text-left border-collapse">
                             <thead class="bg-gray-50/50">
                                 <tr>
-                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Identité</th>
+                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Identité / Appareil</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Coordonnées</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Sécurité</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
@@ -172,7 +172,7 @@
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Groupe</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Créateur</th>
                                     <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider">Membres</th>
-                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Date</th>
+                                    <th class="px-8 py-5 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="groups-table-body"></tbody>
@@ -196,6 +196,21 @@
         </div>
     </div>
 
+    <!-- MODAL MEMBRES GROUPE -->
+    <div id="modal-members" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
+            <div class="p-6 border-b flex justify-between items-center bg-gray-50">
+                <h3 class="text-xl font-bold text-gray-800">Membres du groupe</h3>
+                <button onclick="closeModal()" class="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                    <i data-lucide="x" class="w-6 h-6 text-gray-500"></i>
+                </button>
+            </div>
+            <div id="members-list" class="max-height-[60vh] overflow-y-auto p-4 space-y-4">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+
     <script>
         const BASE_URL = window.location.origin;
         const API_URL = BASE_URL + '/api';
@@ -214,30 +229,18 @@
             try {
                 btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
                 lucide.createIcons();
-
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
-
                 if (res.data.success) {
                     const tempToken = res.data.data.token;
-                    const profileRes = await axios.get(`${BASE_URL}/api/me`, {
-                        headers: { Authorization: `Bearer ${tempToken}` }
-                    });
-
+                    const profileRes = await axios.get(`${BASE_URL}/api/me`, { headers: { Authorization: `Bearer ${tempToken}` } });
                     if (profileRes.data.data.is_global_admin) {
                         token = tempToken;
                         localStorage.setItem('admin_token', token);
                         localStorage.setItem('admin_user', JSON.stringify(profileRes.data.data));
                         showDashboard();
-                    } else {
-                        alert("Accès refusé. Droits insuffisants.");
-                    }
+                    } else { alert("Accès refusé."); }
                 }
-            } catch (e) {
-                console.error('Login error:', e);
-                alert("Identifiants incorrects ou erreur réseau.");
-            } finally {
-                btn.innerText = 'SE CONNECTER';
-            }
+            } catch (e) { alert("Identifiants incorrects."); } finally { btn.innerText = 'SE CONNECTER'; }
         }
 
         function showDashboard() {
@@ -256,11 +259,9 @@
                 if (el) el.classList.add('hidden');
                 if (nav) nav.classList.remove('active');
             });
-
             document.getElementById(`section-${name}`).classList.remove('hidden');
             document.getElementById(`nav-${name}`).classList.add('active');
             document.getElementById('section-title').innerText = document.getElementById(`nav-${name}`).innerText.trim();
-
             if (name === 'stats') loadStats();
             if (name === 'users') loadUsers();
             if (name === 'groups') loadGroups();
@@ -277,7 +278,7 @@
                 document.getElementById('stat-groups').innerText = d.totalGroups || 0;
                 if (d.growth) renderGrowthChart(d.growth);
                 if (d.userActivity) renderActivityChart(d.userActivity);
-            } catch (e) { console.error('Stats Error:', e); }
+            } catch (e) { console.error(e); }
         }
 
         async function loadUsers() {
@@ -285,23 +286,46 @@
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
                 const body = document.getElementById('users-table-body');
                 body.innerHTML = '';
-                if (res.data.data && res.data.data.length > 0) {
-                    res.data.data.forEach(u => {
-                        const tr = document.createElement('tr');
-                        tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
-                        tr.innerHTML = `
-                            <td class="px-8 py-5"><div class="flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-10 h-10 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${u.full_name}</p><p class="text-xs text-purple-500 font-bold">@${u.username}</p></div></div></td>
-                            <td class="px-8 py-5 text-sm"><p>${u.email}</p><p class="text-gray-400 font-bold">${u.phone_number || 'SANS NUMÉRO'}</p></td>
-                            <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-xs font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
-                            <td class="px-8 py-5 text-right"><button onclick="toggleLock('${u.id}', ${!u.is_locked})" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button></td>
-                        `;
-                        body.appendChild(tr);
-                    });
-                } else {
-                    body.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-400 italic">Aucun utilisateur trouvé</td></tr>';
-                }
+                res.data.data.forEach(u => {
+                    const dev = u.device_info || {};
+                    const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'Jamais';
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
+                    tr.innerHTML = `
+                        <td class="px-8 py-5">
+                            <div class="flex items-center">
+                                <img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-11 h-11 rounded-xl mr-4">
+                                <div>
+                                    <p class="font-bold">${u.full_name}</p>
+                                    <p class="text-[10px] text-blue-500 font-bold uppercase">${dev.brand || 'Appareil'} ${dev.model || 'Inconnu'}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-8 py-5 text-sm">
+                            <p class="font-medium text-gray-700">${u.email}</p>
+                            <p class="text-gray-400 text-xs">${u.phone_number || 'SANS NUMÉRO'}</p>
+                        </td>
+                        <td class="px-8 py-5">
+                            <span class="px-3 py-1 rounded-lg text-xs font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span>
+                            <p class="text-[9px] text-gray-400 mt-1 uppercase">Dernier accès: ${lastLogin}</p>
+                        </td>
+                        <td class="px-8 py-5 text-right space-x-2">
+                            <button onclick="toggleLock('${u.id}', ${!u.is_locked})" class="p-2 text-gray-400 hover:text-purple-600"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-5 h-5"></i></button>
+                            <button onclick="deleteUser('${u.id}')" class="p-2 text-gray-400 hover:text-red-500"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
                 lucide.createIcons();
-            } catch (e) { console.error('Users Error:', e); }
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm("⚠️ Action irréversible : Supprimer définitivement ce compte ?")) return;
+            try {
+                await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                loadUsers();
+            } catch (e) { alert(e.response?.data?.error || "Erreur de suppression."); }
         }
 
         async function loadGroups() {
@@ -309,75 +333,73 @@
                 const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
                 const body = document.getElementById('groups-table-body');
                 body.innerHTML = '';
-                if (res.data.data && res.data.data.length > 0) {
-                    res.data.data.forEach(g => {
-                        const tr = document.createElement('tr');
-                        tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
-                        tr.innerHTML = `
-                            <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-10 h-10 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p><p class="text-xs text-gray-400">${g.description || ''}</p></div></div></td>
-                            <td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td>
-                            <td class="px-8 py-5"><span class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold">${g.members_count} membres</span></td>
-                            <td class="px-8 py-5 text-right text-xs text-gray-400 font-bold">${new Date(g.created_at).toLocaleDateString()}</td>
-                        `;
-                        body.appendChild(tr);
-                    });
-                } else {
-                    body.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-400 italic">Aucun groupe trouvé</td></tr>';
-                }
+                res.data.data.forEach(g => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
+                    tr.innerHTML = `
+                        <td class="px-8 py-5"><div class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-10 h-10 rounded-xl mr-4 shadow-sm"><div><p class="font-bold">${g.name}</p><p class="text-xs text-gray-400">${g.description || ''}</p></div></div></td>
+                        <td class="px-8 py-5 text-sm font-medium text-gray-600">${g.creator_name || 'Système'}</td>
+                        <td class="px-8 py-5"><button onclick="viewMembers('${g.id}')" class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors">${g.members_count} membres</button></td>
+                        <td class="px-8 py-5 text-right text-xs text-gray-400 font-bold">${new Date(g.created_at).toLocaleDateString()}</td>
+                    `;
+                    body.appendChild(tr);
+                });
                 lucide.createIcons();
-            } catch (e) { console.error('Groups Error:', e); }
+            } catch (e) { console.error(e); }
         }
 
-        async function toggleLock(id, isLocked) {
-            if (!confirm("Voulez-vous modifier l'accès ?")) return;
+        async function viewMembers(chatId) {
             try {
-                await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } });
-                loadUsers();
-            } catch (e) { alert("Erreur d'autorisation."); }
+                const res = await axios.get(`${API_URL}/admin/groups/${chatId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+                const list = document.getElementById('members-list');
+                list.innerHTML = '';
+                res.data.data.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center p-3 bg-gray-50 rounded-2xl";
+                    div.innerHTML = `
+                        <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+m.full_name}" class="w-10 h-10 rounded-full mr-4">
+                        <div class="flex-1">
+                            <p class="font-bold text-gray-800">${m.full_name} ${m.role === 'admin' ? '<span class="text-[9px] bg-purple-600 text-white px-1.5 py-0.5 rounded ml-2">ADMIN</span>' : ''}</p>
+                            <p class="text-xs text-gray-500">@${m.username || 'n/a'}</p>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+                document.getElementById('modal-members').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) { alert("Erreur chargement membres."); }
+        }
+
+        function closeModal() { document.getElementById('modal-members').classList.add('hidden'); }
+
+        async function toggleLock(id, isLocked) {
+            if (!confirm("Modifier l'accès ?")) return;
+            await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked }, { headers: { Authorization: `Bearer ${token}` } });
+            loadUsers();
         }
 
         async function sendBroadcast() {
             const title = document.getElementById('bc-title').value;
             const content = document.getElementById('bc-content').value;
             if (!content) return;
-            try {
-                await axios.post(`${API_URL}/admin/broadcast`, { title, content }, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Diffusion réussie !");
-                document.getElementById('bc-title').value = '';
-                document.getElementById('bc-content').value = '';
-            } catch (e) { alert("Erreur de diffusion."); }
+            await axios.post(`${API_URL}/admin/broadcast`, { title, content }, { headers: { Authorization: `Bearer ${token}` } });
+            alert("Diffusé !");
+            document.getElementById('bc-title').value = '';
+            document.getElementById('bc-content').value = '';
         }
 
         let growthChart = null;
         function renderGrowthChart(data) {
             const ctx = document.getElementById('growthChart').getContext('2d');
             if (growthChart) growthChart.destroy();
-            growthChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.map(i => new Date(i.date).toLocaleDateString('fr-FR', { weekday: 'short' })),
-                    datasets: [{ label: 'Inscriptions', data: data.map(i => i.count), borderColor: '#673AB7', tension: 0.4, fill: true, backgroundColor: 'rgba(103, 58, 183, 0.05)' }]
-                },
-                options: { responsive: true, plugins: { legend: { display: false } } }
-            });
+            growthChart = new Chart(ctx, { type: 'line', data: { labels: data.map(i => new Date(i.date).toLocaleDateString()), datasets: [{ data: data.map(i => i.count), borderColor: '#673AB7', tension: 0.4, fill: true, backgroundColor: 'rgba(103, 58, 183, 0.05)' }] }, options: { plugins: { legend: { display: false } } } });
         }
 
         let activityChart = null;
         function renderActivityChart(data) {
             const ctx = document.getElementById('activityChart').getContext('2d');
             if (activityChart) activityChart.destroy();
-            activityChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.map(i => i.name),
-                    datasets: [{ label: 'Messages envoyés', data: data.map(i => i.count), backgroundColor: '#00A884', borderRadius: 8 }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } }
-                }
-            });
+            activityChart = new Chart(ctx, { type: 'bar', data: { labels: data.map(i => i.name), datasets: [{ data: data.map(i => i.count), backgroundColor: '#00A884', borderRadius: 8 }] }, options: { plugins: { legend: { display: false } } } });
         }
 
         function logout() { localStorage.clear(); location.reload(); }

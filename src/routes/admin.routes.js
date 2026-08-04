@@ -19,6 +19,16 @@ router.delete('/groups/:chatId', adminController.deleteGroup);
 router.get('/appeals', adminController.getAppeals);
 router.post('/appeals/:id/reply', adminController.replyToAppeal);
 
+router.get('/reports', adminController.getReports);
+router.put('/reports/:id/resolve', adminController.resolveReport);
+
+router.get('/analytics', adminController.getAnalytics);
+
+router.get('/campaigns', adminController.getCampaigns);
+router.post('/campaigns', adminController.createCampaign);
+
+router.get('/audit-logs', adminController.getAuditLogs);
+
 router.post('/broadcast', adminController.broadcastMessage);
 
 module.exports = router;

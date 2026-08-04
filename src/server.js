@@ -61,7 +61,7 @@ class Server {
         client.release();
       }
       ['uploads', 'uploads/audio', 'uploads/images'].forEach(dir => {
-        const p = path.join(__dirname, '..', '..', dir);
+        const p = path.join(__dirname, '..', dir);
         if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
       });
     } catch (error) {
@@ -76,7 +76,7 @@ class Server {
     this.app.use(morgan(this.nodeEnv === 'development' ? 'dev' : 'combined'));
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-    this.app.use('/uploads', express.static(path.join(__dirname, '..', '..', 'uploads')));
+    this.app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
   }
 
   initializeRoutes() {

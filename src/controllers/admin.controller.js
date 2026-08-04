@@ -11,6 +11,8 @@ const getStats = asyncHandler(async (req, res) => {
   const messagesCount = await query('SELECT COUNT(*) FROM public.messages');
   const chatsCount = await query('SELECT COUNT(*) FROM public.chats');
   const groupsCount = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
+  const lockedUsers = await query('SELECT COUNT(*) FROM public.profiles WHERE is_locked = TRUE AND is_global_admin = FALSE');
+  const appealCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending'");
 
   const growth = await query(`
     SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as count
@@ -29,6 +31,12 @@ const getStats = asyncHandler(async (req, res) => {
     LIMIT 10
   `);
 
+  const recentReports = await query(`
+    SELECT COUNT(*) as count
+    FROM public.reported_content
+    WHERE status = 'open'
+  `);
+
   res.json({
     success: true,
     data: {
@@ -36,12 +44,117 @@ const getStats = asyncHandler(async (req, res) => {
       totalMessages: parseInt(messagesCount.rows[0].count),
       totalChats: parseInt(chatsCount.rows[0].count),
       totalGroups: parseInt(groupsCount.rows[0].count),
+      lockedUsers: parseInt(lockedUsers.rows[0].count),
+      pendingAppeals: parseInt(appealCount.rows[0].count),
+      openReports: parseInt(recentReports.rows[0].count),
       growth: growth.rows,
       userActivity: userActivity.rows,
       onlineUsers: socketService.getConnectionStats().connectedUsers
     }
   });
 });
+
+const getAnalytics = asyncHandler(async (req, res) => {
+  const totalUsers = await query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE');
+  const activeUsers = await query(`
+    SELECT COUNT(DISTINCT sender_id)
+    FROM public.messages
+    WHERE created_at > NOW() - INTERVAL '30 days'
+  `);
+  const messagesThisWeek = await query(`
+    SELECT COUNT(*) FROM public.messages WHERE created_at > NOW() - INTERVAL '7 days'
+  `);
+  const newUsersThisWeek = await query(`
+    SELECT COUNT(*) FROM public.profiles WHERE created_at > NOW() - INTERVAL '7 days' AND is_global_admin = FALSE
+  `);
+  const totalGroups = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
+  const resolvedReports = await query("SELECT COUNT(*) FROM public.reported_content WHERE status = 'resolved'");
+  const weeklyTrend = await query(`
+    SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as total
+    FROM public.profiles
+    WHERE created_at > NOW() - INTERVAL '14 days' AND is_global_admin = FALSE
+    GROUP BY 1 ORDER BY 1 ASC
+  `);
+
+  const topUsers = await query(`
+    SELECT p.full_name, p.email, COUNT(m.id) as message_count
+    FROM public.profiles p
+    LEFT JOIN public.messages m ON p.id = m.sender_id
+    WHERE p.is_global_admin = FALSE
+    GROUP BY p.id, p.full_name, p.email
+    ORDER BY message_count DESC
+    LIMIT 8
+  `);
+
+  res.json({
+    success: true,
+    data: {
+      totalUsers: parseInt(totalUsers.rows[0].count),
+      activeUsers: parseInt(activeUsers.rows[0].count),
+      messagesThisWeek: parseInt(messagesThisWeek.rows[0].count),
+      newUsersThisWeek: parseInt(newUsersThisWeek.rows[0].count),
+      totalGroups: parseInt(totalGroups.rows[0].count),
+      resolvedReports: parseInt(resolvedReports.rows[0].count),
+      weeklyTrend: weeklyTrend.rows,
+      topUsers: topUsers.rows
+    }
+  });
+});
+
+const ensureAdminTables = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.reported_content (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      report_type TEXT NOT NULL CHECK (report_type IN ('message', 'user', 'group')),
+      target_id UUID,
+      target_name TEXT,
+      reporter_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+      reporter_name TEXT,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reviewed', 'resolved', 'dismissed')),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      resolved_at TIMESTAMP WITH TIME ZONE
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+      action TEXT NOT NULL,
+      entity_type TEXT,
+      entity_id UUID,
+      details JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.notification_campaigns (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      target TEXT NOT NULL DEFAULT 'all' CHECK (target IN ('all', 'specific')),
+      target_value TEXT,
+      created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+      sent_count INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'sent', 'failed')),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+};
+
+const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
+  const adminId = req.user?.id || null;
+  try {
+    await query(
+      'INSERT INTO public.admin_audit_logs (admin_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [adminId, action, entityType, entityId, JSON.stringify(details)]
+    );
+  } catch (error) {
+    console.error('Audit log error:', error.message);
+  }
+};
 
 /**
  * @desc    Lister tous les utilisateurs réels
@@ -55,6 +168,30 @@ const getUsers = asyncHandler(async (req, res) => {
   `);
 
   res.json({ success: true, data: result.rows });
+});
+
+const getReports = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
+  const result = await query(`
+    SELECT r.*, p.full_name AS reporter_name, p.email AS reporter_email
+    FROM public.reported_content r
+    LEFT JOIN public.profiles p ON p.id = r.reporter_id
+    ORDER BY r.created_at DESC
+  `);
+
+  res.json({ success: true, data: result.rows });
+});
+
+const resolveReport = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  await ensureAdminTables();
+  await query(
+    'UPDATE public.reported_content SET status = $1, resolved_at = NOW() WHERE id = $2',
+    [status || 'resolved', id]
+  );
+  await logAdminAction(req, 'resolve_report', 'report', id, { status: status || 'resolved' });
+  res.json({ success: true, message: 'Signalement mis à jour.' });
 });
 
 /**
@@ -75,6 +212,7 @@ const toggleUserLock = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { isLocked } = req.body;
   await query('UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3', [isLocked, isLocked ? 3 : 0, userId]);
+  await logAdminAction(req, isLocked ? 'lock_user' : 'unlock_user', 'user', userId, { isLocked });
   res.json({ success: true });
 });
 
@@ -109,6 +247,7 @@ const toggleGroupBan = asyncHandler(async (req, res) => {
 const deleteGroup = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   await query('DELETE FROM public.chats WHERE id = $1', [chatId]);
+  await logAdminAction(req, 'delete_group', 'group', chatId, { deleted: true });
   res.json({ success: true });
 });
 
@@ -178,6 +317,62 @@ const replyToAppeal = asyncHandler(async (req, res) => {
 /**
  * @desc    Diffusion (Email + Push)
  */
+const getCampaigns = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
+  const result = await query(`
+    SELECT c.*, p.full_name AS created_by_name
+    FROM public.notification_campaigns c
+    LEFT JOIN public.profiles p ON p.id = c.created_by
+    ORDER BY c.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+const createCampaign = asyncHandler(async (req, res) => {
+  const { title, message, target = 'all', targetValue } = req.body;
+  if (!title || !message) {
+    return res.status(400).json({ success: false, error: 'Titre et message requis' });
+  }
+
+  await ensureAdminTables();
+  const campaign = await query(
+    `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, sent_count)
+     VALUES ($1, $2, $3, $4, $5, 'sent', 0) RETURNING *`,
+    [title, message, target || 'all', targetValue || null, req.user.id]
+  );
+
+  if (target === 'all') {
+    const users = await query('SELECT id, email FROM public.profiles WHERE is_global_admin = FALSE');
+    for (const user of users.rows) {
+      socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
+      await mailService.sendSystemEmail(user.email, title, message);
+    }
+    await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
+  } else if (targetValue) {
+    const userRes = await query('SELECT id, email FROM public.profiles WHERE email = $1', [targetValue]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Destinataire introuvable' });
+    const user = userRes.rows[0];
+    socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
+    await mailService.sendSystemEmail(user.email, title, message);
+    await query('UPDATE public.notification_campaigns SET sent_count = 1 WHERE id = $1', [campaign.rows[0].id]);
+  }
+
+  await logAdminAction(req, 'create_campaign', 'campaign', campaign.rows[0].id, { title, target });
+  res.json({ success: true, data: campaign.rows[0], message: 'Campagne envoyée.' });
+});
+
+const getAuditLogs = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
+  const result = await query(`
+    SELECT a.*, p.full_name AS admin_name
+    FROM public.admin_audit_logs a
+    LEFT JOIN public.profiles p ON p.id = a.admin_id
+    ORDER BY a.created_at DESC
+    LIMIT 100
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
 const broadcastMessage = asyncHandler(async (req, res) => {
   const { content, title, target = 'all', specificEmail } = req.body;
   if (!content || !title) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
@@ -188,14 +383,34 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     for (const user of users.rows) {
       await mailService.sendSystemEmail(user.email, title, content);
     }
+    await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'all', count: users.rows.length });
     res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
   } else {
     const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [specificEmail]);
     if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Destinataire introuvable' });
     socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
     await mailService.sendSystemEmail(specificEmail, title, content);
+    await logAdminAction(req, 'broadcast_message', 'system', userRes.rows[0].id, { title, target: 'specific' });
     res.json({ success: true, message: 'Message envoyé.' });
   }
 });
 
-module.exports = { getStats, getUsers, deleteUser, toggleUserLock, getGroups, getGroupMembers, toggleGroupBan, deleteGroup, broadcastMessage, getAppeals, replyToAppeal };
+module.exports = {
+  getStats,
+  getUsers,
+  getReports,
+  resolveReport,
+  deleteUser,
+  toggleUserLock,
+  getGroups,
+  getGroupMembers,
+  toggleGroupBan,
+  deleteGroup,
+  getAppeals,
+  replyToAppeal,
+  getAnalytics,
+  getCampaigns,
+  createCampaign,
+  getAuditLogs,
+  broadcastMessage
+};

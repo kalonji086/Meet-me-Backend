@@ -73,6 +73,12 @@ const getAnalytics = asyncHandler(async (req, res) => {
   const totalGroups = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
   const resolvedReports = await query("SELECT COUNT(*) FROM public.reported_content WHERE status = 'resolved'");
 
+  const messageDistribution = await query(`
+    SELECT type, COUNT(*) as count
+    FROM public.messages
+    GROUP BY type
+  `);
+
   const accountDistribution = await query(`
     SELECT
       SUM(CASE WHEN is_locked = FALSE THEN 1 ELSE 0 END) as active,

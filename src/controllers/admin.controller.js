@@ -13,6 +13,8 @@ const getStats = asyncHandler(async (req, res) => {
   const groupsCount = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
   const lockedUsers = await query('SELECT COUNT(*) FROM public.profiles WHERE is_locked = TRUE AND is_global_admin = FALSE');
   const appealCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending'");
+  const helpdeskCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND type = 'helpdesk'");
+  const contestationCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND (type = 'contestation' OR type = 'deletion')");
 
   const growth = await query(`
     SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as count
@@ -45,7 +47,8 @@ const getStats = asyncHandler(async (req, res) => {
       totalChats: parseInt(chatsCount.rows[0].count),
       totalGroups: parseInt(groupsCount.rows[0].count),
       lockedUsers: parseInt(lockedUsers.rows[0].count),
-      pendingAppeals: parseInt(appealCount.rows[0].count),
+      pendingAppeals: parseInt(contestationCount.rows[0].count),
+      pendingHelpdesk: parseInt(helpdeskCount.rows[0].count),
       openReports: parseInt(recentReports.rows[0].count),
       growth: growth.rows,
       userActivity: userActivity.rows,
@@ -69,6 +72,15 @@ const getAnalytics = asyncHandler(async (req, res) => {
   `);
   const totalGroups = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
   const resolvedReports = await query("SELECT COUNT(*) FROM public.reported_content WHERE status = 'resolved'");
+
+  const accountDistribution = await query(`
+    SELECT
+      SUM(CASE WHEN is_locked = FALSE THEN 1 ELSE 0 END) as active,
+      SUM(CASE WHEN is_locked = TRUE THEN 1 ELSE 0 END) as locked
+    FROM public.profiles
+    WHERE is_global_admin = FALSE
+  `);
+
   const weeklyTrend = await query(`
     SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as total
     FROM public.profiles
@@ -95,6 +107,10 @@ const getAnalytics = asyncHandler(async (req, res) => {
       newUsersThisWeek: parseInt(newUsersThisWeek.rows[0].count),
       totalGroups: parseInt(totalGroups.rows[0].count),
       resolvedReports: parseInt(resolvedReports.rows[0].count),
+      accountDistribution: {
+        active: parseInt(accountDistribution.rows[0].active || 0),
+        locked: parseInt(accountDistribution.rows[0].locked || 0)
+      },
       weeklyTrend: weeklyTrend.rows,
       topUsers: topUsers.rows
     }

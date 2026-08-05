@@ -154,17 +154,53 @@
             </header>
 
             <main class="flex-1 overflow-y-auto p-8">
-                <!-- Section Stats -->
+                <!-- Section Vue d'ensemble Premium -->
                 <div id="section-stats" class="animate-fade-in">
+                    <!-- Cartes Stats -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center"><div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users" class="w-7 h-7 text-purple-600"></i></div><div><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Utilisateurs</p><h4 id="stat-users" class="text-3xl font-black">0</h4></div></div>
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center"><div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="zap" class="w-7 h-7 text-green-600"></i></div><div><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">En ligne</p><h4 id="stat-online" class="text-3xl font-black">0</h4></div></div>
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center"><div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="message-circle" class="w-7 h-7 text-blue-600"></i></div><div><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Messages</p><h4 id="stat-messages" class="text-3xl font-black">0</h4></div></div>
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center"><div class="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="hash" class="w-7 h-7 text-orange-600"></i></div><div><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Groupes</p><h4 id="stat-groups" class="text-3xl font-black">0</h4></div></div>
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
+                            <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5 shadow-inner"><i data-lucide="users" class="w-7 h-7 text-purple-600"></i></div>
+                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Utilisateurs</p><h4 id="stat-users" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
+                            <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mr-5 shadow-inner"><i data-lucide="zap" class="w-7 h-7 text-green-600"></i></div>
+                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">En ligne</p><h4 id="stat-online" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
+                            <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mr-5 shadow-inner"><i data-lucide="message-circle" class="w-7 h-7 text-blue-600"></i></div>
+                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Messages</p><h4 id="stat-messages" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
+                            <div class="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mr-5 shadow-inner"><i data-lucide="users-2" class="w-7 h-7 text-orange-600"></i></div>
+                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Groupes</p><h4 id="stat-groups" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="bg-white p-8 rounded-3xl border border-gray-100"><h3 class="text-xl font-bold mb-8 text-gray-800">Croissance</h3><canvas id="growthChart" height="150"></canvas></div>
-                        <div class="bg-white p-8 rounded-3xl border border-gray-100"><h3 class="text-xl font-bold mb-8 text-gray-800">Activité</h3><canvas id="activityChart" height="150"></canvas></div>
+
+                    <!-- Graphiques Vue d'ensemble -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+                        <!-- Courbe Croissance Rapide -->
+                        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl">
+                            <h3 class="text-xl font-black text-gray-800 tracking-tighter mb-8 flex items-center"><i data-lucide="trending-up" class="w-5 h-5 mr-3 text-purple-600"></i>Croissance (7j)</h3>
+                            <div class="h-[250px]"><canvas id="overviewGrowthChart"></canvas></div>
+                        </div>
+
+                        <!-- Répartition Messages Premium -->
+                        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl">
+                            <div class="flex justify-between items-center mb-8">
+                                <h3 class="text-xl font-black text-gray-800 tracking-tighter flex items-center"><i data-lucide="pie-chart" class="w-5 h-5 mr-3 text-orange-500"></i>Types de Messages</h3>
+                                <span class="px-3 py-1 bg-orange-50 text-orange-600 text-[10px] font-black rounded-lg uppercase">Global</span>
+                            </div>
+                            <div class="flex flex-col md:flex-row items-center justify-around">
+                                <div class="w-full max-w-[200px] h-[200px]"><canvas id="overviewMessageTypePieChart"></canvas></div>
+                                <div id="overview-pie-legend" class="mt-6 md:mt-0 space-y-3"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Activité -->
+                    <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl">
+                        <h3 class="text-xl font-black text-gray-800 tracking-tighter mb-8 flex items-center"><i data-lucide="bar-chart-2" class="w-5 h-5 mr-3 text-green-500"></i>Activité Utilisateurs</h3>
+                        <div class="h-[300px]"><canvas id="overviewActivityChart"></canvas></div>
                     </div>
                 </div>
 
@@ -502,7 +538,8 @@
             status: null,
             radial: null,
             oldGrowth: null,
-            oldActivity: null
+            oldActivity: null,
+            oldPie: null
         };
 
         window.onload = () => {
@@ -598,9 +635,72 @@
                 if (d.pendingHelpdesk > 0) { supportBadge.innerText = d.pendingHelpdesk; supportBadge.classList.remove('hidden'); } else if(supportBadge) supportBadge.classList.add('hidden');
                 if (d.pendingAppeals > 0) { contestBadge.innerText = d.pendingAppeals; contestBadge.classList.remove('hidden'); } else if(contestBadge) contestBadge.classList.add('hidden');
 
-                if (d.growth) renderOldGrowthChart(d.growth);
-                if (d.userActivity) renderOldActivityChart(d.userActivity);
+                // Render Overview Premium Charts
+                renderOverviewGrowthChart(d.growth || []);
+                renderOverviewMessagePieChart(d.messageDistribution || {});
+                renderOverviewActivityChart(d.userActivity || []);
             } catch (e) { console.error(e); }
+        }
+
+        function renderOverviewGrowthChart(data) {
+            const ctx = document.getElementById('overviewGrowthChart').getContext('2d');
+            if (charts.oldGrowth) charts.oldGrowth.destroy();
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(103, 58, 183, 0.3)');
+            gradient.addColorStop(1, 'rgba(103, 58, 183, 0)');
+            charts.oldGrowth = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(i => new Date(i.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })),
+                    datasets: [{
+                        label: 'Inscriptions', data: data.map(i => i.count),
+                        borderColor: '#673AB7', borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff',
+                        tension: 0.4, fill: true, backgroundColor: gradient
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } } }
+            });
+        }
+
+        function renderOverviewMessagePieChart(dist) {
+            const ctx = document.getElementById('overviewMessageTypePieChart').getContext('2d');
+            if (charts.oldPie) charts.oldPie.destroy();
+            const colors = ['#8B5CF6', '#10B981', '#F59E0B'];
+            const labels = ['Texte', 'Images', 'Audios'];
+            charts.oldPie = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: [dist.text || 0, dist.image || 0, dist.audio || 0],
+                        backgroundColor: colors, borderWidth: 5, borderColor: '#FFF', hoverOffset: 15
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+            const legend = document.getElementById('overview-pie-legend');
+            legend.innerHTML = labels.map((l, i) => `
+                <div class="flex items-center justify-between min-w-[120px]">
+                    <div class="flex items-center"><div class="w-2.5 h-2.5 rounded-full mr-2" style="background-color: ${colors[i]}"></div><span class="text-xs font-bold text-gray-500 uppercase">${l}</span></div>
+                    <span class="text-xs font-black text-gray-700 ml-4">${dist[l.toLowerCase() === 'texte' ? 'text' : l.toLowerCase()] || 0}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderOverviewActivityChart(data) {
+            const ctx = document.getElementById('overviewActivityChart').getContext('2d');
+            if (charts.oldActivity) charts.oldActivity.destroy();
+            charts.oldActivity = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(i => i.name.split(' ')[0]),
+                    datasets: [{
+                        label: 'Messages', data: data.map(i => i.count),
+                        backgroundColor: '#10B981', borderRadius: 10, barThickness: 15
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.02)' } }, x: { grid: { display: false } } } }
+            });
         }
 
         async function loadAnalytics() {

@@ -39,6 +39,12 @@ const getStats = asyncHandler(async (req, res) => {
     WHERE status = 'open'
   `);
 
+  const messageDistribution = await query(`
+    SELECT type, COUNT(*) as count
+    FROM public.messages
+    GROUP BY type
+  `);
+
   res.json({
     success: true,
     data: {
@@ -52,6 +58,10 @@ const getStats = asyncHandler(async (req, res) => {
       openReports: parseInt(recentReports.rows[0].count),
       growth: growth.rows,
       userActivity: userActivity.rows,
+      messageDistribution: messageDistribution.rows.reduce((acc, curr) => {
+        acc[curr.type] = parseInt(curr.count);
+        return acc;
+      }, {}),
       onlineUsers: socketService.getConnectionStats().connectedUsers
     }
   });

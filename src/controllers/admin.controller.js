@@ -119,6 +119,18 @@ const getAnalytics = asyncHandler(async (req, res) => {
 
 const ensureAdminTables = async () => {
   await query(`
+    CREATE TABLE IF NOT EXISTS public.app_configs (
+      id SERIAL PRIMARY KEY,
+      current_version TEXT NOT NULL,
+      force_update BOOLEAN DEFAULT FALSE,
+      update_url TEXT,
+      release_notes TEXT,
+      target_user_ids UUID[] DEFAULT '{}',
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS public.reported_content (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       report_type TEXT NOT NULL CHECK (report_type IN ('message', 'user', 'group')),
@@ -411,6 +423,68 @@ const broadcastMessage = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Gestion de la mise à jour (App Config)
+ */
+const getAppConfig = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
+  const result = await query('SELECT * FROM public.app_configs ORDER BY id DESC LIMIT 1');
+  if (result.rows.length === 0) {
+    const init = await query("INSERT INTO public.app_configs (current_version, force_update) VALUES ('1.0.0', false) RETURNING *");
+    return res.json({ success: true, data: init.rows[0] });
+  }
+  res.json({ success: true, data: result.rows[0] });
+});
+
+const updateAppConfig = asyncHandler(async (req, res) => {
+  const { current_version, force_update, update_url, release_notes, target_user_emails } = req.body;
+
+  let targetIds = [];
+  if (target_user_emails && target_user_emails.length > 0) {
+    const users = await query('SELECT id FROM public.profiles WHERE email = ANY($1)', [target_user_emails]);
+    targetIds = users.rows.map(u => u.id);
+  }
+
+  await ensureAdminTables();
+  const result = await query(
+    `INSERT INTO public.app_configs (current_version, force_update, update_url, release_notes, target_user_ids)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [current_version, force_update, update_url, release_notes, targetIds]
+  );
+
+  await logAdminAction(req, 'update_app_config', 'config', result.rows[0].id, req.body);
+  res.json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Route publique pour l'App Mobile
+ */
+const checkUpdate = asyncHandler(async (req, res) => {
+  const { version, userId } = req.query; // La version actuelle de l'app de l'user
+
+  const config = await query('SELECT * FROM public.app_configs ORDER BY id DESC LIMIT 1');
+  if (config.rows.length === 0) return res.json({ updateRequired: false });
+
+  const latest = config.rows[0];
+  const isTargeted = userId && latest.target_user_ids.includes(userId);
+  const isGlobal = latest.target_user_ids.length === 0;
+
+  // Si l'utilisateur est concerné (soit global, soit ciblé)
+  if (isGlobal || isTargeted) {
+    if (version !== latest.current_version) {
+      return res.json({
+        updateRequired: true,
+        forceUpdate: latest.force_update,
+        latestVersion: latest.current_version,
+        updateUrl: latest.update_url,
+        releaseNotes: latest.release_notes
+      });
+    }
+  }
+
+  res.json({ updateRequired: false });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -428,5 +502,8 @@ module.exports = {
   getCampaigns,
   createCampaign,
   getAuditLogs,
-  broadcastMessage
+  broadcastMessage,
+  getAppConfig,
+  updateAppConfig,
+  checkUpdate
 };

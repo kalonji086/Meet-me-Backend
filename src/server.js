@@ -83,6 +83,9 @@ class Server {
     this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me' }));
     this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '1.0.0' }));
 
+    // Route publique pour vérification de mise à jour App Mobile
+    this.app.get('/api/check-update', adminRoutes.checkUpdate || require('./controllers/admin.controller').checkUpdate);
+
     // Global /api/me to avoid 404
     this.app.get('/api/me', authenticate, userController.getMe);
 

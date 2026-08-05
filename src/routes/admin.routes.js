@@ -31,4 +31,7 @@ router.get('/audit-logs', adminController.getAuditLogs);
 
 router.post('/broadcast', adminController.broadcastMessage);
 
+router.get('/app-config', adminController.getAppConfig);
+router.post('/app-config', adminController.updateAppConfig);
+
 module.exports = router;

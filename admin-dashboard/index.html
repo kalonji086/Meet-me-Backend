@@ -265,83 +265,93 @@
                     </div>
                 </div>
 
-                <!-- Section Analytics -->
-                <div id="section-analytics" class="hidden animate-fade-in">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100"><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Utilisateurs actifs</p><h4 id="analytics-active-users" class="text-3xl font-black">0</h4></div>
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100"><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Messages 7j</p><h4 id="analytics-week-messages" class="text-3xl font-black">0</h4></div>
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100"><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Nouveaux 7j</p><h4 id="analytics-week-users" class="text-3xl font-black">0</h4></div>
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100"><p class="text-gray-400 text-sm font-bold uppercase tracking-widest">Signalements résolus</p><h4 id="analytics-resolved-reports" class="text-3xl font-black">0</h4></div>
+                    <!-- Section Analytics Premium -->
+                    <div id="section-analytics" class="hidden animate-fade-in">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+                            <div class="bg-white p-8 rounded-[2rem] shadow-lg border border-gray-50 flex flex-col justify-center transition-all hover:scale-105">
+                                <p class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Utilisateurs actifs</p>
+                                <h4 id="analytics-active-users" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2rem] shadow-lg border border-gray-50 flex flex-col justify-center transition-all hover:scale-105">
+                                <p class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Messages 7j</p>
+                                <h4 id="analytics-week-messages" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2rem] shadow-lg border border-gray-50 flex flex-col justify-center transition-all hover:scale-105">
+                                <p class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Nouveaux 7j</p>
+                                <h4 id="analytics-week-users" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2rem] shadow-lg border border-gray-50 flex flex-col justify-center transition-all hover:scale-105">
+                                <p class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Signalements résolus</p>
+                                <h4 id="analytics-resolved-reports" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4>
+                            </div>
+                        </div>
+
+                        <!-- Ligne 1 : Croissance et Types de Messages (Style Circulaire Master) -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+                            <!-- Croissance (Vue Circulaire par jour) -->
+                            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl flex flex-col items-center">
+                                <div class="flex justify-between items-center w-full mb-8">
+                                    <div>
+                                        <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Inscriptions (7j)</h3>
+                                        <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Intensité circulaire</p>
+                                    </div>
+                                    <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 shadow-inner">
+                                        <i data-lucide="trending-up" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+                                <div class="w-full max-w-[300px] h-[300px]"><canvas id="analyticsTrendPolarChart"></canvas></div>
+                                <div id="trend-polar-legend" class="mt-8 flex flex-wrap justify-center gap-2"></div>
+                            </div>
+
+                            <!-- Types de Messages (Polar Style) -->
+                            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl flex flex-col items-center">
+                                <div class="flex justify-between items-center w-full mb-8">
+                                    <div>
+                                        <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Types de Messages</h3>
+                                        <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Répartition globale des médias</p>
+                                    </div>
+                                    <div class="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-600">
+                                        <i data-lucide="pie-chart" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+                                <div class="w-full max-w-[280px] h-[280px]"><canvas id="messageTypePieChart"></canvas></div>
+                                <div id="pie-legend" class="mt-8 flex flex-wrap justify-center gap-3"></div>
+                            </div>
+                        </div>
+
+                        <!-- Ligne 2 : Santé et Objectifs -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <!-- Santé Système (Donut) -->
+                            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
+                                <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Santé Système</h3>
+                                <div class="w-full max-w-[220px] relative">
+                                    <canvas id="accountStatusChart"></canvas>
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span class="text-[10px] text-gray-400 uppercase font-black">Total</span>
+                                        <span id="chart-total-count" class="text-3xl font-black text-gray-900 tracking-tighter">0</span>
+                                    </div>
+                                </div>
+                                <div id="chart-legend" class="mt-10 w-full space-y-4"></div>
+                            </div>
+
+                            <!-- Objectif (Radial) -->
+                            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
+                                <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Objectif 1000 Users</h3>
+                                <div class="w-full max-w-[220px] relative"><canvas id="growthRadialChart"></canvas></div>
+                                <div class="mt-8 text-center bg-gray-50 px-6 py-4 rounded-3xl w-full border border-gray-100">
+                                    <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Progression</p>
+                                    <p id="radial-progress-text" class="text-3xl font-black text-purple-600 tracking-tighter">0%</p>
+                                </div>
+                            </div>
+
+                            <!-- Classement Actifs (Circular) -->
+                            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
+                                <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Classement Actifs</h3>
+                                <div class="w-full max-w-[220px] h-[220px]"><canvas id="analyticsTopUsersPolarChart"></canvas></div>
+                                <div id="top-users-list" class="mt-8 w-full space-y-2 overflow-y-auto max-h-[150px]"></div>
+                            </div>
+                        </div>
                     </div>
-
-                    <!-- Graphiques Avancés Premium -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
-                        <!-- Courbe de Croissance Premium -->
-                        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl">
-                            <div class="flex justify-between items-center mb-8">
-                                <div>
-                                    <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Croissance Utilisateurs</h3>
-                                    <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Évolution des 14 derniers jours</p>
-                                </div>
-                                <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 shadow-inner">
-                                    <i data-lucide="trending-up" class="w-6 h-6"></i>
-                                </div>
-                            </div>
-                            <div class="h-[320px]"><canvas id="analyticsTrendChart"></canvas></div>
-                        </div>
-
-                        <!-- Répartition des Messages (Pie Chart Classique) -->
-                        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl">
-                            <div class="flex justify-between items-center mb-8">
-                                <div>
-                                    <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Types de Messages</h3>
-                                    <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Répartition globale (Camembert)</p>
-                                </div>
-                                <div class="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-600">
-                                    <i data-lucide="pie-chart" class="w-6 h-6"></i>
-                                </div>
-                            </div>
-                            <div class="flex flex-col items-center">
-                                <div class="w-full max-w-[260px]"><canvas id="messageTypePieChart"></canvas></div>
-                                <div id="pie-legend" class="mt-10 flex flex-wrap justify-center gap-4"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <!-- État des comptes (Donut Moderne) -->
-                        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
-                            <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Santé Système</h3>
-                            <div class="w-full max-w-[220px] relative">
-                                <canvas id="accountStatusChart"></canvas>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Total</span>
-                                    <span id="chart-total-count" class="text-3xl font-black text-gray-900 tracking-tighter">0</span>
-                                </div>
-                            </div>
-                            <div id="chart-legend" class="mt-10 w-full space-y-4"></div>
-                        </div>
-
-                        <!-- Objectifs (Radial Premium) -->
-                        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
-                            <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Objectif 1000 Users</h3>
-                            <div class="w-full max-w-[220px] relative"><canvas id="growthRadialChart"></canvas></div>
-                            <div class="mt-8 text-center bg-gray-50 px-6 py-4 rounded-3xl w-full border border-gray-100 shadow-inner">
-                                <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Progression</p>
-                                <p id="radial-progress-text" class="text-3xl font-black text-purple-600 tracking-tighter">0%</p>
-                            </div>
-                        </div>
-
-                        <!-- Top Activité Premium -->
-                        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 transition-all hover:shadow-2xl">
-                            <div class="flex justify-between items-center mb-8">
-                                <h3 class="text-xl font-black text-gray-800 tracking-tighter">Classement Actifs</h3>
-                                <i data-lucide="award" class="text-yellow-500 w-6 h-6"></i>
-                            </div>
-                            <div id="top-users-list" class="space-y-4"></div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Section Campaigns -->
                 <div id="section-campaigns" class="hidden animate-fade-in max-w-4xl mx-auto">
@@ -559,7 +569,8 @@
             status: null,
             radial: null,
             master: null,
-            userActivity: null
+            userActivity: null,
+            analyticsTopUsers: null
         };
 
         window.onload = () => {
@@ -793,34 +804,72 @@
                 const res = await axios.get(`${API_URL}/admin/analytics`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data;
 
-                // Update summary counters
                 document.getElementById('analytics-active-users').innerText = d.activeUsers || 0;
                 document.getElementById('analytics-week-messages').innerText = d.messagesThisWeek || 0;
                 document.getElementById('analytics-week-users').innerText = d.newUsersThisWeek || 0;
                 document.getElementById('analytics-resolved-reports').innerText = d.resolvedReports || 0;
 
-                // Render High-End Charts
-                renderTrendChart(d.weeklyTrend || []);
+                // Render High-End Circular Charts
+                renderTrendPolarChart(d.weeklyTrend || []);
                 renderMessagePieChart(d.messageDistribution || {});
                 renderStatusDonutChart(d.accountDistribution || { active: 0, locked: 0 });
                 renderGrowthRadialChart(d.totalUsers || 0);
-
-                // Update Top Users List
-                const list = document.getElementById('top-users-list');
-                list.innerHTML = '';
-                (d.topUsers || []).forEach((user, idx) => {
-                    const row = document.createElement('div');
-                    row.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100';
-                    row.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white text-[10px] font-black mr-3 shadow-md">${idx + 1}</div>
-                            <p class="font-bold text-gray-800 text-sm">${user.full_name.split(' ')[0]}</p>
-                        </div>
-                        <span class="font-black text-purple-600 text-xs">${user.message_count} msg</span>
-                    `;
-                    list.appendChild(row);
-                });
+                renderAnalyticsTopUsersChart(d.topUsers || []);
             } catch (e) { console.error("Analytics Error:", e); }
+        }
+
+        function renderTrendPolarChart(data) {
+            const ctx = document.getElementById('analyticsTrendPolarChart').getContext('2d');
+            if (charts.trend) charts.trend.destroy();
+            const last7Days = data.slice(-7);
+            const labels = last7Days.map(i => new Date(i.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }));
+            const colors = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE', '#F5F3FF', '#FAFAFA'];
+            charts.trend = new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: last7Days.map(i => Number(i.total || 0)),
+                        backgroundColor: colors.map(c => c + 'CC'),
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { r: { display: false } }, plugins: { legend: { display: false } } }
+            });
+            const legend = document.getElementById('trend-polar-legend');
+            legend.innerHTML = labels.map((l, i) => `<div class="flex items-center px-2 py-1 bg-white rounded-lg border border-gray-100 shadow-sm"><div class="w-2 h-2 rounded-full mr-2" style="background-color: ${colors[i]}"></div><span class="text-[8px] font-black text-gray-500 uppercase">${l}</span></div>`).join('');
+        }
+
+        function renderAnalyticsTopUsersChart(data) {
+            const ctx = document.getElementById('analyticsTopUsersPolarChart').getContext('2d');
+            if (charts.analyticsTopUsers) charts.analyticsTopUsers.destroy();
+            const colors = ['#8B5CF6', '#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#06B6D4', '#EC4899', '#6366F1'];
+            const labels = data.map(u => u.full_name.split(' ')[0]);
+            charts.analyticsTopUsers = new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: data.map(u => Number(u.message_count)),
+                        backgroundColor: colors.map(c => c + 'CC'),
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { r: { display: false } }, plugins: { legend: { display: false } } }
+            });
+
+            const list = document.getElementById('top-users-list');
+            list.innerHTML = data.map((user, idx) => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 mb-2 transition-all hover:scale-105">
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[9px] font-black mr-3" style="background-color: ${colors[idx % colors.length]}">${idx + 1}</div>
+                        <span class="text-xs font-bold text-gray-700 uppercase">${user.full_name.split(' ')[0]}</span>
+                    </div>
+                    <span class="text-xs font-black text-gray-900">${user.message_count} msg</span>
+                </div>
+            `).join('');
         }
 
         function renderTrendChart(data) {

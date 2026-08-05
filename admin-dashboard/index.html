@@ -319,36 +319,30 @@
                             </div>
                         </div>
 
-                        <!-- Ligne 2 : Santé et Objectifs -->
+                        <!-- Ligne 2 : Santé, Objectifs et Classement (Tous en Cercles Polaires) -->
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            <!-- Santé Système (Donut) -->
+                            <!-- Santé Système (Polar Area) -->
                             <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
                                 <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Santé Système</h3>
-                                <div class="w-full max-w-[220px] relative">
-                                    <canvas id="accountStatusChart"></canvas>
-                                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                        <span class="text-[10px] text-gray-400 uppercase font-black">Total</span>
-                                        <span id="chart-total-count" class="text-3xl font-black text-gray-900 tracking-tighter">0</span>
-                                    </div>
-                                </div>
-                                <div id="chart-legend" class="mt-10 w-full space-y-4"></div>
+                                <div class="w-full max-w-[220px] h-[220px]"><canvas id="analyticsStatusPolarChart"></canvas></div>
+                                <div id="status-polar-legend" class="mt-8 w-full space-y-3"></div>
                             </div>
 
-                            <!-- Objectif (Radial) -->
+                            <!-- Objectif (Polar Area) -->
                             <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
                                 <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Objectif 1000 Users</h3>
-                                <div class="w-full max-w-[220px] relative"><canvas id="growthRadialChart"></canvas></div>
-                                <div class="mt-8 text-center bg-gray-50 px-6 py-4 rounded-3xl w-full border border-gray-100">
-                                    <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Progression</p>
+                                <div class="w-full max-w-[220px] h-[220px]"><canvas id="analyticsGrowthRadialChart"></canvas></div>
+                                <div class="mt-8 text-center bg-purple-50 px-6 py-4 rounded-3xl w-full border border-purple-100">
+                                    <p class="text-[10px] text-purple-400 font-black uppercase tracking-widest mb-1">Progression</p>
                                     <p id="radial-progress-text" class="text-3xl font-black text-purple-600 tracking-tighter">0%</p>
                                 </div>
                             </div>
 
-                            <!-- Classement Actifs (Circular) -->
+                            <!-- Classement Actifs (Polar Area) -->
                             <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center transition-all hover:shadow-2xl">
-                                <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Classement Actifs</h3>
+                                <h3 class="text-xl font-black text-gray-800 self-start tracking-tighter mb-8">Top Activité</h3>
                                 <div class="w-full max-w-[220px] h-[220px]"><canvas id="analyticsTopUsersPolarChart"></canvas></div>
-                                <div id="top-users-list" class="mt-8 w-full space-y-2 overflow-y-auto max-h-[150px]"></div>
+                                <div id="top-users-list" class="mt-8 w-full space-y-2 overflow-y-auto max-h-[180px] pr-2 custom-scrollbar"></div>
                             </div>
                         </div>
                     </div>
@@ -809,13 +803,64 @@
                 document.getElementById('analytics-week-users').innerText = d.newUsersThisWeek || 0;
                 document.getElementById('analytics-resolved-reports').innerText = d.resolvedReports || 0;
 
-                // Render High-End Circular Charts
+                // Render ALL Analytics Charts in Polar Circular Style
                 renderTrendPolarChart(d.weeklyTrend || []);
                 renderMessagePieChart(d.messageDistribution || {});
-                renderStatusDonutChart(d.accountDistribution || { active: 0, locked: 0 });
-                renderGrowthRadialChart(d.totalUsers || 0);
+                renderStatusPolarChart(d.accountDistribution || { active: 0, locked: 0 });
+                renderAnalyticsGrowthRadialChart(d.totalUsers || 0);
                 renderAnalyticsTopUsersChart(d.topUsers || []);
             } catch (e) { console.error("Analytics Error:", e); }
+        }
+
+        function renderStatusPolarChart(dist) {
+            const ctx = document.getElementById('analyticsStatusPolarChart').getContext('2d');
+            if (charts.status) charts.status.destroy();
+            const total = dist.active + dist.locked;
+            charts.status = new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels: ['Actifs', 'Bloqués'],
+                    datasets: [{
+                        data: [dist.active, dist.locked],
+                        backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(239, 68, 68, 0.8)'],
+                        borderColor: '#fff',
+                        borderWidth: 3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { r: { display: false } }, plugins: { legend: { display: false } } }
+            });
+            const legend = document.getElementById('status-polar-legend');
+            legend.innerHTML = `
+                <div class="flex justify-between items-center p-3 bg-green-50 rounded-2xl border border-green-100">
+                    <span class="text-[10px] font-black text-green-700 uppercase">Actifs</span>
+                    <span class="text-sm font-black text-green-800">${dist.active}</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-red-50 rounded-2xl border border-red-100">
+                    <span class="text-[10px] font-black text-red-700 uppercase">Bloqués</span>
+                    <span class="text-sm font-black text-red-800">${dist.locked}</span>
+                </div>
+            `;
+        }
+
+        function renderAnalyticsGrowthRadialChart(count) {
+            const ctx = document.getElementById('analyticsGrowthRadialChart').getContext('2d');
+            if (charts.radial) charts.radial.destroy();
+            const goal = 1000;
+            const progress = Math.min((count/goal)*100, 100);
+            document.getElementById('radial-progress-text').innerText = Math.round(progress) + '%';
+            charts.radial = new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels: ['Actuel', 'Objectif'],
+                    datasets: [{
+                        data: [count, goal],
+                        backgroundColor: ['rgba(139, 92, 246, 0.9)', 'rgba(243, 244, 246, 0.5)'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { r: { display: false } }, plugins: { legend: { display: false } } }
+            });
         }
 
         function renderTrendPolarChart(data) {

@@ -34,4 +34,10 @@ router.post('/broadcast', adminController.broadcastMessage);
 router.get('/app-config', adminController.getAppConfig);
 router.post('/app-config', adminController.updateAppConfig);
 
+router.get('/legal', adminController.getLegalDocs);
+router.post('/legal', adminController.updateLegalDoc);
+
+router.get('/verifications', adminController.getVerificationRequests);
+router.put('/verifications/:id', adminController.handleVerification);
+
 module.exports = router;

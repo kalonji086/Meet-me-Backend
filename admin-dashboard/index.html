@@ -120,6 +120,15 @@
                     <i data-lucide="megaphone" class="w-5 h-5 mr-4"></i>
                     <span class="font-medium">Diffusion</span>
                 </a>
+                <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                    <i data-lucide="check-circle" class="w-5 h-5 mr-4"></i>
+                    <span class="font-medium">Vérifications</span>
+                    <span id="verif-badge" class="hidden ml-auto bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                </a>
+                <a href="#" onclick="showSection('legal')" id="nav-legal" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                    <i data-lucide="file-text" class="w-5 h-5 mr-4"></i>
+                    <span class="font-medium">Légal (CGU/Privacy)</span>
+                </a>
                 <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
                     <i data-lucide="settings" class="w-5 h-5 mr-4"></i>
                     <span class="font-medium">Configuration</span>
@@ -275,6 +284,42 @@
                             <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Admin</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Action</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Entité</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Détails</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Date</th></tr></thead>
                             <tbody id="audit-table-body"></tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Section Verifications -->
+                <div id="section-verifications" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Utilisateur</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Document</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Date</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Actions</th></tr></thead>
+                            <tbody id="verifications-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section Légal -->
+                <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto">
+                    <div class="space-y-8">
+                        <div class="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm">
+                            <h3 class="text-2xl font-black mb-8 text-purple-600 flex items-center"><i data-lucide="file-text" class="w-6 h-6 mr-3"></i> Politique de Confidentialité</h3>
+                            <div class="space-y-4">
+                                <textarea id="legal-privacy-content" rows="10" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium"></textarea>
+                                <div class="flex items-center justify-between">
+                                    <input type="text" id="legal-privacy-version" placeholder="Version (ex: 1.0.1)" class="p-3 bg-gray-50 border rounded-xl outline-none w-40">
+                                    <button onclick="saveLegal('privacy')" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-black">ENREGISTRER PRIVACY</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm">
+                            <h3 class="text-2xl font-black mb-8 text-purple-600 flex items-center"><i data-lucide="shield" class="w-6 h-6 mr-3"></i> Conditions Générales (CGU)</h3>
+                            <div class="space-y-4">
+                                <textarea id="legal-tos-content" rows="10" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium"></textarea>
+                                <div class="flex items-center justify-between">
+                                    <input type="text" id="legal-tos-version" placeholder="Version (ex: 1.0.1)" class="p-3 bg-gray-50 border rounded-xl outline-none w-40">
+                                    <button onclick="saveLegal('tos')" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-black">ENREGISTRER CGU</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -456,7 +501,7 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'support', 'contestation', 'reports', 'analytics', 'campaigns', 'audit', 'broadcast', 'config'].forEach(s => {
+            ['stats', 'users', 'groups', 'support', 'contestation', 'reports', 'analytics', 'campaigns', 'audit', 'broadcast', 'config', 'legal', 'verifications'].forEach(s => {
                 const el = document.getElementById(`section-${s}`);
                 const nav = document.getElementById(`nav-${s}`);
                 if (el) el.classList.add('hidden'); if (nav) nav.classList.remove('active');
@@ -483,8 +528,67 @@
                 if (name === 'campaigns') loadCampaigns();
                 if (name === 'audit') loadAuditLogs();
                 if (name === 'config') loadAppConfig();
+                if (name === 'legal') loadLegalDocs();
+                if (name === 'verifications') loadVerifications();
             }
             lucide.createIcons();
+        }
+
+        async function loadLegalDocs() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } });
+                res.data.data.forEach(doc => {
+                    if (doc.type === 'privacy') {
+                        document.getElementById('legal-privacy-content').value = doc.content;
+                        document.getElementById('legal-privacy-version').value = doc.version;
+                    } else if (doc.type === 'tos') {
+                        document.getElementById('legal-tos-content').value = doc.content;
+                        document.getElementById('legal-tos-version').value = doc.version;
+                    }
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveLegal(type) {
+            const content = document.getElementById(`legal-${type}-content`).value;
+            const version = document.getElementById(`legal-${type}-version`).value;
+            try {
+                await axios.post(`${API_URL}/admin/legal`, { type, content, version, force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
+                alert(`${type.toUpperCase()} mis à jour avec succès !`);
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function loadVerifications() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/verifications`, { headers: { Authorization: `Bearer ${token}` } });
+                const body = document.getElementById('verifications-table-body');
+                body.innerHTML = '';
+                res.data.data.forEach(v => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-50 hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="px-8 py-5"><div class="flex items-center"><img src="${v.avatar_url || 'https://ui-avatars.com/api/?name='+v.full_name}" class="w-10 h-10 rounded-xl mr-3"><div><p class="font-bold">${v.full_name}</p><p class="text-xs text-gray-400">${v.email}</p></div></div></td>
+                        <td class="px-8 py-5"><a href="${v.document_url}" target="_blank" class="text-purple-600 font-bold hover:underline">Voir Document</a></td>
+                        <td class="px-8 py-5 text-xs text-gray-500 font-bold">${new Date(v.created_at).toLocaleDateString()}</td>
+                        <td class="px-8 py-5 text-right space-x-2">
+                            ${v.status === 'pending' ? `
+                                <button onclick="handleVerif('${v.id}', 'approved')" class="bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-black">APPROUVER</button>
+                                <button onclick="handleVerif('${v.id}', 'rejected')" class="bg-red-500 text-white px-4 py-2 rounded-lg text-xs font-black">REFUSER</button>
+                            ` : `<span class="text-xs font-black uppercase ${v.status === 'approved' ? 'text-green-500' : 'text-red-500'}">${v.status}</span>`}
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function handleVerif(id, status) {
+            const notes = prompt("Notes admin (optionnel) :");
+            try {
+                await axios.put(`${API_URL}/admin/verifications/${id}`, { status, admin_notes: notes }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Décision enregistrée.");
+                loadVerifications();
+            } catch (e) { alert("Erreur."); }
         }
 
         async function loadAppConfig() {

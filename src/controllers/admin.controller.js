@@ -131,6 +131,32 @@ const ensureAdminTables = async () => {
   `);
 
   await query(`
+    CREATE TABLE IF NOT EXISTS public.app_legal_docs (
+      id SERIAL PRIMARY KEY,
+      type TEXT NOT NULL UNIQUE,
+      content TEXT NOT NULL,
+      version TEXT NOT NULL,
+      force_acceptance BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.verification_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+      document_url TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_legal_version TEXT');
+
+  await query(`
     CREATE TABLE IF NOT EXISTS public.reported_content (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       report_type TEXT NOT NULL CHECK (report_type IN ('message', 'user', 'group')),
@@ -485,6 +511,64 @@ const checkUpdate = asyncHandler(async (req, res) => {
   res.json({ updateRequired: false });
 });
 
+/**
+ * @desc    Gestion des documents légaux
+ */
+const getLegalDocs = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
+  const result = await query('SELECT * FROM public.app_legal_docs ORDER BY type ASC');
+  res.json({ success: true, data: result.rows });
+});
+
+const updateLegalDoc = asyncHandler(async (req, res) => {
+  const { type, content, version, force_acceptance } = req.body;
+  await ensureAdminTables();
+  const result = await query(
+    `INSERT INTO public.app_legal_docs (type, content, version, force_acceptance)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (type) DO UPDATE SET content = $2, version = $3, force_acceptance = $4, updated_at = NOW()
+     RETURNING *`,
+    [type, content, version, force_acceptance]
+  );
+  await logAdminAction(req, 'update_legal_doc', 'legal', result.rows[0].id, { type, version });
+  res.json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Gestion des vérifications (Badge Bleu)
+ */
+const getVerificationRequests = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
+  const result = await query(`
+    SELECT vr.*, p.full_name, p.email, p.avatar_url
+    FROM public.verification_requests vr
+    JOIN public.profiles p ON vr.user_id = p.id
+    ORDER BY vr.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+const handleVerification = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body; // 'approved' or 'rejected'
+
+  const vr = await query('SELECT user_id FROM public.verification_requests WHERE id = $1', [id]);
+  if (vr.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
+
+  const userId = vr.rows[0].user_id;
+
+  await query('UPDATE public.verification_requests SET status = $1, admin_notes = $2, updated_at = NOW() WHERE id = $3', [status, admin_notes, id]);
+
+  if (status === 'approved') {
+    await query('UPDATE public.profiles SET is_verified = TRUE WHERE id = $1', [userId]);
+  } else {
+    await query('UPDATE public.profiles SET is_verified = FALSE WHERE id = $1', [userId]);
+  }
+
+  await logAdminAction(req, 'handle_verification', 'verification', id, { status });
+  res.json({ success: true });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -505,5 +589,9 @@ module.exports = {
   broadcastMessage,
   getAppConfig,
   updateAppConfig,
-  checkUpdate
+  checkUpdate,
+  getLegalDocs,
+  updateLegalDoc,
+  getVerificationRequests,
+  handleVerification
 };

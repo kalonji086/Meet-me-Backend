@@ -107,6 +107,10 @@ const getAnalytics = asyncHandler(async (req, res) => {
       newUsersThisWeek: parseInt(newUsersThisWeek.rows[0].count),
       totalGroups: parseInt(totalGroups.rows[0].count),
       resolvedReports: parseInt(resolvedReports.rows[0].count),
+      messageDistribution: messageDistribution.rows.reduce((acc, curr) => {
+        acc[curr.type] = parseInt(curr.count);
+        return acc;
+      }, {}),
       accountDistribution: {
         active: parseInt(accountDistribution.rows[0].active || 0),
         locked: parseInt(accountDistribution.rows[0].locked || 0)

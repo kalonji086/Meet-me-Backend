@@ -24,7 +24,8 @@ const getChats = asyncHandler(async (req, res) => {
               'id', p.id,
               'full_name', p.full_name,
               'avatar_url', p.avatar_url,
-              'status', p.status
+              'status', p.status,
+              'is_verified', p.is_verified
             )
             FROM public.chat_participants cp2
             JOIN public.profiles p ON cp2.user_id = p.id
@@ -36,7 +37,8 @@ const getChats = asyncHandler(async (req, res) => {
               'id', p.id,
               'full_name', p.full_name,
               'avatar_url', p.avatar_url,
-              'status', p.status
+              'status', p.status,
+              'is_verified', p.is_verified
             )
             FROM public.profiles p
             WHERE p.id = $1
@@ -143,7 +145,7 @@ const getMessages = asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit;
 
   const result = await query(
-    `SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar
+    `SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar, p.is_verified as sender_is_verified
      FROM public.messages m
      JOIN public.profiles p ON m.sender_id = p.id
      WHERE m.chat_id = $1
@@ -355,7 +357,7 @@ const getChatDetails = asyncHandler(async (req, res) => {
 
   // Récupérer les participants
   const participantsResult = await query(
-    `SELECT p.id, p.full_name, p.avatar_url, p.status, cp.role, cp.joined_at
+    `SELECT p.id, p.full_name, p.avatar_url, p.status, p.is_verified, cp.role, cp.joined_at
      FROM public.chat_participants cp
      JOIN public.profiles p ON cp.user_id = p.id
      WHERE cp.chat_id = $1

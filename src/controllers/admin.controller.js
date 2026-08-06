@@ -652,6 +652,16 @@ const updateLegalDoc = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Supprimer un document légal (Annule l'obligation d'acceptation)
+ */
+const deleteLegalDoc = asyncHandler(async (req, res) => {
+  const { type } = req.params;
+  await query('DELETE FROM public.app_legal_docs WHERE type = $1', [type]);
+  await logAdminAction(req, 'delete_legal_doc', 'legal', null, { type });
+  res.json({ success: true, message: `Document ${type} supprimé.` });
+});
+
+/**
  * @desc    Gestion des vérifications (Badge Bleu)
  */
 const getVerificationRequests = asyncHandler(async (req, res) => {
@@ -711,6 +721,7 @@ module.exports = {
   reportUpdateDone,
   getLegalDocs,
   updateLegalDoc,
+  deleteLegalDoc,
   getVerificationRequests,
   handleVerification
 };

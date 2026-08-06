@@ -429,23 +429,33 @@
                 <!-- Section Légal -->
                 <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto">
                     <div class="space-y-8">
-                        <div class="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm">
+                        <div class="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm relative group">
+                            <div class="absolute top-8 right-8 flex space-x-2">
+                                <button onclick="deleteLegal('privacy')" class="p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white" title="Retirer cette politique">
+                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
                             <h3 class="text-2xl font-black mb-8 text-purple-600 flex items-center"><i data-lucide="file-text" class="w-6 h-6 mr-3"></i> Politique de Confidentialité</h3>
                             <div class="space-y-4">
                                 <textarea id="legal-privacy-content" rows="10" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium"></textarea>
                                 <div class="flex items-center justify-between">
                                     <input type="text" id="legal-privacy-version" placeholder="Version (ex: 1.0.1)" class="p-3 bg-gray-50 border rounded-xl outline-none w-40">
-                                    <button onclick="saveLegal('privacy')" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-black">ENREGISTRER PRIVACY</button>
+                                    <button onclick="saveLegal('privacy')" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-purple-100 hover:scale-105 transition-all">PUBLIER PRIVACY</button>
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm">
+                        <div class="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm relative group">
+                            <div class="absolute top-8 right-8 flex space-x-2">
+                                <button onclick="deleteLegal('tos')" class="p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white" title="Retirer ces CGU">
+                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
                             <h3 class="text-2xl font-black mb-8 text-purple-600 flex items-center"><i data-lucide="shield" class="w-6 h-6 mr-3"></i> Conditions Générales (CGU)</h3>
                             <div class="space-y-4">
                                 <textarea id="legal-tos-content" rows="10" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium"></textarea>
                                 <div class="flex items-center justify-between">
                                     <input type="text" id="legal-tos-version" placeholder="Version (ex: 1.0.1)" class="p-3 bg-gray-50 border rounded-xl outline-none w-40">
-                                    <button onclick="saveLegal('tos')" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-black">ENREGISTRER CGU</button>
+                                    <button onclick="saveLegal('tos')" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-purple-100 hover:scale-105 transition-all">PUBLIER CGU</button>
                                 </div>
                             </div>
                         </div>
@@ -1434,10 +1444,23 @@
         async function saveLegal(type) {
             const content = document.getElementById(`legal-${type}-content`).value;
             const version = document.getElementById(`legal-${type}-version`).value;
+            if (!content || !version) return alert("Veuillez remplir le contenu et la version.");
             try {
                 await axios.post(`${API_URL}/admin/legal`, { type, content, version, force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`${type.toUpperCase()} mis à jour !`);
-            } catch (e) { alert("Erreur."); }
+                alert(`${type.toUpperCase()} publié avec succès ! Les utilisateurs devront accepter cette version.`);
+                loadLegalDocs();
+            } catch (e) { alert("Erreur lors de l'enregistrement."); }
+        }
+
+        async function deleteLegal(type) {
+            if (!confirm(`Voulez-vous vraiment retirer ce document (${type}) ? L'obligation d'acceptation disparaîtra immédiatement pour tous les utilisateurs.`)) return;
+            try {
+                await axios.delete(`${API_URL}/admin/legal/${type}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Document retiré.");
+                document.getElementById(`legal-${type}-content`).value = "";
+                document.getElementById(`legal-${type}-version`).value = "";
+                loadLegalDocs();
+            } catch (e) { alert("Erreur lors du retrait."); }
         }
 
         async function loadVerifications() {

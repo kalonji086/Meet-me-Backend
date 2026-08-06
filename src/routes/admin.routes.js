@@ -37,6 +37,7 @@ router.delete('/app-config/:id', adminController.deleteAppConfig);
 
 router.get('/legal', adminController.getLegalDocs);
 router.post('/legal', adminController.updateLegalDoc);
+router.delete('/legal/:type', adminController.deleteLegalDoc);
 
 router.get('/verifications', adminController.getVerificationRequests);
 router.put('/verifications/:id', adminController.handleVerification);

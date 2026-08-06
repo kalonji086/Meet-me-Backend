@@ -282,7 +282,7 @@
                 <div id="section-appeals" class="hidden animate-fade-in">
                     <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                         <table class="w-full text-left border-collapse">
-                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Type / Utilisateur</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Catégorie / Message</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Date</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Action</th></tr></thead>
+                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Type / Utilisateur</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Catégorie / Message</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Statut</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Date</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Action</th></tr></thead>
                             <tbody id="appeals-table-body"></tbody>
                         </table>
                     </div>
@@ -1335,9 +1335,10 @@
             const isHelpdesk = selectedAppeal.type === 'helpdesk';
 
             document.getElementById('appeal-modal-title').innerText = isDeletion ? 'DEMANDE DE SUPPRESSION' : (isHelpdesk ? 'DEMANDE HELPDESK' : 'EXAMEN CONTESTATION');
-            document.getElementById('appeal-type-tag').innerText = `${selectedAppeal.type} | ${selectedAppeal.category || 'AUTRE'}`;
+            document.getElementById('appeal-type-tag').innerText = `${selectedAppeal.type} | ${selectedAppeal.category || 'AUTRE'} | ${selectedAppeal.status.toUpperCase()}`;
             document.getElementById('appeal-reason').innerText = selectedAppeal.reason;
-            document.getElementById('admin-reply-content').value = "";
+            document.getElementById('admin-reply-content').value = selectedAppeal.admin_reply || "";
+            document.getElementById('admin-reply-content').readOnly = selectedAppeal.status === 'resolved';
 
             const userInfo = document.getElementById('appeal-user-info');
             const emailToShow = selectedAppeal.email || selectedAppeal.contact_email;
@@ -1346,11 +1347,14 @@
                 <div>
                     <p class="text-lg font-black text-gray-800">${selectedAppeal.full_name || 'Utilisateur Anonyme'}</p>
                     <p class="text-xs font-bold text-purple-500">Email: ${emailToShow}</p>
+                    ${selectedAppeal.resolved_at ? `<p class="text-[9px] text-green-500 font-bold uppercase mt-1">Résolu le ${new Date(selectedAppeal.resolved_at).toLocaleString()}</p>` : ''}
                 </div>
             `;
 
             const actions = document.getElementById('appeal-actions');
-            if (isDeletion) {
+            if (selectedAppeal.status === 'resolved') {
+                actions.innerHTML = `<div class="flex-1 p-4 bg-green-50 text-green-700 text-center rounded-2xl font-bold uppercase border border-green-100">CETTE DEMANDE A ÉTÉ TRAITÉE</div>`;
+            } else if (isDeletion) {
                 actions.innerHTML = `<button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'delete_confirmed')" class="flex-1 py-5 bg-red-600 text-white font-black rounded-2xl shadow-xl hover:bg-red-700 uppercase">SUPPRIMER & NOTIFIER</button>`;
             } else {
                 actions.innerHTML = `
@@ -1382,13 +1386,17 @@
                 if (viewMode === 'contestation') filtered = appeals_data.filter(a => a.type === 'contestation' || a.type === 'deletion' || a.type === 'appeal');
                 filtered.forEach(a => {
                     const typeLabel = a.type === 'helpdesk' ? 'HELPDESK' : (a.type === 'deletion' ? 'SUPPRESSION' : 'CONTESTATION');
+                    const statusLabel = a.status === 'resolved' ? 'TRAITÉ' : (a.status === 'reviewed' ? 'EN EXAMEN' : 'EN ATTENTE');
+                    const statusColor = a.status === 'resolved' ? 'bg-green-50 text-green-600' : (a.status === 'reviewed' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600');
+
                     const tr = document.createElement('tr');
                     tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
                     tr.innerHTML = `
                         <td class="px-8 py-5"><p class="text-[9px] font-black ${a.type === 'helpdesk' ? 'text-blue-600' : 'text-red-600'} tracking-widest">${typeLabel}</p><p class="font-bold text-gray-800">${a.full_name || 'Utilisateur Anonyme'}</p><p class="text-xs text-gray-400 font-medium">${a.email || a.contact_email}</p></td>
                         <td class="px-8 py-5"><p class="text-[9px] font-black text-gray-400 uppercase tracking-widest">${a.category || 'Général'}</p><p class="text-sm font-bold text-gray-600 italic line-clamp-1">${a.reason}</p></td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${statusColor}">${statusLabel}</span></td>
                         <td class="px-8 py-5 text-xs text-gray-400 font-bold uppercase tracking-tighter">${new Date(a.created_at).toLocaleDateString()}</td>
-                        <td class="px-8 py-5 text-right"><button onclick="examineAppeal('${a.id}')" class="px-5 py-2.5 bg-purple-600 text-white text-xs font-black rounded-xl hover:bg-purple-700 shadow-md">EXAMINER</button></td>
+                        <td class="px-8 py-5 text-right"><button onclick="examineAppeal('${a.id}')" class="px-5 py-2.5 bg-purple-600 text-white text-xs font-black rounded-xl hover:bg-purple-700 shadow-md">${a.status === 'resolved' ? 'VOIR' : 'EXAMINER'}</button></td>
                     `;
                     body.appendChild(tr);
                 });

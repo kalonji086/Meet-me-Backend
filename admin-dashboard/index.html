@@ -450,7 +450,10 @@
                         <div class="lg:col-span-1 space-y-8">
                             <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
                                 <h3 class="text-xl font-bold mb-6 text-gray-800">Version Publiée</h3>
-                                <div class="p-6 bg-purple-50 rounded-2xl border border-purple-100 text-center">
+                                <div class="p-6 bg-purple-50 rounded-2xl border border-purple-100 text-center relative group">
+                                    <button onclick="deleteCurrentConfig()" class="absolute top-2 right-2 p-2 bg-red-100 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-200" title="Supprimer/Retirer cette version">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
                                     <span class="text-xs font-black text-purple-400 uppercase tracking-widest block mb-2">Version Actuelle</span>
                                     <h4 id="current-app-version" class="text-5xl font-black text-purple-600 tracking-tighter">1.0.0</h4>
                                     <div id="status-badge-container" class="mt-4 inline-block">
@@ -464,8 +467,17 @@
                             </div>
 
                             <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-                                <h3 class="text-lg font-bold mb-4 text-gray-800">Aide</h3>
-                                <p class="text-sm text-gray-500 leading-relaxed italic">"Cibler des utilisateurs permet de tester la mise à jour (Beta) avant de forcer l'installation pour tout le monde, comme sur Amazon."</p>
+                                <h3 class="text-lg font-bold mb-4 text-gray-800">Statistiques MAJ</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-bold text-gray-400">À JOUR</span>
+                                        <span id="stat-updated-count" class="text-sm font-black text-green-600">0</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-bold text-gray-400">EN RETARD</span>
+                                        <span id="stat-pending-update" class="text-sm font-black text-orange-600">0</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1363,10 +1375,13 @@
             } catch (e) { alert("Erreur."); }
         }
 
+        let currentConfigId = null;
+
         async function loadAppConfig() {
             try {
                 const res = await axios.get(`${API_URL}/admin/app-config`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data;
+                currentConfigId = d.id;
                 document.getElementById('current-app-version').innerText = d.current_version;
                 document.getElementById('current-force-status').innerText = d.force_update ? 'OUI' : 'NON';
                 document.getElementById('current-force-status').className = d.force_update ? 'font-black text-red-600' : 'font-black text-gray-400';
@@ -1377,7 +1392,24 @@
                 document.getElementById('up-url').value = d.update_url || '';
                 document.getElementById('up-notes').value = d.release_notes || '';
                 document.getElementById('up-force').checked = d.force_update;
+
+                // Calculer les stats de mise à jour à partir de users_data
+                if (users_data.length === 0) await loadUsers();
+                const updated = users_data.filter(u => u.app_version === d.current_version).length;
+                document.getElementById('stat-updated-count').innerText = updated;
+                document.getElementById('stat-pending-update').innerText = users_data.length - updated;
+
             } catch (e) { console.error(e); }
+        }
+
+        async function deleteCurrentConfig() {
+            if (!currentConfigId) return;
+            if (!confirm("Voulez-vous vraiment retirer cette mise à jour ? Les utilisateurs ne verront plus la demande de mise à jour.")) return;
+            try {
+                await axios.delete(`${API_URL}/admin/app-config/${currentConfigId}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Configuration de mise à jour retirée.");
+                loadAppConfig();
+            } catch (e) { alert("Erreur lors de la suppression."); }
         }
 
         function toggleTargetEmails() {

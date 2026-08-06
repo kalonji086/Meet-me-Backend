@@ -145,12 +145,16 @@ const ensureAdminTables = async () => {
       id SERIAL PRIMARY KEY,
       current_version TEXT NOT NULL,
       force_update BOOLEAN DEFAULT FALSE,
+      active BOOLEAN DEFAULT TRUE,
       update_url TEXT,
       release_notes TEXT,
       target_user_ids UUID[] DEFAULT '{}',
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `);
+
+  // S'assurer que la colonne active existe
+  try { await query('ALTER TABLE public.app_configs ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE'); } catch (e) {}
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.app_legal_docs (
@@ -177,6 +181,8 @@ const ensureAdminTables = async () => {
 
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_legal_version TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS app_version TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_update_at TIMESTAMP WITH TIME ZONE');
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.reported_content (
@@ -527,7 +533,7 @@ const getAppConfig = asyncHandler(async (req, res) => {
 });
 
 const updateAppConfig = asyncHandler(async (req, res) => {
-  const { current_version, force_update, update_url, release_notes, target_user_emails } = req.body;
+  const { current_version, force_update, update_url, release_notes, target_user_emails, active = true } = req.body;
 
   let targetIds = [];
   if (target_user_emails && target_user_emails.length > 0) {
@@ -537,9 +543,9 @@ const updateAppConfig = asyncHandler(async (req, res) => {
 
   await ensureAdminTables();
   const result = await query(
-    `INSERT INTO public.app_configs (current_version, force_update, update_url, release_notes, target_user_ids)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [current_version, force_update, update_url, release_notes, targetIds]
+    `INSERT INTO public.app_configs (current_version, force_update, update_url, release_notes, target_user_ids, active)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [current_version, force_update, update_url, release_notes, targetIds, active]
   );
 
   await logAdminAction(req, 'update_app_config', 'config', result.rows[0].id, req.body);
@@ -547,32 +553,55 @@ const updateAppConfig = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Supprimer/Désactiver une configuration de mise à jour
+ */
+const deleteAppConfig = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  await query('DELETE FROM public.app_configs WHERE id = $1', [id]);
+  await logAdminAction(req, 'delete_app_config', 'config', id, { deleted: true });
+  res.json({ success: true, message: 'Configuration de mise à jour supprimée.' });
+});
+
+/**
  * @desc    Route publique pour l'App Mobile
  */
 const checkUpdate = asyncHandler(async (req, res) => {
-  const { version, userId } = req.query; // La version actuelle de l'app de l'user
+  const { version, userId } = req.query;
 
-  const config = await query('SELECT * FROM public.app_configs ORDER BY id DESC LIMIT 1');
+  const config = await query('SELECT * FROM public.app_configs WHERE active = TRUE ORDER BY id DESC LIMIT 1');
   if (config.rows.length === 0) return res.json({ updateRequired: false });
 
   const latest = config.rows[0];
+
+  // Si l'utilisateur est déjà sur la version cible ou une version supérieure, pas de MAJ
+  if (version === latest.current_version) {
+    return res.json({ updateRequired: false });
+  }
+
   const isTargeted = userId && latest.target_user_ids.includes(userId);
   const isGlobal = latest.target_user_ids.length === 0;
 
-  // Si l'utilisateur est concerné (soit global, soit ciblé)
   if (isGlobal || isTargeted) {
-    if (version !== latest.current_version) {
-      return res.json({
-        updateRequired: true,
-        forceUpdate: latest.force_update,
-        latestVersion: latest.current_version,
-        updateUrl: latest.update_url,
-        releaseNotes: latest.release_notes
-      });
-    }
+    return res.json({
+      updateRequired: true,
+      forceUpdate: latest.force_update,
+      latestVersion: latest.current_version,
+      updateUrl: latest.update_url,
+      releaseNotes: latest.release_notes
+    });
   }
 
   res.json({ updateRequired: false });
+});
+
+/**
+ * @desc    Signaler qu'un utilisateur a fait la mise à jour
+ */
+const reportUpdateDone = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { version } = req.body;
+  await query('UPDATE public.profiles SET app_version = $1, last_update_at = NOW() WHERE id = $2', [version, userId]);
+  res.json({ success: true });
 });
 
 /**

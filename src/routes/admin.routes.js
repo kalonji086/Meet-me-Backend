@@ -33,6 +33,7 @@ router.post('/broadcast', adminController.broadcastMessage);
 
 router.get('/app-config', adminController.getAppConfig);
 router.post('/app-config', adminController.updateAppConfig);
+router.delete('/app-config/:id', adminController.deleteAppConfig);
 
 router.get('/legal', adminController.getLegalDocs);
 router.post('/legal', adminController.updateLegalDoc);

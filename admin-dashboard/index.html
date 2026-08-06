@@ -48,14 +48,14 @@
                     <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Adresse Email</label>
                     <div class="relative">
                         <i data-lucide="mail" class="absolute left-4 top-3.5 w-5 h-5 text-gray-400"></i>
-                        <input type="email" id="email" value="wecanconcept@gmail.com" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+                        <input type="email" id="email" placeholder="votre@email.com" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
                     </div>
                 </div>
                 <div>
                     <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Mot de passe</label>
                     <div class="relative">
                         <i data-lucide="lock" class="absolute left-4 top-3.5 w-5 h-5 text-gray-400"></i>
-                        <input type="password" id="password" value="Proverbe:15!?@" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+                        <input type="password" id="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
                     </div>
                 </div>
                 <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold shadow-xl shadow-purple-200 transition-all active:scale-95">SE CONNECTER</button>
@@ -609,36 +609,55 @@
         function initSocket() {
             if (socket) return;
             socket = io(BASE_URL, { query: { token } });
-            socket.on('connect', () => { socket.emit('authenticate', { userId: JSON.parse(localStorage.getItem('admin_user')).id, token }); });
+            socket.on('connect', () => {
+                console.log("Admin connected to socket");
+                socket.emit('authenticate', { userId: JSON.parse(localStorage.getItem('admin_user')).id, token });
+            });
+
             socket.on('user_status_changed', () => loadStats());
 
             // Nouveau badge Support/Contestation
-            socket.on('admin_new_appeal', () => {
-                const supportBadge = document.getElementById('support-badge');
-                const contestBadge = document.getElementById('contestation-badge');
-                if (supportBadge) {
-                    supportBadge.innerText = parseInt(supportBadge.innerText || 0) + 1;
-                    supportBadge.classList.remove('hidden');
+            socket.on('admin_new_appeal', (data) => {
+                console.log("New appeal received:", data);
+                loadStats(); // Met à jour les badges
+                if (!document.getElementById('section-appeals').classList.contains('hidden')) {
+                    loadAppeals(currentAppealsView);
                 }
-                if (!document.getElementById('section-appeals').classList.contains('hidden')) loadAppeals();
             });
 
             // Nouveau badge Vérification
-            socket.on('admin_new_verification', () => {
-                const verifBadge = document.getElementById('verif-badge');
-                if (verifBadge) {
-                    verifBadge.innerText = parseInt(verifBadge.innerText || 0) + 1;
-                    verifBadge.classList.remove('hidden');
+            socket.on('admin_new_verification', (data) => {
+                console.log("New verification request received:", data);
+                loadStats(); // Met à jour les badges
+                if (!document.getElementById('section-verifications').classList.contains('hidden')) {
+                    loadVerifications();
                 }
-                if (!document.getElementById('section-verifications').classList.contains('hidden')) loadVerifications();
             });
 
             // Mise à jour Audit en temps réel + Refresh Stats
             socket.on('admin_new_audit', (log) => {
+                console.log("New audit log:", log);
                 loadStats(); // Recharger les compteurs globaux
-                if (!document.getElementById('section-audit').classList.contains('hidden')) loadAuditLogs();
+                if (!document.getElementById('section-audit').classList.contains('hidden')) {
+                    loadAuditLogs();
+                }
+            });
+
+            // Rafraîchir les utilisateurs si quelqu'un se connecte/déconnecte
+            socket.on('user_status_changed', () => {
+                if (!document.getElementById('section-users').classList.contains('hidden')) {
+                    loadUsers();
+                }
+            });
+
+            socket.on('authentication_error', (data) => {
+                console.error('Socket authentication error:', data);
+                alert('Erreur d\'authentification socket : ' + (data?.error || 'session invalide'));
+                logout();
             });
         }
+
+        let currentAppealsView = 'all';
 
         function showSection(name) {
             ['stats', 'users', 'groups', 'support', 'contestation', 'reports', 'analytics', 'campaigns', 'audit', 'broadcast', 'config', 'legal', 'verifications'].forEach(s => {
@@ -648,12 +667,16 @@
                 if (nav) nav.classList.remove('active');
             });
 
+            // On utilise la même section pour support et contestation mais avec des filtres
+            const sectionAppeals = document.getElementById('section-appeals');
             if (name === 'support' || name === 'contestation') {
-                document.getElementById('section-appeals').classList.remove('hidden');
+                currentAppealsView = name;
+                if (sectionAppeals) sectionAppeals.classList.remove('hidden');
                 document.getElementById(`nav-${name}`).classList.add('active');
                 document.getElementById('section-title').innerText = document.getElementById(`nav-${name}`).innerText.trim();
                 loadAppeals(name);
             } else {
+                if (sectionAppeals) sectionAppeals.classList.add('hidden');
                 const target = document.getElementById(`section-${name}`);
                 if (target) target.classList.remove('hidden');
                 const nav = document.getElementById(`nav-${name}`);
@@ -686,6 +709,7 @@
                 const supportBadge = document.getElementById('support-badge');
                 const contestBadge = document.getElementById('contestation-badge');
                 const verifBadge = document.getElementById('verif-badge');
+
                 if (d.pendingHelpdesk > 0) { supportBadge.innerText = d.pendingHelpdesk; supportBadge.classList.remove('hidden'); } else if(supportBadge) supportBadge.classList.add('hidden');
                 if (d.pendingAppeals > 0) { contestBadge.innerText = d.pendingAppeals; contestBadge.classList.remove('hidden'); } else if(contestBadge) contestBadge.classList.add('hidden');
                 if (d.pendingVerifications > 0) { verifBadge.innerText = d.pendingVerifications; verifBadge.classList.remove('hidden'); } else if(verifBadge) verifBadge.classList.add('hidden');
@@ -693,7 +717,7 @@
                 // Render NEW Master Circular System View
                 renderMasterCircularChart(d);
                 renderUserActivityPolarChart(d.userActivity || []);
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Stats Error:", e); }
         }
 
         function renderMasterCircularChart(stats) {
@@ -1433,6 +1457,27 @@
             } catch (e) { console.error(e); }
         }
 
+        async function createCampaign() {
+            const title = document.getElementById('campaign-title').value.trim();
+            const target = document.getElementById('campaign-target').value;
+            const targetValue = document.getElementById('campaign-target-email')?.value.trim();
+            const message = document.getElementById('campaign-message').value.trim();
+            const btn = document.querySelector('button[onclick="createCampaign()"]');
+
+            if (!title || !message) return alert('Titre et message requis');
+            try {
+                if (btn) { btn.disabled = true; btn.innerText = 'ENVOI...'; }
+                await axios.post(`${API_URL}/admin/campaigns`, { title, message, target, targetValue }, { headers: { Authorization: `Bearer ${token}` } });
+                alert('Campagne envoyée !');
+                loadCampaigns();
+            } catch (e) {
+                console.error('Create campaign error:', e);
+                alert(e.response?.data?.error || 'Erreur lors de l\'envoi de la campagne.');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = 'LANCER LA CAMPAGNE'; }
+            }
+        }
+
         async function loadAuditLogs() {
             try {
                 const res = await axios.get(`${API_URL}/admin/audit-logs`, { headers: { Authorization: `Bearer ${token}` } });
@@ -1456,6 +1501,7 @@
 
         function logout() { localStorage.clear(); location.reload(); }
         function toggleSpecificEmail() { const target = document.getElementById('bc-target').value; document.getElementById('specific-email-container').className = target === 'specific' ? 'block' : 'hidden'; }
+        function toggleCampaignSpecificEmail() { const v = document.getElementById('campaign-target')?.value; if (!document.getElementById('campaign-specific-container')) return; document.getElementById('campaign-specific-container').className = v === 'specific' ? 'block' : 'hidden'; }
         document.getElementById('campaign-target')?.addEventListener('change', toggleCampaignSpecificEmail);
     </script>
 </body>

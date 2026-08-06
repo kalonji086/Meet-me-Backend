@@ -108,9 +108,11 @@ class SocketService {
             if (calleeSocket) this.io.to(calleeSocket).emit('call:timeout', { callId: callIdentifier });
 
             this.pendingCalls.delete(callIdentifier);
+            // persist missed call
+            this.persistCallRecord({ callerId, calleeId: toUserId, status: 'missed', callType: callType || 'audio', channelName });
           }, 30000);
 
-          this.pendingCalls.set(callIdentifier, { callerId, calleeId: toUserId, timeout });
+          this.pendingCalls.set(callIdentifier, { callerId, calleeId: toUserId, timeout, callType, channelName });
 
           // Acknowledge to caller
           socket.emit('call:offered', { toUserId, callId: callIdentifier });
@@ -138,6 +140,9 @@ class SocketService {
             this.io.to(callerSocketId).emit('call:accepted', { callId, by: accepterId });
           }
 
+          // persist connected start
+          this.persistCallRecord({ callerId: pending.callerId, calleeId: pending.calleeId, status: 'connected', callType: pending.callType || 'audio', channelName: pending.channelName, startedAt: new Date() });
+
           // Notify callee also (confirmation)
           socket.emit('call:accepted', { callId, by: accepterId });
         } catch (err) {
@@ -157,6 +162,8 @@ class SocketService {
             if (callerSocketId) {
               this.io.to(callerSocketId).emit('call:rejected', { callId, by: rejecterId });
             }
+            // persist rejected
+            this.persistCallRecord({ callerId: pending.callerId, calleeId: pending.calleeId, status: 'rejected', callType: pending.callType || 'audio', channelName: pending.channelName });
           }
           // Confirm to rejecter
           socket.emit('call:rejected', { callId, by: rejecterId });
@@ -181,6 +188,7 @@ class SocketService {
           if (pending) {
             clearTimeout(pending.timeout);
             this.pendingCalls.delete(callId);
+            this.persistCallRecord({ callerId: pending.callerId, calleeId: pending.calleeId, status: 'hung_up', callType: pending.callType || 'audio', channelName: pending.channelName });
           }
 
           socket.emit('call:hangup', { callId, by: hangerId });
@@ -267,6 +275,18 @@ class SocketService {
     } catch (error) {
       logger.error('Erreur d\'authentification Socket.IO:', error);
       socket.emit('authentication_error', { error: 'Erreur d\'authentification' });
+    }
+  }
+
+  async persistCallRecord({ callerId, calleeId, status = 'missed', callType = 'audio', channelName = null, startedAt = null, endedAt = null, durationSeconds = null }) {
+    try {
+      await query(
+        `INSERT INTO public.calls (caller_id, callee_id, status, call_type, channel_name, started_at, ended_at, duration_seconds)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [callerId, calleeId, status, callType, channelName, startedAt, endedAt, durationSeconds]
+      );
+    } catch (err) {
+      logger.error('Error persisting call record:', err);
     }
   }
 

@@ -46,4 +46,9 @@ router.get('/badges', userController.getBadges);
  */
 router.post('/verify', userController.submitVerification);
 
+/**
+ * @route GET /api/users/:id
+ */
+router.get('/:id', userController.getUserById);
+
 module.exports = router;

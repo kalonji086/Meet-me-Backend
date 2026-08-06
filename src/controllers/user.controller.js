@@ -181,3 +181,16 @@ const submitVerification = asyncHandler(async (req, res) => {
 });
 
 module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification };
+
+/**
+ * @desc Get user by id (public minimal profile)
+ */
+const getUserById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await query('SELECT id, full_name, avatar_url, status, username FROM public.profiles WHERE id = $1', [id]);
+  const user = result.rows[0];
+  if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  res.json({ success: true, data: { id: user.id, name: user.full_name, avatar: user.avatar_url, status: user.status, username: user.username } });
+});
+
+module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById };

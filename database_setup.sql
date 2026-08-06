@@ -161,3 +161,17 @@ CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
   details JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Calls table for recording call attempts and history
+CREATE TABLE IF NOT EXISTS public.calls (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  caller_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  callee_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'missed' CHECK (status IN ('offered','connected','rejected','missed','hung_up')),
+  call_type TEXT DEFAULT 'audio' CHECK (call_type IN ('audio','video')),
+  channel_name TEXT,
+  started_at TIMESTAMP WITH TIME ZONE,
+  ended_at TIMESTAMP WITH TIME ZONE,
+  duration_seconds INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

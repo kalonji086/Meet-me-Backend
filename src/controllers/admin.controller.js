@@ -288,9 +288,11 @@ const deleteUser = asyncHandler(async (req, res) => {
   // 2. Nettoyage manuel des dépendances critiques (au cas où CASCADE manque)
   await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
   await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
+  await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]); // Résout le bug de contrainte
   await query('DELETE FROM public.appeals WHERE user_id = $1', [userId]);
   await query('DELETE FROM public.verification_requests WHERE user_id = $1', [userId]);
   await query('DELETE FROM public.reported_content WHERE reporter_id = $1 OR target_id = $1', [userId]);
+  await query('UPDATE public.notification_campaigns SET created_by = NULL WHERE created_by = $1', [userId]);
 
   // 3. Suppression finale du profil
   await query('DELETE FROM public.profiles WHERE id = $1', [userId]);

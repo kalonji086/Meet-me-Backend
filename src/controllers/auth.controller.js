@@ -138,7 +138,8 @@ const register = asyncHandler(async (req, res) => {
         username: user.username,
         avatar: user.avatar_url,
         status: user.status,
-        isGlobalAdmin: user.is_global_admin
+        isGlobalAdmin: user.is_global_admin,
+        push_token: user.push_token
       },
     }
   });
@@ -230,7 +231,8 @@ const login = asyncHandler(async (req, res) => {
         username: user.username,
         avatar: user.avatar_url,
         status: 'online',
-        isGlobalAdmin: user.is_global_admin
+        isGlobalAdmin: user.is_global_admin,
+        push_token: user.push_token
       },
     }
   });

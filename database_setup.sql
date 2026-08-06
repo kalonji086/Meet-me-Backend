@@ -72,6 +72,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_login_at') THEN
     ALTER TABLE public.profiles ADD COLUMN last_login_at TIMESTAMP WITH TIME ZONE;
   END IF;
+
+  -- push_token
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='push_token') THEN
+    ALTER TABLE public.profiles ADD COLUMN push_token TEXT;
+  END IF;
 END $$;
 
 -- 4. Droits Administrateurs

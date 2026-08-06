@@ -10,7 +10,7 @@ const getMe = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   const result = await query(
-    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin, is_locked FROM public.profiles WHERE id = $1',
+    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin, is_locked, push_token FROM public.profiles WHERE id = $1',
     [userId]
   );
 
@@ -69,7 +69,7 @@ const updateProfile = asyncHandler(async (req, res) => {
          username = COALESCE($4, username),
          updated_at = NOW()
      WHERE id = $5
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin`,
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token`,
     [name, status, avatar_url, username?.toLowerCase().trim(), userId]
   );
 

@@ -197,11 +197,16 @@ const ensureAdminTables = async () => {
       admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
       action TEXT NOT NULL,
       entity_type TEXT,
-      entity_id TEXT,
+      entity_id TEXT, -- Changé UUID en TEXT pour supporter les IDs numériques
       details JSONB DEFAULT '{}'::jsonb,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `);
+
+  // S'assurer que entity_id est bien de type TEXT si la table existe déjà
+  try {
+    await query('ALTER TABLE public.admin_audit_logs ALTER COLUMN entity_id TYPE TEXT');
+  } catch (e) { /* Table peut être déjà correcte */ }
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.notification_campaigns (

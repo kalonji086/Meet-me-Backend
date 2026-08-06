@@ -83,6 +83,9 @@ class Server {
     this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me' }));
     this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '1.0.0' }));
 
+    // Gérer le favicon pour éviter les erreurs 404 dans les logs
+    this.app.get('/favicon.ico', (req, res) => res.status(204).end());
+
     // Route publique pour vérification de mise à jour App Mobile
     this.app.get('/api/check-update', adminRoutes.checkUpdate || require('./controllers/admin.controller').checkUpdate);
 

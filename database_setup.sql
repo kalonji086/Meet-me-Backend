@@ -150,3 +150,14 @@ DROP TRIGGER IF EXISTS on_new_message_update_chat ON public.messages;
 CREATE TRIGGER on_new_message_update_chat
   AFTER INSERT ON public.messages
   FOR EACH ROW EXECUTE FUNCTION update_last_message_at();
+
+-- 7. Audit Logs
+CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  entity_type TEXT,
+  entity_id TEXT,
+  details JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

@@ -1054,11 +1054,11 @@
                         </span>
                     </td>
                     <td class="px-8 py-5 text-right space-x-2">
-                        <button onclick="showImpactModal('lock', '${u.id}', ${!u.is_locked})" class="p-2.5 rounded-xl bg-gray-50 text-gray-400 hover:bg-black hover:text-white transition-all shadow-sm">
-                            <i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i>
+                        <button type="button" onclick="console.log('Lock clicked'); showImpactModal('lock', '${u.id}', ${!u.is_locked})" class="p-2.5 rounded-xl bg-gray-50 text-gray-400 hover:bg-black hover:text-white transition-all shadow-sm cursor-pointer">
+                            <i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4 pointer-events-none"></i>
                         </button>
-                        <button onclick="showImpactModal('delete', '${u.id}')" class="p-2.5 rounded-xl bg-red-50 text-red-400 hover:bg-red-600 hover:text-white transition-all shadow-sm">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        <button type="button" onclick="console.log('Delete clicked'); showImpactModal('delete', '${u.id}')" class="p-2.5 rounded-xl bg-red-50 text-red-400 hover:bg-red-600 hover:text-white transition-all shadow-sm cursor-pointer">
+                            <i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i>
                         </button>
                     </td>
                 `;

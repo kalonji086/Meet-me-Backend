@@ -235,7 +235,8 @@ const logAdminAction = async (req, action, entityType, entityId, details = {}) =
  */
 const getUsers = asyncHandler(async (req, res) => {
   const result = await query(`
-    SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked, login_attempts, created_at, is_global_admin, last_login_at
+    SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked,
+           login_attempts, created_at, is_global_admin, last_login_at, device_info, is_verified
     FROM public.profiles
     WHERE is_global_admin = FALSE
     ORDER BY last_login_at DESC NULLS LAST
@@ -273,10 +274,24 @@ const resolveReport = asyncHandler(async (req, res) => {
  */
 const deleteUser = asyncHandler(async (req, res) => {
   const { userId } = req.params;
+
+  // 1. Vérifier si la cible est un admin
   const target = await query('SELECT is_global_admin FROM public.profiles WHERE id = $1', [userId]);
-  if (target.rows[0]?.is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un admin' });
+  if (!target.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  if (target.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
+
+  // 2. Nettoyage manuel des dépendances critiques (au cas où CASCADE manque)
+  await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
+  await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
+  await query('DELETE FROM public.appeals WHERE user_id = $1', [userId]);
+  await query('DELETE FROM public.verification_requests WHERE user_id = $1', [userId]);
+  await query('DELETE FROM public.reported_content WHERE reporter_id = $1 OR target_id = $1', [userId]);
+
+  // 3. Suppression finale du profil
   await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
-  res.json({ success: true, message: 'Utilisateur supprimé définitivement' });
+
+  await logAdminAction(req, 'delete_user', 'user', userId, { deleted: true });
+  res.json({ success: true, message: 'Utilisateur et toutes ses données supprimés' });
 });
 
 /**

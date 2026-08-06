@@ -1120,6 +1120,46 @@
         function closeModal() { document.getElementById('modal-members').classList.add('hidden'); }
         function closeAppealModal() { document.getElementById('modal-appeal').classList.add('hidden'); selectedAppeal = null; }
 
+        function showImpactModal(type, id, extra = null) {
+            const modal = document.getElementById('impact-modal');
+            const header = document.getElementById('impact-header');
+            const icon = document.getElementById('impact-icon');
+            const title = document.getElementById('impact-title');
+            const message = document.getElementById('impact-message');
+            const confirmBtn = document.getElementById('impact-confirm-btn');
+
+            // Reset classes
+            confirmBtn.className = "flex-1 py-4 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all";
+
+            if (type === 'delete' || type === 'group_delete') {
+                header.className = "h-40 flex items-center justify-center bg-red-600";
+                icon.setAttribute('data-lucide', 'trash-2');
+                title.innerText = "SUPPRESSION TOTALE";
+                message.innerText = "Cette action est irréversible. Désintégrer définitivement ?";
+                confirmBtn.onclick = () => type === 'delete' ? performDelete(id) : performGroupDelete(id);
+                confirmBtn.classList.add('bg-red-600');
+            } else if (type === 'lock' || type === 'group_ban') {
+                const isLocking = extra;
+                header.className = isLocking ? "h-40 flex items-center justify-center bg-black" : "h-40 flex items-center justify-center bg-green-500";
+                icon.setAttribute('data-lucide', isLocking ? 'lock' : 'unlock');
+                title.innerText = isLocking ? "BANNISSEMENT" : "RÉTABLISSEMENT";
+                message.innerText = isLocking ? "Révoquer l'accès de cet utilisateur ?" : "Rétablir l'accès complet ?";
+                confirmBtn.onclick = () => type === 'lock' ? performLock(id, isLocking) : performGroupBan(id, isLocking);
+                confirmBtn.classList.add(isLocking ? 'bg-black' : 'bg-green-600');
+            } else if (type === 'appeal_resolve') {
+                const action = extra;
+                header.className = action === 'resolved' ? "h-40 flex items-center justify-center bg-green-500" : (action === 'delete_confirmed' ? "h-40 flex items-center justify-center bg-red-900" : "h-40 flex items-center justify-center bg-black");
+                icon.setAttribute('data-lucide', 'mail');
+                title.innerText = "CONFIRMER L'ENVOI";
+                message.innerText = "Envoyer votre réponse par e-mail à l'utilisateur ?";
+                confirmBtn.onclick = () => submitAppealReply(id, action);
+                confirmBtn.classList.add('bg-purple-600');
+            }
+
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
         // --- GESTION DU SUPPORT & CONTESTATIONS ---
         function examineAppeal(id) {
             selectedAppeal = appeals_data.find(a => a.id === id);

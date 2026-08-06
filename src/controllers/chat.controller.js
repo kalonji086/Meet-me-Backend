@@ -2,6 +2,7 @@ const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const { asyncHandler } = require('../middleware/error.middleware');
 const notificationService = require('../services/notification.service');
+const translationService = require('../services/translation.service');
 
 /**
  * @desc    Obtenir la liste des conversations
@@ -495,6 +496,32 @@ const changeMemberRole = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Rôle mis à jour' });
 });
 
+/**
+ * @desc    Traduire un message
+ * @route   POST /api/messages/:messageId/translate
+ */
+const translateMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const { targetLanguage } = req.body;
+
+  if (!targetLanguage) {
+    return res.status(400).json({ success: false, error: 'Langue cible requise' });
+  }
+
+  try {
+    const translatedText = await translationService.translateMessage(messageId, targetLanguage);
+    res.json({
+      success: true,
+      data: {
+        translatedText
+      }
+    });
+  } catch (error) {
+    logger.error('Erreur de traduction:', error);
+    res.status(500).json({ success: false, error: 'Échec de la traduction' });
+  }
+});
+
 module.exports = {
   getChats,
   createChat,
@@ -509,4 +536,5 @@ module.exports = {
   addMembers,
   removeMember,
   changeMemberRole,
+  translateMessage,
 };

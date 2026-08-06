@@ -29,4 +29,9 @@ router.post('/', chatController.sendMessage);
  */
 router.delete('/:messageId', chatController.deleteMessage);
 
+/**
+ * @route   POST /api/messages/:messageId/translate
+ */
+router.post('/:messageId/translate', chatController.translateMessage);
+
 module.exports = router;

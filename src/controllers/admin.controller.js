@@ -197,7 +197,7 @@ const ensureAdminTables = async () => {
       admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
       action TEXT NOT NULL,
       entity_type TEXT,
-      entity_id UUID,
+      entity_id TEXT,
       details JSONB DEFAULT '{}'::jsonb,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );

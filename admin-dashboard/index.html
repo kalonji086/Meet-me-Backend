@@ -1098,6 +1098,73 @@
             }
         }
 
+        // --- NOUVELLES FONCTIONS DE GESTION DES GROUPES ---
+        async function performGroupBan(id, isBanned) {
+            try {
+                await axios.put(`${API_URL}/admin/groups/${id}/ban`, { isBanned }, { headers: { Authorization: `Bearer ${token}` } });
+                closeImpactModal();
+                loadGroups();
+            } catch (e) { alert("Erreur lors du bannissement du groupe."); }
+        }
+
+        async function performGroupDelete(id) {
+            try {
+                await axios.delete(`${API_URL}/admin/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                closeImpactModal();
+                loadGroups();
+            } catch (e) { alert("Erreur lors de la suppression du groupe."); }
+        }
+
+        // --- FONCTIONS DE FERMETURE DES MODAUX ---
+        function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }
+        function closeModal() { document.getElementById('modal-members').classList.add('hidden'); }
+        function closeAppealModal() { document.getElementById('modal-appeal').classList.add('hidden'); selectedAppeal = null; }
+
+        // --- GESTION DU SUPPORT & CONTESTATIONS ---
+        function examineAppeal(id) {
+            selectedAppeal = appeals_data.find(a => a.id === id);
+            if (!selectedAppeal) return;
+
+            const isDeletion = selectedAppeal.type === 'deletion';
+            const isHelpdesk = selectedAppeal.type === 'helpdesk';
+
+            document.getElementById('appeal-modal-title').innerText = isDeletion ? 'DEMANDE DE SUPPRESSION' : (isHelpdesk ? 'DEMANDE HELPDESK' : 'EXAMEN CONTESTATION');
+            document.getElementById('appeal-type-tag').innerText = `${selectedAppeal.type} | ${selectedAppeal.category || 'AUTRE'}`;
+            document.getElementById('appeal-reason').innerText = selectedAppeal.reason;
+            document.getElementById('admin-reply-content').value = "";
+
+            const userInfo = document.getElementById('appeal-user-info');
+            const emailToShow = selectedAppeal.email || selectedAppeal.contact_email;
+            userInfo.innerHTML = `
+                <img src="${selectedAppeal.avatar_url || 'https://ui-avatars.com/api/?name='+(selectedAppeal.full_name || 'U')}" class="w-14 h-14 rounded-2xl mr-4 border-2 border-white shadow-md">
+                <div>
+                    <p class="text-lg font-black text-gray-800">${selectedAppeal.full_name || 'Utilisateur Anonyme'}</p>
+                    <p class="text-xs font-bold text-purple-500">Email: ${emailToShow}</p>
+                </div>
+            `;
+
+            const actions = document.getElementById('appeal-actions');
+            if (isDeletion) {
+                actions.innerHTML = `<button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'delete_confirmed')" class="flex-1 py-5 bg-red-600 text-white font-black rounded-2xl shadow-xl hover:bg-red-700 uppercase">SUPPRIMER & NOTIFIER</button>`;
+            } else {
+                actions.innerHTML = `
+                    <button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'resolved')" class="flex-1 py-5 bg-green-600 text-white font-black rounded-2xl shadow-xl hover:bg-green-700">RÉSOUDRE</button>
+                    <button onclick="showImpactModal('appeal_resolve', '${selectedAppeal.id}', 'reviewed')" class="flex-1 py-5 bg-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-900">MAINTENIR</button>
+                `;
+            }
+            document.getElementById('modal-appeal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        async function submitAppealReply(id, action) {
+            const reply = document.getElementById('admin-reply-content').value;
+            if (!reply && action !== 'delete_confirmed') return alert("Veuillez saisir votre réponse.");
+            try {
+                await axios.post(`${API_URL}/admin/appeals/${id}/reply`, { reply, action }, { headers: { Authorization: `Bearer ${token}` } });
+                closeImpactModal(); closeAppealModal(); alert("Réponse envoyée !"); loadAppeals();
+            } catch (e) { alert("Erreur lors de l'envoi de la réponse."); }
+        }
+
         async function loadAppeals(viewMode = 'all') {
             try {
                 const res = await axios.get(`${API_URL}/admin/appeals`, { headers: { Authorization: `Bearer ${token}` } });

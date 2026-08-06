@@ -216,6 +216,14 @@ const login = asyncHandler(async (req, res) => {
     [JSON.stringify(device_info || user.device_info || {}), user.id]
   );
 
+  const socketService = require('../services/socket.service');
+  socketService.broadcast('admin_user_login', {
+    userId: user.id,
+    name: user.full_name,
+    email: user.email,
+    time: new Date()
+  });
+
   const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
   const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
 

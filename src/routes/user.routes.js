@@ -41,4 +41,9 @@ router.put('/push-token', userController.updatePushToken);
  */
 router.get('/badges', userController.getBadges);
 
+/**
+ * @route   POST /api/users/verify
+ */
+router.post('/verify', userController.submitVerification);
+
 module.exports = router;

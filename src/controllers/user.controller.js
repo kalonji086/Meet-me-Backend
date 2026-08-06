@@ -159,4 +159,25 @@ const getBadges = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { messages: parseInt(msgRes.rows[0].count), calls: 0, status: 0 } });
 });
 
-module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges };
+/**
+ * @desc    Soumettre une demande de vérification
+ */
+const submitVerification = asyncHandler(async (req, res) => {
+  const { documentUrl } = req.body;
+  const userId = req.userId;
+
+  if (!documentUrl) {
+    return res.status(400).json({ success: false, error: 'Document requis' });
+  }
+
+  const result = await query(
+    'INSERT INTO public.verification_requests (user_id, document_url) VALUES ($1, $2) RETURNING *',
+    [userId, documentUrl]
+  );
+
+  socketService.broadcast('admin_new_verification', { requestId: result.rows[0].id, userId });
+
+  res.json({ success: true, message: 'Demande envoyée' });
+});
+
+module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification };

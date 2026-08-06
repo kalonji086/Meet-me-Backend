@@ -15,6 +15,7 @@ const getStats = asyncHandler(async (req, res) => {
   const appealCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending'");
   const helpdeskCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND type = 'helpdesk'");
   const contestationCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND (type = 'contestation' OR type = 'deletion')");
+  const verificationsCount = await query("SELECT COUNT(*) FROM public.verification_requests WHERE status = 'pending'");
 
   const growth = await query(`
     SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as count
@@ -55,6 +56,7 @@ const getStats = asyncHandler(async (req, res) => {
       lockedUsers: parseInt(lockedUsers.rows[0].count),
       pendingAppeals: parseInt(contestationCount.rows[0].count),
       pendingHelpdesk: parseInt(helpdeskCount.rows[0].count),
+      pendingVerifications: parseInt(verificationsCount.rows[0].count),
       openReports: parseInt(recentReports.rows[0].count),
       growth: growth.rows,
       userActivity: userActivity.rows,
@@ -225,11 +227,14 @@ const ensureAdminTables = async () => {
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
   const adminId = req.user?.id || null;
+  const adminName = req.user?.full_name || 'Admin';
   try {
-    await query(
-      'INSERT INTO public.admin_audit_logs (admin_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5)',
+    const res = await query(
+      'INSERT INTO public.admin_audit_logs (admin_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [adminId, action, entityType, entityId, JSON.stringify(details)]
     );
+
+    socketService.broadcast('admin_new_audit', { ...res.rows[0], admin_name: adminName });
   } catch (error) {
     console.error('Audit log error:', error.message);
   }
@@ -334,6 +339,7 @@ const toggleGroupBan = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const { isBanned } = req.body;
   await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [isBanned, chatId]);
+  await logAdminAction(req, isBanned ? 'ban_group' : 'unban_group', 'group', chatId, { isBanned });
   res.json({ success: true });
 });
 
@@ -396,6 +402,8 @@ const replyToAppeal = asyncHandler(async (req, res) => {
     // 2. Supprimer définitivement l'utilisateur (CASCADE supprimera l'appel et tout le reste)
     await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
 
+    await logAdminAction(req, 'confirm_deletion', 'user', userId, { appealId: id });
+
     return res.json({ success: true, message: 'Compte supprimé et utilisateur notifié par e-mail.' });
   }
 
@@ -404,6 +412,8 @@ const replyToAppeal = asyncHandler(async (req, res) => {
     'UPDATE public.appeals SET admin_reply = $1, status = $2, resolved_at = NOW() WHERE id = $3',
     [reply, action === 'resolved' ? 'resolved' : 'reviewed', id]
   );
+
+  await logAdminAction(req, 'reply_appeal', 'appeal', id, { action });
 
   await mailService.sendSystemEmail(user.email, "Réponse à votre contestation Meet Me", reply);
 

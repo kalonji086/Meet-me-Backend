@@ -7,6 +7,7 @@ class SocketService {
     this.io = null;
     this.connectedUsers = new Map(); // socketId -> userId
     this.userSockets = new Map(); // userId -> socketId
+    this.pendingCalls = new Map(); // callId -> { callerId, calleeId, timeout }
   }
 
   initialize(io) {
@@ -68,6 +69,124 @@ class SocketService {
       // Typing indicator
       socket.on('typing', (data) => {
         this.handleTyping(socket, data);
+      });
+
+      // Call signaling
+      socket.on('call:offer', async (data) => {
+        // data: { toUserId, channelName, callType, callId, fromUserName }
+        try {
+          const callerId = this.connectedUsers.get(socket.id);
+          if (!callerId) return socket.emit('error', { error: 'Non authentifié' });
+
+          const { toUserId, channelName, callType, callId } = data;
+          if (!toUserId || !channelName) return socket.emit('error', { error: 'Données d\'appel manquantes' });
+
+          const calleeSocketId = this.userSockets.get(toUserId.toString());
+          const callIdentifier = callId || `${callerId}_${toUserId}_${Date.now()}`;
+
+          if (!calleeSocketId) {
+            // Callee offline
+            socket.emit('call:callee_unavailable', { toUserId, callId: callIdentifier });
+            return;
+          }
+
+          // Forward ring to callee
+          this.io.to(calleeSocketId).emit('call:ring', {
+            fromUserId: callerId,
+            channelName,
+            callType,
+            callId: callIdentifier,
+          });
+
+          // Store pending call with timeout (30s)
+          const timeout = setTimeout(() => {
+            // Notify both parties of timeout
+            const callerSocket = this.userSockets.get(callerId.toString());
+            const calleeSocket = this.userSockets.get(toUserId.toString());
+
+            if (callerSocket) this.io.to(callerSocket).emit('call:timeout', { callId: callIdentifier });
+            if (calleeSocket) this.io.to(calleeSocket).emit('call:timeout', { callId: callIdentifier });
+
+            this.pendingCalls.delete(callIdentifier);
+          }, 30000);
+
+          this.pendingCalls.set(callIdentifier, { callerId, calleeId: toUserId, timeout });
+
+          // Acknowledge to caller
+          socket.emit('call:offered', { toUserId, callId: callIdentifier });
+        } catch (err) {
+          logger.error('Error handling call:offer', err);
+          socket.emit('error', { error: 'Erreur signaling' });
+        }
+      });
+
+      socket.on('call:accept', (data) => {
+        // data: { callId }
+        try {
+          const accepterId = this.connectedUsers.get(socket.id);
+          const { callId } = data;
+          const pending = this.pendingCalls.get(callId);
+          if (!pending) return socket.emit('error', { error: 'Appel introuvable ou expiré' });
+
+          // Clear timeout
+          clearTimeout(pending.timeout);
+          this.pendingCalls.delete(callId);
+
+          // Notify caller
+          const callerSocketId = this.userSockets.get(pending.callerId.toString());
+          if (callerSocketId) {
+            this.io.to(callerSocketId).emit('call:accepted', { callId, by: accepterId });
+          }
+
+          // Notify callee also (confirmation)
+          socket.emit('call:accepted', { callId, by: accepterId });
+        } catch (err) {
+          logger.error('Error handling call:accept', err);
+        }
+      });
+
+      socket.on('call:reject', (data) => {
+        try {
+          const rejecterId = this.connectedUsers.get(socket.id);
+          const { callId } = data;
+          const pending = this.pendingCalls.get(callId);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            this.pendingCalls.delete(callId);
+            const callerSocketId = this.userSockets.get(pending.callerId.toString());
+            if (callerSocketId) {
+              this.io.to(callerSocketId).emit('call:rejected', { callId, by: rejecterId });
+            }
+          }
+          // Confirm to rejecter
+          socket.emit('call:rejected', { callId, by: rejecterId });
+        } catch (err) {
+          logger.error('Error handling call:reject', err);
+        }
+      });
+
+      socket.on('call:hangup', (data) => {
+        try {
+          const hangerId = this.connectedUsers.get(socket.id);
+          const { callId, toUserId } = data;
+
+          // Forward hangup to other side if online
+          if (toUserId) {
+            const targetSocket = this.userSockets.get(toUserId.toString());
+            if (targetSocket) this.io.to(targetSocket).emit('call:hangup', { callId, by: hangerId });
+          }
+
+          // Cleanup pending if exists
+          const pending = this.pendingCalls.get(callId);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            this.pendingCalls.delete(callId);
+          }
+
+          socket.emit('call:hangup', { callId, by: hangerId });
+        } catch (err) {
+          logger.error('Error handling call:hangup', err);
+        }
       });
 
       // Stop typing

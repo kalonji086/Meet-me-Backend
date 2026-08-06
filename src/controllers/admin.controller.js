@@ -568,14 +568,37 @@ const deleteAppConfig = asyncHandler(async (req, res) => {
 const checkUpdate = asyncHandler(async (req, res) => {
   const { version, userId } = req.query;
 
+  // 1. Vérification du statut de l'utilisateur (Banni/Bloqué/Supprimé)
+  if (userId) {
+    const user = await query('SELECT id, is_locked FROM public.profiles WHERE id = $1', [userId]);
+
+    // Si l'utilisateur n'existe plus (supprimé)
+    if (user.rows.length === 0) {
+      return res.json({
+        updateRequired: false,
+        accountStatus: 'deleted',
+        message: 'Votre compte a été supprimé définitivement. Vous pouvez en créer un nouveau.'
+      });
+    }
+
+    // Si l'utilisateur est bloqué/banni
+    if (user.rows[0].is_locked) {
+      return res.json({
+        updateRequired: false,
+        accountStatus: 'banned',
+        message: 'Votre compte a été suspendu pour non-respect des conditions d\'utilisation. Vous pouvez contester cette décision.'
+      });
+    }
+  }
+
+  // 2. Logique de mise à jour standard
   const config = await query('SELECT * FROM public.app_configs WHERE active = TRUE ORDER BY id DESC LIMIT 1');
-  if (config.rows.length === 0) return res.json({ updateRequired: false });
+  if (config.rows.length === 0) return res.json({ updateRequired: false, accountStatus: 'active' });
 
   const latest = config.rows[0];
 
-  // Si l'utilisateur est déjà sur la version cible ou une version supérieure, pas de MAJ
   if (version === latest.current_version) {
-    return res.json({ updateRequired: false });
+    return res.json({ updateRequired: false, accountStatus: 'active' });
   }
 
   const isTargeted = userId && latest.target_user_ids.includes(userId);
@@ -584,6 +607,7 @@ const checkUpdate = asyncHandler(async (req, res) => {
   if (isGlobal || isTargeted) {
     return res.json({
       updateRequired: true,
+      accountStatus: 'active',
       forceUpdate: latest.force_update,
       latestVersion: latest.current_version,
       updateUrl: latest.update_url,
@@ -591,7 +615,7 @@ const checkUpdate = asyncHandler(async (req, res) => {
     });
   }
 
-  res.json({ updateRequired: false });
+  res.json({ updateRequired: false, accountStatus: 'active' });
 });
 
 /**

@@ -1258,7 +1258,7 @@
                 body.innerHTML = '';
                 let filtered = appeals_data;
                 if (viewMode === 'support') filtered = appeals_data.filter(a => a.type === 'helpdesk');
-                if (viewMode === 'contestation') filtered = appeals_data.filter(a => a.type === 'contestation' || a.type === 'deletion');
+                if (viewMode === 'contestation') filtered = appeals_data.filter(a => a.type === 'contestation' || a.type === 'deletion' || a.type === 'appeal');
                 filtered.forEach(a => {
                     const typeLabel = a.type === 'helpdesk' ? 'HELPDESK' : (a.type === 'deletion' ? 'SUPPRESSION' : 'CONTESTATION');
                     const tr = document.createElement('tr');

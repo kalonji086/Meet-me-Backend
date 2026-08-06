@@ -14,7 +14,7 @@ const getStats = asyncHandler(async (req, res) => {
   const lockedUsers = await query('SELECT COUNT(*) FROM public.profiles WHERE is_locked = TRUE AND is_global_admin = FALSE');
   const appealCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending'");
   const helpdeskCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND type = 'helpdesk'");
-  const contestationCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND (type = 'contestation' OR type = 'deletion')");
+  const contestationCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND (type = 'contestation' OR type = 'deletion' OR type = 'appeal')");
   const verificationsCount = await query("SELECT COUNT(*) FROM public.verification_requests WHERE status = 'pending'");
 
   const growth = await query(`
@@ -374,7 +374,7 @@ const getAppeals = asyncHandler(async (req, res) => {
   const result = await query(`
     SELECT a.*, p.full_name, p.email, p.username, p.avatar_url
     FROM public.appeals a
-    JOIN public.profiles p ON a.user_id = p.id
+    LEFT JOIN public.profiles p ON a.user_id = p.id
     ORDER BY a.status ASC, a.created_at DESC
   `);
   res.json({ success: true, data: result.rows });
@@ -387,22 +387,34 @@ const replyToAppeal = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reply, action } = req.body; // action: 'resolved', 'reviewed', 'delete_confirmed'
 
-  const appealRes = await query('SELECT user_id, reason FROM public.appeals WHERE id = $1', [id]);
+  const appealRes = await query('SELECT user_id, reason, contact_email FROM public.appeals WHERE id = $1', [id]);
   if (appealRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
 
-  const userId = appealRes.rows[0].user_id;
-  const userRes = await query('SELECT email, full_name FROM public.profiles WHERE id = $1', [userId]);
-  const user = userRes.rows[0];
+  const { user_id, contact_email } = appealRes.rows[0];
+  let email = contact_email;
+  let fullName = 'Utilisateur';
 
-  if (action === 'delete_confirmed') {
+  if (user_id) {
+    const userRes = await query('SELECT email, full_name FROM public.profiles WHERE id = $1', [user_id]);
+    if (userRes.rows.length > 0) {
+      email = userRes.rows[0].email;
+      fullName = userRes.rows[0].full_name;
+    }
+  }
+
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Aucune adresse email trouvée pour répondre.' });
+  }
+
+  if (action === 'delete_confirmed' && user_id) {
     // 1. Envoyer le mail de confirmation de suppression (Template Amazon)
     const finalReply = reply || "Votre demande de suppression de compte Meet Me a été traitée. Toutes vos données ont été effacées de nos serveurs conformément aux politiques de Google Play.";
-    await mailService.sendSystemEmail(user.email, "Confirmation de suppression de votre compte Meet Me", finalReply);
+    await mailService.sendSystemEmail(email, "Confirmation de suppression de votre compte Meet Me", finalReply);
 
     // 2. Supprimer définitivement l'utilisateur (CASCADE supprimera l'appel et tout le reste)
-    await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
+    await query('DELETE FROM public.profiles WHERE id = $1', [user_id]);
 
-    await logAdminAction(req, 'confirm_deletion', 'user', userId, { appealId: id });
+    await logAdminAction(req, 'confirm_deletion', 'user', user_id, { appealId: id });
 
     return res.json({ success: true, message: 'Compte supprimé et utilisateur notifié par e-mail.' });
   }
@@ -415,7 +427,7 @@ const replyToAppeal = asyncHandler(async (req, res) => {
 
   await logAdminAction(req, 'reply_appeal', 'appeal', id, { action });
 
-  await mailService.sendSystemEmail(user.email, "Réponse à votre contestation Meet Me", reply);
+  await mailService.sendSystemEmail(email, "Réponse à votre demande Meet Me", reply);
 
   res.json({ success: true, message: 'Réponse envoyée par e-mail.' });
 });

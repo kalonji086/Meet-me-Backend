@@ -67,10 +67,11 @@ const updateProfile = asyncHandler(async (req, res) => {
          status = COALESCE($2, status),
          avatar_url = COALESCE($3, avatar_url),
          username = COALESCE($4, username),
+         accepted_legal_version = COALESCE($5, accepted_legal_version),
          updated_at = NOW()
-     WHERE id = $5
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token`,
-    [name, status, avatar_url, username?.toLowerCase().trim(), userId]
+     WHERE id = $6
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, accepted_legal_version`,
+    [name, status, avatar_url, username?.toLowerCase().trim(), req.body.accepted_legal_version, userId]
   );
 
   const updatedUser = result.rows[0];

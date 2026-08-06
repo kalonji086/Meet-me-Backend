@@ -648,6 +648,15 @@ const updateLegalDoc = asyncHandler(async (req, res) => {
     [type, content, version, force_acceptance]
   );
   await logAdminAction(req, 'update_legal_doc', 'legal', result.rows[0].id, { type, version });
+
+  // Notifier tous les utilisateurs en ligne du changement légal
+  socketService.broadcast('legal_update', {
+    type,
+    version,
+    force_acceptance,
+    content
+  });
+
   res.json({ success: true, data: result.rows[0] });
 });
 

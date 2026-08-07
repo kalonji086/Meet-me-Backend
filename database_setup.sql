@@ -77,6 +77,14 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='push_token') THEN
     ALTER TABLE public.profiles ADD COLUMN push_token TEXT;
   END IF;
+
+  -- legal versions
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='accepted_tos_version') THEN
+    ALTER TABLE public.profiles ADD COLUMN accepted_tos_version TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='accepted_privacy_version') THEN
+    ALTER TABLE public.profiles ADD COLUMN accepted_privacy_version TEXT;
+  END IF;
 END $$;
 
 -- 4. Droits Administrateurs

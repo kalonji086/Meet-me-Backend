@@ -61,17 +61,23 @@ const updateProfile = asyncHandler(async (req, res) => {
     }
   }
 
-  const result = await query(
-    `UPDATE public.profiles
-     SET full_name = COALESCE($1, full_name),
-         status = COALESCE($2, status),
-         avatar_url = COALESCE($3, avatar_url),
          username = COALESCE($4, username),
          accepted_legal_version = COALESCE($5, accepted_legal_version),
+         accepted_tos_version = COALESCE($6, accepted_tos_version),
+         accepted_privacy_version = COALESCE($7, accepted_privacy_version),
          updated_at = NOW()
-     WHERE id = $6
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, accepted_legal_version`,
-    [name, status, avatar_url, username?.toLowerCase().trim(), req.body.accepted_legal_version, userId]
+     WHERE id = $8
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, accepted_legal_version, accepted_tos_version, accepted_privacy_version`,
+    [
+      name,
+      status,
+      avatar_url,
+      username?.toLowerCase().trim(),
+      req.body.accepted_legal_version,
+      req.body.accepted_tos_version,
+      req.body.accepted_privacy_version,
+      userId
+    ]
   );
 
   const updatedUser = result.rows[0];

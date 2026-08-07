@@ -49,4 +49,30 @@ const generateToken = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { generateToken };
+/**
+ * @desc    Obtenir l'historique des appels
+ * @route   GET /api/calls/history
+ */
+const getCallHistory = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+
+  const result = await query(
+    `SELECT c.*,
+            p1.full_name as caller_name, p1.avatar_url as caller_avatar,
+            p2.full_name as callee_name, p2.avatar_url as callee_avatar
+     FROM public.calls c
+     LEFT JOIN public.profiles p1 ON c.caller_id = p1.id
+     LEFT JOIN public.profiles p2 ON c.callee_id = p2.id
+     WHERE c.caller_id = $1 OR c.callee_id = $1
+     ORDER BY c.created_at DESC
+     LIMIT 50`,
+    [userId]
+  );
+
+  res.json({
+    success: true,
+    data: result.rows
+  });
+});
+
+module.exports = { generateToken, getCallHistory };

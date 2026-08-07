@@ -11,4 +11,9 @@ router.use(authenticate);
  */
 router.post('/generate-token', callController.generateToken);
 
+/**
+ * @route   GET /api/calls/history
+ */
+router.get('/history', callController.getCallHistory);
+
 module.exports = router;

@@ -738,6 +738,17 @@
                 loadStats();
             });
 
+            // Mise à jour profil (Photo/Pseudo)
+            socket.on('admin_user_profile_updated', (data) => {
+                addNotification('user', 'Profil mis à jour', `${data.name} a changé sa photo ou son pseudo.`, 'refresh-cw');
+
+                // Si on est sur la liste des utilisateurs, on recharge
+                if (!document.getElementById('section-users').classList.contains('hidden')) {
+                    loadUsers();
+                }
+                loadStats();
+            });
+
             // Connexion utilisateur
             socket.on('admin_user_login', (data) => {
                 addNotification('user', 'Connexion', `${data.name} s'est connecté à l'instant.`, 'zap');

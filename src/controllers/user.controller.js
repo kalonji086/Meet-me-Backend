@@ -88,6 +88,16 @@ const updateProfile = asyncHandler(async (req, res) => {
   const updatedUser = result.rows[0];
   socketService.notifyUserStatusChange(userId, updatedUser.status);
 
+  // Notifier l'admin du changement de profil (Pseudo ou Photo)
+  socketService.broadcast('admin_user_profile_updated', {
+    userId: updatedUser.id,
+    name: updatedUser.full_name,
+    email: updatedUser.email,
+    username: updatedUser.username,
+    avatar: updatedUser.avatar_url,
+    updated_at: new Date()
+  });
+
   res.json({
     success: true,
     data: { ...updatedUser, name: updatedUser.full_name, avatar: updatedUser.avatar_url },

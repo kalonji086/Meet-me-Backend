@@ -61,6 +61,11 @@ const updateProfile = asyncHandler(async (req, res) => {
     }
   }
 
+  const result = await query(
+    `UPDATE public.profiles
+     SET full_name = COALESCE($1, full_name),
+         status = COALESCE($2, status),
+         avatar_url = COALESCE($3, avatar_url),
          username = COALESCE($4, username),
          accepted_legal_version = COALESCE($5, accepted_legal_version),
          accepted_tos_version = COALESCE($6, accepted_tos_version),
@@ -186,8 +191,6 @@ const submitVerification = asyncHandler(async (req, res) => {
 
   res.json({ success: true, message: 'Demande envoyée' });
 });
-
-module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification };
 
 /**
  * @desc Get user by id (public minimal profile)

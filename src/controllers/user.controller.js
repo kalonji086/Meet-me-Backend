@@ -203,4 +203,64 @@ const getUserById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { id: user.id, name: user.full_name, avatar: user.avatar_url, status: user.status, username: user.username } });
 });
 
-module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById };
+/**
+ * @desc    Bloquer un utilisateur
+ */
+const blockUser = asyncHandler(async (req, res) => {
+  const { targetId } = req.body;
+  const userId = req.userId;
+
+  await query(
+    'INSERT INTO public.blocked_users (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [userId, targetId]
+  );
+
+  res.json({ success: true, message: 'Utilisateur bloqué' });
+});
+
+/**
+ * @desc    Signaler un utilisateur
+ */
+const reportUser = asyncHandler(async (req, res) => {
+  const { targetId, reason } = req.body;
+  const userId = req.userId;
+
+  await query(
+    'INSERT INTO public.reported_content (reporter_id, target_id, reason, report_type) VALUES ($1, $2, $3, \'user\')',
+    [userId, targetId, reason]
+  );
+
+  res.json({ success: true, message: 'Signalement envoyé' });
+});
+
+/**
+ * @desc    Ajouter aux contacts
+ */
+const addContact = asyncHandler(async (req, res) => {
+  const { contactId } = req.body;
+  const userId = req.userId;
+
+  await query(
+    'INSERT INTO public.contacts (user_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [userId, contactId]
+  );
+
+  res.json({ success: true, message: 'Contact ajouté' });
+});
+
+/**
+ * @desc    Vérifier si un utilisateur est dans les contacts
+ */
+const checkContact = asyncHandler(async (req, res) => {
+  const { peerId } = req.params;
+  const userId = req.userId;
+
+  const result = await query(
+    'SELECT 1 FROM public.contacts WHERE user_id = $1 AND contact_id = $2',
+    [userId, peerId]
+  );
+
+  res.json({ success: true, isContact: result.rows.length > 0 });
+});
+
+module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact };

@@ -42,6 +42,26 @@ router.put('/push-token', userController.updatePushToken);
 router.get('/badges', userController.getBadges);
 
 /**
+ * @route   POST /api/users/block
+ */
+router.post('/block', userController.blockUser);
+
+/**
+ * @route   POST /api/users/report
+ */
+router.post('/report', userController.reportUser);
+
+/**
+ * @route   POST /api/users/contacts
+ */
+router.post('/contacts', userController.addContact);
+
+/**
+ * @route   GET /api/users/contacts/check/:peerId
+ */
+router.get('/contacts/check/:peerId', userController.checkContact);
+
+/**
  * @route   POST /api/users/verify
  */
 router.post('/verify', userController.submitVerification);

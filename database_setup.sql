@@ -189,3 +189,19 @@ CREATE TABLE IF NOT EXISTS public.calls (
   duration_seconds INTEGER,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Blocked users table
+CREATE TABLE IF NOT EXISTS public.blocked_users (
+  blocker_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  blocked_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (blocker_id, blocked_id)
+);
+
+-- Contacts table
+CREATE TABLE IF NOT EXISTS public.contacts (
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  contact_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (user_id, contact_id)
+);

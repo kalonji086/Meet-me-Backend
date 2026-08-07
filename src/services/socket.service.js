@@ -84,6 +84,13 @@ class SocketService {
           const calleeSocketId = this.userSockets.get(toUserId.toString());
           const callIdentifier = callId || `${callerId}_${toUserId}_${Date.now()}`;
 
+          // Check if callee is already in a call
+          const isBusy = Array.from(this.pendingCalls.values()).some(c => c.callerId === toUserId || c.calleeId === toUserId);
+          if (isBusy) {
+            socket.emit('call:busy', { toUserId, callId: callIdentifier });
+            return;
+          }
+
           if (!calleeSocketId) {
             // Callee offline
             socket.emit('call:callee_unavailable', { toUserId, callId: callIdentifier });
@@ -97,6 +104,9 @@ class SocketService {
             callType,
             callId: callIdentifier,
           });
+
+          // Acknowledge to caller that we are trying to reach the callee
+          socket.emit('call:calling', { toUserId, callId: callIdentifier });
 
           // Store pending call with timeout (30s)
           const timeout = setTimeout(() => {
@@ -114,11 +124,24 @@ class SocketService {
 
           this.pendingCalls.set(callIdentifier, { callerId, calleeId: toUserId, timeout, callType, channelName });
 
-          // Acknowledge to caller
-          socket.emit('call:offered', { toUserId, callId: callIdentifier });
+          // Acknowledge to caller that we are trying to reach the callee
+          socket.emit('call:calling', { toUserId, callId: callIdentifier });
         } catch (err) {
           logger.error('Error handling call:offer', err);
           socket.emit('error', { error: 'Erreur signaling' });
+        }
+      });
+
+      socket.on('call:ringing', (data) => {
+        // Callee signals that their phone is actually ringing
+        try {
+          const { callId, toUserId } = data; // toUserId is the caller here
+          const callerSocketId = this.userSockets.get(toUserId.toString());
+          if (callerSocketId) {
+            this.io.to(callerSocketId).emit('call:ringing', { callId });
+          }
+        } catch (err) {
+          logger.error('Error handling call:ringing', err);
         }
       });
 

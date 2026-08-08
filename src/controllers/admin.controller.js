@@ -525,11 +525,17 @@ const broadcastMessage = asyncHandler(async (req, res) => {
 const getAppConfig = asyncHandler(async (req, res) => {
   await ensureAdminTables();
   const result = await query('SELECT * FROM public.app_configs ORDER BY id DESC LIMIT 1');
+
+  // Récupérer la version la plus haute détectée chez les utilisateurs
+  const maxDetected = await query('SELECT app_version FROM public.profiles WHERE app_version IS NOT NULL ORDER BY app_version DESC LIMIT 1');
+  const latestDetected = maxDetected.rows[0]?.app_version || 'N/A';
+
   if (result.rows.length === 0) {
     const init = await query("INSERT INTO public.app_configs (current_version, force_update) VALUES ('1.0.0', false) RETURNING *");
-    return res.json({ success: true, data: init.rows[0] });
+    return res.json({ success: true, data: init.rows[0], latestDetected });
   }
-  res.json({ success: true, data: result.rows[0] });
+
+  res.json({ success: true, data: result.rows[0], latestDetected });
 });
 
 const updateAppConfig = asyncHandler(async (req, res) => {

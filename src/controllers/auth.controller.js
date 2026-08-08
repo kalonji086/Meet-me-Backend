@@ -48,7 +48,7 @@ const checkAvailability = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const register = asyncHandler(async (req, res) => {
-  const { name, email, password, phone_number, username, device_info } = req.body;
+  const { name, email, password, phone_number, username, device_info, appVersion } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({
@@ -91,9 +91,9 @@ const register = asyncHandler(async (req, res) => {
   const finalUsername = usernameLower || (emailLower.split('@')[0] + Math.floor(1000 + Math.random() * 9000));
 
   const result = await query(
-    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at, device_info)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number`,
+    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at, device_info, app_version)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8)
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, app_version`,
     [
       userId,
       name,
@@ -101,7 +101,8 @@ const register = asyncHandler(async (req, res) => {
       hashedPassword,
       finalUsername,
       phone_number || null,
-      JSON.stringify(device_info || {})
+      JSON.stringify(device_info || {}),
+      appVersion || null
     ]
   );
 
@@ -210,10 +211,11 @@ const login = asyncHandler(async (req, res) => {
     });
   }
 
-  // 4. Succès: Réinitialiser les tentatives et mettre à jour last_login_at et device_info
+  // 4. Succès: Réinitialiser les tentatives et mettre à jour last_login_at, app_version et device_info
+  const appVersion = req.body.appVersion || null;
   await query(
-    "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(), device_info = $1 WHERE id = $2",
-    [JSON.stringify(device_info || user.device_info || {}), user.id]
+    "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(), device_info = $1, app_version = COALESCE($2, app_version) WHERE id = $3",
+    [JSON.stringify(device_info || user.device_info || {}), appVersion, user.id]
   );
 
   const socketService = require('../services/socket.service');

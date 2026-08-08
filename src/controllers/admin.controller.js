@@ -592,6 +592,11 @@ function isVersionGreaterOrEqual(v1, v2) {
 const checkUpdate = asyncHandler(async (req, res) => {
   const { version, userId } = req.query;
 
+  // Enregistrer la version actuelle de l'utilisateur pour que l'admin la voie
+  if (userId && version) {
+    await query('UPDATE public.profiles SET app_version = $1, last_update_at = NOW() WHERE id = $2', [version, userId]);
+  }
+
   // 1. Vérification du statut de l'utilisateur (Banni/Bloqué/Supprimé)
   if (userId) {
     const user = await query('SELECT id, is_locked FROM public.profiles WHERE id = $1', [userId]);

@@ -563,6 +563,24 @@ const deleteAppConfig = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Compare deux versions (format x.y.z)
+ * @returns true si v1 >= v2
+ */
+function isVersionGreaterOrEqual(v1, v2) {
+  if (!v1 || !v2) return false;
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    if (p1 > p2) return true;
+    if (p1 < p2) return false;
+  }
+  return true; // Égal
+}
+
+/**
  * @desc    Route publique pour l'App Mobile
  */
 const checkUpdate = asyncHandler(async (req, res) => {
@@ -597,7 +615,9 @@ const checkUpdate = asyncHandler(async (req, res) => {
 
   const latest = config.rows[0];
 
-  if (version === latest.current_version) {
+  // On compare les versions de manière simple mais efficace
+  // Si la version de l'app est identique ou supérieure à la version cible, pas de MAJ
+  if (version === latest.current_version || isVersionGreaterOrEqual(version, latest.current_version)) {
     return res.json({ updateRequired: false, accountStatus: 'active' });
   }
 

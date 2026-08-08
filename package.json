@@ -8,7 +8,11 @@
     "dev": "nodemon src/server.js",
     "test": "jest",
     "lint": "eslint src/**/*.js",
-    "migrate": "node src/utils/migrate.js"
+    "migrate": "node src/utils/migrate.js",
+    "config:check": "node scripts/check-config.js",
+    "config:generate-secret": "node -e \"console.log(require('crypto').randomBytes(64).toString('hex'))\"",
+    "deploy:prepare": "npm run lint && npm run config:check && npm test",
+    "keep-alive": "node scripts/keep-alive.js"
   },
   "keywords": [
     "chat",

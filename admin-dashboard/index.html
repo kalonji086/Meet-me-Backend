@@ -1540,6 +1540,7 @@
 
         let currentConfigId = null;
         let lastDetectedVersion = "1.0.0";
+        const CURRENT_APP_VERSION = "5.0.0"; // Version actuelle de l'application
 
         async function loadAppConfig() {
             try {
@@ -1548,8 +1549,10 @@
                 currentConfigId = d.id;
                 lastDetectedVersion = res.data.latestDetected;
 
-                document.getElementById('current-app-version').innerText = d.current_version;
-                document.getElementById('detected-app-version').innerText = lastDetectedVersion;
+                // Afficher la version actuelle de l'application (5.0.0) ou la version détectée
+                const displayVersion = CURRENT_APP_VERSION;
+                document.getElementById('current-app-version').innerText = displayVersion;
+                document.getElementById('detected-app-version').innerText = lastDetectedVersion !== 'N/A' ? lastDetectedVersion : displayVersion;
 
                 document.getElementById('current-force-status').innerText = d.force_update ? 'OUI' : 'NON';
                 document.getElementById('current-force-status').className = d.force_update ? 'font-black text-red-600' : 'font-black text-gray-400';
@@ -1558,7 +1561,7 @@
                 document.getElementById('current-target-status').innerText = isBeta ? 'BETA' : 'TOUS';
                 document.getElementById('current-target-status').className = isBeta ? 'font-black text-blue-600' : 'font-black text-green-600';
 
-                document.getElementById('up-version').value = lastDetectedVersion !== 'N/A' ? lastDetectedVersion : d.current_version;
+                document.getElementById('up-version').value = lastDetectedVersion !== 'N/A' ? lastDetectedVersion : CURRENT_APP_VERSION;
                 document.getElementById('up-url').value = d.update_url || '';
                 document.getElementById('up-notes').value = d.release_notes || '';
                 document.getElementById('up-force').checked = d.force_update;

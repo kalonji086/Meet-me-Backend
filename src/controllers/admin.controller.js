@@ -141,6 +141,17 @@ const getAnalytics = asyncHandler(async (req, res) => {
 
 const ensureAdminTables = async () => {
   await query(`
+    CREATE TABLE IF NOT EXISTS public.app_legal_docs (
+      id SERIAL PRIMARY KEY,
+      type TEXT NOT NULL UNIQUE,
+      content TEXT NOT NULL,
+      version TEXT NOT NULL,
+      force_acceptance BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS public.app_configs (
       id SERIAL PRIMARY KEY,
       current_version TEXT NOT NULL,
@@ -156,16 +167,20 @@ const ensureAdminTables = async () => {
   // S'assurer que la colonne active existe
   try { await query('ALTER TABLE public.app_configs ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE'); } catch (e) {}
 
-  await query(`
-    CREATE TABLE IF NOT EXISTS public.app_legal_docs (
-      id SERIAL PRIMARY KEY,
-      type TEXT NOT NULL UNIQUE,
-      content TEXT NOT NULL,
-      version TEXT NOT NULL,
-      force_acceptance BOOLEAN DEFAULT FALSE,
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `);
+  // Initialiser avec la version actuelle de l'application si aucune config n'existe
+  const existingConfig = await query('SELECT id FROM public.app_configs LIMIT 1');
+  if (existingConfig.rows.length === 0) {
+    await query(`INSERT INTO public.app_configs (current_version, force_update, active) VALUES ('5.0.0', false, true)`);
+  }
+
+  // S'assurer que les documents légaux existent avec la version 5.0.0
+  const existingLegalDocs = await query('SELECT type FROM public.app_legal_docs');
+  if (existingLegalDocs.rows.length === 0) {
+    // Initialiser avec des documents légaux par défaut pour la version 5.0.0
+    await query(`INSERT INTO public.app_legal_docs (type, content, version, force_acceptance) VALUES 
+      ('tos', 'Conditions Générales d\'Utilisation - Version 5.0.0', '5.0.0', true),
+      ('privacy', 'Politique de Confidentialité - Version 5.0.0', '5.0.0', true)`);
+  }
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.verification_requests (
@@ -530,12 +545,16 @@ const getAppConfig = asyncHandler(async (req, res) => {
   const maxDetected = await query('SELECT app_version FROM public.profiles WHERE app_version IS NOT NULL ORDER BY app_version DESC LIMIT 1');
   const latestDetected = maxDetected.rows[0]?.app_version || 'N/A';
 
+  // Version actuelle de l'application (définie dans app.json)
+  const currentAppVersion = '5.0.0';
+
   if (result.rows.length === 0) {
-    const init = await query("INSERT INTO public.app_configs (current_version, force_update) VALUES ('1.0.0', false) RETURNING *");
+    // Si aucune config n'existe, utiliser la version actuelle de l'app
+    const init = await query(`INSERT INTO public.app_configs (current_version, force_update) VALUES ('${currentAppVersion}', false) RETURNING *`);
     return res.json({ success: true, data: init.rows[0], latestDetected });
   }
 
-  res.json({ success: true, data: result.rows[0], latestDetected });
+  res.json({ success: true, data: result.rows[0], latestDetected, currentAppVersion });
 });
 
 const updateAppConfig = asyncHandler(async (req, res) => {

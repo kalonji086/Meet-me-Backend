@@ -82,6 +82,15 @@ class Server {
   initializeRoutes() {
     this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me' }));
     this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '1.0.0' }));
+    
+    // Route de ping pour garder le serveur actif sur Render
+    this.app.get('/api/ping', (req, res) => {
+      res.json({ 
+        status: 'pong', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      });
+    });
 
     // Gérer le favicon pour éviter les erreurs 404 dans les logs
     this.app.get('/favicon.ico', (req, res) => res.status(204).end());

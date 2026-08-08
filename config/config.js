@@ -102,7 +102,7 @@ const config = {
   // Application Constants
   constants: {
     appName: 'Meet Me',
-    appVersion: '1.0.0',
+    appVersion: '9.0.0',
     defaultLanguage: 'fr',
     supportedLanguages: ['fr', 'en', 'es', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar'],
     messageTypes: {
@@ -118,6 +118,13 @@ const config = {
       AWAY: 'away',
       BUSY: 'busy',
     },
+  },
+
+  // Keep-alive configuration
+  keepAlive: {
+    enabled: process.env.KEEP_ALIVE_ENABLED === 'true' || true,
+    interval: parseInt(process.env.KEEP_ALIVE_INTERVAL) || 10 * 60 * 1000, // 10 minutes
+    endpoints: ['/api/ping', '/api/health', '/'],
   },
 };
 

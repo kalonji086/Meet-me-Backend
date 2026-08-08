@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: meet-me-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: AGORA_APP_ID
+        sync: false
+      - key: AGORA_APP_CERTIFICATE
+        sync: false
+      - key: SENDINBLUE_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: GOOGLE_TRANSLATE_API_KEY
+        sync: false
+      - key: DEEPL_API_KEY
+        sync: false
+
+  - type: cron
+    name: keep-alive
+    env: node
+    schedule: "*/10 * * * *"  # Toutes les 10 minutes
+    buildCommand: npm install
+    startCommand: npm run keep-alive
+    envVars:
+      - key: BACKEND_URL
+        value: https://meet-me-backend-sg5c.onrender.com

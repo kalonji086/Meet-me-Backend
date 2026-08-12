@@ -302,12 +302,26 @@ const deleteAccount = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
   }
 
-  // 2. Supprimer l'utilisateur
-  await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
+  // 2. Nettoyage manuel des dépendances critiques avant suppression
+  try {
+    await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
+    await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
+    await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]);
+    await query('DELETE FROM public.appeals WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.verification_requests WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.reported_content WHERE reporter_id = $1 OR target_id = $1', [userId]);
+    await query('DELETE FROM public.blocked_users WHERE blocker_id = $1 OR blocked_id = $1', [userId]);
+    await query('DELETE FROM public.contacts WHERE user_id = $1 OR contact_id = $1', [userId]);
 
-  socketService.broadcast('admin_user_deleted', { userId });
+    // 3. Suppression finale du profil
+    await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
 
-  res.json({ success: true, message: 'Compte supprimé avec succès' });
+    socketService.broadcast('admin_user_deleted', { userId });
+    res.json({ success: true, message: 'Compte supprimé avec succès' });
+  } catch (deleteError) {
+    logger.error('Erreur lors de la suppression du compte:', deleteError);
+    return res.status(500).json({ success: false, error: 'Une erreur technique a empêché la suppression complète de votre compte' });
+  }
 });
 
 module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact, deleteAccount };

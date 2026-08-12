@@ -46,11 +46,12 @@ class StorageService {
       const fileName = this.generateFileName(file.originalname || 'file', userId);
       const filePath = `${fileType}/${fileName}`;
 
+      // Configurer le type de contenu et s'assurer que c'est public
       const { data, error } = await this.supabase.storage
         .from(this.bucketName)
         .upload(filePath, file.buffer, {
           contentType: file.mimetype,
-          cacheControl: '3600',
+          cacheControl: '0', // Désactiver le cache pour les mises à jour immédiates
           upsert: true
         });
 

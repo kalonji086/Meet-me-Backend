@@ -122,8 +122,21 @@ CREATE TABLE IF NOT EXISTS public.messages (
   type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image', 'audio', 'video', 'file')),
   file_url TEXT,
   status TEXT DEFAULT 'sent' CHECK (status IN ('sent', 'delivered', 'read')),
+  translated_content TEXT,
+  source_language TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migration des colonnes messages si nécessaire
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='translated_content') THEN
+    ALTER TABLE public.messages ADD COLUMN translated_content TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='source_language') THEN
+    ALTER TABLE public.messages ADD COLUMN source_language TEXT;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.appeals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

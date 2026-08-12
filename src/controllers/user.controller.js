@@ -304,11 +304,26 @@ const deleteAccount = asyncHandler(async (req, res) => {
 
   // 2. Nettoyage manuel des dépendances critiques avant suppression
   try {
+    // Utiliser une transaction pour s'assurer que tout est nettoyé ou rien
+    await query('BEGIN');
+
+    // Supprimer les données liées (celles avec ON DELETE CASCADE devraient partir seules, mais on assure le coup)
     await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
     await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
-    await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]);
+    await query('DELETE FROM public.status_reactions WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.status_views WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.statuses WHERE user_id = $1', [userId]);
     await query('DELETE FROM public.appeals WHERE user_id = $1', [userId]);
     await query('DELETE FROM public.verification_requests WHERE user_id = $1', [userId]);
+
+    // Nettoyer les références circulaires ou protectrices
+    await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]);
+    await query('UPDATE public.calls SET caller_id = NULL WHERE caller_id = $1', [userId]);
+    await query('UPDATE public.calls SET callee_id = NULL WHERE callee_id = $1', [userId]);
+    await query('UPDATE public.notification_campaigns SET created_by = NULL WHERE created_by = $1', [userId]);
+    await query('UPDATE public.admin_audit_logs SET admin_id = NULL WHERE admin_id = $1', [userId]);
+
+    // Supprimer des tables de relations
     await query('DELETE FROM public.reported_content WHERE reporter_id = $1 OR target_id = $1', [userId]);
     await query('DELETE FROM public.blocked_users WHERE blocker_id = $1 OR blocked_id = $1', [userId]);
     await query('DELETE FROM public.contacts WHERE user_id = $1 OR contact_id = $1', [userId]);
@@ -316,11 +331,18 @@ const deleteAccount = asyncHandler(async (req, res) => {
     // 3. Suppression finale du profil
     await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
 
+    await query('COMMIT');
+
     socketService.broadcast('admin_user_deleted', { userId });
     res.json({ success: true, message: 'Compte supprimé avec succès' });
   } catch (deleteError) {
+    await query('ROLLBACK');
     logger.error('Erreur lors de la suppression du compte:', deleteError);
-    return res.status(500).json({ success: false, error: 'Une erreur technique a empêché la suppression complète de votre compte' });
+    return res.status(500).json({
+      success: false,
+      error: 'Erreur technique de base de données',
+      message: 'Une contrainte de référence empêche la suppression. Contactez le support.'
+    });
   }
 });
 

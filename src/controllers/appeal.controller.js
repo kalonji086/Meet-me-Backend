@@ -15,6 +15,19 @@ const submitAppeal = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Veuillez expliquer votre contestation.' });
   }
 
+  // Sécurité: Une seule demande active à la fois
+  const existing = await query(
+    'SELECT id FROM public.appeals WHERE user_id = $1 AND status = \'pending\' AND type = \'appeal\'',
+    [userId]
+  );
+  if (existing.rows.length > 0) {
+    return res.status(403).json({
+      success: false,
+      error: 'Violation des droits : Demande multiple détectée',
+      message: 'Vous avez déjà une demande en attente. Toute tentative de soumissions multiples est strictement interdite. Votre compte sera définitivement banni pour violation de nos conditions d\'utilisation si vous persistez.'
+    });
+  }
+
   const result = await query(
     'INSERT INTO public.appeals (user_id, reason, type) VALUES ($1, $2, \'appeal\') RETURNING id',
     [userId, reason]
@@ -36,9 +49,28 @@ const submitHelpdesk = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Catégorie et message requis.' });
   }
 
-  // Si non connecté, l'email est obligatoire
   if (!userId && !email) {
     return res.status(400).json({ success: false, error: 'Veuillez fournir un email pour que nous puissions vous répondre.' });
+  }
+
+  // Sécurité: Une seule demande active à la fois
+  let checkSql = 'SELECT id FROM public.appeals WHERE status = \'pending\' AND type = \'helpdesk\' AND ';
+  const checkParams = [];
+  if (userId) {
+    checkSql += 'user_id = $1';
+    checkParams.push(userId);
+  } else {
+    checkSql += 'contact_email = $1';
+    checkParams.push(email.toLowerCase());
+  }
+
+  const existing = await query(checkSql, checkParams);
+  if (existing.rows.length > 0) {
+    return res.status(403).json({
+      success: false,
+      error: 'Accès restreint : Violation de protocole',
+      message: 'Vous avez déjà une demande d\'aide en cours de traitement. Il est strictement interdit d\'inonder le système avec plusieurs demandes. Toute récidive entraînera le blocage définitif de votre compte pour violation du droit d\'utilisation.'
+    });
   }
 
   const result = await query(

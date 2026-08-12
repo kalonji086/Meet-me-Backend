@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Migration des colonnes messages si nécessaire
+-- Fix colonnes manquantes (Critique pour erreurs logs)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='translated_content') THEN
@@ -141,9 +141,9 @@ END $$;
 CREATE TABLE IF NOT EXISTS public.appeals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  contact_email TEXT, -- Pour les demandes hors connexion
+  contact_email TEXT,
   type TEXT DEFAULT 'appeal' CHECK (type IN ('appeal', 'helpdesk', 'deletion')),
-  category TEXT DEFAULT 'other', -- ex: 'connection', 'bug', 'account', 'translation', 'other'
+  category TEXT DEFAULT 'other',
   reason TEXT NOT NULL,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved')),
   admin_reply TEXT,
@@ -151,7 +151,6 @@ CREATE TABLE IF NOT EXISTS public.appeals (
   resolved_at TIMESTAMP WITH TIME ZONE
 );
 
--- Migration des colonnes si la table existe déjà
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='appeals' AND column_name='type') THEN
@@ -178,7 +177,7 @@ CREATE TRIGGER on_new_message_update_chat
   AFTER INSERT ON public.messages
   FOR EACH ROW EXECUTE FUNCTION update_last_message_at();
 
--- 7. Audit Logs
+-- 7. Tables additionnelles
 CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -189,7 +188,6 @@ CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Calls table for recording call attempts and history
 CREATE TABLE IF NOT EXISTS public.calls (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   caller_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -203,7 +201,6 @@ CREATE TABLE IF NOT EXISTS public.calls (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Blocked users table
 CREATE TABLE IF NOT EXISTS public.blocked_users (
   blocker_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   blocked_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -211,10 +208,39 @@ CREATE TABLE IF NOT EXISTS public.blocked_users (
   PRIMARY KEY (blocker_id, blocked_id)
 );
 
--- Contacts table
 CREATE TABLE IF NOT EXISTS public.contacts (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   contact_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   PRIMARY KEY (user_id, contact_id)
 );
+
+CREATE TABLE IF NOT EXISTS public.verification_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  document_url TEXT NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 8. CORRECTIF CRITIQUE POUR SUPPRESSION DE COMPTE (Migrations des contraintes existantes)
+DO $$
+BEGIN
+  -- Fix chats.created_by constraint
+  IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'chats_created_by_fkey') THEN
+    ALTER TABLE public.chats DROP CONSTRAINT chats_created_by_fkey;
+  END IF;
+  ALTER TABLE public.chats ADD CONSTRAINT chats_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+  -- Fix messages.sender_id constraint
+  IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'messages_sender_id_fkey') THEN
+    ALTER TABLE public.messages DROP CONSTRAINT messages_sender_id_fkey;
+  END IF;
+  ALTER TABLE public.messages ADD CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+  -- Fix chat_participants.user_id constraint
+  IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'chat_participants_user_id_fkey') THEN
+    ALTER TABLE public.chat_participants DROP CONSTRAINT chat_participants_user_id_fkey;
+  END IF;
+  ALTER TABLE public.chat_participants ADD CONSTRAINT chat_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+END $$;

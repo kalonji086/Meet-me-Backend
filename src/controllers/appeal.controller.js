@@ -15,16 +15,17 @@ const submitAppeal = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Veuillez expliquer votre contestation.' });
   }
 
-  // Sécurité: Une seule demande active à la fois
+  // SÉCURITÉ RENFORCÉE : Une seule demande PENDING de n'importe quel type par utilisateur
   const existing = await query(
-    'SELECT id FROM public.appeals WHERE user_id = $1 AND status = \'pending\' AND type = \'appeal\'',
+    'SELECT id FROM public.appeals WHERE user_id = $1 AND status = \'pending\'',
     [userId]
   );
+
   if (existing.rows.length > 0) {
     return res.status(403).json({
       success: false,
-      error: 'Violation des droits : Demande multiple détectée',
-      message: 'Vous avez déjà une demande en attente. Toute tentative de soumissions multiples est strictement interdite. Votre compte sera définitivement banni pour violation de nos conditions d\'utilisation si vous persistez.'
+      error: 'Violation des droits : Tentative de soumissions multiples',
+      message: 'ACCÈS REFUSÉ. Vous avez déjà une demande en attente de traitement par nos services. Toute tentative de multiplier les requêtes est considérée comme une attaque par déni de service (Spam). Votre compte est sous surveillance et sera DÉFINITIVEMENT BANNI pour violation grave de nos conditions d\'utilisation si vous réitérez cette action.'
     });
   }
 
@@ -34,7 +35,7 @@ const submitAppeal = asyncHandler(async (req, res) => {
   );
 
   socketService.broadcast('admin_new_appeal', { appealId: result.rows[0].id, userId, type: 'appeal', reason });
-  res.json({ success: true, message: 'Votre demande a été envoyée.' });
+  res.json({ success: true, message: 'Votre contestation a été envoyée.' });
 });
 
 /**
@@ -43,7 +44,7 @@ const submitAppeal = asyncHandler(async (req, res) => {
  */
 const submitHelpdesk = asyncHandler(async (req, res) => {
   const { category, reason, email } = req.body;
-  const userId = req.userId || null; // Optionnel si authentifié
+  const userId = req.userId || null;
 
   if (!reason || !category) {
     return res.status(400).json({ success: false, error: 'Catégorie et message requis.' });
@@ -53,8 +54,8 @@ const submitHelpdesk = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Veuillez fournir un email pour que nous puissions vous répondre.' });
   }
 
-  // Sécurité: Une seule demande active à la fois
-  let checkSql = 'SELECT id FROM public.appeals WHERE status = \'pending\' AND type = \'helpdesk\' AND ';
+  // SÉCURITÉ RENFORCÉE : Limiter par email ou par ID utilisateur
+  let checkSql = 'SELECT id FROM public.appeals WHERE status = \'pending\' AND ';
   const checkParams = [];
   if (userId) {
     checkSql += 'user_id = $1';
@@ -68,8 +69,8 @@ const submitHelpdesk = asyncHandler(async (req, res) => {
   if (existing.rows.length > 0) {
     return res.status(403).json({
       success: false,
-      error: 'Accès restreint : Violation de protocole',
-      message: 'Vous avez déjà une demande d\'aide en cours de traitement. Il est strictement interdit d\'inonder le système avec plusieurs demandes. Toute récidive entraînera le blocage définitif de votre compte pour violation du droit d\'utilisation.'
+      error: 'Système saturé : Requête dupliquée',
+      message: 'AVERTISSEMENT SÉCURITÉ. Notre système détecte déjà une demande d\'aide active associée à vos identifiants. Il est strictement interdit d\'inonder le support avec des demandes répétitives. En cas de nouvelle tentative, votre accès sera révoqué et votre compte bloqué pour non-respect du protocole de sécurité et violation des droits d\'utilisation.'
     });
   }
 
@@ -80,7 +81,7 @@ const submitHelpdesk = asyncHandler(async (req, res) => {
 
   socketService.broadcast('admin_new_appeal', { appealId: result.rows[0].id, type: 'helpdesk', reason, category });
 
-  res.json({ success: true, message: 'Votre demande a été transmise au support technique.' });
+  res.json({ success: true, message: 'Votre demande a été transmise avec succès.' });
 });
 
 /**
@@ -97,7 +98,13 @@ const requestDeletion = asyncHandler(async (req, res) => {
   const user = userRes.rows[0];
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(401).json({ success: false, error: 'Identifiants incorrects.' });
+    return res.status(401).json({ success: false, error: 'Identifiants de sécurité incorrects.' });
+  }
+
+  // Vérifier si une demande de suppression est déjà en cours
+  const existing = await query('SELECT id FROM public.appeals WHERE user_id = $1 AND type = \'deletion\' AND status = \'pending\'', [user.id]);
+  if (existing.rows.length > 0) {
+    return res.status(400).json({ success: false, error: 'Une demande de suppression est déjà en attente pour ce compte.' });
   }
 
   const fullReason = `⚠️ DEMANDE DE SUPPRESSION DÉFINITIVE\nRaison: ${reason || 'Non précisée'}`;
@@ -110,7 +117,7 @@ const requestDeletion = asyncHandler(async (req, res) => {
   await query('UPDATE public.profiles SET is_locked = TRUE WHERE id = $1', [user.id]);
   socketService.broadcast('admin_new_appeal', { userId: user.id, type: 'deletion', reason: fullReason });
 
-  res.json({ success: true, message: 'Demande enregistrée.' });
+  res.json({ success: true, message: 'Votre demande de suppression a été enregistrée. Votre compte est désormais verrouillé.' });
 });
 
 module.exports = { submitAppeal, submitHelpdesk, requestDeletion };

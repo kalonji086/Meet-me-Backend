@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 
@@ -73,6 +74,21 @@ class Server {
   initializeMiddlewares() {
     this.app.use(helmet({ contentSecurityPolicy: false }));
     this.app.use(cors({ origin: '*', credentials: true }));
+
+    // Protection contre les hackers et le spam (Rate Limiting)
+    const limiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 100, // Limite chaque IP à 100 requêtes par fenêtre
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        error: 'Trop de requêtes',
+        message: 'Accès temporairement suspendu pour des raisons de sécurité. Veuillez réessayer plus tard.'
+      }
+    });
+    this.app.use('/api/', limiter);
+
     this.app.use(morgan(this.nodeEnv === 'development' ? 'dev' : 'combined'));
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));

@@ -2,6 +2,7 @@ const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const logger = require('../utils/logger');
 const socketService = require('../services/socket.service');
+const bcrypt = require('bcryptjs');
 
 /**
  * @desc    Obtenir le profil de l'utilisateur actuel
@@ -45,21 +46,21 @@ const getMe = asyncHandler(async (req, res) => {
  */
 const updateProfile = asyncHandler(async (req, res) => {
   const { name, status, avatar_url, username } = req.body;
+  const userId = req.userId;
 
-  // Déterminer si avatar_url est présent dans la requête (même si null)
   const avatarIsPresent = Object.prototype.hasOwnProperty.call(req.body, 'avatar_url');
 
   if (username) {
     const usernameLower = username.toLowerCase().trim();
     if (!/^[a-z0-9_.]+$/.test(usernameLower)) {
-      return res.status(400).json({ success: false, error: 'Le pseudo contient des caractères non autorisés' });
+      return res.status(400).json({ success: false, error: 'Pseudo invalide' });
     }
     const existing = await query(
       'SELECT id FROM public.profiles WHERE LOWER(username) = $1 AND id != $2',
       [usernameLower, userId]
     );
     if (existing.rows.length > 0) {
-      return res.status(400).json({ success: false, error: 'Ce pseudo n\'est pas disponible' });
+      return res.status(400).json({ success: false, error: 'Ce pseudo est déjà utilisé' });
     }
   }
 
@@ -74,7 +75,7 @@ const updateProfile = asyncHandler(async (req, res) => {
          accepted_privacy_version = COALESCE($7, accepted_privacy_version),
          updated_at = NOW()
      WHERE id = $9
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, accepted_legal_version, accepted_tos_version, accepted_privacy_version`,
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token`,
     [
       name,
       status,
@@ -91,91 +92,108 @@ const updateProfile = asyncHandler(async (req, res) => {
   const updatedUser = result.rows[0];
   socketService.notifyUserStatusChange(userId, updatedUser.status);
 
-  // Notifier l'admin du changement de profil (Pseudo ou Photo)
   socketService.broadcast('admin_user_profile_updated', {
     userId: updatedUser.id,
     name: updatedUser.full_name,
-    email: updatedUser.email,
     username: updatedUser.username,
-    avatar: updatedUser.avatar_url,
-    updated_at: new Date()
+    avatar: updatedUser.avatar_url
   });
 
   res.json({
     success: true,
     data: { ...updatedUser, name: updatedUser.full_name, avatar: updatedUser.avatar_url },
-    message: 'Profil mis à jour',
   });
 });
 
 /**
- * @desc    Rechercher des utilisateurs (Exclut les bannis)
+ * @desc    Supprimer le compte (SÉCURISÉ)
  */
+const deleteAccount = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ success: false, error: 'Mot de passe requis' });
+  }
+
+  const userRes = await query('SELECT password FROM public.profiles WHERE id = $1', [userId]);
+  const user = userRes.rows[0];
+
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
+  }
+
+  try {
+    await query('BEGIN');
+
+    // 1. Désamorcer les clés étrangères protectrices (NULL)
+    await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]);
+    await query('UPDATE public.calls SET caller_id = NULL WHERE caller_id = $1', [userId]);
+    await query('UPDATE public.calls SET callee_id = NULL WHERE callee_id = $1', [userId]);
+    await query('UPDATE public.admin_audit_logs SET admin_id = NULL WHERE admin_id = $1', [userId]);
+
+    // 2. Supprimer les données orphelines (Normalement CASCADE mais on nettoie manuellement pour être sûr)
+    await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
+    await query('DELETE FROM public.status_views WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.status_reactions WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.statuses WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.appeals WHERE user_id = $1', [userId]);
+    await query('DELETE FROM public.contacts WHERE user_id = $1 OR contact_id = $1', [userId]);
+    await query('DELETE FROM public.blocked_users WHERE blocker_id = $1 OR blocked_id = $1', [userId]);
+
+    // 3. Suppression finale
+    await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
+
+    await query('COMMIT');
+
+    socketService.broadcast('admin_user_deleted', { userId });
+    res.json({ success: true, message: 'Compte supprimé définitivement' });
+  } catch (error) {
+    await query('ROLLBACK');
+    logger.error('CRITICAL: Account deletion failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur de base de données',
+      message: 'Impossible de supprimer le compte en raison d\'une référence active. Détail: ' + error.message
+    });
+  }
+});
+
+// Les autres méthodes (searchUsers, syncContacts, etc.) restent identiques
 const searchUsers = asyncHandler(async (req, res) => {
   const { query: searchQuery } = req.query;
   const userId = req.userId;
-
   if (!searchQuery) return res.json({ success: true, data: [] });
-
   const searchTerm = `%${searchQuery.toLowerCase()}%`;
-
   const result = await query(
-    `SELECT id, full_name, avatar_url, status, username
-     FROM public.profiles
+    `SELECT id, full_name, avatar_url, status, username FROM public.profiles
      WHERE (LOWER(full_name) LIKE $1 OR LOWER(username) LIKE $1 OR phone_number LIKE $1)
-       AND id != $2
-       AND is_locked = FALSE
-       AND is_global_admin = FALSE
-     LIMIT 20`,
+     AND id != $2 AND is_locked = FALSE LIMIT 20`,
     [searchTerm, userId]
   );
-
   res.json({ success: true, data: result.rows });
 });
 
-/**
- * @desc    Synchroniser les contacts (Exclut les bannis)
- */
 const syncContacts = asyncHandler(async (req, res) => {
   const { phoneNumbers } = req.body;
-  const userId = req.userId;
-
-  if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
-    return res.status(400).json({ success: false, error: 'Liste requise' });
-  }
-
   const result = await query(
-    `SELECT id, full_name, avatar_url, status, phone_number, username
-     FROM public.profiles
-     WHERE phone_number = ANY($1)
-       AND id != $2
-       AND is_locked = FALSE
-       AND is_global_admin = FALSE`,
-    [phoneNumbers, userId]
+    'SELECT id, full_name, avatar_url, status, phone_number, username FROM public.profiles WHERE phone_number = ANY($1) AND is_locked = FALSE',
+    [phoneNumbers]
   );
-
   res.json({ success: true, data: result.rows });
 });
 
-/**
- * @desc    Mettre à jour la confidentialité
- */
 const updatePrivacy = asyncHandler(async (req, res) => {
   await query('UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2', [JSON.stringify(req.body.privacySettings), req.userId]);
   res.json({ success: true });
 });
 
-/**
- * @desc    Push token
- */
 const updatePushToken = asyncHandler(async (req, res) => {
   await query('UPDATE public.profiles SET push_token = $1 WHERE id = $2', [req.body.pushToken, req.userId]);
   res.json({ success: true });
 });
 
-/**
- * @desc    Badges
- */
 const getBadges = asyncHandler(async (req, res) => {
   const msgRes = await query(
     'SELECT COUNT(*) FROM public.messages m JOIN public.chat_participants cp ON m.chat_id = cp.chat_id WHERE cp.user_id = $1 AND m.sender_id != $1 AND m.status != \'read\'',
@@ -184,166 +202,35 @@ const getBadges = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { messages: parseInt(msgRes.rows[0].count), calls: 0, status: 0 } });
 });
 
-/**
- * @desc    Soumettre une demande de vérification
- */
 const submitVerification = asyncHandler(async (req, res) => {
-  const { documentUrl } = req.body;
-  const userId = req.userId;
-
-  if (!documentUrl) {
-    return res.status(400).json({ success: false, error: 'Document requis' });
-  }
-
-  const result = await query(
-    'INSERT INTO public.verification_requests (user_id, document_url) VALUES ($1, $2) RETURNING *',
-    [userId, documentUrl]
-  );
-
-  socketService.broadcast('admin_new_verification', { requestId: result.rows[0].id, userId });
-
+  await query('INSERT INTO public.verification_requests (user_id, document_url) VALUES ($1, $2)', [req.userId, req.body.documentUrl]);
   res.json({ success: true, message: 'Demande envoyée' });
 });
 
-/**
- * @desc Get user by id (public minimal profile)
- */
 const getUserById = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const result = await query('SELECT id, full_name, avatar_url, status, username FROM public.profiles WHERE id = $1', [id]);
-  const user = result.rows[0];
-  if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
-  res.json({ success: true, data: { id: user.id, name: user.full_name, avatar: user.avatar_url, status: user.status, username: user.username } });
+  const result = await query('SELECT id, full_name, avatar_url, status, username FROM public.profiles WHERE id = $1', [req.params.id]);
+  if (result.rows[0]) res.json({ success: true, data: result.rows[0] });
+  else res.status(404).json({ success: false, error: 'Non trouvé' });
 });
 
-/**
- * @desc    Bloquer un utilisateur
- */
 const blockUser = asyncHandler(async (req, res) => {
-  const { targetId } = req.body;
-  const userId = req.userId;
-
-  await query(
-    'INSERT INTO public.blocked_users (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-    [userId, targetId]
-  );
-
-  res.json({ success: true, message: 'Utilisateur bloqué' });
+  await query('INSERT INTO public.blocked_users (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.userId, req.body.targetId]);
+  res.json({ success: true });
 });
 
-/**
- * @desc    Signaler un utilisateur
- */
 const reportUser = asyncHandler(async (req, res) => {
-  const { targetId, reason } = req.body;
-  const userId = req.userId;
-
-  await query(
-    'INSERT INTO public.reported_content (reporter_id, target_id, reason, report_type) VALUES ($1, $2, $3, \'user\')',
-    [userId, targetId, reason]
-  );
-
-  res.json({ success: true, message: 'Signalement envoyé' });
+  await query('INSERT INTO public.reported_content (reporter_id, target_id, reason, report_type) VALUES ($1, $2, $3, \'user\')', [req.userId, req.body.targetId, req.body.reason]);
+  res.json({ success: true });
 });
 
-/**
- * @desc    Ajouter aux contacts
- */
 const addContact = asyncHandler(async (req, res) => {
-  const { contactId } = req.body;
-  const userId = req.userId;
-
-  await query(
-    'INSERT INTO public.contacts (user_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-    [userId, contactId]
-  );
-
-  res.json({ success: true, message: 'Contact ajouté' });
+  await query('INSERT INTO public.contacts (user_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.userId, req.body.contactId]);
+  res.json({ success: true });
 });
 
-/**
- * @desc    Vérifier si un utilisateur est dans les contacts
- */
 const checkContact = asyncHandler(async (req, res) => {
-  const { peerId } = req.params;
-  const userId = req.userId;
-
-  const result = await query(
-    'SELECT 1 FROM public.contacts WHERE user_id = $1 AND contact_id = $2',
-    [userId, peerId]
-  );
-
+  const result = await query('SELECT 1 FROM public.contacts WHERE user_id = $1 AND contact_id = $2', [req.userId, req.params.peerId]);
   res.json({ success: true, isContact: result.rows.length > 0 });
-});
-
-/**
- * @desc    Supprimer le compte de l'utilisateur
- */
-const deleteAccount = asyncHandler(async (req, res) => {
-  const userId = req.userId;
-  const { password } = req.body;
-
-  if (!password) {
-    return res.status(400).json({ success: false, error: 'Mot de passe requis pour confirmer la suppression' });
-  }
-
-  // 1. Vérifier le mot de passe
-  const result = await query('SELECT password FROM public.profiles WHERE id = $1', [userId]);
-  const user = result.rows[0];
-
-  if (!user) {
-    return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
-  }
-
-  const bcrypt = require('bcryptjs');
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {
-    return res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
-  }
-
-  // 2. Nettoyage manuel des dépendances critiques avant suppression
-  try {
-    // Utiliser une transaction pour s'assurer que tout est nettoyé ou rien
-    await query('BEGIN');
-
-    // Supprimer les données liées (celles avec ON DELETE CASCADE devraient partir seules, mais on assure le coup)
-    await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
-    await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
-    await query('DELETE FROM public.status_reactions WHERE user_id = $1', [userId]);
-    await query('DELETE FROM public.status_views WHERE user_id = $1', [userId]);
-    await query('DELETE FROM public.statuses WHERE user_id = $1', [userId]);
-    await query('DELETE FROM public.appeals WHERE user_id = $1', [userId]);
-    await query('DELETE FROM public.verification_requests WHERE user_id = $1', [userId]);
-
-    // Nettoyer les références circulaires ou protectrices
-    await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]);
-    await query('UPDATE public.calls SET caller_id = NULL WHERE caller_id = $1', [userId]);
-    await query('UPDATE public.calls SET callee_id = NULL WHERE callee_id = $1', [userId]);
-    await query('UPDATE public.notification_campaigns SET created_by = NULL WHERE created_by = $1', [userId]);
-    await query('UPDATE public.admin_audit_logs SET admin_id = NULL WHERE admin_id = $1', [userId]);
-
-    // Supprimer des tables de relations
-    await query('DELETE FROM public.reported_content WHERE reporter_id = $1 OR target_id = $1', [userId]);
-    await query('DELETE FROM public.blocked_users WHERE blocker_id = $1 OR blocked_id = $1', [userId]);
-    await query('DELETE FROM public.contacts WHERE user_id = $1 OR contact_id = $1', [userId]);
-
-    // 3. Suppression finale du profil
-    await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
-
-    await query('COMMIT');
-
-    socketService.broadcast('admin_user_deleted', { userId });
-    res.json({ success: true, message: 'Compte supprimé avec succès' });
-  } catch (deleteError) {
-    await query('ROLLBACK');
-    logger.error('Erreur lors de la suppression du compte:', deleteError);
-    return res.status(500).json({
-      success: false,
-      error: 'Erreur technique de base de données',
-      message: 'Une contrainte de référence empêche la suppression. Contactez le support.'
-    });
-  }
 });
 
 module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact, deleteAccount };

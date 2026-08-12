@@ -66,9 +66,8 @@ class MailService {
               </a>
             </div>
             <div class="footer-links">
-              <a href="https://meetme.app/privacy">Politique de confidentialité</a>
-              <a href="https://meetme.app/terms">Conditions d'utilisation</a>
-              <a href="https://meetme.app/help">Aide & Support</a>
+              <a href="https://meet-me-backend-sg5c.onrender.com/privacy">Politique de confidentialité</a>
+              <a href="https://meet-me-backend-sg5c.onrender.com/support/helpdesk">Aide & Support</a>
             </div>
             <div class="address">
               © 2026 Meet Me Team. Tous droits réservés.<br>

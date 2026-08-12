@@ -115,6 +115,9 @@ class Server {
     this.app.get('/delete-account', (req, res) => {
       res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'delete-account.html'));
     });
+    this.app.get('/privacy', (req, res) => {
+      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'privacy.html'));
+    });
 
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);

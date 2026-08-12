@@ -118,6 +118,9 @@ class Server {
     this.app.get('/privacy', (req, res) => {
       res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'privacy.html'));
     });
+    this.app.get('/support/helpdesk', (req, res) => {
+      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'support.html'));
+    });
 
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);

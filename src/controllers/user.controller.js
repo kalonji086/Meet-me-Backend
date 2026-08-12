@@ -276,4 +276,38 @@ const checkContact = asyncHandler(async (req, res) => {
   res.json({ success: true, isContact: result.rows.length > 0 });
 });
 
-module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact };
+/**
+ * @desc    Supprimer le compte de l'utilisateur
+ */
+const deleteAccount = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ success: false, error: 'Mot de passe requis pour confirmer la suppression' });
+  }
+
+  // 1. Vérifier le mot de passe
+  const result = await query('SELECT password FROM public.profiles WHERE id = $1', [userId]);
+  const user = result.rows[0];
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  }
+
+  const bcrypt = require('bcryptjs');
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (!isMatch) {
+    return res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
+  }
+
+  // 2. Supprimer l'utilisateur
+  await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
+
+  socketService.broadcast('admin_user_deleted', { userId });
+
+  res.json({ success: true, message: 'Compte supprimé avec succès' });
+});
+
+module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact, deleteAccount };

@@ -71,4 +71,9 @@ router.post('/verify', userController.submitVerification);
  */
 router.get('/:id', userController.getUserById);
 
+/**
+ * @route POST /api/users/delete-account
+ */
+router.post('/delete-account', userController.deleteAccount);
+
 module.exports = router;

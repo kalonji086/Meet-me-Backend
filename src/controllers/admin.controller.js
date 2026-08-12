@@ -573,6 +573,14 @@ const updateAppConfig = asyncHandler(async (req, res) => {
     [current_version, force_update, update_url, release_notes, targetIds, active]
   );
 
+  // Notifier les utilisateurs de la nouvelle version
+  socketService.broadcast('app_config_update', {
+    current_version,
+    force_update,
+    update_url,
+    release_notes
+  });
+
   await logAdminAction(req, 'update_app_config', 'config', result.rows[0].id, req.body);
   res.json({ success: true, data: result.rows[0] });
 });

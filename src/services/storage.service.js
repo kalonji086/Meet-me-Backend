@@ -85,6 +85,14 @@ class StorageService {
     return this.uploadFile(file, userId, 'audio');
   }
 
+  async uploadDocument(file, userId) {
+    return this.uploadFile(file, userId, 'documents');
+  }
+
+  async uploadVideo(file, userId) {
+    return this.uploadFile(file, userId, 'videos');
+  }
+
   async deleteFile(fileUrl) {
     try {
       const parts = fileUrl.split(`${this.bucketName}/`);
@@ -96,7 +104,10 @@ class StorageService {
   }
 
   getFileCategory(mimeType) {
-    return mimeType.startsWith('image/') ? 'image' : 'audio';
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    return 'document';
   }
 
   validateFileType() { return true; }

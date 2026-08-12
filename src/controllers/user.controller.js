@@ -44,8 +44,10 @@ const getMe = asyncHandler(async (req, res) => {
  * @desc    Mettre à jour le profil
  */
 const updateProfile = asyncHandler(async (req, res) => {
-  const userId = req.userId;
   const { name, status, avatar_url, username } = req.body;
+
+  // Déterminer si avatar_url est présent dans la requête (même si null)
+  const avatarIsPresent = Object.prototype.hasOwnProperty.call(req.body, 'avatar_url');
 
   if (username) {
     const usernameLower = username.toLowerCase().trim();
@@ -65,13 +67,13 @@ const updateProfile = asyncHandler(async (req, res) => {
     `UPDATE public.profiles
      SET full_name = COALESCE($1, full_name),
          status = COALESCE($2, status),
-         avatar_url = COALESCE($3, avatar_url),
+         avatar_url = CASE WHEN $8 THEN $3 ELSE avatar_url END,
          username = COALESCE($4, username),
          accepted_legal_version = COALESCE($5, accepted_legal_version),
          accepted_tos_version = COALESCE($6, accepted_tos_version),
          accepted_privacy_version = COALESCE($7, accepted_privacy_version),
          updated_at = NOW()
-     WHERE id = $8
+     WHERE id = $9
      RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, accepted_legal_version, accepted_tos_version, accepted_privacy_version`,
     [
       name,
@@ -81,6 +83,7 @@ const updateProfile = asyncHandler(async (req, res) => {
       req.body.accepted_legal_version,
       req.body.accepted_tos_version,
       req.body.accepted_privacy_version,
+      avatarIsPresent,
       userId
     ]
   );

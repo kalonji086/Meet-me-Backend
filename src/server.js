@@ -72,6 +72,7 @@ class Server {
   }
 
   initializeMiddlewares() {
+    this.app.set('trust proxy', 1);
     this.app.use(helmet({ contentSecurityPolicy: false }));
     this.app.use(cors({ origin: '*', credentials: true }));
 

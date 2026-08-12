@@ -201,6 +201,14 @@ CREATE TABLE IF NOT EXISTS public.calls (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Migration des colonnes calls si nécessaire
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='calls' AND column_name='callee_id') THEN
+    ALTER TABLE public.calls ADD COLUMN callee_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.blocked_users (
   blocker_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   blocked_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,

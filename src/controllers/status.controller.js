@@ -41,6 +41,7 @@ const getStatuses = asyncHandler(async (req, res) => {
      FROM public.statuses s
      JOIN public.profiles p ON s.user_id = p.id
      WHERE s.expires_at > NOW()
+       AND p.is_global_admin = FALSE
      ORDER BY s.created_at DESC`,
     []
   );

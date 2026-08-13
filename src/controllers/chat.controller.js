@@ -319,13 +319,13 @@ const deleteMessage = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, error: 'Non autorisé à supprimer ce message' });
   }
 
-  // Au lieu de supprimer, on met à jour le contenu
+  // Au lieu de supprimer, on met à jour le contenu (WhatsApp Style)
   const updatedMessage = await query(
     `UPDATE public.messages
-     SET content = $1, type = 'text', file_url = NULL, status = 'read'
+     SET content = $1, type = 'text', file_url = NULL, status = 'read', translated_content = NULL, source_language = NULL
      WHERE id = $2
      RETURNING *`,
-    [`🚫 Ce message a été supprimé par ${message.sender_name}`, messageId]
+    [`🚫 Ce message a été supprimé par l'expéditeur`, messageId]
   );
 
   res.json({

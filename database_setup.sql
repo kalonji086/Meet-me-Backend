@@ -280,3 +280,8 @@ BEGIN
   END IF;
   ALTER TABLE public.chat_participants ADD CONSTRAINT chat_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 END $$;
+
+-- 9. Activer le Realtime Supabase pour les messages et discussions
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.chats;
+ALTER TABLE public.messages REPLICA IDENTITY FULL;

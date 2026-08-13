@@ -163,7 +163,15 @@ class TranslationService {
       }
 
       // Vérifier si la traduction existe déjà
-      const translatedContent = message.translated_content || {};
+      let translatedContent = {};
+      try {
+        translatedContent = typeof message.translated_content === 'string'
+          ? JSON.parse(message.translated_content)
+          : (message.translated_content || {});
+      } catch (e) {
+        translatedContent = {};
+      }
+
       if (translatedContent[targetLanguage]) {
         return translatedContent[targetLanguage];
       }

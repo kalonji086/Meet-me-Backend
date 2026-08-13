@@ -150,6 +150,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='source_language') THEN
     ALTER TABLE public.messages ADD COLUMN source_language TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='deleted_for_users') THEN
+    ALTER TABLE public.messages ADD COLUMN deleted_for_users UUID[] DEFAULT '{}';
+  END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS public.appeals (

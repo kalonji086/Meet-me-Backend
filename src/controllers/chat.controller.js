@@ -143,6 +143,7 @@ const createChat = asyncHandler(async (req, res) => {
 const getMessages = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const { page = 1, limit = 50 } = req.query;
+  const userId = req.userId;
   const offset = (page - 1) * limit;
 
   const result = await query(
@@ -150,9 +151,10 @@ const getMessages = asyncHandler(async (req, res) => {
      FROM public.messages m
      JOIN public.profiles p ON m.sender_id = p.id
      WHERE m.chat_id = $1
+       AND (m.deleted_for_users IS NULL OR NOT ($2 = ANY(m.deleted_for_users)))
      ORDER BY m.created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [chatId, limit, offset]
+     LIMIT $3 OFFSET $4`,
+    [chatId, userId, limit, offset]
   );
 
   res.json({
@@ -293,19 +295,17 @@ const deleteChat = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Supprimer un message (Le marquer comme retiré)
+ * @desc    Supprimer un message (Le marquer comme retiré ou le masquer)
  * @route   DELETE /api/messages/:messageId
  */
 const deleteMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
+  const { deleteType = 'everyone' } = req.query; // 'everyone' or 'me'
   const userId = req.userId;
 
-  // Récupérer le message et les infos de l'expéditeur
+  // Récupérer le message
   const messageResult = await query(
-    `SELECT m.*, p.full_name as sender_name
-     FROM public.messages m
-     JOIN public.profiles p ON m.sender_id = p.id
-     WHERE m.id = $1`,
+    'SELECT * FROM public.messages WHERE id = $1',
     [messageId]
   );
 
@@ -315,22 +315,59 @@ const deleteMessage = asyncHandler(async (req, res) => {
 
   const message = messageResult.rows[0];
 
-  if (message.sender_id !== userId) {
-    return res.status(403).json({ success: false, error: 'Non autorisé à supprimer ce message' });
+  if (deleteType === 'me') {
+    // Supprimer uniquement pour l'utilisateur actuel
+    const updatedMessage = await query(
+      `UPDATE public.messages
+       SET deleted_for_users = array_append(COALESCE(deleted_for_users, '{}'), $1)
+       WHERE id = $2
+       RETURNING *`,
+      [userId, messageId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Message masqué pour vous',
+      data: updatedMessage.rows[0]
+    });
   }
 
-  // Au lieu de supprimer, on met à jour le contenu (WhatsApp Style)
+  // Suppression pour tout le monde
+  if (message.sender_id !== userId) {
+    return res.status(403).json({ success: false, error: 'Non autorisé à supprimer ce message pour tous' });
+  }
+
+  // Au lieu de supprimer physiquement, on met à jour le contenu (Style WhatsApp)
+  const deleteMention = "🚫 Ce message a été supprimé";
   const updatedMessage = await query(
     `UPDATE public.messages
-     SET content = $1, type = 'text', file_url = NULL, status = 'read', translated_content = NULL, source_language = NULL
+     SET content = $1,
+         type = 'text',
+         file_url = NULL,
+         status = 'read',
+         translated_content = NULL,
+         source_language = NULL
      WHERE id = $2
      RETURNING *`,
-    [`🚫 Ce message a été supprimé par l'expéditeur`, messageId]
+    [deleteMention, messageId]
   );
+
+  // Mettre à jour le last_message du chat si c'était le dernier message
+  const chatRes = await query(
+    'SELECT id FROM public.chats WHERE id = $1 AND last_message_at = $2',
+    [message.chat_id, message.created_at]
+  );
+
+  if (chatRes.rows.length > 0) {
+    await query(
+      'UPDATE public.chats SET last_message = $1 WHERE id = $2',
+      [deleteMention, message.chat_id]
+    );
+  }
 
   res.json({
     success: true,
-    message: 'Message retiré',
+    message: 'Message retiré pour tout le monde',
     data: updatedMessage.rows[0]
   });
 });

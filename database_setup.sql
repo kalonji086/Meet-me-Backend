@@ -78,6 +78,20 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN push_token TEXT;
   END IF;
 
+  -- additional profile columns (v19.0.3)
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_verified') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='accepted_legal_version') THEN
+    ALTER TABLE public.profiles ADD COLUMN accepted_legal_version TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='app_version') THEN
+    ALTER TABLE public.profiles ADD COLUMN app_version TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_update_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN last_update_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+
   -- legal versions
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='accepted_tos_version') THEN
     ALTER TABLE public.profiles ADD COLUMN accepted_tos_version TEXT;
@@ -221,6 +235,20 @@ CREATE TABLE IF NOT EXISTS public.contacts (
   contact_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   PRIMARY KEY (user_id, contact_id)
+);
+
+-- reported_content (v19.0.3)
+CREATE TABLE IF NOT EXISTS public.reported_content (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_type TEXT NOT NULL CHECK (report_type IN ('message', 'user', 'group')),
+  target_id UUID,
+  target_name TEXT,
+  reporter_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  reporter_name TEXT,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reviewed', 'resolved', 'dismissed')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  resolved_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS public.verification_requests (

@@ -219,8 +219,28 @@ const blockUser = asyncHandler(async (req, res) => {
 });
 
 const reportUser = asyncHandler(async (req, res) => {
-  await query('INSERT INTO public.reported_content (reporter_id, target_id, reason, report_type) VALUES ($1, $2, $3, \'user\')', [req.userId, req.body.targetId, req.body.reason]);
-  res.json({ success: true });
+  const { targetId, reason } = req.body;
+  const userId = req.userId;
+
+  // Récupérer les noms pour l'admin
+  const reporter = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
+  const target = await query('SELECT full_name FROM public.profiles WHERE id = $1', [targetId]);
+
+  const result = await query(
+    `INSERT INTO public.reported_content (reporter_id, reporter_name, target_id, target_name, reason, report_type)
+     VALUES ($1, $2, $3, $4, $5, 'user')
+     RETURNING id`,
+    [userId, reporter.rows[0]?.full_name, targetId, target.rows[0]?.full_name, reason]
+  );
+
+  socketService.broadcast('admin_new_report', {
+    reportId: result.rows[0].id,
+    reporterName: reporter.rows[0]?.full_name,
+    targetName: target.rows[0]?.full_name,
+    reason
+  });
+
+  res.json({ success: true, message: 'Signalement envoyé avec succès' });
 });
 
 const addContact = asyncHandler(async (req, res) => {

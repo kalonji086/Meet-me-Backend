@@ -208,7 +208,10 @@ const submitVerification = asyncHandler(async (req, res) => {
 });
 
 const getUserById = asyncHandler(async (req, res) => {
-  const result = await query('SELECT id, full_name, avatar_url, status, username FROM public.profiles WHERE id = $1', [req.params.id]);
+  const result = await query(
+    'SELECT id, full_name, avatar_url, status, username, phone_number, is_verified FROM public.profiles WHERE id = $1',
+    [req.params.id]
+  );
   if (result.rows[0]) res.json({ success: true, data: result.rows[0] });
   else res.status(404).json({ success: false, error: 'Non trouvé' });
 });

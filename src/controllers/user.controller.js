@@ -196,7 +196,12 @@ const updatePushToken = asyncHandler(async (req, res) => {
 
 const getBadges = asyncHandler(async (req, res) => {
   const msgRes = await query(
-    'SELECT COUNT(*) FROM public.messages m JOIN public.chat_participants cp ON m.chat_id = cp.chat_id WHERE cp.user_id = $1 AND m.sender_id != $1 AND m.status != \'read\'',
+    `SELECT COUNT(*) FROM public.messages m
+     JOIN public.chat_participants cp ON m.chat_id = cp.chat_id
+     WHERE cp.user_id = $1
+       AND m.sender_id != $1
+       AND m.status != 'read'
+       AND (m.deleted_for_users IS NULL OR NOT ($1 = ANY(m.deleted_for_users)))`,
     [req.userId]
   );
   res.json({ success: true, data: { messages: parseInt(msgRes.rows[0].count), calls: 0, status: 0 } });

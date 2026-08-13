@@ -15,7 +15,7 @@ const getChats = asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit;
 
   // On récupère les conversations où l'utilisateur participe
-  // Si c'est un auto-chat (un seul participant), on récupère ses propres infos
+  // On inclut le décompte des messages non lus (unread_count)
   const result = await query(
     `SELECT
         c.*,
@@ -44,7 +44,15 @@ const getChats = asyncHandler(async (req, res) => {
             FROM public.profiles p
             WHERE p.id = $1
           )
-        ) as other_user
+        ) as other_user,
+        (
+          SELECT COUNT(*)
+          FROM public.messages m
+          WHERE m.chat_id = c.id
+            AND m.sender_id != $1
+            AND m.status != 'read'
+            AND (m.deleted_for_users IS NULL OR NOT ($1 = ANY(m.deleted_for_users)))
+        ) as unread_count
      FROM public.chats c
      JOIN public.chat_participants cp ON c.id = cp.chat_id
      WHERE cp.user_id = $1 AND cp.is_archived = $4
@@ -202,9 +210,15 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   for (const row of participantsResult.rows) {
     if (row.push_token) {
-      // Compter les messages non lus pour ce destinataire spécifique
+      // Compter les messages non lus pour ce destinataire spécifique (Total Badge)
       const unreadResult = await query(
-        "SELECT COUNT(*) as count FROM public.messages WHERE chat_id IN (SELECT chat_id FROM public.chat_participants WHERE user_id = (SELECT id FROM public.profiles WHERE push_token = $1)) AND status != 'read' AND sender_id != (SELECT id FROM public.profiles WHERE push_token = $1)",
+        `SELECT COUNT(*) as count FROM public.messages m
+         JOIN public.chat_participants cp ON m.chat_id = cp.chat_id
+         JOIN public.profiles p ON cp.user_id = p.id
+         WHERE p.push_token = $1
+           AND m.sender_id != p.id
+           AND m.status != 'read'
+           AND (m.deleted_for_users IS NULL OR NOT (p.id = ANY(m.deleted_for_users)))`,
         [row.push_token]
       );
       const badgeCount = parseInt(unreadResult.rows[0].count);

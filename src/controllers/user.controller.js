@@ -164,12 +164,25 @@ const deleteAccount = asyncHandler(async (req, res) => {
 const searchUsers = asyncHandler(async (req, res) => {
   const { query: searchQuery } = req.query;
   const userId = req.userId;
-  if (!searchQuery) return res.json({ success: true, data: [] });
+
+  // Si pas de recherche, on retourne tous les contacts de l'utilisateur (Style WhatsApp)
+  if (!searchQuery || searchQuery.trim() === '') {
+    const result = await query(
+      `SELECT p.id, p.full_name, p.avatar_url, p.status, p.username
+       FROM public.profiles p
+       JOIN public.contacts c ON (c.contact_id = p.id AND c.user_id = $1)
+       WHERE p.is_locked = FALSE
+       ORDER BY p.full_name ASC`,
+      [userId]
+    );
+    return res.json({ success: true, data: result.rows });
+  }
+
   const searchTerm = `%${searchQuery.toLowerCase()}%`;
   const result = await query(
     `SELECT id, full_name, avatar_url, status, username FROM public.profiles
      WHERE (LOWER(full_name) LIKE $1 OR LOWER(username) LIKE $1 OR phone_number LIKE $1)
-     AND id != $2 AND is_locked = FALSE LIMIT 20`,
+     AND id != $2 AND is_locked = FALSE LIMIT 50`,
     [searchTerm, userId]
   );
   res.json({ success: true, data: result.rows });

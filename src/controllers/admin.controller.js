@@ -477,7 +477,7 @@ const createCampaign = asyncHandler(async (req, res) => {
   const campaign = await query(
     `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, sent_count)
      VALUES ($1, $2, $3, $4, $5, 'sent', 0) RETURNING *`,
-    [title, message, target || 'all', targetValue || null, req.user.id]
+    [title, message, target || 'all', targetValue || null, req.user?.id || null]
   );
 
   if (target === 'all') {
@@ -488,11 +488,14 @@ const createCampaign = asyncHandler(async (req, res) => {
     }
     await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
   } else if (targetValue) {
-    const userRes = await query('SELECT id, email FROM public.profiles WHERE email = $1', [targetValue]);
-    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Destinataire introuvable' });
-    const user = userRes.rows[0];
-    socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
-    await mailService.sendSystemEmail(user.email, title, message);
+    // On essaie d'envoyer par socket si l'utilisateur existe
+    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [targetValue]);
+    if (userRes.rows.length > 0) {
+      socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
+    }
+
+    // On envoie toujours par email, même s'il n'est pas dans la DB
+    await mailService.sendSystemEmail(targetValue, title, message);
     await query('UPDATE public.notification_campaigns SET sent_count = 1 WHERE id = $1', [campaign.rows[0].id]);
   }
 
@@ -525,11 +528,15 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'all', count: users.rows.length });
     res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
   } else {
+    // On essaie d'envoyer par socket si l'utilisateur existe
     const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [specificEmail]);
-    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Destinataire introuvable' });
-    socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
+    if (userRes.rows.length > 0) {
+      socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
+    }
+
+    // On envoie toujours par email, même s'il n'est pas inscrit
     await mailService.sendSystemEmail(specificEmail, title, content);
-    await logAdminAction(req, 'broadcast_message', 'system', userRes.rows[0].id, { title, target: 'specific' });
+    await logAdminAction(req, 'broadcast_message', 'system', userRes.rows[0]?.id || null, { title, target: 'specific', email: specificEmail });
     res.json({ success: true, message: 'Message envoyé.' });
   }
 });

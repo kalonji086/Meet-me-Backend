@@ -19,8 +19,9 @@ const getChats = asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT
         c.*,
-        COALESCE(
-          (
+        CASE
+          WHEN c.type = 'group' THEN NULL
+          ELSE (
             SELECT json_build_object(
               'id', p.id,
               'full_name', p.full_name,
@@ -32,19 +33,8 @@ const getChats = asyncHandler(async (req, res) => {
             JOIN public.profiles p ON cp2.user_id = p.id
             WHERE cp2.chat_id = c.id AND cp2.user_id != $1
             LIMIT 1
-          ),
-          (
-            SELECT json_build_object(
-              'id', p.id,
-              'full_name', p.full_name,
-              'avatar_url', p.avatar_url,
-              'status', p.status,
-              'is_verified', p.is_verified
-            )
-            FROM public.profiles p
-            WHERE p.id = $1
           )
-        ) as other_user,
+        END as other_user,
         (
           SELECT COUNT(*)
           FROM public.messages m

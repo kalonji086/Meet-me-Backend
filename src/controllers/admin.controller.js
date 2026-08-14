@@ -600,6 +600,14 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     for (const user of users.rows) {
       await mailService.sendSystemEmail(user.email, title, content, theme);
     }
+
+    // Sauvegarder dans l'historique
+    await query(
+      `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
+       VALUES ($1, $2, $3, $4, $5, 'sent', NOW(), $6, $7)`,
+      [title, content, 'all', null, req.user?.id || null, users.rows.length, JSON.stringify({ theme, isBroadcast: true })]
+    );
+
     await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'all', count: users.rows.length, theme });
     res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
   } else if (specificEmail) {
@@ -608,16 +616,20 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     let sentCount = 0;
 
     for (const email of emails) {
-      // On essaie d'envoyer par socket si l'utilisateur existe
       const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
       if (userRes.rows.length > 0) {
         socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
       }
-
-      // On envoie toujours par email, même s'il n'est pas inscrit
       const success = await mailService.sendSystemEmail(email, title, content, theme);
       if (success) sentCount++;
     }
+
+    // Sauvegarder dans l'historique
+    await query(
+      `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
+       VALUES ($1, $2, $3, $4, $5, 'sent', NOW(), $6, $7)`,
+      [title, content, 'specific', specificEmail, req.user?.id || null, sentCount, JSON.stringify({ theme, isBroadcast: true })]
+    );
 
     await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'specific', count: sentCount, emails: specificEmail, theme });
     res.json({ success: true, message: `Message envoyé à ${sentCount} destinataires.` });

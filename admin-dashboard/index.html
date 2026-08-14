@@ -497,8 +497,8 @@
                 </div>
 
                 <!-- Section Broadcast -->
-                <div id="section-broadcast" class="hidden animate-fade-in max-w-2xl mx-auto">
-                    <div class="bg-white p-10 rounded-3xl border border-gray-100">
+                <div id="section-broadcast" class="hidden animate-fade-in max-w-4xl mx-auto">
+                    <div class="bg-white p-10 rounded-3xl border border-gray-100 mb-8">
                         <h3 class="text-2xl font-black mb-8 text-purple-600">Centre de Diffusion</h3>
                         <div class="space-y-6">
                             <div class="grid grid-cols-2 gap-4">
@@ -516,6 +516,26 @@
                             </div>
                             <button onclick="sendBroadcast()" id="bc-btn" class="w-full bg-orange-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-orange-100 hover:bg-orange-600 transition-all flex items-center justify-center"><i data-lucide="send" class="w-5 h-5 mr-2"></i> DIFFUSER</button>
                         </div>
+                    </div>
+
+                    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="flex items-center justify-between p-6 border-b border-gray-50 bg-gray-50/30">
+                            <div class="flex bg-gray-100 p-1 rounded-xl">
+                                <button onclick="filterBroadcasts('sent')" id="btn-bc-sent" class="px-6 py-2 rounded-lg text-xs font-black transition-all bg-white shadow-sm text-orange-600">ENVOYÉS</button>
+                                <button onclick="filterBroadcasts('scheduled')" id="btn-bc-scheduled" class="px-6 py-2 rounded-lg text-xs font-black transition-all text-gray-400">PROGRAMMÉS</button>
+                            </div>
+                            <span id="bc-count-badge" class="px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black">0 total</span>
+                        </div>
+                        <div id="bc-empty-state" class="hidden p-20 text-center">
+                            <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="mail-warning" class="w-10 h-10 text-gray-300"></i>
+                            </div>
+                            <p class="text-gray-400 font-bold">Aucune diffusion trouvée.</p>
+                        </div>
+                        <table id="bc-history-table" class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Sujet</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Cible</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Envoyés</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Statut / Date</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Actions</th></tr></thead>
+                            <tbody id="bc-history-table-body"></tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -980,6 +1000,7 @@
                 if (name === 'reports') loadReports();
                 if (name === 'analytics') loadAnalytics();
                 if (name === 'campaigns') loadCampaigns();
+                if (name === 'broadcast') loadBroadcasts();
                 if (name === 'audit') loadAuditLogs();
                 if (name === 'config') loadAppConfig();
                 if (name === 'legal') loadLegalDocs();
@@ -1773,6 +1794,82 @@
             document.getElementById('modal-members').classList.remove('hidden'); lucide.createIcons();
         }
 
+        let allBroadcastsData = [];
+        let currentBroadcastsView = 'sent';
+
+        async function filterBroadcasts(status) {
+            currentBroadcastsView = status;
+            const sentBtn = document.getElementById('btn-bc-sent');
+            const scheduledBtn = document.getElementById('btn-bc-scheduled');
+
+            if (status === 'sent') {
+                sentBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all bg-white shadow-sm text-orange-600";
+                scheduledBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all text-gray-400";
+            } else {
+                scheduledBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all bg-white shadow-sm text-orange-600";
+                sentBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all text-gray-400";
+            }
+            renderBroadcasts();
+        }
+
+        async function loadBroadcasts() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/campaigns`, { headers: { Authorization: `Bearer ${token}` } });
+                // On filtre pour ne garder que les diffusions (metadata.isBroadcast === true)
+                allBroadcastsData = res.data.data.filter(item => item.metadata?.isBroadcast === true);
+                renderBroadcasts();
+            } catch (e) { console.error(e); }
+        }
+
+        function renderBroadcasts() {
+            const body = document.getElementById('bc-history-table-body');
+            const emptyState = document.getElementById('bc-empty-state');
+            const table = document.getElementById('bc-history-table');
+
+            const filtered = allBroadcastsData.filter(c => c.status === currentBroadcastsView || (currentBroadcastsView === 'sent' && c.status === 'processing'));
+            document.getElementById('bc-count-badge').innerText = `${filtered.length} ${currentBroadcastsView}`;
+
+            body.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                table.classList.add('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+                table.classList.remove('hidden');
+            }
+
+            filtered.forEach(bc => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-50 hover:bg-gray-50 transition-colors';
+
+                const dateInfo = bc.status === 'scheduled'
+                    ? `<p class="text-[10px] text-orange-600 font-bold">${new Date(bc.scheduled_at).toLocaleString()}</p>`
+                    : `<p class="text-[10px] text-gray-400 font-bold">${new Date(bc.created_at).toLocaleString()}</p>`;
+
+                const actions = bc.status === 'scheduled'
+                    ? `<td class="px-8 py-5 text-right space-x-2">
+                        <button onclick="openEditCampaignModal('${bc.id}')" class="p-2 text-gray-400 hover:text-orange-600 transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="deleteScheduledCampaign('${bc.id}')" class="p-2 text-gray-400 hover:text-red-500 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                       </td>`
+                    : `<td class="px-8 py-5 text-right"><span class="text-[10px] font-bold text-gray-300 italic">Verrouillé</span></td>`;
+
+                tr.innerHTML = `
+                    <td class="px-8 py-5"><p class="font-bold text-sm text-gray-800">${bc.title}</p></td>
+                    <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${bc.target === 'all' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}">${bc.target.toUpperCase()}</span></td>
+                    <td class="px-8 py-5"><p class="font-bold text-sm text-gray-700">${bc.sent_count || 0}</p></td>
+                    <td class="px-8 py-5">
+                        <span class="px-3 py-1 rounded-lg text-[10px] font-black ${bc.status === 'sent' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}">${bc.status.toUpperCase()}</span>
+                        <div class="mt-1">${dateInfo}</div>
+                    </td>
+                    ${actions}
+                `;
+                body.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
         async function sendBroadcast() {
             const target = document.getElementById('bc-target').value;
             const specificEmail = document.getElementById('bc-specific-email').value;
@@ -1794,6 +1891,7 @@
                 document.getElementById('bc-title').value = '';
                 bcEditor.setContents([]);
                 document.getElementById('bc-scheduled-at').value = '';
+                loadBroadcasts();
             } catch (e) { alert("Erreur."); } finally { btn.disabled = false; btn.innerHTML = 'DIFFUSER'; lucide.createIcons(); }
         }
 
@@ -1817,7 +1915,8 @@
         async function loadCampaigns() {
             try {
                 const res = await axios.get(`${API_URL}/admin/campaigns`, { headers: { Authorization: `Bearer ${token}` } });
-                allCampaignsData = res.data.data;
+                // On filtre pour ne garder que les campagnes classiques (pas les diffusions)
+                allCampaignsData = res.data.data.filter(item => !item.metadata?.isBroadcast);
                 renderCampaigns();
             } catch (e) { console.error(e); }
         }

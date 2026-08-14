@@ -36,6 +36,10 @@ class AutomationService {
    */
   async processScheduledCampaigns() {
     try {
+      // S'assurer que les tables admin existent
+      const { ensureAdminTables } = require('../controllers/admin.controller');
+      await ensureAdminTables();
+
       const now = new Date().toISOString();
       const pending = await query(
         `SELECT * FROM public.notification_campaigns

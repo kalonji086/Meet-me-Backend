@@ -45,12 +45,20 @@ class Server {
     this.nodeEnv = config.server.nodeEnv;
     this.pool = pool;
 
-    this.initializeDatabase();
+    this.startServer();
+  }
+
+  async startServer() {
+    await this.initializeDatabase();
     this.initializeMiddlewares();
     this.initializeRoutes();
     this.initializeSocketIO();
     this.initializeErrorHandling();
     this.initializeAutomation();
+
+    this.server.listen(this.port, () => {
+      logger.info(`🚀 Server on port ${this.port}`);
+    });
   }
 
   async initializeDatabase() {
@@ -173,14 +181,7 @@ class Server {
     this.app.use(notFound);
     this.app.use(errorHandler);
   }
-
-  start() {
-    this.server.listen(this.port, () => {
-      logger.info(`🚀 Server on port ${this.port}`);
-    });
-  }
 }
 
 const server = new Server();
-server.start();
 module.exports = { app: server.app, server: server.server };

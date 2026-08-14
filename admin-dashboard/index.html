@@ -420,8 +420,21 @@
                         <button onclick="createCampaign()" class="mt-8 w-full bg-purple-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all">LANCER LA CAMPAGNE</button>
                     </div>
                     <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Titre</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Cible</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Envoyés</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Statut</th></tr></thead>
+                        <div class="flex items-center justify-between p-6 border-b border-gray-50 bg-gray-50/30">
+                            <div class="flex bg-gray-100 p-1 rounded-xl">
+                                <button onclick="filterCampaigns('sent')" id="btn-campaign-sent" class="px-6 py-2 rounded-lg text-xs font-black transition-all bg-white shadow-sm text-purple-600">ENVOYÉS</button>
+                                <button onclick="filterCampaigns('scheduled')" id="btn-campaign-scheduled" class="px-6 py-2 rounded-lg text-xs font-black transition-all text-gray-400">PROGRAMMÉS</button>
+                            </div>
+                            <span id="campaign-count-badge" class="px-3 py-1 bg-purple-100 text-purple-600 rounded-full text-[10px] font-black">0 total</span>
+                        </div>
+                        <div id="campaign-empty-state" class="hidden p-20 text-center">
+                            <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="calendar-off" class="w-10 h-10 text-gray-300"></i>
+                            </div>
+                            <p class="text-gray-400 font-bold">C'est vide pour le moment.</p>
+                        </div>
+                        <table id="campaigns-table" class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Titre</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Cible</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Envoyés</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Statut / Date</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Actions</th></tr></thead>
                             <tbody id="campaigns-table-body"></tbody>
                         </table>
                     </div>
@@ -595,6 +608,33 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- MODAL EDIT CAMPAIGN -->
+    <div id="modal-edit-campaign" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4 backdrop-blur-md">
+        <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
+            <div class="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
+                <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Modifier la programmation</h3>
+                <button onclick="closeCampaignEditModal()" class="p-2 hover:bg-gray-200 rounded-full"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar">
+                <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Titre</label><input id="edit-campaign-title" type="text" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Date d'envoi</label><input id="edit-campaign-scheduled-at" type="datetime-local" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                    <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Thème</label><select id="edit-campaign-theme" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"><option value="amazon">Amazon</option><option value="modern">Modern</option><option value="dark">Dark</option><option value="minimal">Minimal</option></select></div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Message</label>
+                    <div class="quill-editor-container">
+                        <div id="edit-campaign-editor"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-8 border-t bg-gray-50 flex space-x-4">
+                <button onclick="closeCampaignEditModal()" class="flex-1 py-4 font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-all">ANNULER</button>
+                <button id="save-campaign-btn" class="flex-[2] bg-purple-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all">ENREGISTRER</button>
+            </div>
         </div>
     </div>
 
@@ -875,7 +915,8 @@
         }
 
         let currentAppealsView = 'all';
-        let bcEditor, campaignEditor;
+        let currentCampaignsView = 'sent';
+        let bcEditor, campaignEditor, editCampaignEditor;
 
         function initRichEditors() {
             const toolbarOptions = [
@@ -896,6 +937,13 @@
 
             if (!campaignEditor) {
                 campaignEditor = new Quill('#campaign-editor', {
+                    theme: 'snow',
+                    modules: { toolbar: toolbarOptions }
+                });
+            }
+
+            if (!editCampaignEditor) {
+                editCampaignEditor = new Quill('#edit-campaign-editor', {
                     theme: 'snow',
                     modules: { toolbar: toolbarOptions }
                 });
@@ -1749,24 +1797,131 @@
             } catch (e) { alert("Erreur."); } finally { btn.disabled = false; btn.innerHTML = 'DIFFUSER'; lucide.createIcons(); }
         }
 
+        let allCampaignsData = [];
+
+        async function filterCampaigns(status) {
+            currentCampaignsView = status;
+            const sentBtn = document.getElementById('btn-campaign-sent');
+            const scheduledBtn = document.getElementById('btn-campaign-scheduled');
+
+            if (status === 'sent') {
+                sentBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all bg-white shadow-sm text-purple-600";
+                scheduledBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all text-gray-400";
+            } else {
+                scheduledBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all bg-white shadow-sm text-purple-600";
+                sentBtn.className = "px-6 py-2 rounded-lg text-xs font-black transition-all text-gray-400";
+            }
+            renderCampaigns();
+        }
+
         async function loadCampaigns() {
             try {
                 const res = await axios.get(`${API_URL}/admin/campaigns`, { headers: { Authorization: `Bearer ${token}` } });
-                const body = document.getElementById('campaigns-table-body');
-                body.innerHTML = '';
-                res.data.data.forEach(campaign => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'border-b border-gray-50 hover:bg-gray-50 transition-colors';
-                    tr.innerHTML = `
-                        <td class="px-8 py-5"><p class="font-bold text-sm text-gray-800">${campaign.title}</p></td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${campaign.target === 'all' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}">${campaign.target.toUpperCase()}</span></td>
-                        <td class="px-8 py-5"><p class="font-bold text-sm text-gray-700">${campaign.sent_count || 0}</p></td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${campaign.status === 'sent' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}">${campaign.status.toUpperCase()}</span></td>
-                    `;
-                    body.appendChild(tr);
-                });
-                lucide.createIcons();
+                allCampaignsData = res.data.data;
+                renderCampaigns();
             } catch (e) { console.error(e); }
+        }
+
+        function renderCampaigns() {
+            const body = document.getElementById('campaigns-table-body');
+            const emptyState = document.getElementById('campaign-empty-state');
+            const table = document.getElementById('campaigns-table');
+
+            const filtered = allCampaignsData.filter(c => c.status === currentCampaignsView || (currentCampaignsView === 'sent' && c.status === 'processing'));
+            document.getElementById('campaign-count-badge').innerText = `${filtered.length} ${currentCampaignsView}`;
+
+            body.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                table.classList.add('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+                table.classList.remove('hidden');
+            }
+
+            filtered.forEach(campaign => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-50 hover:bg-gray-50 transition-colors';
+
+                const dateInfo = campaign.status === 'scheduled'
+                    ? `<p class="text-[10px] text-purple-600 font-bold">${new Date(campaign.scheduled_at).toLocaleString()}</p>`
+                    : `<p class="text-[10px] text-gray-400 font-bold">${new Date(campaign.created_at).toLocaleString()}</p>`;
+
+                const actions = campaign.status === 'scheduled'
+                    ? `<td class="px-8 py-5 text-right space-x-2">
+                        <button onclick="openEditCampaignModal('${campaign.id}')" class="p-2 text-gray-400 hover:text-purple-600 transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="deleteScheduledCampaign('${campaign.id}')" class="p-2 text-gray-400 hover:text-red-500 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                       </td>`
+                    : `<td class="px-8 py-5 text-right"><span class="text-[10px] font-bold text-gray-300 italic">Verrouillé</span></td>`;
+
+                tr.innerHTML = `
+                    <td class="px-8 py-5"><p class="font-bold text-sm text-gray-800">${campaign.title}</p></td>
+                    <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${campaign.target === 'all' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}">${campaign.target.toUpperCase()}</span></td>
+                    <td class="px-8 py-5"><p class="font-bold text-sm text-gray-700">${campaign.sent_count || 0}</p></td>
+                    <td class="px-8 py-5">
+                        <span class="px-3 py-1 rounded-lg text-[10px] font-black ${campaign.status === 'sent' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}">${campaign.status.toUpperCase()}</span>
+                        <div class="mt-1">${dateInfo}</div>
+                    </td>
+                    ${actions}
+                `;
+                body.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        let editingCampaignId = null;
+        function openEditCampaignModal(id) {
+            const c = allCampaignsData.find(item => item.id === id);
+            if (!c) return;
+
+            editingCampaignId = id;
+            document.getElementById('edit-campaign-title').value = c.title;
+            document.getElementById('edit-campaign-theme').value = c.metadata?.theme || 'amazon';
+
+            // Format date for datetime-local input
+            const date = new Date(c.scheduled_at);
+            const formattedDate = date.toISOString().slice(0, 16);
+            document.getElementById('edit-campaign-scheduled-at').value = formattedDate;
+
+            editCampaignEditor.root.innerHTML = c.message;
+
+            document.getElementById('modal-edit-campaign').classList.remove('hidden');
+            document.getElementById('save-campaign-btn').onclick = () => saveEditedCampaign();
+        }
+
+        function closeCampaignEditModal() {
+            document.getElementById('modal-edit-campaign').classList.add('hidden');
+            editingCampaignId = null;
+        }
+
+        async function saveEditedCampaign() {
+            const btn = document.getElementById('save-campaign-btn');
+            const data = {
+                title: document.getElementById('edit-campaign-title').value,
+                theme: document.getElementById('edit-campaign-theme').value,
+                scheduledAt: document.getElementById('edit-campaign-scheduled-at').value,
+                message: editCampaignEditor.root.innerHTML
+            };
+
+            try {
+                btn.disabled = true; btn.innerText = 'SAUVEGARDE...';
+                await axios.put(`${API_URL}/admin/campaigns/${editingCampaignId}`, data, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Campagne mise à jour !");
+                closeCampaignEditModal();
+                loadCampaigns();
+            } catch (e) { alert("Erreur lors de la mise à jour."); }
+            finally { btn.disabled = false; btn.innerText = 'ENREGISTRER'; }
+        }
+
+        async function deleteScheduledCampaign(id) {
+            if (!confirm("Supprimer cette programmation ?")) return;
+            try {
+                await axios.delete(`${API_URL}/admin/campaigns/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Programmation supprimée.");
+                loadCampaigns();
+            } catch (e) { alert("Erreur lors de la suppression."); }
         }
 
         async function createCampaign() {

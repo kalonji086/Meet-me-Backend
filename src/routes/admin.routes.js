@@ -26,6 +26,8 @@ router.get('/analytics', adminController.getAnalytics);
 
 router.get('/campaigns', adminController.getCampaigns);
 router.post('/campaigns', adminController.createCampaign);
+router.put('/campaigns/:id', adminController.updateCampaign);
+router.delete('/campaigns/:id', adminController.deleteCampaign);
 
 router.get('/audit-logs', adminController.getAuditLogs);
 

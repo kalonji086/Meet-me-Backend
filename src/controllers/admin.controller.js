@@ -527,6 +527,42 @@ const createCampaign = asyncHandler(async (req, res) => {
   res.json({ success: true, data: campaign.rows[0], message: isFuture ? 'Campagne programmée.' : 'Campagne envoyée.' });
 });
 
+const updateCampaign = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { title, message, scheduledAt, theme } = req.body;
+
+  const result = await query(
+    `UPDATE public.notification_campaigns
+     SET title = COALESCE($1, title),
+         message = COALESCE($2, message),
+         scheduled_at = COALESCE($3, scheduled_at),
+         metadata = CASE WHEN $4 IS NOT NULL THEN jsonb_set(COALESCE(metadata, '{}'::jsonb), '{theme}', to_jsonb($4::text)) ELSE metadata END,
+         updated_at = NOW()
+     WHERE id = $5 AND status = 'scheduled'
+     RETURNING *`,
+    [title, message, scheduledAt, theme, id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Campagne introuvable ou déjà envoyée' });
+  }
+
+  await logAdminAction(req, 'update_campaign', 'campaign', id, { title });
+  res.json({ success: true, data: result.rows[0], message: 'Campagne mise à jour' });
+});
+
+const deleteCampaign = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await query('DELETE FROM public.notification_campaigns WHERE id = $1 AND status = \'scheduled\' RETURNING id');
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Campagne introuvable ou déjà envoyée' });
+  }
+
+  await logAdminAction(req, 'delete_campaign', 'campaign', id);
+  res.json({ success: true, message: 'Campagne supprimée' });
+});
+
 const getAuditLogs = asyncHandler(async (req, res) => {
   await ensureAdminTables();
   const result = await query(`
@@ -835,6 +871,8 @@ module.exports = {
   getAnalytics,
   getCampaigns,
   createCampaign,
+  updateCampaign,
+  deleteCampaign,
   getAuditLogs,
   broadcastMessage,
   getAppConfig,

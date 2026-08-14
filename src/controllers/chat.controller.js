@@ -155,9 +155,11 @@ const getMessages = asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit;
 
   const result = await query(
-    `SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar, p.is_verified as sender_is_verified
+    `SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar, p.is_verified as sender_is_verified,
+            med.file_name, med.file_size, med.mime_type, med.metadata as media_metadata
      FROM public.messages m
      JOIN public.profiles p ON m.sender_id = p.id
+     LEFT JOIN public.media med ON m.id = med.message_id
      WHERE m.chat_id = $1
        AND (m.deleted_for_users IS NULL OR NOT ($2 = ANY(m.deleted_for_users)))
      ORDER BY m.created_at DESC
@@ -178,7 +180,7 @@ const getMessages = asyncHandler(async (req, res) => {
  */
 const sendMessage = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const { chat: chatId, content, type = 'text', fileUrl } = req.body;
+  const { chat: chatId, content, type = 'text', file_url: fileUrl, fileSize, mimeType } = req.body;
 
   if (!chatId || !content) {
     return res.status(400).json({
@@ -195,6 +197,19 @@ const sendMessage = asyncHandler(async (req, res) => {
   );
 
   const message = result.rows[0];
+
+  // Si c'est un message avec un fichier, on l'ajoute à la table media
+  if (fileUrl && type !== 'text') {
+    try {
+      await query(
+        `INSERT INTO public.media (user_id, message_id, file_url, file_name, file_size, mime_type, type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [userId, message.id, fileUrl, content, fileSize, mimeType, type]
+      );
+    } catch (mediaErr) {
+      logger.error('Erreur insertion table media:', mediaErr);
+    }
+  }
 
   // Envoyer une notification push aux autres participants
   const participantsResult = await query(

@@ -262,6 +262,20 @@ CREATE TABLE IF NOT EXISTS public.verification_requests (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Table pour les médias (Images, Audio, Documents)
+CREATE TABLE IF NOT EXISTS public.media (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  message_id UUID REFERENCES public.messages(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  file_name TEXT,
+  file_size INTEGER,
+  mime_type TEXT,
+  type TEXT CHECK (type IN ('image', 'audio', 'video', 'file')),
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 8. CORRECTIF CRITIQUE POUR SUPPRESSION DE COMPTE (Migrations des contraintes existantes)
 DO $$
 BEGIN

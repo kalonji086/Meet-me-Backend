@@ -70,6 +70,9 @@ class StorageService {
       return {
         success: true,
         fileUrl: publicUrl,
+        fileName: file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype,
         storageType: 'supabase',
       };
     } catch (error) {

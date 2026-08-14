@@ -1972,7 +1972,8 @@
 
         let editingCampaignId = null;
         function openEditCampaignModal(id) {
-            const c = allCampaignsData.find(item => item.id === id);
+            // Chercher dans les deux listes (Campagnes et Diffusions)
+            const c = allCampaignsData.find(item => item.id === id) || allBroadcastsData.find(item => item.id === id);
             if (!c) return;
 
             editingCampaignId = id;
@@ -2007,9 +2008,10 @@
             try {
                 btn.disabled = true; btn.innerText = 'SAUVEGARDE...';
                 await axios.put(`${API_URL}/admin/campaigns/${editingCampaignId}`, data, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Campagne mise à jour !");
+                alert("Mise à jour réussie !");
                 closeCampaignEditModal();
                 loadCampaigns();
+                loadBroadcasts();
             } catch (e) { alert("Erreur lors de la mise à jour."); }
             finally { btn.disabled = false; btn.innerText = 'ENREGISTRER'; }
         }
@@ -2020,6 +2022,7 @@
                 await axios.delete(`${API_URL}/admin/campaigns/${id}`, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Programmation supprimée.");
                 loadCampaigns();
+                loadBroadcasts();
             } catch (e) { alert("Erreur lors de la suppression."); }
         }
 

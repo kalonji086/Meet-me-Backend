@@ -178,7 +178,7 @@ const ensureAdminTables = async () => {
   if (existingLegalDocs.rows.length === 0) {
     // Initialiser avec des documents légaux par défaut pour la version 5.0.0
     await query(`INSERT INTO public.app_legal_docs (type, content, version, force_acceptance) VALUES 
-      ('tos', 'Conditions Générales d\'Utilisation - Version 5.0.0', '5.0.0', true),
+      ('tos', 'Conditions Générales d''Utilisation - Version 5.0.0', '5.0.0', true),
       ('privacy', 'Politique de Confidentialité - Version 5.0.0', '5.0.0', true)`);
   }
 

@@ -95,7 +95,7 @@ class MailService {
         <li>Changer les couleurs de l'application selon vos goûts</li>
       </ul>
       <div style="text-align: center;">
-        <a href="#" class="btn">DÉCOUVRIR L'APPLICATION</a>
+        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">DÉCOUVRIR L'APPLICATION</a>
       </div>
       <p style="margin-top: 30px;">Si vous avez des questions, n'hésitez pas à répondre à cet email ou à nous contacter sur WhatsApp.</p>
       <p>L'équipe Meet Me</p>
@@ -126,6 +126,9 @@ class MailService {
       <div class="otp-box">${otp}</div>
       <p>Ce code est <strong>valable pendant 15 minutes</strong>.</p>
       <p>Si vous n'avez pas demandé ce code, vous pouvez ignorer cet email en toute sécurité. Votre compte reste protégé.</p>
+      <div style="text-align: center;">
+        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">OUVRIR L'APPLICATION</a>
+      </div>
       <p>À bientôt,<br>L'équipe de sécurité Meet Me</p>
     `;
 
@@ -147,9 +150,16 @@ class MailService {
    * Envoyer un email de diffusion (Broadcast)
    */
   async sendSystemEmail(email, title, body) {
+    const content = `
+      <p>${body.replace(/\n/g, '<br>')}</p>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">DÉCOUVRIR L'APPLICATION</a>
+      </div>
+    `;
+
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = title;
-    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, `<p>${body.replace(/\n/g, '<br>')}</p>`, title);
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, title);
     sendSmtpEmail.sender = { name: "Meet Me Official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email }];
 

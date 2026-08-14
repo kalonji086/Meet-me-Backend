@@ -262,6 +262,22 @@ CREATE TABLE IF NOT EXISTS public.verification_requests (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Table pour les campagnes et diffusions
+CREATE TABLE IF NOT EXISTS public.notification_campaigns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  target TEXT NOT NULL DEFAULT 'all' CHECK (target IN ('all', 'specific')),
+  target_value TEXT,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  sent_count INTEGER DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'processing', 'sent', 'failed')),
+  scheduled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Table pour les médias (Images, Audio, Documents)
 CREATE TABLE IF NOT EXISTS public.media (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -275,6 +291,26 @@ CREATE TABLE IF NOT EXISTS public.media (
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migration pour les campagnes (scheduled_at, metadata)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='notification_campaigns') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notification_campaigns' AND column_name='scheduled_at') THEN
+      ALTER TABLE public.notification_campaigns ADD COLUMN scheduled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notification_campaigns' AND column_name='metadata') THEN
+      ALTER TABLE public.notification_campaigns ADD COLUMN metadata JSONB DEFAULT '{}'::jsonb;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notification_campaigns' AND column_name='updated_at') THEN
+      ALTER TABLE public.notification_campaigns ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+
+    -- Fix status constraint
+    ALTER TABLE public.notification_campaigns DROP CONSTRAINT IF EXISTS notification_campaigns_status_check;
+    ALTER TABLE public.notification_campaigns ADD CONSTRAINT notification_campaigns_status_check CHECK (status IN ('scheduled', 'processing', 'sent', 'failed'));
+  END IF;
+END $$;
 
 -- 8. CORRECTIF CRITIQUE POUR SUPPRESSION DE COMPTE (Migrations des contraintes existantes)
 DO $$

@@ -242,10 +242,20 @@ const ensureAdminTables = async () => {
       target_value TEXT,
       created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
       sent_count INTEGER DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'sent', 'failed')),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'processing', 'sent', 'failed')),
+      scheduled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `);
+
+  // Migration pour ajouter scheduled_at si la table existe déjà
+  try {
+    await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
+    await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
+    await query('ALTER TABLE public.notification_campaigns DROP CONSTRAINT IF EXISTS notification_campaigns_status_check');
+    await query('ALTER TABLE public.notification_campaigns ADD CONSTRAINT notification_campaigns_status_check CHECK (status IN (\'scheduled\', \'processing\', \'sent\', \'failed\'))');
+  } catch (e) { /* S'il y a une erreur c'est que c'est déjà à jour */ }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
@@ -470,47 +480,50 @@ const getCampaigns = asyncHandler(async (req, res) => {
 });
 
 const createCampaign = asyncHandler(async (req, res) => {
-  const { title, message, target = 'all', targetValue } = req.body;
+  const { title, message, target = 'all', targetValue, scheduledAt } = req.body;
   if (!title || !message) {
     return res.status(400).json({ success: false, error: 'Titre et message requis' });
   }
 
   await ensureAdminTables();
+
+  // Si scheduledAt est fourni et est dans le futur, on enregistre seulement
+  const now = new Date();
+  const scheduledDate = scheduledAt ? new Date(scheduledAt) : now;
+  const isFuture = scheduledDate > now;
+
   const campaign = await query(
-    `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, sent_count)
-     VALUES ($1, $2, $3, $4, $5, 'sent', 0) RETURNING *`,
-    [title, message, target || 'all', targetValue || null, req.user?.id || null]
+    `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 0) RETURNING *`,
+    [title, message, target || 'all', targetValue || null, req.user?.id || null, isFuture ? 'scheduled' : 'sent', scheduledDate]
   );
 
-  if (target === 'all') {
-    const users = await query('SELECT id, email FROM public.profiles WHERE is_global_admin = FALSE');
-    for (const user of users.rows) {
-      socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
-      await mailService.sendSystemEmail(user.email, title, message);
-    }
-    await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
-  } else if (targetValue) {
-    // Supporter plusieurs emails séparés par des virgules
-    const emails = targetValue.split(',').map(e => e.trim()).filter(e => e);
-    let sentCount = 0;
-
-    for (const email of emails) {
-      // On essaie d'envoyer par socket si l'utilisateur existe
-      const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
-      if (userRes.rows.length > 0) {
-        socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
+  // Si l'envoi est immédiat
+  if (!isFuture) {
+    if (target === 'all') {
+      const users = await query('SELECT id, email FROM public.profiles WHERE is_global_admin = FALSE');
+      for (const user of users.rows) {
+        socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
+        await mailService.sendSystemEmail(user.email, title, message);
       }
-
-      // On envoie toujours par email
-      const success = await mailService.sendSystemEmail(email, title, message);
-      if (success) sentCount++;
+      await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
+    } else if (targetValue) {
+      const emails = targetValue.split(',').map(e => e.trim()).filter(e => e);
+      let sentCount = 0;
+      for (const email of emails) {
+        const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
+        if (userRes.rows.length > 0) {
+          socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
+        }
+        const success = await mailService.sendSystemEmail(email, title, message);
+        if (success) sentCount++;
+      }
+      await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sentCount, campaign.rows[0].id]);
     }
-
-    await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sentCount, campaign.rows[0].id]);
   }
 
-  await logAdminAction(req, 'create_campaign', 'campaign', campaign.rows[0].id, { title, target });
-  res.json({ success: true, data: campaign.rows[0], message: 'Campagne envoyée.' });
+  await logAdminAction(req, 'create_campaign', 'campaign', campaign.rows[0].id, { title, target, scheduledAt: isFuture ? scheduledAt : 'immediate' });
+  res.json({ success: true, data: campaign.rows[0], message: isFuture ? 'Campagne programmée.' : 'Campagne envoyée.' });
 });
 
 const getAuditLogs = asyncHandler(async (req, res) => {

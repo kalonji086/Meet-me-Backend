@@ -28,6 +28,7 @@ const userController = require('./controllers/user.controller');
 const appealController = require('./controllers/appeal.controller');
 
 const socketService = require('./services/socket.service');
+const automationService = require('./services/automation.service');
 const { runMigrations } = require('./utils/migration');
 
 class Server {
@@ -49,6 +50,7 @@ class Server {
     this.initializeRoutes();
     this.initializeSocketIO();
     this.initializeErrorHandling();
+    this.initializeAutomation();
   }
 
   async initializeDatabase() {
@@ -69,6 +71,10 @@ class Server {
       logger.error('❌ DB Error:', error.message);
       setTimeout(() => process.exit(1), 1000);
     }
+  }
+
+  initializeAutomation() {
+    automationService.initialize();
   }
 
   initializeMiddlewares() {

@@ -488,15 +488,23 @@ const createCampaign = asyncHandler(async (req, res) => {
     }
     await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
   } else if (targetValue) {
-    // On essaie d'envoyer par socket si l'utilisateur existe
-    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [targetValue]);
-    if (userRes.rows.length > 0) {
-      socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
+    // Supporter plusieurs emails séparés par des virgules
+    const emails = targetValue.split(',').map(e => e.trim()).filter(e => e);
+    let sentCount = 0;
+
+    for (const email of emails) {
+      // On essaie d'envoyer par socket si l'utilisateur existe
+      const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
+      if (userRes.rows.length > 0) {
+        socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
+      }
+
+      // On envoie toujours par email
+      const success = await mailService.sendSystemEmail(email, title, message);
+      if (success) sentCount++;
     }
 
-    // On envoie toujours par email, même s'il n'est pas dans la DB
-    await mailService.sendSystemEmail(targetValue, title, message);
-    await query('UPDATE public.notification_campaigns SET sent_count = 1 WHERE id = $1', [campaign.rows[0].id]);
+    await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sentCount, campaign.rows[0].id]);
   }
 
   await logAdminAction(req, 'create_campaign', 'campaign', campaign.rows[0].id, { title, target });
@@ -527,17 +535,27 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     }
     await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'all', count: users.rows.length });
     res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
-  } else {
-    // On essaie d'envoyer par socket si l'utilisateur existe
-    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [specificEmail]);
-    if (userRes.rows.length > 0) {
-      socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
+  } else if (specificEmail) {
+    // Supporter plusieurs emails séparés par des virgules
+    const emails = specificEmail.split(',').map(e => e.trim()).filter(e => e);
+    let sentCount = 0;
+
+    for (const email of emails) {
+      // On essaie d'envoyer par socket si l'utilisateur existe
+      const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
+      if (userRes.rows.length > 0) {
+        socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
+      }
+
+      // On envoie toujours par email, même s'il n'est pas inscrit
+      const success = await mailService.sendSystemEmail(email, title, content);
+      if (success) sentCount++;
     }
 
-    // On envoie toujours par email, même s'il n'est pas inscrit
-    await mailService.sendSystemEmail(specificEmail, title, content);
-    await logAdminAction(req, 'broadcast_message', 'system', userRes.rows[0]?.id || null, { title, target: 'specific', email: specificEmail });
-    res.json({ success: true, message: 'Message envoyé.' });
+    await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'specific', count: sentCount, emails: specificEmail });
+    res.json({ success: true, message: `Message envoyé à ${sentCount} destinataires.` });
+  } else {
+    res.status(400).json({ success: false, error: 'Email spécifique requis pour cette cible.' });
   }
 });
 

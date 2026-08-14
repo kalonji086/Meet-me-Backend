@@ -536,11 +536,11 @@ const updateCampaign = asyncHandler(async (req, res) => {
      SET title = COALESCE($1, title),
          message = COALESCE($2, message),
          scheduled_at = COALESCE($3, scheduled_at),
-         metadata = CASE WHEN $4 IS NOT NULL THEN jsonb_set(COALESCE(metadata, '{}'::jsonb), '{theme}', to_jsonb($4::text)) ELSE metadata END,
+         metadata = CASE WHEN $4::text IS NOT NULL THEN jsonb_set(COALESCE(metadata, '{}'::jsonb), '{theme}', to_jsonb($4::text)) ELSE metadata END,
          updated_at = NOW()
      WHERE id = $5 AND status = 'scheduled'
      RETURNING *`,
-    [title, message, scheduledAt, theme, id]
+    [title, message, scheduledAt, theme || null, id]
   );
 
   if (result.rows.length === 0) {
@@ -896,5 +896,6 @@ module.exports = {
   updateLegalDoc,
   deleteLegalDoc,
   getVerificationRequests,
-  handleVerification
+  handleVerification,
+  ensureAdminTables
 };

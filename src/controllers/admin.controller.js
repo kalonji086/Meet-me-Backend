@@ -736,7 +736,7 @@ const updateLegalDoc = asyncHandler(async (req, res) => {
   socketService.broadcast('legal_update', {
     type,
     version,
-    force_acceptance,
+    force_acceptance: String(force_acceptance) === 'true',
     content
   });
 

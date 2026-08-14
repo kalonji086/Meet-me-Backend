@@ -196,6 +196,8 @@ const ensureAdminTables = async () => {
 
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_legal_version TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_tos_version TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_privacy_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS app_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_update_at TIMESTAMP WITH TIME ZONE');
 

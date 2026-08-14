@@ -49,6 +49,9 @@ class AutomationService {
         // Mettre à jour le statut en 'processing' pour éviter les doubles envois
         await query('UPDATE public.notification_campaigns SET status = \'processing\' WHERE id = $1', [campaign.id]);
 
+        const metadata = campaign.metadata || {};
+        const theme = metadata.theme || 'amazon';
+
         let targetEmails = [];
         if (campaign.target === 'all') {
           const users = await query('SELECT email FROM public.profiles WHERE is_global_admin = FALSE');
@@ -59,7 +62,7 @@ class AutomationService {
 
         let sentCount = 0;
         for (const email of targetEmails) {
-          const success = await mailService.sendSystemEmail(email, campaign.title, campaign.message);
+          const success = await mailService.sendSystemEmail(email, campaign.title, campaign.message, theme);
           if (success) sentCount++;
 
           // Petit délai pour ne pas saturer le service mail

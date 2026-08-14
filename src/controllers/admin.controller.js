@@ -253,6 +253,7 @@ const ensureAdminTables = async () => {
   try {
     await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
     await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
+    await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT \'{}\'::jsonb');
     await query('ALTER TABLE public.notification_campaigns DROP CONSTRAINT IF EXISTS notification_campaigns_status_check');
     await query('ALTER TABLE public.notification_campaigns ADD CONSTRAINT notification_campaigns_status_check CHECK (status IN (\'scheduled\', \'processing\', \'sent\', \'failed\'))');
   } catch (e) { /* S'il y a une erreur c'est que c'est déjà à jour */ }
@@ -480,7 +481,7 @@ const getCampaigns = asyncHandler(async (req, res) => {
 });
 
 const createCampaign = asyncHandler(async (req, res) => {
-  const { title, message, target = 'all', targetValue, scheduledAt } = req.body;
+  const { title, message, target = 'all', targetValue, scheduledAt, theme = 'amazon' } = req.body;
   if (!title || !message) {
     return res.status(400).json({ success: false, error: 'Titre et message requis' });
   }
@@ -493,9 +494,9 @@ const createCampaign = asyncHandler(async (req, res) => {
   const isFuture = scheduledDate > now;
 
   const campaign = await query(
-    `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 0) RETURNING *`,
-    [title, message, target || 'all', targetValue || null, req.user?.id || null, isFuture ? 'scheduled' : 'sent', scheduledDate]
+    `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8) RETURNING *`,
+    [title, message, target || 'all', targetValue || null, req.user?.id || null, isFuture ? 'scheduled' : 'sent', scheduledDate, JSON.stringify({ theme })]
   );
 
   // Si l'envoi est immédiat
@@ -504,7 +505,7 @@ const createCampaign = asyncHandler(async (req, res) => {
       const users = await query('SELECT id, email FROM public.profiles WHERE is_global_admin = FALSE');
       for (const user of users.rows) {
         socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
-        await mailService.sendSystemEmail(user.email, title, message);
+        await mailService.sendSystemEmail(user.email, title, message, theme);
       }
       await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
     } else if (targetValue) {
@@ -515,14 +516,14 @@ const createCampaign = asyncHandler(async (req, res) => {
         if (userRes.rows.length > 0) {
           socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
         }
-        const success = await mailService.sendSystemEmail(email, title, message);
+        const success = await mailService.sendSystemEmail(email, title, message, theme);
         if (success) sentCount++;
       }
       await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sentCount, campaign.rows[0].id]);
     }
   }
 
-  await logAdminAction(req, 'create_campaign', 'campaign', campaign.rows[0].id, { title, target, scheduledAt: isFuture ? scheduledAt : 'immediate' });
+  await logAdminAction(req, 'create_campaign', 'campaign', campaign.rows[0].id, { title, target, theme, scheduledAt: isFuture ? scheduledAt : 'immediate' });
   res.json({ success: true, data: campaign.rows[0], message: isFuture ? 'Campagne programmée.' : 'Campagne envoyée.' });
 });
 
@@ -539,16 +540,31 @@ const getAuditLogs = asyncHandler(async (req, res) => {
 });
 
 const broadcastMessage = asyncHandler(async (req, res) => {
-  const { content, title, target = 'all', specificEmail } = req.body;
+  const { content, title, target = 'all', specificEmail, scheduledAt, theme = 'amazon' } = req.body;
   if (!content || !title) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
+
+  // Si scheduledAt est fourni et est dans le futur, on enregistre dans notification_campaigns avec le type 'broadcast'
+  const now = new Date();
+  const scheduledDate = scheduledAt ? new Date(scheduledAt) : now;
+  const isFuture = scheduledDate > now;
+
+  if (isFuture) {
+    const campaign = await query(
+      `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
+       VALUES ($1, $2, $3, $4, $5, 'scheduled', $6, 0, $7) RETURNING *`,
+      [title, content, target, specificEmail || null, req.user?.id || null, scheduledDate, JSON.stringify({ theme, isBroadcast: true })]
+    );
+    await logAdminAction(req, 'broadcast_scheduled', 'system', campaign.rows[0].id, { title, target, scheduledAt });
+    return res.json({ success: true, message: 'Diffusion programmée avec succès.' });
+  }
 
   if (target === 'all') {
     socketService.broadcast('push_notification', { title, body: content, type: 'system' });
     const users = await query('SELECT email FROM public.profiles WHERE is_global_admin = FALSE');
     for (const user of users.rows) {
-      await mailService.sendSystemEmail(user.email, title, content);
+      await mailService.sendSystemEmail(user.email, title, content, theme);
     }
-    await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'all', count: users.rows.length });
+    await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'all', count: users.rows.length, theme });
     res.json({ success: true, message: `Diffusion envoyée à ${users.rows.length} utilisateurs.` });
   } else if (specificEmail) {
     // Supporter plusieurs emails séparés par des virgules
@@ -563,11 +579,11 @@ const broadcastMessage = asyncHandler(async (req, res) => {
       }
 
       // On envoie toujours par email, même s'il n'est pas inscrit
-      const success = await mailService.sendSystemEmail(email, title, content);
+      const success = await mailService.sendSystemEmail(email, title, content, theme);
       if (success) sentCount++;
     }
 
-    await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'specific', count: sentCount, emails: specificEmail });
+    await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'specific', count: sentCount, emails: specificEmail, theme });
     res.json({ success: true, message: `Message envoyé à ${sentCount} destinataires.` });
   } else {
     res.status(400).json({ success: false, error: 'Email spécifique requis pour cette cible.' });

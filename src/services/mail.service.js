@@ -13,31 +13,56 @@ const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
  */
 class MailService {
   /**
-   * Template de base style Amazon
+   * Template de base avec thèmes
    */
-  _getBaseTemplate(title, content, preheader = "") {
+  _getBaseTemplate(title, content, preheader = "", theme = "amazon") {
+    let primaryColor = "#673AB7";
+    let bgColor = "#f3f3f3";
+    let containerBg = "#ffffff";
+    let textColor = "#111111";
+    let footerBg = "#232f3e";
+    let buttonColor = "#FF9900";
+    let buttonText = "#111111";
+
+    if (theme === "modern") {
+      primaryColor = "#008069"; // Style WhatsApp
+      buttonColor = "#25D366";
+      buttonText = "#ffffff";
+    } else if (theme === "dark") {
+      bgColor = "#121212";
+      containerBg = "#1e1e1e";
+      textColor = "#eeeeee";
+      footerBg = "#000000";
+    } else if (theme === "minimal") {
+      bgColor = "#ffffff";
+      containerBg = "#ffffff";
+      footerBg = "#f8f9fa";
+      textColor = "#333333";
+      primaryColor = "#333333";
+    }
+
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: 'Amazon Ember', 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f3f3f3; color: #111; }
-          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #ddd; }
-          .header { padding: 20px; text-align: center; border-bottom: 1px solid #f3f3f3; }
-          .logo { color: #673AB7; font-size: 28px; font-weight: bold; text-decoration: none; }
-          .content { padding: 40px 30px; line-height: 1.6; min-height: 200px; }
-          .title { font-size: 24px; font-weight: 500; margin-bottom: 20px; color: #111; }
-          .footer { background-color: #232f3e; color: #ffffff; padding: 50px 20px; text-align: center; font-size: 13px; clear: both; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: ${bgColor}; color: ${textColor}; }
+          .container { max-width: 600px; margin: 20px auto; background-color: ${containerBg}; border-radius: 12px; border: 1px solid #ddd; overflow: hidden; }
+          .header { padding: 30px; text-align: center; border-bottom: 1px solid #f3f3f3; }
+          .logo { color: ${primaryColor}; font-size: 32px; font-weight: bold; text-decoration: none; letter-spacing: -1px; }
+          .content { padding: 40px 35px; line-height: 1.7; min-height: 200px; font-size: 16px; }
+          .title { font-size: 26px; font-weight: 700; margin-bottom: 25px; color: ${textColor}; }
+          .footer { background-color: ${footerBg}; color: #ffffff; padding: 50px 20px; text-align: center; font-size: 13px; clear: both; }
           .social-icons { margin-bottom: 25px; }
-          .social-icons a { display: inline-block; margin: 0 10px; text-decoration: none; }
-          .social-icons img { width: 24px; height: 24px; filter: brightness(0) invert(1); }
-          .footer-links { margin-bottom: 20px; }
-          .footer-links a { color: #ffffff; text-decoration: none; margin: 0 10px; border-bottom: 1px solid transparent; }
-          .footer-links a:hover { border-bottom: 1px solid #ffffff; }
-          .address { color: #cccccc; font-size: 11px; margin-top: 20px; line-height: 1.5; }
-          .btn { background-color: #FF9900; color: #111 !important; padding: 12px 30px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 20px; }
-          .otp-box { background-color: #f7f7f7; border: 1px dashed #ddd; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; color: #673AB7; letter-spacing: 10px; margin: 25px 0; }
+          .social-icons a { display: inline-block; margin: 0 12px; text-decoration: none; }
+          .social-icons img { width: 22px; height: 22px; filter: brightness(0) invert(1); }
+          .footer-links { margin-bottom: 25px; }
+          .footer-links a { color: #ffffff; text-decoration: none; margin: 0 12px; border-bottom: 1px solid transparent; opacity: 0.8; }
+          .footer-links a:hover { border-bottom: 1px solid #ffffff; opacity: 1; }
+          .address { color: #aaaaaa; font-size: 11px; margin-top: 25px; line-height: 1.6; }
+          .btn { background-color: ${buttonColor}; color: ${buttonText} !important; padding: 14px 35px; border-radius: 30px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          .otp-box { background-color: #f7f7f7; border: 2px dashed ${primaryColor}; padding: 25px; text-align: center; font-size: 36px; font-weight: bold; color: ${primaryColor}; letter-spacing: 12px; margin: 30px 0; border-radius: 10px; }
         </style>
       </head>
       <body>
@@ -52,26 +77,20 @@ class MailService {
           </div>
           <div class="footer">
             <div class="social-icons">
-              <a href="https://www.facebook.com/people/TOGETHE-Tech/61589824992529/" target="_blank">
-                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook">
-              </a>
-              <a href="https://www.linkedin.com/company/together-tech-solutions" target="_blank">
-                <img src="https://cdn-icons-png.flaticon.com/512/3536/3536505.png" alt="LinkedIn">
+              <a href="https://wa.me/243975186643" target="_blank">
+                <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" alt="WhatsApp">
               </a>
               <a href="https://github.com/kalonji086/Docteur-parle-moi" target="_blank">
                 <img src="https://cdn-icons-png.flaticon.com/512/733/733553.png" alt="GitHub">
               </a>
-              <a href="https://wa.me/243975186643" target="_blank">
-                <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" alt="WhatsApp">
-              </a>
             </div>
             <div class="footer-links">
-              <a href="https://meet-me-backend-sg5c.onrender.com/privacy">Politique de confidentialité</a>
-              <a href="https://meet-me-backend-sg5c.onrender.com/support/helpdesk">Aide & Support</a>
+              <a href="https://meet-me-backend-sg5c.onrender.com/privacy">Confidentialité</a>
+              <a href="https://meet-me-backend-sg5c.onrender.com/support/helpdesk">Support</a>
             </div>
             <div class="address">
-              © 2026 Meet Me Team. Tous droits réservés.<br>
-              TOGETHE Tech Solutions, 123 Avenue de l'Innovation, Kinshasa, RDC.
+              © 2026 Meet Me Team. TOGETHE Tech Solutions.<br>
+              Kinshasa, République Démocratique du Congo.
             </div>
           </div>
         </div>
@@ -149,7 +168,7 @@ class MailService {
   /**
    * Envoyer un email de diffusion (Broadcast)
    */
-  async sendSystemEmail(email, title, body) {
+  async sendSystemEmail(email, title, body, theme = "amazon") {
     const content = `
       <p>${body.replace(/\n/g, '<br>')}</p>
       <div style="text-align: center; margin-top: 30px;">
@@ -159,7 +178,7 @@ class MailService {
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = title;
-    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, title);
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, title, theme);
     sendSmtpEmail.sender = { name: "Meet Me Official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email }];
 

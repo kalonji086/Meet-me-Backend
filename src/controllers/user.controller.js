@@ -167,7 +167,7 @@ const searchUsers = asyncHandler(async (req, res) => {
 
   // Si pas de recherche, on retourne tous les contacts de l'utilisateur (Style WhatsApp)
   if (!searchQuery || searchQuery.trim() === '') {
-    const result = await query(
+    const contactsRes = await query(
       `SELECT p.id, p.full_name, p.avatar_url, p.status, p.username
        FROM public.profiles p
        JOIN public.contacts c ON (c.contact_id = p.id AND c.user_id = $1)
@@ -175,7 +175,20 @@ const searchUsers = asyncHandler(async (req, res) => {
        ORDER BY p.full_name ASC`,
       [userId]
     );
-    return res.json({ success: true, data: result.rows });
+
+    // Si l'utilisateur n'a aucun contact, on lui suggère les autres utilisateurs (pour l'aider à démarrer)
+    if (contactsRes.rows.length === 0) {
+      const allUsersRes = await query(
+        `SELECT id, full_name, avatar_url, status, username
+         FROM public.profiles
+         WHERE id != $1 AND is_locked = FALSE
+         ORDER BY full_name ASC LIMIT 50`,
+        [userId]
+      );
+      return res.json({ success: true, data: allUsersRes.rows });
+    }
+
+    return res.json({ success: true, data: contactsRes.rows });
   }
 
   const searchTerm = `%${searchQuery.toLowerCase()}%`;

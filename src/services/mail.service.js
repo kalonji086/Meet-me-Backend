@@ -23,20 +23,20 @@ class MailService {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           body { font-family: 'Amazon Ember', 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f3f3f3; color: #111; }
-          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #ddd; }
           .header { padding: 20px; text-align: center; border-bottom: 1px solid #f3f3f3; }
           .logo { color: #673AB7; font-size: 28px; font-weight: bold; text-decoration: none; }
-          .content { padding: 40px 30px; line-height: 1.6; }
+          .content { padding: 40px 30px; line-height: 1.6; min-height: 200px; }
           .title { font-size: 24px; font-weight: 500; margin-bottom: 20px; color: #111; }
-          .footer { background-color: #232f3e; color: #ffffff; padding: 40px 20px; text-align: center; font-size: 13px; }
+          .footer { background-color: #232f3e; color: #ffffff; padding: 50px 20px; text-align: center; font-size: 13px; clear: both; }
           .social-icons { margin-bottom: 25px; }
           .social-icons a { display: inline-block; margin: 0 10px; text-decoration: none; }
           .social-icons img { width: 24px; height: 24px; filter: brightness(0) invert(1); }
           .footer-links { margin-bottom: 20px; }
           .footer-links a { color: #ffffff; text-decoration: none; margin: 0 10px; border-bottom: 1px solid transparent; }
           .footer-links a:hover { border-bottom: 1px solid #ffffff; }
-          .address { color: #999; font-size: 11px; margin-top: 20px; }
-          .btn { background-color: #FF9900; color: #111; padding: 12px 30px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 20px; }
+          .address { color: #cccccc; font-size: 11px; margin-top: 20px; line-height: 1.5; }
+          .btn { background-color: #FF9900; color: #111 !important; padding: 12px 30px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 20px; }
           .otp-box { background-color: #f7f7f7; border: 1px dashed #ddd; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; color: #673AB7; letter-spacing: 10px; margin: 25px 0; }
         </style>
       </head>

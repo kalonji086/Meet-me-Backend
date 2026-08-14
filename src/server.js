@@ -113,7 +113,9 @@ class Server {
     this.app.get('/favicon.ico', (req, res) => res.status(204).end());
 
     // Route publique pour vérification de mise à jour App Mobile
-    this.app.get('/api/check-update', adminRoutes.checkUpdate || require('./controllers/admin.controller').checkUpdate);
+    const adminController = require('./controllers/admin.controller');
+    this.app.get('/api/check-update', adminController.checkUpdate);
+    this.app.get('/api/legal', adminController.getLegalDocs);
 
     // Global /api/me to avoid 404
     this.app.get('/api/me', authenticate, userController.getMe);

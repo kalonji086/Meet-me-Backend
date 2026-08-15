@@ -55,6 +55,7 @@ class AutomationService {
 
         const metadata = campaign.metadata || {};
         const theme = metadata.theme || 'amazon';
+        const cta = metadata.ctaText ? { text: metadata.ctaText, url: metadata.ctaUrl } : null;
 
         let targetUsers = [];
         if (campaign.target === 'all') {
@@ -74,7 +75,7 @@ class AutomationService {
 
         let sentCount = 0;
         for (const user of targetUsers) {
-          const success = await mailService.sendSystemEmail(user.email, campaign.title, campaign.message, theme, user.full_name || 'Utilisateur');
+          const success = await mailService.sendSystemEmail(user.email, campaign.title, campaign.message, theme, user.full_name || 'Utilisateur', cta);
           if (success) sentCount++;
 
           // Petit délai pour ne pas saturer le service mail

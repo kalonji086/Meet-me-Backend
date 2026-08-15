@@ -169,20 +169,35 @@ class MailService {
   /**
    * Envoyer un email de diffusion (Broadcast)
    */
-  async sendSystemEmail(email, title, body, theme = "amazon", name = "Utilisateur") {
+  async sendSystemEmail(email, title, body, theme = "amazon", name = "Utilisateur", cta = null) {
     // Personnalisation du corps du message
     let personalizedBody = body;
     personalizedBody = personalizedBody.replace(/\{\{name\}\}/g, name);
     personalizedBody = personalizedBody.replace(/\{\{full_name\}\}/g, name);
     personalizedBody = personalizedBody.replace(/\{\{email\}\}/g, email);
 
+    // Gestion du bouton d'action (CTA)
+    let ctaHtml = '';
+    if (cta && cta.text && cta.url) {
+      ctaHtml = `
+        <div style="text-align: center; margin-top: 30px;">
+          <a href="${cta.url}" class="btn">${cta.text.toUpperCase()}</a>
+        </div>
+      `;
+    } else {
+      // Bouton par défaut si rien n'est spécifié
+      ctaHtml = `
+        <div style="text-align: center; margin-top: 30px;">
+          <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">DÉCOUVRIR L'APPLICATION</a>
+        </div>
+      `;
+    }
+
     const content = `
       <div class="rich-text-content">
         ${personalizedBody}
       </div>
-      <div style="text-align: center; margin-top: 30px;">
-        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">DÉCOUVRIR L'APPLICATION</a>
-      </div>
+      ${ctaHtml}
     `;
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();

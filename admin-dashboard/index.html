@@ -407,6 +407,10 @@
                             <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Date d'envoi (Optionnel)</label><input id="campaign-scheduled-at" type="datetime-local" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
                             <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Thème de l'email</label><select id="campaign-theme" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"><option value="amazon">Amazon (Classique)</option><option value="modern">Modern (Vert WhatsApp)</option><option value="dark">Dark Mode (Élégant)</option><option value="minimal">Minimaliste</option></select></div>
                         </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Bouton Action (Texte)</label><input id="campaign-cta-text" type="text" placeholder="Découvrir, S'inscrire..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                            <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Lien du bouton (URL)</label><input id="campaign-cta-url" type="text" placeholder="https://..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                        </div>
                         <div id="campaign-specific-container" class="mt-6 hidden">
                             <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Email utilisateur</label>
                             <input id="campaign-target-email" type="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none">
@@ -414,7 +418,10 @@
                         <div class="mt-6">
                             <div class="flex items-center justify-between mb-2">
                                 <label class="text-xs font-bold text-gray-400 uppercase block tracking-widest">Message</label>
-                                <span class="text-[10px] bg-purple-50 text-purple-500 px-2 py-1 rounded-lg font-bold">Astuce: Utilisez {{name}} pour personnaliser</span>
+                                <div class="flex space-x-2">
+                                    <span class="text-[10px] bg-blue-50 text-blue-500 px-2 py-1 rounded-lg font-bold">Suppr. image: Clic + Suppr</span>
+                                    <span class="text-[10px] bg-purple-50 text-purple-500 px-2 py-1 rounded-lg font-bold">Astuce: Utilisez {{name}}</span>
+                                </div>
                             </div>
                             <div class="quill-editor-container">
                                 <div id="campaign-editor"></div>
@@ -510,11 +517,18 @@
                             </div>
                             <div id="specific-email-container" class="hidden"><label class="text-xs font-bold text-gray-400 uppercase mb-2 block">Email(s)</label><input type="email" id="bc-specific-email" placeholder="email1@test.com, email2@test.com" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
                             <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Date d'envoi (Optionnel)</label><input id="bc-scheduled-at" type="datetime-local" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Bouton Action</label><input id="bc-cta-text" type="text" placeholder="Découvrir..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                                <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Lien</label><input id="bc-cta-url" type="text" placeholder="https://..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                            </div>
                             <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Sujet</label><input type="text" id="bc-title" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
                             <div>
                                 <div class="flex items-center justify-between mb-2">
                                     <label class="text-xs font-bold text-gray-400 uppercase block tracking-widest">Message</label>
-                                    <span class="text-[10px] bg-orange-50 text-orange-500 px-2 py-1 rounded-lg font-bold">Astuce: Utilisez {{name}} pour personnaliser</span>
+                                    <div class="flex space-x-2">
+                                        <span class="text-[10px] bg-blue-50 text-blue-500 px-2 py-1 rounded-lg font-bold">Suppr. image: Clic + Suppr</span>
+                                        <span class="text-[10px] bg-orange-50 text-orange-500 px-2 py-1 rounded-lg font-bold">Astuce: Utilisez {{name}}</span>
+                                    </div>
                                 </div>
                                 <div class="quill-editor-container">
                                     <div id="bc-editor"></div>
@@ -649,6 +663,10 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Date d'envoi</label><input id="edit-campaign-scheduled-at" type="datetime-local" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
                     <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Thème</label><select id="edit-campaign-theme" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"><option value="amazon">Amazon</option><option value="modern">Modern</option><option value="dark">Dark</option><option value="minimal">Minimal</option></select></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Bouton</label><input id="edit-campaign-cta-text" type="text" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                    <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Lien (URL)</label><input id="edit-campaign-cta-url" type="text" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-2">
@@ -1887,13 +1905,15 @@
             const content = bcEditor.root.innerHTML;
             const scheduledAt = document.getElementById('bc-scheduled-at').value;
             const theme = document.getElementById('bc-theme').value;
+            const ctaText = document.getElementById('bc-cta-text').value;
+            const ctaUrl = document.getElementById('bc-cta-url').value;
             const btn = document.getElementById('bc-btn');
 
             if (!bcEditor.getText().trim() || !title) return alert("Remplissez tout.");
             try {
                 btn.disabled = true; btn.innerHTML = 'ENVOI EN COURS...';
                 await axios.post(`${API_URL}/admin/broadcast`, {
-                    title, content, target, specificEmail, scheduledAt, theme
+                    title, content, target, specificEmail, scheduledAt, theme, ctaText, ctaUrl
                 }, { headers: { Authorization: `Bearer ${token}` } });
 
                 alert(scheduledAt ? "Diffusion programmée !" : "Diffusion réussie !");
@@ -1901,6 +1921,8 @@
                 document.getElementById('bc-title').value = '';
                 bcEditor.setContents([]);
                 document.getElementById('bc-scheduled-at').value = '';
+                document.getElementById('bc-cta-text').value = '';
+                document.getElementById('bc-cta-url').value = '';
                 loadBroadcasts();
             } catch (e) { alert("Erreur."); } finally { btn.disabled = false; btn.innerHTML = 'DIFFUSER'; lucide.createIcons(); }
         }
@@ -1989,6 +2011,8 @@
             editingCampaignId = id;
             document.getElementById('edit-campaign-title').value = c.title;
             document.getElementById('edit-campaign-theme').value = c.metadata?.theme || 'amazon';
+            document.getElementById('edit-campaign-cta-text').value = c.metadata?.ctaText || '';
+            document.getElementById('edit-campaign-cta-url').value = c.metadata?.ctaUrl || '';
 
             // Format date for datetime-local input
             const date = new Date(c.scheduled_at);
@@ -2011,6 +2035,8 @@
             const data = {
                 title: document.getElementById('edit-campaign-title').value,
                 theme: document.getElementById('edit-campaign-theme').value,
+                ctaText: document.getElementById('edit-campaign-cta-text').value,
+                ctaUrl: document.getElementById('edit-campaign-cta-url').value,
                 scheduledAt: document.getElementById('edit-campaign-scheduled-at').value,
                 message: editCampaignEditor.root.innerHTML
             };
@@ -2043,13 +2069,15 @@
             const message = campaignEditor.root.innerHTML;
             const scheduledAt = document.getElementById('campaign-scheduled-at').value;
             const theme = document.getElementById('campaign-theme').value;
+            const ctaText = document.getElementById('campaign-cta-text').value;
+            const ctaUrl = document.getElementById('campaign-cta-url').value;
             const btn = document.querySelector('button[onclick="createCampaign()"]');
 
             if (!title || !campaignEditor.getText().trim()) return alert('Titre et message requis');
             try {
                 if (btn) { btn.disabled = true; btn.innerText = 'ENVOI...'; }
                 await axios.post(`${API_URL}/admin/campaigns`, {
-                    title, message, target, targetValue, scheduledAt, theme
+                    title, message, target, targetValue, scheduledAt, theme, ctaText, ctaUrl
                 }, { headers: { Authorization: `Bearer ${token}` } });
 
                 alert(scheduledAt ? 'Campagne programmée !' : 'Campagne envoyée !');
@@ -2057,6 +2085,8 @@
                 document.getElementById('campaign-title').value = '';
                 campaignEditor.setContents([]);
                 document.getElementById('campaign-scheduled-at').value = '';
+                document.getElementById('campaign-cta-text').value = '';
+                document.getElementById('campaign-cta-url').value = '';
                 loadCampaigns();
             } catch (e) {
                 console.error('Create campaign error:', e);

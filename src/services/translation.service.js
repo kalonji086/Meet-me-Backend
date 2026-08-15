@@ -1,5 +1,8 @@
 const axios = require('axios');
 const NodeCache = require('node-cache');
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
@@ -13,16 +16,16 @@ const translationCache = new NodeCache({
 class TranslationService {
   constructor() {
     this.provider = config.translation.provider;
-    this.apiKey = this.provider === 'google' 
-      ? config.translation.googleApiKey 
-      : config.translation.deeplApiKey;
+    this.googleApiKey = config.translation.googleApiKey;
+    this.deeplApiKey = config.translation.deeplApiKey;
+    this.openaiApiKey = config.translation.openaiApiKey;
     
     this.validateConfig();
   }
 
   validateConfig() {
-    if (!this.apiKey) {
-      logger.warn(`Clé API ${this.provider} non configurée. Le service de traduction fonctionnera en mode simulé.`);
+    if (!this.googleApiKey && !this.deeplApiKey && !this.openaiApiKey) {
+      logger.warn(`Aucune clé API de traduction configurée. Le service fonctionnera en mode simulé.`);
     }
   }
 
@@ -40,21 +43,18 @@ class TranslationService {
         return cachedTranslation;
       }
 
-      // Si aucune clé API n'est configurée, retourner le texte original
-      if (!this.apiKey) {
-        logger.debug('Mode traduction simulé (pas de clé API configurée)');
-        return this.getMockTranslation(text, targetLanguage);
-      }
-
       let translatedText;
 
-      // Utiliser le provider configuré
-      if (this.provider === 'google') {
+      // Utiliser l'IA (OpenAI) en priorité si configuré, sinon Google/DeepL
+      if (this.openaiApiKey) {
+        translatedText = await this.translateWithOpenAI(text, targetLanguage, sourceLanguage);
+      } else if (this.provider === 'google' && this.googleApiKey) {
         translatedText = await this.translateWithGoogle(text, targetLanguage, sourceLanguage);
-      } else if (this.provider === 'deepl') {
+      } else if (this.provider === 'deepl' && this.deeplApiKey) {
         translatedText = await this.translateWithDeepL(text, targetLanguage, sourceLanguage);
       } else {
-        throw new Error(`Provider de traduction non supporté: ${this.provider}`);
+        logger.debug('Mode traduction simulé (pas de clé API configurée)');
+        translatedText = this.getMockTranslation(text, targetLanguage);
       }
 
       // Mettre en cache la traduction
@@ -65,9 +65,75 @@ class TranslationService {
       return translatedText;
     } catch (error) {
       logger.error('Erreur lors de la traduction:', error);
-      
-      // En cas d'erreur, retourner une traduction simulée
       return this.getMockTranslation(text, targetLanguage);
+    }
+  }
+
+  /**
+   * Traduction avec OpenAI GPT (Mode IA)
+   */
+  async translateWithOpenAI(text, targetLanguage, sourceLanguage = 'auto') {
+    const url = 'https://api.openai.com/v1/chat/completions';
+
+    const prompt = `Translate the following text to ${targetLanguage}.
+    ${sourceLanguage !== 'auto' ? `Source language is ${sourceLanguage}.` : ''}
+    Only return the translated text without any explanations.
+    Text: "${text}"`;
+
+    const response = await axios.post(url, {
+      model: "gpt-4o-mini", // Utilisation d'un modèle rapide et économique
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3
+    }, {
+      headers: {
+        'Authorization': `Bearer ${this.openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    });
+
+    if (response.data && response.data.choices && response.data.choices[0]) {
+      return response.data.choices[0].message.content.trim();
+    }
+
+    throw new Error('Réponse invalide de OpenAI API');
+  }
+
+  /**
+   * Traduction et Transcription Audio avec OpenAI Whisper (Mode IA Vocal)
+   */
+  async transcribeAndTranslateAudio(filePath, targetLanguage) {
+    try {
+      if (!this.openaiApiKey) {
+        throw new Error('OpenAI API Key non configurée pour la transcription');
+      }
+
+      // 1. Transcription avec Whisper
+      const whisperUrl = 'https://api.openai.com/v1/audio/transcriptions';
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(filePath));
+      formData.append('model', 'whisper-1');
+
+      const transcriptionRes = await axios.post(whisperUrl, formData, {
+        headers: {
+          ...formData.getHeaders(),
+          'Authorization': `Bearer ${this.openaiApiKey}`,
+        },
+        timeout: 30000,
+      });
+
+      const originalText = transcriptionRes.data.text;
+
+      // 2. Traduction du texte transcrit
+      const translatedText = await this.translate(originalText, targetLanguage);
+
+      return {
+        originalText,
+        translatedText
+      };
+    } catch (error) {
+      logger.error('Erreur transcription/traduction audio:', error.response?.data || error.message);
+      throw error;
     }
   }
 
@@ -82,10 +148,10 @@ class TranslationService {
         q: text,
         target: targetLanguage,
         source: sourceLanguage,
-        key: this.apiKey,
+        key: this.googleApiKey,
         format: 'text',
       },
-      timeout: 10000, // 10 secondes timeout
+      timeout: 10000,
     });
 
     if (response.data && response.data.data && response.data.data.translations) {
@@ -111,10 +177,10 @@ class TranslationService {
 
     const response = await axios.post(url, params, {
       headers: {
-        'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
+        'Authorization': `DeepL-Auth-Key ${this.deeplApiKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      timeout: 10000, // 10 secondes timeout
+      timeout: 10000,
     });
 
     if (response.data && response.data.translations) {

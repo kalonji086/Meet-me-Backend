@@ -1,5 +1,8 @@
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
 const { asyncHandler } = require('../middleware/error.middleware');
 const notificationService = require('../services/notification.service');
 const translationService = require('../services/translation.service');
@@ -578,6 +581,81 @@ const translateMessage = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Traduire un message vocal (Transcription + Traduction IA)
+ * @route   POST /api/messages/:messageId/translate-voice
+ */
+const translateAudioMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const { targetLanguage } = req.body;
+
+  if (!targetLanguage) {
+    return res.status(400).json({ success: false, error: 'Langue cible requise' });
+  }
+
+  try {
+    // 1. Récupérer le message et son URL audio
+    const result = await query(
+      'SELECT m.*, media.file_url as audio_url FROM public.messages m LEFT JOIN public.media ON m.id = media.message_id WHERE m.id = $1',
+      [messageId]
+    );
+    const message = result.rows[0];
+
+    if (!message || message.type !== 'audio' || !message.audio_url) {
+      return res.status(404).json({ success: false, error: 'Audio non trouvé pour ce message' });
+    }
+
+    // 2. Télécharger le fichier temporairement pour Whisper
+    const tempFilePath = path.join(__dirname, '../../uploads', `temp_${messageId}.m4a`);
+    const response = await axios({
+      method: 'get',
+      url: message.audio_url,
+      responseType: 'stream'
+    });
+
+    const writer = fs.createWriteStream(tempFilePath);
+    response.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    // 3. Transcription et Traduction avec l'IA
+    const aiResult = await translationService.transcribeAndTranslateAudio(tempFilePath, targetLanguage);
+
+    // 4. Nettoyer le fichier temp
+    if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+
+    // 5. Sauvegarder dans la base de données
+    let translatedContent = {};
+    try {
+      translatedContent = typeof message.translated_content === 'string'
+        ? JSON.parse(message.translated_content)
+        : (message.translated_content || {});
+    } catch (e) { translatedContent = {}; }
+
+    translatedContent[targetLanguage] = aiResult.translatedText;
+    translatedContent[`${targetLanguage}_transcription`] = aiResult.originalText;
+
+    await query(
+      'UPDATE public.messages SET translated_content = $1 WHERE id = $2',
+      [JSON.stringify(translatedContent), messageId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        transcription: aiResult.originalText,
+        translatedText: aiResult.translatedText
+      }
+    });
+  } catch (error) {
+    logger.error('Erreur traduction audio IA:', error);
+    res.status(500).json({ success: false, error: 'Échec de la transcription/traduction par l\'IA' });
+  }
+});
+
 module.exports = {
   getChats,
   createChat,
@@ -593,4 +671,5 @@ module.exports = {
   removeMember,
   changeMemberRole,
   translateMessage,
+  translateAudioMessage,
 };

@@ -99,6 +99,14 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='accepted_privacy_version') THEN
     ALTER TABLE public.profiles ADD COLUMN accepted_privacy_version TEXT;
   END IF;
+
+  -- AI Translation Settings
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='preferred_language') THEN
+    ALTER TABLE public.profiles ADD COLUMN preferred_language TEXT DEFAULT 'fr';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='auto_translate') THEN
+    ALTER TABLE public.profiles ADD COLUMN auto_translate BOOLEAN DEFAULT FALSE;
+  END IF;
 END $$;
 
 -- 4. Droits Administrateurs

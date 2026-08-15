@@ -34,6 +34,7 @@ const config = {
   translation: {
     googleApiKey: process.env.GOOGLE_TRANSLATE_API_KEY,
     deeplApiKey: process.env.DEEPL_API_KEY,
+    openaiApiKey: process.env.OPENAI_API_KEY,
     provider: process.env.TRANSLATION_PROVIDER || 'google',
     cacheDuration: 24 * 60 * 60 * 1000, // 24 hours
   },

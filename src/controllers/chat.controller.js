@@ -525,6 +525,10 @@ const removeMember = asyncHandler(async (req, res) => {
 
   await query("DELETE FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2", [chatId, targetUserId]);
 
+  // Notifier en temps réel
+  const socketService = require('../services/socket.service');
+  socketService.sendToChat(chatId, 'member_removed', { chatId, userId: targetUserId });
+
   res.json({ success: true, message: 'Membre retiré' });
 });
 
@@ -551,6 +555,10 @@ const changeMemberRole = asyncHandler(async (req, res) => {
     "UPDATE public.chat_participants SET role = $1 WHERE chat_id = $2 AND user_id = $3",
     [role, chatId, targetUserId]
   );
+
+  // Notifier en temps réel
+  const socketService = require('../services/socket.service');
+  socketService.sendToChat(chatId, 'member_role_changed', { chatId, userId: targetUserId, role });
 
   res.json({ success: true, message: 'Rôle mis à jour' });
 });

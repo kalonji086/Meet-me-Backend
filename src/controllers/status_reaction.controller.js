@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const { asyncHandler } = require('../middleware/error.middleware');
+const socketService = require('../services/socket.service');
 
 /**
  * @desc    Ajouter une réaction ou un commentaire à un status
@@ -19,6 +20,7 @@ const addReaction = asyncHandler(async (req, res) => {
     });
   }
 
+  // 1. Insérer la réaction
   const result = await query(
     `INSERT INTO public.status_reactions (status_id, user_id, content, type)
      VALUES ($1, $2, $3, $4)
@@ -26,9 +28,30 @@ const addReaction = asyncHandler(async (req, res) => {
     [statusId, userId, content, type]
   );
 
+  const reaction = result.rows[0];
+
+  // 2. Récupérer les infos de l'expéditeur et du propriétaire du status
+  const userInfo = await query('SELECT full_name, avatar_url FROM public.profiles WHERE id = $1', [userId]);
+  const statusOwner = await query('SELECT user_id FROM public.statuses WHERE id = $1', [statusId]);
+
+  if (userInfo.rows.length > 0 && statusOwner.rows.length > 0) {
+    const sender = userInfo.rows[0];
+    const ownerId = statusOwner.rows[0].user_id;
+
+    // 3. Notifier le propriétaire en temps réel
+    socketService.sendToUser(ownerId, 'status:reacted', {
+      statusId,
+      reaction: {
+        ...reaction,
+        full_name: sender.full_name,
+        avatar_url: sender.avatar_url
+      }
+    });
+  }
+
   res.status(201).json({
     success: true,
-    data: result.rows[0],
+    data: reaction,
   });
 });
 

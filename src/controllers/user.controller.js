@@ -176,18 +176,6 @@ const searchUsers = asyncHandler(async (req, res) => {
       [userId]
     );
 
-    // Si l'utilisateur n'a aucun contact, on lui suggère les autres utilisateurs (pour l'aider à démarrer)
-    if (contactsRes.rows.length === 0) {
-      const allUsersRes = await query(
-        `SELECT id, full_name, avatar_url, status, username
-         FROM public.profiles
-         WHERE id != $1 AND is_locked = FALSE
-         ORDER BY full_name ASC LIMIT 50`,
-        [userId]
-      );
-      return res.json({ success: true, data: allUsersRes.rows });
-    }
-
     return res.json({ success: true, data: contactsRes.rows });
   }
 

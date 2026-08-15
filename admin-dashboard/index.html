@@ -412,7 +412,10 @@
                             <input id="campaign-target-email" type="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none">
                         </div>
                         <div class="mt-6">
-                            <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Message</label>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-bold text-gray-400 uppercase block tracking-widest">Message</label>
+                                <span class="text-[10px] bg-purple-50 text-purple-500 px-2 py-1 rounded-lg font-bold">Astuce: Utilisez {{name}} pour personnaliser</span>
+                            </div>
                             <div class="quill-editor-container">
                                 <div id="campaign-editor"></div>
                             </div>
@@ -509,7 +512,10 @@
                             <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Date d'envoi (Optionnel)</label><input id="bc-scheduled-at" type="datetime-local" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
                             <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Sujet</label><input type="text" id="bc-title" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
                             <div>
-                                <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Message</label>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="text-xs font-bold text-gray-400 uppercase block tracking-widest">Message</label>
+                                    <span class="text-[10px] bg-orange-50 text-orange-500 px-2 py-1 rounded-lg font-bold">Astuce: Utilisez {{name}} pour personnaliser</span>
+                                </div>
                                 <div class="quill-editor-container">
                                     <div id="bc-editor"></div>
                                 </div>
@@ -645,7 +651,10 @@
                     <div><label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Thème</label><select id="edit-campaign-theme" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"><option value="amazon">Amazon</option><option value="modern">Modern</option><option value="dark">Dark</option><option value="minimal">Minimal</option></select></div>
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Message</label>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-bold text-gray-400 uppercase block tracking-widest">Message</label>
+                        <span class="text-[10px] bg-purple-50 text-purple-500 px-2 py-1 rounded-lg font-bold">Astuce: Utilisez {{name}} pour personnaliser</span>
+                    </div>
                     <div class="quill-editor-container">
                         <div id="edit-campaign-editor"></div>
                     </div>
@@ -945,6 +954,7 @@
                 [{ 'color': [] }, { 'background': [] }],
                 [{ 'list': 'ordered'}, { 'list': 'bullet' }],
                 [{ 'align': [] }],
+                ['image', 'link'],
                 ['clean']
             ];
 

@@ -502,21 +502,22 @@ const createCampaign = asyncHandler(async (req, res) => {
   // Si l'envoi est immédiat
   if (!isFuture) {
     if (target === 'all') {
-      const users = await query('SELECT id, email FROM public.profiles WHERE is_global_admin = FALSE');
+      const users = await query('SELECT id, email, full_name FROM public.profiles WHERE is_global_admin = FALSE');
       for (const user of users.rows) {
         socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
-        await mailService.sendSystemEmail(user.email, title, message, theme);
+        await mailService.sendSystemEmail(user.email, title, message, theme, user.full_name || 'Utilisateur');
       }
       await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
     } else if (targetValue) {
       const emails = targetValue.split(',').map(e => e.trim()).filter(e => e);
       let sentCount = 0;
       for (const email of emails) {
-        const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
+        const userRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [email]);
+        const userName = userRes.rows[0]?.full_name || 'Utilisateur';
         if (userRes.rows.length > 0) {
           socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
         }
-        const success = await mailService.sendSystemEmail(email, title, message, theme);
+        const success = await mailService.sendSystemEmail(email, title, message, theme, userName);
         if (success) sentCount++;
       }
       await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sentCount, campaign.rows[0].id]);
@@ -596,9 +597,9 @@ const broadcastMessage = asyncHandler(async (req, res) => {
 
   if (target === 'all') {
     socketService.broadcast('push_notification', { title, body: content, type: 'system' });
-    const users = await query('SELECT email FROM public.profiles WHERE is_global_admin = FALSE');
+    const users = await query('SELECT email, full_name FROM public.profiles WHERE is_global_admin = FALSE');
     for (const user of users.rows) {
-      await mailService.sendSystemEmail(user.email, title, content, theme);
+      await mailService.sendSystemEmail(user.email, title, content, theme, user.full_name || 'Utilisateur');
     }
 
     // Sauvegarder dans l'historique
@@ -616,11 +617,12 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     let sentCount = 0;
 
     for (const email of emails) {
-      const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
+      const userRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [email]);
+      const userName = userRes.rows[0]?.full_name || 'Utilisateur';
       if (userRes.rows.length > 0) {
         socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
       }
-      const success = await mailService.sendSystemEmail(email, title, content, theme);
+      const success = await mailService.sendSystemEmail(email, title, content, theme, userName);
       if (success) sentCount++;
     }
 

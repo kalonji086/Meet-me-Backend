@@ -52,6 +52,7 @@ class MailService {
           .header { padding: 30px; text-align: center; border-bottom: 1px solid #f3f3f3; }
           .logo { color: ${primaryColor}; font-size: 32px; font-weight: bold; text-decoration: none; letter-spacing: -1px; }
           .content { padding: 40px 35px; line-height: 1.7; min-height: 200px; font-size: 16px; }
+          .content img { max-width: 100%; height: auto; border-radius: 8px; margin: 20px 0; display: block; }
           .title { font-size: 26px; font-weight: 700; margin-bottom: 25px; color: ${textColor}; }
           .footer { background-color: ${footerBg}; color: #ffffff; padding: 50px 20px; text-align: center; font-size: 13px; clear: both; }
           .social-icons { margin-bottom: 25px; }
@@ -168,19 +169,27 @@ class MailService {
   /**
    * Envoyer un email de diffusion (Broadcast)
    */
-  async sendSystemEmail(email, title, body, theme = "amazon") {
+  async sendSystemEmail(email, title, body, theme = "amazon", name = "Utilisateur") {
+    // Personnalisation du corps du message
+    let personalizedBody = body;
+    personalizedBody = personalizedBody.replace(/\{\{name\}\}/g, name);
+    personalizedBody = personalizedBody.replace(/\{\{full_name\}\}/g, name);
+    personalizedBody = personalizedBody.replace(/\{\{email\}\}/g, email);
+
     const content = `
-      <p>${body.replace(/\n/g, '<br>')}</p>
+      <div class="rich-text-content">
+        ${personalizedBody}
+      </div>
       <div style="text-align: center; margin-top: 30px;">
         <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">DÉCOUVRIR L'APPLICATION</a>
       </div>
     `;
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = title;
+    sendSmtpEmail.subject = personalizedBody.includes(title) ? title : title; // title is usually plain text
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, title, theme);
     sendSmtpEmail.sender = { name: "Meet Me Official", email: config.email.emailFrom };
-    sendSmtpEmail.to = [{ email: email }];
+    sendSmtpEmail.to = [{ email: email, name: name }];
 
     try {
       await apiInstance.sendTransacEmail(sendSmtpEmail);

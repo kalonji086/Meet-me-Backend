@@ -56,17 +56,25 @@ class AutomationService {
         const metadata = campaign.metadata || {};
         const theme = metadata.theme || 'amazon';
 
-        let targetEmails = [];
+        let targetUsers = [];
         if (campaign.target === 'all') {
-          const users = await query('SELECT email FROM public.profiles WHERE is_global_admin = FALSE');
-          targetEmails = users.rows.map(u => u.email);
+          const users = await query('SELECT email, full_name FROM public.profiles WHERE is_global_admin = FALSE');
+          targetUsers = users.rows;
         } else if (campaign.target_value) {
-          targetEmails = campaign.target_value.split(',').map(e => e.trim()).filter(e => e);
+          const emails = campaign.target_value.split(',').map(e => e.trim()).filter(e => e);
+          const users = await query('SELECT email, full_name FROM public.profiles WHERE email = ANY($1)', [emails]);
+          targetUsers = users.rows;
+
+          // Ajouter les emails qui ne sont pas en base (pour specific email externe)
+          const foundEmails = new Set(targetUsers.map(u => u.email));
+          emails.forEach(e => {
+            if (!foundEmails.has(e)) targetUsers.push({ email: e, full_name: 'Utilisateur' });
+          });
         }
 
         let sentCount = 0;
-        for (const email of targetEmails) {
-          const success = await mailService.sendSystemEmail(email, campaign.title, campaign.message, theme);
+        for (const user of targetUsers) {
+          const success = await mailService.sendSystemEmail(user.email, campaign.title, campaign.message, theme, user.full_name || 'Utilisateur');
           if (success) sentCount++;
 
           // Petit délai pour ne pas saturer le service mail
@@ -103,13 +111,13 @@ class AutomationService {
       if (result.rows.length === 0) return;
 
       const title = "Tu nous manques sur Meet Me ! 👋";
-      const message = "Tes amis t'attendent ! Reviens voir ce qu'il y a de nouveau et continue tes conversations.";
+      const message = "Salut {{name}}, tes amis t'attendent ! Reviens voir ce qu'il y a de nouveau et continue tes conversations.";
 
       for (const user of result.rows) {
-        await mailService.sendSystemEmail(user.email, title, message);
+        await mailService.sendSystemEmail(user.email, title, message, 'amazon', user.full_name || 'Utilisateur');
         socketService.sendToUser(user.id, 'push_notification', {
           title,
-          body: message,
+          body: message.replace('{{name}}', user.full_name || 'Utilisateur'),
           type: 'retention'
         });
       }
@@ -134,10 +142,10 @@ class AutomationService {
       if (result.rows.length === 0) return;
 
       const title = "Complète ton profil Meet Me ✨";
-      const message = "Ajoute une photo et un pseudo pour que tes amis puissent te reconnaître plus facilement.";
+      const message = "Salut {{name}}, ajoute une photo et un pseudo pour que tes amis puissent te reconnaître plus facilement.";
 
       for (const user of result.rows) {
-        await mailService.sendSystemEmail(user.email, title, message);
+        await mailService.sendSystemEmail(user.email, title, message, 'amazon', user.full_name || 'Utilisateur');
       }
     } catch (error) {
       logger.error('Erreur remindIncompleteProfiles:', error);

@@ -364,4 +364,31 @@ BEGIN
   END IF;
 END $$;
 
+-- Market Module Tables
+CREATE TABLE IF NOT EXISTS public.market_businesses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
+  category TEXT NOT NULL,
+  business_name TEXT NOT NULL,
+  short_description TEXT,
+  full_description TEXT,
+  logo_url TEXT,
+  banner_url TEXT,
+  contact_info TEXT,
+  address_city TEXT,
+  address_commune TEXT,
+  address_province TEXT,
+  address_quarter TEXT,
+  address_postal_code TEXT,
+  id_card_url TEXT,
+  national_id_number TEXT,
+  rccm_number TEXT,
+  employee_count INTEGER,
+  capital_amount DECIMAL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  verified_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 ALTER TABLE public.messages REPLICA IDENTITY FULL;

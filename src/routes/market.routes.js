@@ -41,4 +41,24 @@ router.get('/feed', marketController.getDiscoveryFeed);
  */
 router.get('/business/:id', marketController.getBusinessById);
 
+/**
+ * @route   GET /api/market/orders
+ */
+router.get('/orders', marketController.getOrders);
+
+/**
+ * @route   GET /api/market/requests
+ */
+router.get('/requests', marketController.getRequests);
+
+/**
+ * @route   GET /api/market/inventory
+ */
+router.get('/inventory', marketController.getInventory);
+
+/**
+ * @route   GET /api/market/chats
+ */
+router.get('/chats', marketController.getBusinessChats);
+
 module.exports = router;

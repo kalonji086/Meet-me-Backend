@@ -183,11 +183,88 @@ const getBusinessById = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Get business orders (for Boutiques)
+ */
+const getOrders = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    `SELECT o.*, p.full_name as customer_name, p.avatar_url as customer_avatar
+     FROM public.market_orders o
+     JOIN public.profiles p ON o.customer_id = p.id
+     WHERE o.business_id = $1 ORDER BY o.created_at DESC`,
+    [business.rows[0].id]
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Get business quote requests (for Artisans)
+ */
+const getRequests = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    `SELECT r.*, p.full_name as customer_name, p.avatar_url as customer_avatar
+     FROM public.market_requests r
+     JOIN public.profiles p ON r.customer_id = p.id
+     WHERE r.business_id = $1 ORDER BY r.created_at DESC`,
+    [business.rows[0].id]
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Get business inventory (for Boutiques)
+ */
+const getInventory = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    'SELECT * FROM public.market_inventory WHERE business_id = $1 ORDER BY name ASC',
+    [business.rows[0].id]
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Get business chats
+ */
+const getBusinessChats = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const result = await query(
+    `SELECT c.*, p.full_name as other_name, p.avatar_url as other_avatar
+     FROM public.chats c
+     JOIN public.chat_participants cp1 ON c.id = cp1.chat_id AND cp1.user_id = $1
+     JOIN public.chat_participants cp2 ON c.id = cp2.chat_id AND cp2.user_id != $1
+     JOIN public.profiles p ON cp2.user_id = p.id
+     WHERE c.type = 'private'
+     ORDER BY c.updated_at DESC LIMIT 20`,
+    [userId]
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
 module.exports = {
   registerBusiness,
   getMyBusiness,
   getDashboardStats,
   createPost,
   getDiscoveryFeed,
-  getBusinessById
+  getBusinessById,
+  getOrders,
+  getRequests,
+  getInventory,
+  getBusinessChats
 };

@@ -964,6 +964,58 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
   res.json({ success: true, message: `Business ${status === 'approved' ? 'approuvé' : 'rejeté'}.` });
 });
 
+/**
+ * @desc    Block or unblock a market business
+ */
+const toggleMarketBlock = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { block } = req.body; // true to block, false to unblock
+
+  const businessRes = await query('SELECT * FROM public.market_businesses WHERE id = $1', [id]);
+  if (businessRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Business non trouvé' });
+
+  const business = businessRes.rows[0];
+  const newStatus = block ? 'blocked' : 'approved';
+
+  await query(
+    'UPDATE public.market_businesses SET status = $1, updated_at = NOW() WHERE id = $2',
+    [newStatus, id]
+  );
+
+  // Notifier l'utilisateur
+  const socketService = require('../services/socket.service');
+  socketService.sendToUser(business.user_id, 'market:status_changed', {
+    businessName: business.business_name,
+    status: newStatus
+  });
+
+  await logAdminAction(req, `market_${newStatus}`, 'market', id, { businessName: business.business_name });
+  res.json({ success: true, message: `Business ${block ? 'bloqué' : 'débloqué'}.` });
+});
+
+/**
+ * @desc    Delete a market business
+ */
+const deleteMarketBusiness = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const businessRes = await query('SELECT * FROM public.market_businesses WHERE id = $1', [id]);
+  if (businessRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Business non trouvé' });
+
+  const business = businessRes.rows[0];
+
+  await query('DELETE FROM public.market_businesses WHERE id = $1', [id]);
+
+  // Notifier l'utilisateur
+  const socketService = require('../services/socket.service');
+  socketService.sendToUser(business.user_id, 'market:deleted', {
+    businessName: business.business_name
+  });
+
+  await logAdminAction(req, 'market_deleted', 'market', id, { businessName: business.business_name });
+  res.json({ success: true, message: 'Business supprimé définitivement.' });
+});
+
 const handleVerification = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, admin_notes } = req.body; // 'approved' or 'rejected'
@@ -1017,5 +1069,7 @@ module.exports = {
   handleVerification,
   getMarketRequests,
   handleMarketRequest,
+  toggleMarketBlock,
+  deleteMarketBusiness,
   ensureAdminTables
 };

@@ -2192,7 +2192,12 @@
                     ${m.status === 'pending' ? `
                         <button onclick="handleMarketAction('${m.id}', 'rejected')" class="flex-1 bg-red-100 text-red-600 py-4 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all">REJETER</button>
                         <button onclick="handleMarketAction('${m.id}', 'approved')" class="flex-[2] bg-green-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-600 transition-all">APPROUVER & CRÉER GROUPE</button>
-                    ` : ''}
+                    ` : `
+                        <button onclick="toggleMarketBlock('${m.id}', ${m.status !== 'blocked'})" class="flex-1 ${m.status === 'blocked' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'} py-4 rounded-2xl font-black transition-all">
+                            ${m.status === 'blocked' ? 'DÉBLOQUER' : 'BLOQUER'}
+                        </button>
+                        <button onclick="deleteMarketBusiness('${m.id}')" class="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black hover:bg-red-600 transition-all">SUPPRIMER</button>
+                    `}
                 `;
 
                 document.getElementById('modal-market-request').classList.remove('hidden');
@@ -2210,6 +2215,26 @@
                 loadMarketRequests();
                 loadStats();
             } catch (e) { alert("Erreur lors de l'action."); }
+        }
+
+        async function toggleMarketBlock(id, block) {
+            if (!confirm(`Confirmer : ${block ? 'BLOQUER' : 'DÉBLOQUER'} ce business ?`)) return;
+            try {
+                await axios.put(`${API_URL}/admin/market-requests/${id}/toggle-block`, { block }, { headers: { Authorization: `Bearer ${token}` } });
+                alert(block ? "Business suspendu." : "Business réactivé.");
+                closeMarketModal();
+                loadMarketRequests();
+            } catch (e) { alert("Erreur lors de l'action."); }
+        }
+
+        async function deleteMarketBusiness(id) {
+            if (!confirm("⚠️ SUPPRIMER DÉFINITIVEMENT ce business ? Cette action est irréversible.")) return;
+            try {
+                await axios.delete(`${API_URL}/admin/market-requests/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Business supprimé.");
+                closeMarketModal();
+                loadMarketRequests();
+            } catch (e) { alert("Erreur lors de la suppression."); }
         }
 
         function closeMarketModal() {

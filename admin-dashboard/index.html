@@ -669,7 +669,22 @@
 
     <!-- MODAL MARKET DETAILS -->
     <div id="modal-market-request" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4 backdrop-blur-md">
-        <!-- ... existing ... -->
+        <div class="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
+            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
+                <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Examen de la demande Market</h3>
+                <button onclick="closeMarketModal()" class="p-2 hover:bg-gray-200 rounded-full"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
+            </div>
+            <div id="market-modal-content" class="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+                <!-- Content injected via JS -->
+            </div>
+            <div class="p-8 border-t bg-gray-50">
+                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block">Note ou motif du refus (optionnel) :</label>
+                <textarea id="market-admin-notes" rows="2" class="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none text-sm" placeholder="Expliquez ici la raison du refus..."></textarea>
+            </div>
+            <div id="market-modal-footer" class="p-8 border-t bg-gray-50 flex space-x-4">
+                <!-- Buttons injected via JS -->
+            </div>
+        </div>
     </div>
 
     <!-- MODAL MANAGE MARKET GROUP -->
@@ -2217,7 +2232,10 @@
 
                 document.getElementById('modal-market-request').classList.remove('hidden');
                 lucide.createIcons();
-            } catch (e) { alert("Erreur chargement détails."); }
+            } catch (e) {
+                console.error("Market Details Error:", e);
+                alert("Erreur chargement détails : " + (e.response?.data?.error || e.message));
+            }
         }
 
         async function handleMarketAction(id, status) {

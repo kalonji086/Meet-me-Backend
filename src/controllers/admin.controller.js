@@ -277,6 +277,19 @@ const ensureAdminTables = async () => {
   } catch (e) {
     logger.error('Error adding is_banned to chats:', e);
   }
+
+  // S'assurer que le statut 'blocked' est autorisé dans market_businesses
+  try {
+    await query(`
+      ALTER TABLE public.market_businesses
+      DROP CONSTRAINT IF EXISTS market_businesses_status_check;
+      ALTER TABLE public.market_businesses
+      ADD CONSTRAINT market_businesses_status_check
+      CHECK (status IN ('pending', 'approved', 'rejected', 'blocked'));
+    `);
+  } catch (e) {
+    logger.error('Error updating market_businesses status constraint:', e);
+  }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
@@ -951,6 +964,7 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
  * @desc    Block or unblock a market business
  */
 const toggleMarketBlock = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
   const { id } = req.params;
   const { block } = req.body; // true to block, false to unblock
 

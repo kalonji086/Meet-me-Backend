@@ -49,4 +49,9 @@ router.put('/market-requests/:id', adminController.handleMarketRequest);
 router.put('/market-requests/:id/toggle-block', adminController.toggleMarketBlock);
 router.delete('/market-requests/:id', adminController.deleteMarketBusiness);
 
+// Market Groups Management
+router.post('/market-groups', adminController.createOfficialGroup);
+router.get('/market-groups/members', adminController.getMarketGroupMembers);
+router.post('/market-groups/remove-member', adminController.removeMarketGroupMember);
+
 module.exports = router;

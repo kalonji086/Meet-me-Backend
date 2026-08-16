@@ -669,20 +669,34 @@
 
     <!-- MODAL MARKET DETAILS -->
     <div id="modal-market-request" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4 backdrop-blur-md">
-        <div class="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
-            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
-                <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Examen de la demande Market</h3>
-                <button onclick="closeMarketModal()" class="p-2 hover:bg-gray-200 rounded-full"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
+        <!-- ... existing ... -->
+    </div>
+
+    <!-- MODAL MANAGE MARKET GROUP -->
+    <div id="modal-manage-group" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[210] p-4 backdrop-blur-md">
+        <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[85vh]">
+            <div class="p-8 border-b bg-blue-50 flex justify-between items-center">
+                <div>
+                    <h3 id="group-modal-title" class="text-2xl font-black text-blue-800 tracking-tighter">Gestion du Groupe</h3>
+                    <p id="group-modal-subtitle" class="text-xs font-bold text-blue-400 uppercase tracking-widest mt-1"></p>
+                </div>
+                <button onclick="closeGroupModal()" class="p-2 hover:bg-blue-100 rounded-full"><i data-lucide="x" class="w-6 h-6 text-blue-400"></i></button>
             </div>
-            <div id="market-modal-content" class="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
-                <!-- Content injected via JS -->
-                <div class="space-y-4">
-                    <label class="text-xs font-black text-gray-400 uppercase mb-3 block tracking-widest">Note ou motif du refus (optionnel) :</label>
-                    <textarea id="market-admin-notes" rows="3" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-[1.5rem] outline-none" placeholder="Expliquez ici la raison du refus pour l'utilisateur..."></textarea>
+            <div class="p-8 space-y-6">
+                <div class="flex space-x-4">
+                    <button id="btn-add-to-group" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center">
+                        <i data-lucide="plus-circle" class="w-5 h-5 mr-2"></i> AJOUTER LE PRO AU GROUPE
+                    </button>
+                </div>
+                <div class="border-t border-gray-100 pt-6">
+                    <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Membres Actuels du Groupe Officiel</h4>
+                    <div id="group-members-list" class="space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
+                        <!-- Members list -->
+                    </div>
                 </div>
             </div>
-            <div id="market-modal-footer" class="p-8 border-t bg-gray-50 flex space-x-4">
-                <!-- Buttons injected via JS -->
+            <div class="p-8 border-t bg-gray-50">
+                <button onclick="closeGroupModal()" class="w-full py-4 font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-all">TERMINER</button>
             </div>
         </div>
     </div>
@@ -2191,8 +2205,9 @@
                     <button onclick="closeMarketModal()" class="flex-1 py-4 font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-all">FERMER</button>
                     ${m.status === 'pending' ? `
                         <button onclick="handleMarketAction('${m.id}', 'rejected')" class="flex-1 bg-red-100 text-red-600 py-4 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all">REJETER</button>
-                        <button onclick="handleMarketAction('${m.id}', 'approved')" class="flex-[2] bg-green-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-600 transition-all">APPROUVER & CRÉER GROUPE</button>
+                        <button onclick="handleMarketAction('${m.id}', 'approved')" class="flex-[2] bg-green-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-600 transition-all">APPROUVER LE BUSINESS</button>
                     ` : `
+                        <button onclick="manageMarketGroup('${m.id}', '${m.category}')" class="flex-1 bg-blue-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all">GÉRER LE GROUPE</button>
                         <button onclick="toggleMarketBlock('${m.id}', ${m.status !== 'blocked'})" class="flex-1 ${m.status === 'blocked' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'} py-4 rounded-2xl font-black transition-all">
                             ${m.status === 'blocked' ? 'DÉBLOQUER' : 'BLOQUER'}
                         </button>
@@ -2239,6 +2254,66 @@
 
         function closeMarketModal() {
             document.getElementById('modal-market-request').classList.add('hidden');
+        }
+
+        async function manageMarketGroup(businessId, category) {
+            document.getElementById('group-modal-subtitle').innerText = `CATÉGORIE : ${category}`;
+            const btnAdd = document.getElementById('btn-add-to-group');
+            btnAdd.onclick = async () => {
+                try {
+                    await axios.post(`${API_URL}/admin/market-groups`, { businessId, category }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Utilisateur ajouté au groupe officiel !");
+                    loadGroupMembers(category);
+                } catch (e) { alert("Erreur lors de l'ajout."); }
+            };
+
+            loadGroupMembers(category);
+            document.getElementById('modal-manage-group').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        async function loadGroupMembers(category) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/market-groups/members`, { params: { category }, headers: { Authorization: `Bearer ${token}` } });
+                const list = document.getElementById('group-members-list');
+                list.innerHTML = '';
+
+                if (res.data.data.length === 0) {
+                    list.innerHTML = '<p class="text-center text-gray-400 py-10 text-xs font-bold">Aucun membre dans ce groupe officiel.</p>';
+                    return;
+                }
+
+                res.data.data.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100";
+                    div.innerHTML = `
+                        <div class="flex items-center">
+                            <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+m.full_name}" class="w-8 h-8 rounded-lg mr-3">
+                            <div>
+                                <p class="text-xs font-bold text-gray-800">${m.full_name}</p>
+                                <p class="text-[9px] text-gray-400 font-bold tracking-tight">${m.business_name}</p>
+                            </div>
+                        </div>
+                        <button onclick="removeGroupMember('${m.business_id}', '${category}')" class="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all" title="Retirer du groupe">
+                            <i data-lucide="user-minus" class="w-4 h-4"></i>
+                        </button>
+                    `;
+                    list.appendChild(div);
+                });
+                lucide.createIcons();
+            } catch (e) { console.error(e); }
+        }
+
+        async function removeGroupMember(businessId, category) {
+            if (!confirm("Retirer ce professionnel du groupe officiel ?")) return;
+            try {
+                await axios.post(`${API_URL}/admin/market-groups/remove-member`, { businessId, category }, { headers: { Authorization: `Bearer ${token}` } });
+                loadGroupMembers(category);
+            } catch (e) { alert("Erreur lors de la suppression."); }
+        }
+
+        function closeGroupModal() {
+            document.getElementById('modal-manage-group').classList.add('hidden');
         }
 
         async function createCampaign() {

@@ -901,35 +901,10 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
       ['approved', id]
     );
 
-    // 2. Logique de Groupe Automatique
-    const groupName = `${business.category} Meet Me`;
-
-    // Vérifier si le groupe de catégorie existe déjà
-    let groupRes = await query("SELECT id FROM public.chats WHERE name = $1 AND type = 'group'", [groupName]);
-    let chatId;
-
-    if (groupRes.rows.length === 0) {
-      // Créer le groupe s'il n'existe pas
-      const newGroup = await query(
-        "INSERT INTO public.chats (name, description, type, avatar_url) VALUES ($1, $2, 'group', $3) RETURNING id",
-        [groupName, `Groupe officiel pour la catégorie ${business.category}`, 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png']
-      );
-      chatId = newGroup.rows[0].id;
-    } else {
-      chatId = groupRes.rows[0].id;
-    }
-
-    // Ajouter l'utilisateur au groupe (on ne vérifie pas s'il y est déjà car PRIMARY KEY (chat_id, user_id) gère le doublon)
-    await query(
-      "INSERT INTO public.chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
-      [chatId, userId]
-    );
-
-    // 3. Notifier l'utilisateur par Socket et EMAIL
+    // 2. Notifier l'utilisateur par Socket et EMAIL
     const socketService = require('../services/socket.service');
     socketService.sendToUser(userId, 'market:approved', {
-      businessName: business.business_name,
-      chatId
+      businessName: business.business_name
     });
 
     const mailService = require('../services/mail.service');
@@ -938,7 +913,7 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
       business.owner_name || 'Utilisateur',
       business.business_name,
       business.category,
-      groupName
+      'Dashboard' // On remplace le nom du groupe par une mention générique
     );
 
   } else {
@@ -1016,6 +991,82 @@ const deleteMarketBusiness = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Business supprimé définitivement.' });
 });
 
+/**
+ * @desc    Create an official category group manually
+ */
+const createOfficialGroup = asyncHandler(async (req, res) => {
+  const { category, businessId } = req.body;
+  const groupName = `${category} Meet Me`;
+
+  // 1. Trouver le business pour avoir le user_id
+  const businessRes = await query('SELECT user_id, business_name FROM public.market_businesses WHERE id = $1', [businessId]);
+  if (businessRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Business non trouvé' });
+  const userId = businessRes.rows[0].user_id;
+
+  // 2. Créer ou récupérer le groupe
+  let groupRes = await query("SELECT id FROM public.chats WHERE name = $1 AND type = 'group'", [groupName]);
+  let chatId;
+
+  if (groupRes.rows.length === 0) {
+    const newGroup = await query(
+      "INSERT INTO public.chats (name, description, type, avatar_url, created_by) VALUES ($1, $2, 'group', $3, $4) RETURNING id",
+      [groupName, `Groupe officiel des professionnels de la catégorie ${category}`, 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png', req.user.id]
+    );
+    chatId = newGroup.rows[0].id;
+  } else {
+    chatId = groupRes.rows[0].id;
+  }
+
+  // 3. Ajouter l'utilisateur
+  await query(
+    "INSERT INTO public.chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+    [chatId, userId]
+  );
+
+  await logAdminAction(req, 'create_market_group', 'chat', chatId, { category, businessName: businessRes.rows[0].business_name });
+  res.json({ success: true, message: `Utilisateur ajouté au groupe officiel ${category}.` });
+});
+
+/**
+ * @desc    Get members of a market group for management
+ */
+const getMarketGroupMembers = asyncHandler(async (req, res) => {
+  const { category } = req.query;
+  const groupName = `${category} Meet Me`;
+
+  const groupRes = await query("SELECT id FROM public.chats WHERE name = $1 AND type = 'group'", [groupName]);
+  if (groupRes.rows.length === 0) return res.json({ success: true, data: [] });
+
+  const members = await query(
+    `SELECT p.id, p.full_name, p.email, p.avatar_url, mb.business_name, mb.id as business_id
+     FROM public.chat_participants cp
+     JOIN public.profiles p ON cp.user_id = p.id
+     JOIN public.market_businesses mb ON p.id = mb.user_id
+     WHERE cp.chat_id = $1`,
+    [groupRes.rows[0].id]
+  );
+
+  res.json({ success: true, data: members.rows });
+});
+
+/**
+ * @desc    Remove member from market group
+ */
+const removeMarketGroupMember = asyncHandler(async (req, res) => {
+  const { businessId, category } = req.body;
+  const groupName = `${category} Meet Me`;
+
+  const business = await query('SELECT user_id FROM public.market_businesses WHERE id = $1', [businessId]);
+  const group = await query("SELECT id FROM public.chats WHERE name = $1", [groupName]);
+
+  if (business.rows.length > 0 && group.rows.length > 0) {
+    await query('DELETE FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2', [group.rows[0].id, business.rows[0].user_id]);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ success: false });
+  }
+});
+
 const handleVerification = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, admin_notes } = req.body; // 'approved' or 'rejected'
@@ -1071,5 +1122,8 @@ module.exports = {
   handleMarketRequest,
   toggleMarketBlock,
   deleteMarketBusiness,
+  createOfficialGroup,
+  getMarketGroupMembers,
+  removeMarketGroupMember,
   ensureAdminTables
 };

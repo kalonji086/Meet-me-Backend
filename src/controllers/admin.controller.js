@@ -855,6 +855,81 @@ const getVerificationRequests = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Get all pending market business requests
+ */
+const getMarketRequests = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT mb.*, p.full_name as owner_name, p.email as owner_email
+    FROM public.market_businesses mb
+    JOIN public.profiles p ON mb.user_id = p.id
+    ORDER BY mb.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Approve or reject a market business
+ */
+const handleMarketRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body; // 'approved' or 'rejected'
+
+  const businessRes = await query('SELECT * FROM public.market_businesses WHERE id = $1', [id]);
+  if (businessRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Business non trouvé' });
+
+  const business = businessRes.rows[0];
+  const userId = business.user_id;
+
+  if (status === 'approved') {
+    // 1. Marquer comme approuvé
+    await query(
+      'UPDATE public.market_businesses SET status = $1, verified_at = NOW(), updated_at = NOW() WHERE id = $2',
+      ['approved', id]
+    );
+
+    // 2. Logique de Groupe Automatique
+    const groupName = `${business.category} Meet Me`;
+
+    // Vérifier si le groupe de catégorie existe déjà
+    let groupRes = await query("SELECT id FROM public.chats WHERE name = $1 AND type = 'group'", [groupName]);
+    let chatId;
+
+    if (groupRes.rows.length === 0) {
+      // Créer le groupe s'il n'existe pas
+      const newGroup = await query(
+        "INSERT INTO public.chats (name, description, type, avatar_url) VALUES ($1, $2, 'group', $3) RETURNING id",
+        [groupName, `Groupe officiel pour la catégorie ${business.category}`, 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png']
+      );
+      chatId = newGroup.rows[0].id;
+    } else {
+      chatId = groupRes.rows[0].id;
+    }
+
+    // Ajouter l'utilisateur au groupe (on ne vérifie pas s'il y est déjà car PRIMARY KEY (chat_id, user_id) gère le doublon)
+    await query(
+      "INSERT INTO public.chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+      [chatId, userId]
+    );
+
+    // 3. Notifier l'utilisateur
+    const socketService = require('../services/socket.service');
+    socketService.sendToUser(userId, 'market:approved', {
+      businessName: business.business_name,
+      chatId
+    });
+
+  } else {
+    await query(
+      'UPDATE public.market_businesses SET status = $1, updated_at = NOW() WHERE id = $2',
+      ['rejected', id]
+    );
+  }
+
+  await logAdminAction(req, `market_${status}`, 'market', id, { businessName: business.business_name });
+  res.json({ success: true, message: `Business ${status === 'approved' ? 'approuvé' : 'rejeté'}.` });
+});
+
 const handleVerification = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, admin_notes } = req.body; // 'approved' or 'rejected'
@@ -906,5 +981,7 @@ module.exports = {
   deleteLegalDoc,
   getVerificationRequests,
   handleVerification,
+  getMarketRequests,
+  handleMarketRequest,
   ensureAdminTables
 };

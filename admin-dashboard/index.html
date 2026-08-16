@@ -119,6 +119,16 @@
                     <i data-lucide="triangle-alert" class="w-5 h-5 mr-4"></i>
                     <span class="font-medium">Signalements Contenu</span>
                 </a>
+                <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                    <i data-lucide="check-circle" class="w-5 h-5 mr-4"></i>
+                    <span class="font-medium">Vérifications (Badge)</span>
+                    <span id="verif-badge" class="hidden ml-auto bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                </a>
+                <a href="#" onclick="showSection('market-requests')" id="nav-market-requests" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
+                    <i data-lucide="shopping-bag" class="w-5 h-5 mr-4"></i>
+                    <span class="font-medium">Demandes Market</span>
+                    <span id="market-requests-badge" class="hidden ml-auto bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                </a>
                 <a href="#" onclick="showSection('analytics')" id="nav-analytics" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
                     <i data-lucide="bar-chart-3" class="w-5 h-5 mr-4"></i>
                     <span class="font-medium">Analytics</span>
@@ -135,11 +145,7 @@
                     <i data-lucide="megaphone" class="w-5 h-5 mr-4"></i>
                     <span class="font-medium">Diffusion</span>
                 </a>
-                <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="check-circle" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Vérifications</span>
-                    <span id="verif-badge" class="hidden ml-auto bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                </a>
+
                 <a href="#" onclick="showSection('legal')" id="nav-legal" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
                     <i data-lucide="file-text" class="w-5 h-5 mr-4"></i>
                     <span class="font-medium">Légal (CGU/Privacy)</span>
@@ -470,6 +476,16 @@
                     </div>
                 </div>
 
+                <!-- Section Market Requests -->
+                <div id="section-market-requests" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50/50"><tr><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Business</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Catégorie</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Propriétaire</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500">Statut</th><th class="px-8 py-5 text-xs uppercase font-black text-gray-500 text-right">Actions</th></tr></thead>
+                            <tbody id="market-requests-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Section Légal -->
                 <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto">
                     <div class="space-y-8">
@@ -648,6 +664,22 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- MODAL MARKET DETAILS -->
+    <div id="modal-market-request" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4 backdrop-blur-md">
+        <div class="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
+            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
+                <h3 class="text-2xl font-black text-gray-800 tracking-tighter">Examen de la demande Market</h3>
+                <button onclick="closeMarketModal()" class="p-2 hover:bg-gray-200 rounded-full"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
+            </div>
+            <div id="market-modal-content" class="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+                <!-- Content injected via JS -->
+            </div>
+            <div id="market-modal-footer" class="p-8 border-t bg-gray-50 flex space-x-4">
+                <!-- Buttons injected via JS -->
+            </div>
         </div>
     </div>
 
@@ -1033,6 +1065,7 @@
                 if (name === 'config') loadAppConfig();
                 if (name === 'legal') loadLegalDocs();
                 if (name === 'verifications') loadVerifications();
+                if (name === 'market-requests') loadMarketRequests();
             }
             lucide.createIcons();
         }
@@ -1053,6 +1086,15 @@
                 if (d.pendingHelpdesk > 0) { supportBadge.innerText = d.pendingHelpdesk; supportBadge.classList.remove('hidden'); } else if(supportBadge) supportBadge.classList.add('hidden');
                 if (d.pendingAppeals > 0) { contestBadge.innerText = d.pendingAppeals; contestBadge.classList.remove('hidden'); } else if(contestBadge) contestBadge.classList.add('hidden');
                 if (d.pendingVerifications > 0) { verifBadge.innerText = d.pendingVerifications; verifBadge.classList.remove('hidden'); } else if(verifBadge) verifBadge.classList.add('hidden');
+
+                // Market Badge
+                const marketBadge = document.getElementById('market-requests-badge');
+                if (marketBadge) {
+                    const resMarket = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
+                    const pendingCount = resMarket.data.data.filter(b => b.status === 'pending').length;
+                    marketBadge.innerText = pendingCount;
+                    marketBadge.classList.toggle('hidden', pendingCount === 0);
+                }
 
                 // Render NEW Master Circular System View
                 renderMasterCircularChart(d);
@@ -2060,6 +2102,113 @@
                 loadCampaigns();
                 loadBroadcasts();
             } catch (e) { alert("Erreur lors de la suppression."); }
+        }
+
+        async function loadMarketRequests() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
+                const body = document.getElementById('market-requests-table-body');
+                body.innerHTML = '';
+                res.data.data.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-50 hover:bg-gray-50 transition-colors";
+                    tr.innerHTML = `
+                        <td class="px-8 py-5">
+                            <div class="flex items-center">
+                                <img src="${m.logo_url || 'https://ui-avatars.com/api/?name='+m.business_name}" class="w-10 h-10 rounded-xl mr-3">
+                                <div><p class="font-bold text-sm text-gray-800">${m.business_name}</p><p class="text-[10px] text-gray-400">${m.id_card_url ? 'Papiers fournis' : 'Sans papiers'}</p></div>
+                            </div>
+                        </td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-[10px] font-black">${m.category.toUpperCase()}</span></td>
+                        <td class="px-8 py-5"><div><p class="font-bold text-sm text-gray-700">${m.owner_name}</p><p class="text-[10px] text-gray-400">${m.owner_email}</p></div></td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${m.status === 'approved' ? 'bg-green-50 text-green-600' : (m.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600')}">${m.status.toUpperCase()}</span></td>
+                        <td class="px-8 py-5 text-right"><button onclick="viewMarketRequest('${m.id}')" class="px-4 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black hover:bg-purple-700 transition-all">EXAMINER</button></td>
+                    `;
+                    body.appendChild(tr);
+                });
+                lucide.createIcons();
+            } catch (e) { console.error(e); }
+        }
+
+        async function viewMarketRequest(id) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
+                const m = res.data.data.find(item => item.id === id);
+                if (!m) return;
+
+                const content = document.getElementById('market-modal-content');
+                const footer = document.getElementById('market-modal-footer');
+
+                content.innerHTML = `
+                    <div class="flex items-center space-x-6 mb-8">
+                        <img src="${m.logo_url || 'https://ui-avatars.com/api/?name='+m.business_name}" class="w-24 h-24 rounded-3xl shadow-xl">
+                        <div class="flex-1">
+                            <h4 class="text-3xl font-black text-gray-800">${m.business_name}</h4>
+                            <span class="px-3 py-1 bg-purple-100 text-purple-600 rounded-lg text-xs font-black uppercase tracking-widest">${m.category}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <h5 class="text-xs font-black text-gray-400 uppercase tracking-widest">Informations Business</h5>
+                            <div class="p-6 bg-gray-50 rounded-3xl space-y-3">
+                                <p class="text-sm"><span class="text-gray-400 font-bold">Contact:</span> ${m.contact_info || 'n/a'}</p>
+                                <p class="text-sm"><span class="text-gray-400 font-bold">Localisation:</span> ${m.address_quarter}, ${m.address_commune}, ${m.address_city}</p>
+                                <p class="text-sm"><span class="text-gray-400 font-bold">Employés:</span> ${m.employee_count || 0}</p>
+                                <p class="text-sm"><span class="text-gray-400 font-bold">Capital:</span> $${m.capital_amount || 0}</p>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <h5 class="text-xs font-black text-gray-400 uppercase tracking-widest">Documents Officiels</h5>
+                            <div class="p-6 bg-purple-50 rounded-3xl space-y-3 border border-purple-100">
+                                <p class="text-sm"><span class="text-purple-400 font-bold">ID National:</span> ${m.national_id_number || 'N/A'}</p>
+                                <p class="text-sm"><span class="text-purple-400 font-bold">RCCM:</span> ${m.rccm_number || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h5 class="text-xs font-black text-gray-400 uppercase tracking-widest">Description</h5>
+                        <p class="text-gray-600 bg-gray-50 p-6 rounded-3xl leading-relaxed">${m.full_description || 'Pas de description.'}</p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h5 class="text-xs font-black text-gray-400 uppercase tracking-widest">Pièce d'identité</h5>
+                        <img src="${m.id_card_url}" class="w-full rounded-3xl shadow-lg border border-gray-100" onerror="this.src='https://placehold.co/600x400?text=Document+non+disponible'">
+                    </div>
+
+                    <div class="space-y-4">
+                        <h5 class="text-xs font-black text-gray-400 uppercase tracking-widest">Bannière Publicitaire</h5>
+                        <img src="${m.banner_url}" class="w-full h-48 object-cover rounded-3xl shadow-lg border border-gray-100">
+                    </div>
+                `;
+
+                footer.innerHTML = `
+                    <button onclick="closeMarketModal()" class="flex-1 py-4 font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-all">FERMER</button>
+                    ${m.status === 'pending' ? `
+                        <button onclick="handleMarketAction('${m.id}', 'rejected')" class="flex-1 bg-red-100 text-red-600 py-4 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all">REJETER</button>
+                        <button onclick="handleMarketAction('${m.id}', 'approved')" class="flex-[2] bg-green-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-600 transition-all">APPROUVER & CRÉER GROUPE</button>
+                    ` : ''}
+                `;
+
+                document.getElementById('modal-market-request').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) { alert("Erreur chargement détails."); }
+        }
+
+        async function handleMarketAction(id, status) {
+            if (!confirm(`Confirmer la décision : ${status.toUpperCase()} ?`)) return;
+            try {
+                await axios.put(`${API_URL}/admin/market-requests/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+                alert(status === 'approved' ? "Business activé et groupe de catégorie créé !" : "Business rejeté.");
+                closeMarketModal();
+                loadMarketRequests();
+                loadStats();
+            } catch (e) { alert("Erreur lors de l'action."); }
+        }
+
+        function closeMarketModal() {
+            document.getElementById('modal-market-request').classList.add('hidden');
         }
 
         async function createCampaign() {

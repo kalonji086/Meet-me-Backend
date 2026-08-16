@@ -44,4 +44,7 @@ router.delete('/legal/:type', adminController.deleteLegalDoc);
 router.get('/verifications', adminController.getVerificationRequests);
 router.put('/verifications/:id', adminController.handleVerification);
 
+router.get('/market-requests', adminController.getMarketRequests);
+router.put('/market-requests/:id', adminController.handleMarketRequest);
+
 module.exports = router;

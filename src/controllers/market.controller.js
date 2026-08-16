@@ -162,10 +162,32 @@ const getDiscoveryFeed = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Get business details by ID
+ */
+const getBusinessById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const result = await query(
+    'SELECT id, user_id, category, business_name, short_description, full_description, logo_url, banner_url, contact_info, address_city, address_commune, address_province, address_quarter, national_id_number, status FROM public.market_businesses WHERE id = $1',
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Business non trouvé' });
+  }
+
+  res.json({
+    success: true,
+    data: result.rows[0]
+  });
+});
+
 module.exports = {
   registerBusiness,
   getMyBusiness,
   getDashboardStats,
   createPost,
-  getDiscoveryFeed
+  getDiscoveryFeed,
+  getBusinessById
 };

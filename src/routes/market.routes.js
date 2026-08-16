@@ -35,4 +35,10 @@ router.post('/posts', marketController.createPost);
  */
 router.get('/feed', marketController.getDiscoveryFeed);
 
+/**
+ * @route   GET /api/market/business/:id
+ * @desc    Get business details
+ */
+router.get('/business/:id', marketController.getBusinessById);
+
 module.exports = router;

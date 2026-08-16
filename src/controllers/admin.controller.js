@@ -912,18 +912,39 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
       [chatId, userId]
     );
 
-    // 3. Notifier l'utilisateur
+    // 3. Notifier l'utilisateur par Socket et EMAIL
     const socketService = require('../services/socket.service');
     socketService.sendToUser(userId, 'market:approved', {
       businessName: business.business_name,
       chatId
     });
 
+    const mailService = require('../services/mail.service');
+    await mailService.sendMarketApprovalEmail(
+      business.owner_email || '',
+      business.owner_name || 'Utilisateur',
+      business.business_name,
+      business.category,
+      groupName
+    );
+
   } else {
     await query(
       'UPDATE public.market_businesses SET status = $1, updated_at = NOW() WHERE id = $2',
       ['rejected', id]
     );
+
+    // Notifier le rejet par EMAIL
+    const mailService = require('../services/mail.service');
+    const userInfo = await query('SELECT full_name, email FROM public.profiles WHERE id = $1', [userId]);
+    if (userInfo.rows.length > 0) {
+      await mailService.sendMarketRejectionEmail(
+        userInfo.rows[0].email,
+        userInfo.rows[0].full_name,
+        business.business_name,
+        admin_notes || 'Les informations fournies ne correspondent pas à nos critères de sélection.'
+      );
+    }
   }
 
   await logAdminAction(req, `market_${status}`, 'market', id, { businessName: business.business_name });

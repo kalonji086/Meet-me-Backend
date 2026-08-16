@@ -167,6 +167,52 @@ class MailService {
   }
 
   /**
+   * Envoyer un email d'approbation Market
+   */
+  async sendMarketApprovalEmail(email, name, businessName, category, groupName) {
+    const title = `Félicitations {{name}} ! Votre business "${businessName}" est approuvé.`;
+    const content = `
+      <p>Nous avons le plaisir de vous informer que votre demande pour rejoindre le <strong>Market Meet Me</strong> a été acceptée !</p>
+      <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #25D366;">
+        <p style="margin: 0;"><strong>Business :</strong> ${businessName}</p>
+        <p style="margin: 5px 0;"><strong>Catégorie :</strong> ${category}</p>
+        <p style="margin: 0;"><strong>Statut :</strong> ✅ Approuvé & Vérifié</p>
+      </div>
+      <p><strong>Ce qui vient de changer pour vous :</strong></p>
+      <ul>
+        <li>Votre <strong>Business Dashboard</strong> est désormais débloqué dans l'onglet Market.</li>
+        <li>Vous avez été automatiquement ajouté au groupe <strong>"${groupName}"</strong> pour échanger avec d'autres pros.</li>
+        <li>Vos annonces sont désormais visibles par tous les utilisateurs de Meet Me.</li>
+      </ul>
+      <p>Nous sommes impatients de voir votre activité grandir sur Meet Me !</p>
+      <div style="text-align: center;">
+        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">ACCÉDER À MON DASHBOARD</a>
+      </div>
+    `;
+
+    return this.sendSystemEmail(email, `Votre business "${businessName}" est en ligne !`, content, 'modern', name);
+  }
+
+  /**
+   * Envoyer un email de rejet Market
+   */
+  async sendMarketRejectionEmail(email, name, businessName, reason) {
+    const title = `Mise à jour concernant votre demande pour "${businessName}"`;
+    const content = `
+      <p>Bonjour ${name},</p>
+      <p>Nous avons examiné votre demande pour rejoindre le Market Meet Me avec le business "${businessName}".</p>
+      <p>Malheureusement, nous ne pouvons pas approuver votre demande pour la raison suivante :</p>
+      <div style="background-color: #fff5f5; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #f56565; color: #c53030;">
+        <p style="margin: 0;"><strong>Motif du refus :</strong><br>${reason}</p>
+      </div>
+      <p>Vous pouvez corriger ces informations et soumettre une nouvelle demande directement depuis l'application.</p>
+      <p>L'équipe de modération Meet Me</p>
+    `;
+
+    return this.sendSystemEmail(email, `Votre demande Market : ${businessName}`, content, 'amazon', name);
+  }
+
+  /**
    * Envoyer un email de diffusion (Broadcast)
    */
   async sendSystemEmail(email, title, body, theme = "amazon", name = "Utilisateur", cta = null) {

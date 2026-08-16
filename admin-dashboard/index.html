@@ -676,6 +676,10 @@
             </div>
             <div id="market-modal-content" class="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
                 <!-- Content injected via JS -->
+                <div class="space-y-4">
+                    <label class="text-xs font-black text-gray-400 uppercase mb-3 block tracking-widest">Note ou motif du refus (optionnel) :</label>
+                    <textarea id="market-admin-notes" rows="3" class="w-full p-6 bg-gray-50 border border-gray-200 rounded-[1.5rem] outline-none" placeholder="Expliquez ici la raison du refus pour l'utilisateur..."></textarea>
+                </div>
             </div>
             <div id="market-modal-footer" class="p-8 border-t bg-gray-50 flex space-x-4">
                 <!-- Buttons injected via JS -->
@@ -2197,10 +2201,11 @@
         }
 
         async function handleMarketAction(id, status) {
+            const admin_notes = document.getElementById('market-admin-notes')?.value || '';
             if (!confirm(`Confirmer la décision : ${status.toUpperCase()} ?`)) return;
             try {
-                await axios.put(`${API_URL}/admin/market-requests/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
-                alert(status === 'approved' ? "Business activé et groupe de catégorie créé !" : "Business rejeté.");
+                await axios.put(`${API_URL}/admin/market-requests/${id}`, { status, admin_notes }, { headers: { Authorization: `Bearer ${token}` } });
+                alert(status === 'approved' ? "Business activé et email de félicitations envoyé !" : "Business rejeté et email d'explication envoyé.");
                 closeMarketModal();
                 loadMarketRequests();
                 loadStats();

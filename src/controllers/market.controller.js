@@ -194,7 +194,7 @@ const getOrders = asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT o.*, p.full_name as customer_name, p.avatar_url as customer_avatar
      FROM public.market_orders o
-     JOIN public.profiles p ON o.customer_id = p.id
+     JOIN public.profiles p ON o.user_id = p.id
      WHERE o.business_id = $1 ORDER BY o.created_at DESC`,
     [business.rows[0].id]
   );
@@ -213,7 +213,7 @@ const getRequests = asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT r.*, p.full_name as customer_name, p.avatar_url as customer_avatar
      FROM public.market_requests r
-     JOIN public.profiles p ON r.customer_id = p.id
+     JOIN public.profiles p ON r.user_id = p.id
      WHERE r.business_id = $1 ORDER BY r.created_at DESC`,
     [business.rows[0].id]
   );

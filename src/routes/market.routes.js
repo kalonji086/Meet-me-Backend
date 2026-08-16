@@ -61,4 +61,19 @@ router.get('/inventory', marketController.getInventory);
  */
 router.get('/chats', marketController.getBusinessChats);
 
+/**
+ * @route   GET /api/market/documents
+ */
+router.get('/documents', marketController.getDocuments);
+
+/**
+ * @route   POST /api/market/documents
+ */
+router.post('/documents', marketController.uploadDocument);
+
+/**
+ * @route   POST /api/market/quotes
+ */
+router.post('/quotes', marketController.createQuote);
+
 module.exports = router;

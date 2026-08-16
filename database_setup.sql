@@ -385,7 +385,7 @@ CREATE TABLE IF NOT EXISTS public.market_businesses (
   rccm_number TEXT,
   employee_count INTEGER,
   capital_amount DECIMAL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'blocked')),
   verified_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -441,6 +441,31 @@ CREATE TABLE IF NOT EXISTS public.market_reviews (
   user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   rating INTEGER CHECK (rating >= 1 AND rating <= 5),
   comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Market Documents (Portfolio)
+CREATE TABLE IF NOT EXISTS public.market_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID REFERENCES public.market_businesses(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  file_url TEXT NOT NULL,
+  file_size TEXT,
+  mime_type TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Market Quotes (Devis)
+CREATE TABLE IF NOT EXISTS public.market_quotes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID REFERENCES public.market_businesses(id) ON DELETE CASCADE,
+  request_id UUID REFERENCES public.market_requests(id) ON DELETE SET NULL,
+  customer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  amount DECIMAL,
+  file_url TEXT,
+  items JSONB DEFAULT '[]'::jsonb,
+  status TEXT DEFAULT 'sent' CHECK (status IN ('draft', 'sent', 'accepted', 'rejected')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

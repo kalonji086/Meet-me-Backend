@@ -238,18 +238,78 @@ const getInventory = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get business documents (Portfolio)
+ */
+const getDocuments = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    'SELECT * FROM public.market_documents WHERE business_id = $1 ORDER BY created_at DESC',
+    [business.rows[0].id]
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Upload a business document
+ */
+const uploadDocument = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { name, fileUrl, fileSize, mimeType } = req.body;
+
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    'INSERT INTO public.market_documents (business_id, name, file_url, file_size, mime_type) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [business.rows[0].id, name, fileUrl, fileSize, mimeType]
+  );
+
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Create a quote (Devis)
+ */
+const createQuote = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { requestId, customerId, title, amount, fileUrl, items, status = 'sent' } = req.body;
+
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    `INSERT INTO public.market_quotes (business_id, request_id, customer_id, title, amount, file_url, items, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [business.rows[0].id, requestId, customerId, title, amount, fileUrl, items || [], status]
+  );
+
+  // Si c'est en réponse à une requête, on peut mettre à jour le statut de la requête
+  if (requestId) {
+    await query('UPDATE public.market_requests SET status = $1 WHERE id = $2', ['accepted', requestId]);
+  }
+
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
  * @desc    Get business chats
  */
 const getBusinessChats = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const result = await query(
-    `SELECT c.*, p.full_name as other_name, p.avatar_url as other_avatar
+    `SELECT c.*, p.full_name as other_name, p.avatar_url as other_avatar,
+     (SELECT content FROM public.messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+     (SELECT created_at FROM public.messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_at
      FROM public.chats c
      JOIN public.chat_participants cp1 ON c.id = cp1.chat_id AND cp1.user_id = $1
      JOIN public.chat_participants cp2 ON c.id = cp2.chat_id AND cp2.user_id != $1
      JOIN public.profiles p ON cp2.user_id = p.id
      WHERE c.type = 'private'
-     ORDER BY c.updated_at DESC LIMIT 20`,
+     ORDER BY c.last_message_at DESC NULLS LAST LIMIT 20`,
     [userId]
   );
 
@@ -266,5 +326,8 @@ module.exports = {
   getOrders,
   getRequests,
   getInventory,
-  getBusinessChats
+  getBusinessChats,
+  getDocuments,
+  uploadDocument,
+  createQuote
 };

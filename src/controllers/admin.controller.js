@@ -659,7 +659,7 @@ const getAppConfig = asyncHandler(async (req, res) => {
   const latestDetected = maxDetected.rows[0]?.app_version || 'N/A';
 
   // Version actuelle de l'application (définie dans app.json)
-  const currentAppVersion = '5.0.0';
+  const currentAppVersion = '29.0.0';
 
   if (result.rows.length === 0) {
     // Si aucune config n'existe, utiliser la version actuelle de l'app

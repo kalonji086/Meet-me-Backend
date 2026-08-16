@@ -270,6 +270,13 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.notification_campaigns DROP CONSTRAINT IF EXISTS notification_campaigns_status_check');
     await query('ALTER TABLE public.notification_campaigns ADD CONSTRAINT notification_campaigns_status_check CHECK (status IN (\'scheduled\', \'processing\', \'sent\', \'failed\'))');
   } catch (e) { /* S'il y a une erreur c'est que c'est déjà à jour */ }
+
+  // S'assurer que la colonne is_banned existe dans la table chats
+  try {
+    await query('ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE');
+  } catch (e) {
+    logger.error('Error adding is_banned to chats:', e);
+  }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
@@ -368,6 +375,7 @@ const toggleUserLock = asyncHandler(async (req, res) => {
  * @desc    Lister les groupes
  */
 const getGroups = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
   const result = await query(`
     SELECT c.*, p.full_name as creator_name,
     (SELECT COUNT(*) FROM public.chat_participants WHERE chat_id = c.id) as members_count

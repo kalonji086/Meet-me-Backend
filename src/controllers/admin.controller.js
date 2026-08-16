@@ -170,16 +170,16 @@ const ensureAdminTables = async () => {
   // Initialiser avec la version actuelle de l'application si aucune config n'existe
   const existingConfig = await query('SELECT id FROM public.app_configs LIMIT 1');
   if (existingConfig.rows.length === 0) {
-    await query(`INSERT INTO public.app_configs (current_version, force_update, active) VALUES ('30.0.0', false, true)`);
+    await query(`INSERT INTO public.app_configs (current_version, force_update, active) VALUES ('31.0.0', false, true)`);
   }
 
-  // S'assurer que les documents légaux existent avec la version 30.0.0
+  // S'assurer que les documents légaux existent avec la version 31.0.0
   const existingLegalDocs = await query('SELECT type FROM public.app_legal_docs');
   if (existingLegalDocs.rows.length === 0) {
-    // Initialiser avec des documents légaux par défaut pour la version 30.0.0
+    // Initialiser avec des documents légaux par défaut pour la version 31.0.0
     await query(`INSERT INTO public.app_legal_docs (type, content, version, force_acceptance) VALUES 
-      ('tos', 'Conditions Générales d''Utilisation - Version 30.0.0', '30.0.0', true),
-      ('privacy', 'Politique de Confidentialité - Version 30.0.0', '30.0.0', true)`);
+      ('tos', 'Conditions Générales d''Utilisation - Version 31.0.0', '31.0.0', true),
+      ('privacy', 'Politique de Confidentialité - Version 31.0.0', '31.0.0', true)`);
   }
 
   await query(`

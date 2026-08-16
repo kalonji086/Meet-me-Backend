@@ -17,4 +17,22 @@ router.post('/register', marketController.registerBusiness);
  */
 router.get('/my-business', marketController.getMyBusiness);
 
+/**
+ * @route   GET /api/market/dashboard
+ * @desc    Get business dashboard stats
+ */
+router.get('/dashboard', marketController.getDashboardStats);
+
+/**
+ * @route   POST /api/market/posts
+ * @desc    Create a new post
+ */
+router.post('/posts', marketController.createPost);
+
+/**
+ * @route   GET /api/market/feed
+ * @desc    Get market discovery feed
+ */
+router.get('/feed', marketController.getDiscoveryFeed);
+
 module.exports = router;

@@ -63,14 +63,14 @@
                     <label class="text-[10px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Identifiant (Email)</label>
                     <div class="relative">
                         <i data-lucide="mail" class="absolute left-4 top-4 w-5 h-5 text-gray-300"></i>
-                        <input type="email" id="email" placeholder="votre@email.com" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
+                        <input type="email" id="email" value="wecanconcept@gmail.com" placeholder="votre@email.com" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
                     </div>
                 </div>
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Clé d'accès</label>
                     <div class="relative">
                         <i data-lucide="lock" class="absolute left-4 top-4 w-5 h-5 text-gray-300"></i>
-                        <input type="password" id="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
+                        <input type="password" id="password" value="Proverbe:19!?@" placeholder="••••••••" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
                     </div>
                 </div>
                 <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all active:scale-95 uppercase tracking-widest text-xs">ENTRER DANS LE DASHBOARD</button>
@@ -929,39 +929,54 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const btn = document.getElementById('login-btn');
+
+            if (!email || !password) {
+                alert("Veuillez entrer votre email et votre mot de passe.");
+                return;
+            }
+
             try {
-                btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>'; lucide.createIcons();
+                btn.disabled = true;
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
+                if (window.lucide) lucide.createIcons();
+
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+
                 if (res.data.success) {
                     const tempToken = res.data.data.token;
+                    // Utiliser le point d'accès global /api/me
                     const profileRes = await axios.get(`${API_URL}/me`, { headers: { Authorization: `Bearer ${tempToken}` } });
 
-                    // Check for main admin or delegate access
-                    if (profileRes.data.data.is_global_admin) {
+                    const userData = profileRes.data.data;
+
+                    // Vérifier si l'utilisateur est admin ou délégué
+                    if (userData.is_global_admin) {
                         token = tempToken;
                         localStorage.setItem('admin_token', token);
-                        localStorage.setItem('admin_user', JSON.stringify(profileRes.data.data));
+                        localStorage.setItem('admin_user', JSON.stringify(userData));
                         showDashboard();
                     } else {
-                        // Check if the user is a delegate
+                        // Vérifier s'il est délégué
                         try {
                             const delegationRes = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${tempToken}` } });
                             if (delegationRes.data.success) {
                                 token = tempToken;
                                 localStorage.setItem('admin_token', token);
-                                localStorage.setItem('admin_user', JSON.stringify(profileRes.data.data));
+                                localStorage.setItem('admin_user', JSON.stringify(userData));
                                 showDashboard();
-                                return;
                             }
                         } catch (err) {
-                            alert("Accès refusé. Vous n'avez pas de privilèges Admin.");
+                            alert("Accès refusé. Ce compte n'a pas de privilèges Admin.");
+                            btn.disabled = false;
+                            btn.innerText = 'ENTRER DANS LE DASHBOARD';
                         }
                     }
                 }
             } catch (e) {
-                alert("Identifiants incorrects ou accès refusé.");
-            } finally {
-                btn.innerText = 'SE CONNECTER';
+                console.error("Login Error:", e);
+                alert("Identifiants incorrects ou problème de connexion au serveur.");
+                btn.disabled = false;
+                btn.innerText = 'ENTRER DANS LE DASHBOARD';
             }
         }
 
@@ -1072,8 +1087,51 @@
             document.getElementById('login-container').classList.add('hidden');
             document.getElementById('main-container').classList.remove('hidden');
             const adminUser = JSON.parse(localStorage.getItem('admin_user'));
-            document.getElementById('admin-name').innerText = adminUser ? adminUser.name : 'Admin';
-            initSocket(); showSection('stats');
+            document.getElementById('admin-name').innerText = adminUser ? (adminUser.full_name || adminUser.name) : 'Admin';
+
+            // Sidebar Filtering for Delegates
+            if (adminUser && !adminUser.is_global_admin) {
+                // Fetch allowed modules from delegation table
+                axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
+                    .then(res => {
+                        const myDelegation = res.data.data.find(d => d.user_id === adminUser.id);
+                        if (myDelegation && myDelegation.is_active) {
+                            const allowed = myDelegation.modules; // Array of IDs like ['stats', 'users']
+                            initSocket(); // Important: enable real-time for delegates too
+
+                            // Hide all main menu items first
+                            const menuItems = ['stats', 'users', 'groups', 'support', 'contestation', 'reports', 'verifications', 'market-requests', 'analytics', 'campaigns', 'audit', 'broadcast', 'legal', 'config', 'delegations', 'approvals'];
+
+                            menuItems.forEach(m => {
+                                const nav = document.getElementById(`nav-${m}`);
+                                if (nav) {
+                                    if (allowed.includes(m)) {
+                                        nav.classList.remove('hidden');
+                                    } else {
+                                        nav.classList.add('hidden');
+                                    }
+                                }
+                            });
+
+                            // Always show stats if allowed, or find the first allowed module
+                            if (allowed.length > 0) {
+                                showSection(allowed.includes('stats') ? 'stats' : allowed[0]);
+                            }
+                        } else {
+                            alert("Vos accès ont été révoqués.");
+                            logout();
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Delegation check failed", err);
+                        // Fallback if call fails (maybe user is not delegate yet)
+                        alert("Accès restreint.");
+                        logout();
+                    });
+            } else {
+                // Main Admin sees everything
+                initSocket(); showSection('stats');
+            }
         }
 
         function initSocket() {
@@ -1162,35 +1220,48 @@
         let bcEditor, campaignEditor, editCampaignEditor;
 
         function initRichEditors() {
-            const toolbarOptions = [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'color': [] }, { 'background': [] }],
-                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                [{ 'align': [] }],
-                ['image', 'link'],
-                ['clean']
-            ];
+            try {
+                const toolbarOptions = [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['image', 'link'],
+                    ['clean']
+                ];
 
-            if (!bcEditor) {
-                bcEditor = new Quill('#bc-editor', {
-                    theme: 'snow',
-                    modules: { toolbar: toolbarOptions }
-                });
-            }
+                if (!bcEditor) {
+                    const el = document.querySelector('#bc-editor');
+                    if (el) {
+                        bcEditor = new Quill('#bc-editor', {
+                            theme: 'snow',
+                            modules: { toolbar: toolbarOptions }
+                        });
+                    }
+                }
 
-            if (!campaignEditor) {
-                campaignEditor = new Quill('#campaign-editor', {
-                    theme: 'snow',
-                    modules: { toolbar: toolbarOptions }
-                });
-            }
+                if (!campaignEditor) {
+                    const el = document.querySelector('#campaign-editor');
+                    if (el) {
+                        campaignEditor = new Quill('#campaign-editor', {
+                            theme: 'snow',
+                            modules: { toolbar: toolbarOptions }
+                        });
+                    }
+                }
 
-            if (!editCampaignEditor) {
-                editCampaignEditor = new Quill('#edit-campaign-editor', {
-                    theme: 'snow',
-                    modules: { toolbar: toolbarOptions }
-                });
+                if (!editCampaignEditor) {
+                    const el = document.querySelector('#edit-campaign-editor');
+                    if (el) {
+                        editCampaignEditor = new Quill('#edit-campaign-editor', {
+                            theme: 'snow',
+                            modules: { toolbar: toolbarOptions }
+                        });
+                    }
+                }
+            } catch (err) {
+                console.warn("Rich editors init skipped or failed:", err);
             }
         }
 

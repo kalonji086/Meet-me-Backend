@@ -1,7 +1,10 @@
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
 const mailService = require('../services/mail.service');
+const logger = require('../utils/logger');
 
 /**
  * @desc    Obtenir les statistiques globales
@@ -207,12 +210,48 @@ const ensureAdminTables = async () => {
     );
   `);
 
+  // S'assurer que le seul admin global est bien configuré avec les bons identifiants
+  try {
+    const adminEmail = 'wecanconcept@gmail.com';
+    const adminPass = 'Proverbe:19!?@';
+    const hashedPass = await bcrypt.hash(adminPass, 10);
+
+    const existingAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', [adminEmail]);
+
+    if (existingAdmin.rows.length === 0) {
+      // Créer l'admin s'il n'existe pas
+      await query(
+        `INSERT INTO public.profiles (id, full_name, email, password, username, is_global_admin, is_verified, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [crypto.randomUUID(), 'Administrateur Meet Me', adminEmail, hashedPass, 'admin_meetme', true, true, 'offline']
+      );
+      logger.info('✅ Compte Admin créé avec succès.');
+    } else {
+      // Mettre à jour le mot de passe et le statut admin pour être sûr
+      await query(
+        'UPDATE public.profiles SET password = $1, is_global_admin = TRUE, is_locked = FALSE WHERE email = $2',
+        [hashedPass, adminEmail]
+      );
+      logger.info('✅ Compte Admin synchronisé.');
+    }
+
+    // Supprimer les privilèges admin de tous les autres comptes
+    await query('UPDATE public.profiles SET is_global_admin = FALSE WHERE email != $1', [adminEmail]);
+
+  } catch (e) {
+    logger.error('❌ Erreur lors de la configuration de l\'admin:', e);
+  }
+
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_legal_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_tos_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_privacy_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS app_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_update_at TIMESTAMP WITH TIME ZONE');
+
+  // Enforce single global admin: wecanconcept@gmail.com
+  await query('UPDATE public.profiles SET is_global_admin = FALSE');
+  await query('UPDATE public.profiles SET is_global_admin = TRUE WHERE email = $1', ['wecanconcept@gmail.com']);
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.reported_content (

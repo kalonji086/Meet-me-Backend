@@ -111,7 +111,7 @@ END $$;
 
 -- 4. Droits Administrateurs
 UPDATE public.profiles SET is_global_admin = FALSE;
-UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'wecanconcept@gmail.co';
+UPDATE public.profiles SET is_global_admin = TRUE WHERE email = 'wecanconcept@gmail.com';
 
 -- 5. Autres tables avec CASCADE
 CREATE TABLE IF NOT EXISTS public.chats (

@@ -321,11 +321,40 @@ const getInventory = asyncHandler(async (req, res) => {
   if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
 
   const result = await query(
-    'SELECT * FROM public.market_inventory WHERE business_id = $1 ORDER BY name ASC',
+    'SELECT * FROM public.market_inventory WHERE business_id = $1 ORDER BY item_name ASC',
     [business.rows[0].id]
   );
 
   res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Add or update inventory item
+ */
+const updateInventory = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { itemName, quantity, price, action } = req.body; // action: 'add', 'remove', 'create'
+
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+  const bId = business.rows[0].id;
+
+  const existing = await query('SELECT id, quantity FROM public.market_inventory WHERE business_id = $1 AND item_name = $2', [bId, itemName]);
+
+  if (action === 'create' || existing.rows.length === 0) {
+    await query(
+      'INSERT INTO public.market_inventory (business_id, item_name, quantity, price) VALUES ($1, $2, $3, $4)',
+      [bId, itemName, quantity, price || 0]
+    );
+  } else {
+    const newQty = action === 'add' ? existing.rows[0].quantity + quantity : Math.max(0, existing.rows[0].quantity - quantity);
+    await query(
+      'UPDATE public.market_inventory SET quantity = $1, updated_at = NOW() WHERE id = $2',
+      [newQty, existing.rows[0].id]
+    );
+  }
+
+  res.json({ success: true });
 });
 
 /**

@@ -72,6 +72,11 @@ router.get('/requests', marketController.getRequests);
 router.get('/inventory', marketController.getInventory);
 
 /**
+ * @route   POST /api/market/inventory
+ */
+router.post('/inventory', marketController.updateInventory);
+
+/**
  * @route   GET /api/market/chats
  */
 router.get('/chats', marketController.getBusinessChats);

@@ -31,6 +31,18 @@
 
     <div id="toast-container" class="fixed top-5 right-5 space-y-4 z-[9999]"></div>
 
+    <!-- BLOCKED SCREEN -->
+    <div id="blocked-container" class="hidden flex-1 flex items-center justify-center bg-gray-900 p-4 z-[1000] fixed inset-0">
+        <div class="max-w-md w-full bg-white p-12 rounded-[3rem] shadow-2xl text-center animate-pop-in">
+            <div class="w-24 h-24 bg-red-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8">
+                <i data-lucide="shield-off" class="w-12 h-12 text-red-600"></i>
+            </div>
+            <h3 class="text-3xl font-black text-gray-900 tracking-tighter mb-4 uppercase">ACCÈS RÉVOQUÉ</h3>
+            <p class="text-gray-500 font-medium leading-relaxed mb-10">Vos privilèges d'administration ont été suspendus par l'administrateur principal. Veuillez contacter le support pour toute réclamation.</p>
+            <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Retour à l'accueil</button>
+        </div>
+    </div>
+
     <!-- LOGIN SCREEN -->
     <div id="login-container" class="flex-1 flex items-center justify-center bg-gray-100 p-4">
         <div class="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in text-center">
@@ -41,11 +53,11 @@
             <div class="space-y-6 text-left">
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Identifiant Email</label>
-                    <input type="email" id="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="votre@email.com" autocomplete="off">
+                    <input type="email" id="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="votre@email.com" autocomplete="off" value="">
                 </div>
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label>
-                    <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password">
+                    <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password" value="">
                 </div>
                 <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
             </div>
@@ -353,6 +365,8 @@
         function showDashboard() {
             document.getElementById('login-container').classList.add('hidden');
             document.getElementById('main-container').classList.remove('hidden');
+            document.getElementById('blocked-container').classList.add('hidden');
+
             const user = JSON.parse(localStorage.getItem('admin_user'));
             document.getElementById('admin-name').innerText = (user.full_name || user.name).toUpperCase();
 
@@ -368,7 +382,7 @@
                             const allowed = myDelegation.modules; // Array of module names
 
                             // Mapping: module in DB -> Sidebar Nav ID
-                            const mapping = {
+                            const sidebarMapping = {
                                 'stats': 'nav-stats',
                                 'users': 'nav-users',
                                 'groups': 'nav-groups',
@@ -382,14 +396,14 @@
                             };
 
                             // Hide everything first
-                            Object.values(mapping).forEach(id => {
+                            Object.values(sidebarMapping).forEach(id => {
                                 const nav = document.getElementById(id);
                                 if (nav) nav.classList.add('hidden');
                             });
 
-                            // Show allowed
+                            // Show only allowed ones
                             allowed.forEach(m => {
-                                const navId = mapping[m];
+                                const navId = sidebarMapping[m];
                                 if (navId) {
                                     const nav = document.getElementById(navId);
                                     if (nav) nav.classList.remove('hidden');
@@ -405,9 +419,15 @@
                                 const sectionMap = { 'market-requests': 'market-requests', 'support': 'appeals', 'reports': 'appeals' };
                                 const first = sectionMap[allowed[0]] || allowed[0];
                                 showSection(first);
+                            } else {
+                                // Rediriger vers l'écran bloqué si aucun module n'est autorisé
+                                document.getElementById('main-container').classList.add('hidden');
+                                document.getElementById('blocked-container').classList.remove('hidden');
                             }
                         } else {
-                            alert("Accès révoqué ou inactif."); logout();
+                            // Rediriger vers l'écran bloqué si le délégué est inactif
+                            document.getElementById('main-container').classList.add('hidden');
+                            document.getElementById('blocked-container').classList.remove('hidden');
                         }
                     }).catch(() => { logout(); });
             } else {
@@ -784,18 +804,24 @@
                         <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
                         <div class="flex items-center space-x-3">
                             <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
-                            <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="shield-off" class="w-4 h-4"></i></button>
+                            <button onclick="editDelegation('${d.user_id}', '${d.full_name}', '${d.modules.join(',')}', ${d.is_active})" class="p-3 bg-gray-50 text-gray-400 hover:text-purple-600 rounded-xl transition-all" title="Modifier les accès"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}', ${d.is_active})" class="p-3 ${d.is_active ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'} rounded-xl hover:shadow-lg transition-all" title="${d.is_active ? 'Révoquer' : 'Rétablir'}"><i data-lucide="${d.is_active ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                         </div>
                     </div>
                 `).join(''); lucide.createIcons();
             } catch (e) {}
         }
 
-        async function revokeDelegation(userId, name) {
-            if (!confirm(`Révoquer tous les privilèges de ${name} ?`)) return;
+        async function revokeDelegation(userId, name, currentlyActive) {
+            const action = currentlyActive ? "RÉVOQUER" : "RÉTABLIR";
+            if (!confirm(`${action} les privilèges de ${name} ?`)) return;
             try {
-                await axios.post(`${API_URL}/admin/delegations`, { userId, modules: [], isActive: false }, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Privilèges révoqués !"); loadDelegations();
+                // Pour révoquer, on garde les modules mais on passe isActive à false
+                // Pour rétablir, on passe isActive à true
+                const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
+                const d = res.data.data.find(x => x.user_id === userId);
+                await axios.post(`${API_URL}/admin/delegations`, { userId, modules: d.modules, isActive: !currentlyActive }, { headers: { Authorization: `Bearer ${token}` } });
+                alert(`Privilèges ${currentlyActive ? 'révoqués' : 'rétablis'} !`); loadDelegations();
             } catch (e) { alert("Erreur."); }
         }
 

@@ -855,13 +855,19 @@
 
         function editDelegation(userId, userName, modules = "", active = true) {
             const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
+            const currentModules = modules ? modules.split(',') : [];
+
             let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
-                <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all"><input type="checkbox" value="${m}" class="mod-checkbox w-5 h-5 accent-purple-600 mr-3"><span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m}</span></label>
+                <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all">
+                    <input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3">
+                    <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m}</span>
+                </label>
             `).join('') + `</div>`;
+
             Alert.show("Droits Admin", html, async () => {
                 const selected = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
                 try {
-                    await axios.post(`${API_URL}/admin/delegations`, { userId, modules: selected, isActive: true }, { headers: { Authorization: `Bearer ${token}` } });
+                    await axios.post(`${API_URL}/admin/delegations`, { userId, modules: selected, isActive: active }, { headers: { Authorization: `Bearer ${token}` } });
                     alert("Délégation validée !"); closeImpactModal(); loadDelegations();
                 } catch (e) { alert("Erreur."); }
             }, "Valider la Délégation", "purple");

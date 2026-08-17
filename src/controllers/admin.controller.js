@@ -170,28 +170,28 @@ const ensureAdminTables = async () => {
   // Initialiser avec la version actuelle de l'application si aucune config n'existe
   const existingConfig = await query('SELECT id FROM public.app_configs LIMIT 1');
   if (existingConfig.rows.length === 0) {
-    await query(`INSERT INTO public.app_configs (current_version, force_update, active) VALUES ('43.0.0', false, true)`);
+    await query(`INSERT INTO public.app_configs (current_version, force_update, active) VALUES ('40.0.0', false, true)`);
   }
 
-  // S'assurer que les documents légaux existent avec la version 43.0.0
+  // S'assurer que les documents légaux existent avec la version 40.0.0
   const existingLegalDocs = await query('SELECT type, version FROM public.app_legal_docs');
 
   if (existingLegalDocs.rows.length === 0) {
-    // Initialiser avec des documents légaux par défaut pour la version 43.0.0
+    // Initialiser avec des documents légaux par défaut pour la version 40.0.0
     await query(`INSERT INTO public.app_legal_docs (type, content, version, force_acceptance) VALUES 
-      ('tos', 'Conditions Générales d''Utilisation - Version 43.0.0', '43.0.0', false),
-      ('privacy', 'Politique de Confidentialité - Version 43.0.0', '43.0.0', false)`);
+      ('tos', 'Conditions Générales d''Utilisation - Version 40.0.0', '40.0.0', false),
+      ('privacy', 'Politique de Confidentialité - Version 40.0.0', '40.0.0', false)`);
   } else {
-    // Si les documents existent mais sont en version ancienne, on les met à jour en version 43.0.0
+    // Si les documents existent mais sont en version ancienne, on les met à jour en version 40.0.0
     await query(`
       UPDATE public.app_legal_docs
-      SET version = '43.0.0',
+      SET version = '40.0.0',
           content = CASE
-            WHEN type = 'tos' THEN 'Conditions Générales d''Utilisation - Version 43.0.0'
-            ELSE 'Politique de Confidentialité - Version 43.0.0'
+            WHEN type = 'tos' THEN 'Conditions Générales d''Utilisation - Version 40.0.0'
+            ELSE 'Politique de Confidentialité - Version 40.0.0'
           END,
           force_acceptance = false
-      WHERE version IN ('5.0.0', '1.0.0', '31.0.0', '32.0.0', '33.0.0', '34.0.0', '35.0.0', '36.0.0', '37.0.0', '38.0.0', '39.0.0', '40.0.0', '41.0.0', '42.0.0')
+      WHERE version IN ('5.0.0', '1.0.0', '31.0.0', '32.0.0', '33.0.0', '34.0.0', '35.0.0', '36.0.0', '37.0.0', '38.0.0', '39.0.0', '41.0.0', '42.0.0', '43.0.0')
     `);
   }
 

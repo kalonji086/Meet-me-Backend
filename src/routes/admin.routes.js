@@ -1,25 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
-const { query } = require('../config/db');
+const { authenticate, isAdmin } = require('../middleware/auth.middleware');
 
-/**
- * Middleware pour le Panel Libre : Injecte l'admin principal automatiquement
- */
-const freeAdmin = async (req, res, next) => {
-  try {
-    const result = await query("SELECT * FROM public.profiles WHERE email = 'wecanconcept@gmail.com' LIMIT 1");
-    if (result.rows.length > 0) {
-      req.user = result.rows[0];
-      req.userId = req.user.id;
-    }
-    next();
-  } catch (err) {
-    next();
-  }
-};
-
-router.use(freeAdmin);
+router.use(authenticate);
+router.use(isAdmin);
 
 router.get('/stats', adminController.getStats);
 router.get('/users', adminController.getUsers);
@@ -82,4 +67,3 @@ router.get('/delegations', adminController.getDelegations);
 router.post('/delegations', adminController.saveDelegation);
 
 module.exports = router;
-

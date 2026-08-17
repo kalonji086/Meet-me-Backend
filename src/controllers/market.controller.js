@@ -449,6 +449,7 @@ module.exports = {
   getOrders,
   getRequests,
   getInventory,
+  updateInventory,
   getBusinessChats,
   getDocuments,
   uploadDocument,

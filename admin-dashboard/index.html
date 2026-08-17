@@ -34,18 +34,18 @@
     <!-- LOGIN SCREEN -->
     <div id="login-container" class="flex-1 flex items-center justify-center bg-gray-100 p-4">
         <div class="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in text-center">
-            <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+            <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
                 <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-16 h-16" alt="Logo">
             </div>
             <h3 class="text-4xl font-black text-gray-900 tracking-tighter mb-10 uppercase">Meet Me Admin</h3>
             <div class="space-y-6 text-left">
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Identifiant Email</label>
-                    <input type="email" id="email" value="wecanconcept@gmail.com" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Email">
+                    <input type="email" id="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="votre@email.com" autocomplete="off">
                 </div>
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label>
-                    <input type="password" id="password" value="Proverbe:19!?@" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe">
+                    <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password">
                 </div>
                 <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
             </div>
@@ -63,7 +63,7 @@
                 </div>
                 <p class="text-[9px] text-gray-500 uppercase tracking-widest font-black">Official Admin Panel</p>
             </div>
-            <nav class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll custom-scrollbar">
+            <nav id="admin-sidebar-nav" class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll custom-scrollbar">
                 <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="layout-dashboard" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vue d'ensemble</span>
                 </a>
@@ -91,7 +91,7 @@
                 <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="settings" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Config App</span>
                 </a>
-                <div class="border-t border-gray-800 my-4 pt-4">
+                <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
                         <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span>
                     </a>
@@ -170,7 +170,7 @@
                     </div>
                 </div>
 
-                <div id="section-market" class="hidden animate-fade-in">
+                <div id="section-market-requests" class="hidden animate-fade-in">
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
                         <table class="w-full text-left">
                             <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5">Business</th><th class="px-8 py-5">Propriétaire</th><th class="px-8 py-5">Catégorie</th><th class="px-8 py-5 text-right">Action</th></tr></thead>
@@ -192,7 +192,6 @@
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left" id="groups-table"></table></div>
                 </div>
 
-                <!-- SECTION CAMPAIGNS -->
                 <div id="section-campaigns" class="hidden animate-fade-in max-w-5xl mx-auto space-y-10 pb-20">
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
                         <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Lancer une Campagne</h3>
@@ -213,7 +212,7 @@
                                 <input type="text" id="campaign-title" placeholder="Ex: Nouvelle fonctionnalité dispo !" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
                             </div>
                             <div>
-                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Contenu du message (Style Amazon)</label>
+                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Contenu du message</label>
                                 <div class="quill-editor-container"><div id="campaign-editor"></div></div>
                             </div>
                             <button onclick="sendCampaign()" id="campaign-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest transition-all">DIFFUSER LA CAMPAGNE</button>
@@ -222,12 +221,12 @@
                 </div>
 
                 <div id="section-delegations" class="hidden animate-fade-in max-w-5xl mx-auto">
-                    <div class="flex justify-between items-center mb-8"><h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Atribus</h3><button onclick="showAddDelegationModal()" class="bg-orange-500 text-white px-8 py-4 rounded-2xl font-black text-xs shadow-lg shadow-orange-100">NOUVELLE DÉLÉGATION</button></div>
+                    <div class="flex justify-between items-center mb-8"><h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Atribus (Délégués)</h3><button onclick="showAddDelegationModal()" class="bg-orange-500 text-white px-8 py-4 rounded-2xl font-black text-xs shadow-lg shadow-orange-100 uppercase tracking-widest">Nouvelle Délégation</button></div>
                     <div class="grid grid-cols-1 gap-4" id="delegations-list"></div>
                 </div>
 
                 <div id="section-approvals" class="hidden animate-fade-in max-w-4xl mx-auto">
-                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Approbations Pendues</h3>
+                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Actions à approuver</h3>
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden" id="approvals-list"></div>
                 </div>
 
@@ -273,7 +272,7 @@
         </div>
     </div>
 
-    <!-- MODAL IMPACT (Global Dialog) -->
+    <!-- GLOBAL IMPACT MODAL -->
     <div id="impact-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[500] p-6 backdrop-blur-xl">
         <div class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
             <div id="impact-header" class="h-40 flex items-center justify-center bg-purple-600"><i id="impact-icon" data-lucide="alert-circle" class="w-16 h-16 text-white"></i></div>
@@ -339,7 +338,7 @@
             const password = document.getElementById('password').value.trim();
             const btn = document.getElementById('login-btn');
             try {
-                btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>'; lucide.createIcons();
+                btn.disabled = true; btn.innerHTML = 'CONNEXION...';
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
                 if (res.data.success) {
                     token = res.data.data.token;
@@ -353,9 +352,50 @@
         function showDashboard() {
             document.getElementById('login-container').classList.add('hidden');
             document.getElementById('main-container').classList.remove('hidden');
-            const u = JSON.parse(localStorage.getItem('admin_user'));
-            document.getElementById('admin-name').innerText = (u.full_name || u.name).toUpperCase();
-            initSocket(); initRichEditors(); showSection('stats');
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            document.getElementById('admin-name').innerText = (user.full_name || user.name).toUpperCase();
+
+            initSocket();
+            initRichEditors();
+
+            // Permission Enforcement for Delegates
+            if (user && !user.isGlobalAdmin) {
+                axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
+                    .then(res => {
+                        const myDelegation = res.data.data.find(d => d.user_id === user.id);
+                        if (myDelegation && myDelegation.is_active) {
+                            const allowed = myDelegation.modules; // Array of module names
+                            const menuItems = ['stats', 'users', 'groups', 'appeals', 'market', 'verifications', 'campaigns', 'legal', 'config'];
+
+                            menuItems.forEach(m => {
+                                const navId = m === 'market' ? 'nav-market-requests' : 'nav-' + m;
+                                const nav = document.getElementById(navId);
+                                if (nav) {
+                                    if (allowed.includes(m) || (m === 'market' && allowed.includes('market-requests'))) {
+                                        nav.classList.remove('hidden');
+                                    } else {
+                                        nav.classList.add('hidden');
+                                    }
+                                }
+                            });
+
+                            // Hide the Administration tools section for delegates
+                            const adminTools = document.getElementById('admin-only-tools');
+                            if (adminTools) adminTools.classList.add('hidden');
+
+                            // Redirect to the first allowed section
+                            if (allowed.length > 0) {
+                                const first = allowed[0] === 'market-requests' ? 'market-requests' : allowed[0];
+                                showSection(first);
+                            }
+                        } else {
+                            alert("Accès révoqué."); logout();
+                        }
+                    }).catch(() => { logout(); });
+            } else {
+                // Main Admin sees everything
+                showSection('stats');
+            }
         }
 
         function initSocket() {
@@ -415,6 +455,7 @@
             if (name === 'groups') loadGroups();
             if (name === 'legal') loadLegal();
             if (name === 'config') loadConfig();
+
             lucide.createIcons();
         }
 
@@ -625,7 +666,7 @@
                 await axios.post(`${API_URL}/admin/campaigns`, { title, message, target, targetValue }, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Campagne lancée !");
                 document.getElementById('campaign-title').value = ''; campaignEditor.setContents([]);
-            } catch (e) { alert("Erreur."); } finally { btn.disabled = false; btn.innerText = 'DIFFUSER LA CAMPAGNE'; }
+            } catch (e) { alert("Erreur lors de l'envoi."); } finally { btn.disabled = false; btn.innerText = 'DIFFUSER LA CAMPAGNE'; }
         }
 
         async function loadGroups() {
@@ -634,11 +675,58 @@
                 document.getElementById('groups-table').innerHTML = res.data.data.map(g => `
                     <tr class="border-b border-gray-50 p-6 flex items-center justify-between hover:bg-gray-50 transition-all">
                         <td class="flex items-center"><img src="${getFullUrl(g.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md"><div><p class="font-black text-gray-800 text-sm">${g.name}</p><p class="text-[10px] text-gray-400 font-bold uppercase">${g.members_count} membres</p></div></td>
-                        <td class="text-right"><button onclick="deleteGroup('${g.id}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+                        <td class="text-right space-x-2">
+                            <button onclick="viewMembers('${g.id}')" class="p-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all"><i data-lucide="users" class="w-4 h-4"></i></button>
+                            <button onclick="toggleGroupBan('${g.id}', ${!g.is_banned})" class="p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${g.is_banned ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
+                            <button onclick="confirmDeleteGroup('${g.id}', '${g.name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
                     </tr>
                 `).join(''); lucide.createIcons();
             } catch (e) {}
         }
+
+        async function viewMembers(chatId) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/groups/${chatId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('members-list').innerHTML = res.data.data.map(m => `
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div class="flex items-center">
+                            <img src="${getFullUrl(m.avatar_url)}" class="w-8 h-8 rounded-lg mr-3 shadow-sm">
+                            <div><p class="text-xs font-bold text-gray-800">${m.full_name}</p><p class="text-[9px] text-gray-400 font-bold uppercase">${m.role}</p></div>
+                        </div>
+                        <button onclick="removeMember('${chatId}', '${m.id}')" class="p-2 text-red-400 hover:bg-red-50 rounded-lg"><i data-lucide="user-minus" class="w-4 h-4"></i></button>
+                    </div>
+                `).join('') || '<p class="p-10 text-center text-gray-400 font-bold uppercase text-xs">Aucun membre</p>';
+                document.getElementById('modal-members').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) { alert("Erreur chargement membres."); }
+        }
+
+        async function removeMember(chatId, userId) {
+            if (!confirm("Retirer ce membre ?")) return;
+            try {
+                await axios.delete(`${API_URL}/admin/groups/${chatId}/members/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+                viewMembers(chatId);
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function toggleGroupBan(chatId, ban) {
+            try {
+                await axios.put(`${API_URL}/admin/groups/${chatId}/ban`, { isBanned: ban }, { headers: { Authorization: `Bearer ${token}` } });
+                loadGroups();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        function confirmDeleteGroup(id, name) {
+            Alert.show("Supprimer Groupe", `Supprimer le groupe <b>${name}</b> définitivement ?`, async () => {
+                try {
+                    await axios.delete(`${API_URL}/admin/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                    closeImpactModal(); loadGroups();
+                } catch (e) { alert("Erreur."); }
+            }, "Supprimer", "red");
+        }
+
+        function closeMembersModal() { document.getElementById('modal-members').classList.add('hidden'); }
 
         async function toggleUserLock(id, lock) {
             await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
@@ -673,9 +761,20 @@
             document.getElementById('delegations-list').innerHTML = res.data.data.map(d => `
                 <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm animate-fade-in mb-2">
                     <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
-                    <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
+                    <div class="flex items-center space-x-3">
+                        <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
+                        <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="shield-off" class="w-4 h-4"></i></button>
+                    </div>
                 </div>
             `).join(''); lucide.createIcons();
+        }
+
+        async function revokeDelegation(userId, name) {
+            if (!confirm(`Révoquer tous les privilèges de ${name} ?`)) return;
+            try {
+                await axios.post(`${API_URL}/admin/delegations`, { userId, modules: [], isActive: false }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Privilèges révoqués !"); loadDelegations();
+            } catch (e) { alert("Erreur."); }
         }
 
         async function loadApprovals() {

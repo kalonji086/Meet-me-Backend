@@ -285,12 +285,38 @@ const getOrders = asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT o.*, p.full_name as customer_name, p.avatar_url as customer_avatar, p.phone_number as customer_phone
      FROM public.market_orders o
-     JOIN public.profiles p ON o.user_id = p.id
+     LEFT JOIN public.profiles p ON o.user_id = p.id
      WHERE o.business_id = $1 ORDER BY o.created_at DESC`,
     [business.rows[0].id]
   );
 
   res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Create a manual order
+ */
+const createOrder = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { customerName, items, totalAmount, status = 'pending' } = req.body;
+
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+  const bId = business.rows[0].id;
+
+  // Si on a un nom de client manuel, on stocke ça dans les métadonnées ou une colonne dédiée
+  // Pour l'instant, on s'assure que la table supporte les infos manuelles
+  try {
+    await query('ALTER TABLE public.market_orders ADD COLUMN IF NOT EXISTS manual_customer_name TEXT');
+  } catch (e) {}
+
+  const result = await query(
+    `INSERT INTO public.market_orders (business_id, items, total_amount, status, manual_customer_name)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [bId, items || {}, totalAmount, status, customerName]
+  );
+
+  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 /**
@@ -524,6 +550,7 @@ module.exports = {
   toggleSubscription,
   getBusinessById,
   getOrders,
+  createOrder,
   updateOrder,
   getRequests,
   getInventory,

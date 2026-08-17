@@ -62,6 +62,11 @@ router.get('/business/:id', marketController.getBusinessById);
 router.get('/orders', marketController.getOrders);
 
 /**
+ * @route   POST /api/market/orders
+ */
+router.post('/orders', marketController.createOrder);
+
+/**
  * @route   PUT /api/market/orders/:orderId
  */
 router.put('/orders/:orderId', marketController.updateOrder);

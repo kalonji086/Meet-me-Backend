@@ -65,10 +65,30 @@ const checkChatParticipation = async (req, res, next) => {
 };
 
 /**
- * Middleware pour l'admin global
+ * Middleware pour l'admin global ou délégué
  */
-const isAdmin = (req, res, next) => {
+const isAdmin = async (req, res, next) => {
   if (req.user && req.user.is_global_admin) return next();
+
+  try {
+    // Vérifier si l'utilisateur est délégué
+    const delegation = await query('SELECT modules, is_active FROM public.admin_delegations WHERE user_id = $1', [req.userId]);
+    if (delegation.rows.length > 0) {
+      if (!delegation.rows[0].is_active) {
+        return res.status(403).json({
+          success: false,
+          error: 'Accès Admin révoqué',
+          message: 'Vos privilèges d\'administration ont été retirés par l\'administrateur principal.'
+        });
+      }
+      req.user.is_delegated = true;
+      req.user.allowed_modules = delegation.rows[0].modules;
+      return next();
+    }
+  } catch (err) {
+    logger.error('Error checking admin delegation:', err);
+  }
+
   res.status(403).json({ success: false, error: 'Accès réservé à l\'administrateur.' });
 };
 

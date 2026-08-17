@@ -11,7 +11,7 @@ const getMe = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   const result = await query(
-    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin, is_locked, push_token FROM public.profiles WHERE id = $1',
+    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin, is_locked, push_token, accepted_tos_version, accepted_privacy_version, accepted_legal_version FROM public.profiles WHERE id = $1',
     [userId]
   );
 

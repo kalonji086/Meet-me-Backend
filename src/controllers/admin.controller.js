@@ -407,30 +407,150 @@ const resolveReport = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Helper to check and process sensitive actions
+ */
+const processSensitiveAction = async (req, actionType, targetId, targetName, details = {}) => {
+  if (req.user.is_global_admin) return true; // L'admin principal peut tout faire directement
+
+  // Créer une action en attente pour les délégués
+  await query(
+    `INSERT INTO public.admin_pending_actions (requested_by, action_type, target_id, target_name, details)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [req.userId, actionType, targetId?.toString(), targetName, JSON.stringify(details)]
+  );
+
+  // Notifier l'admin principal en temps réel
+  const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
+  if (mainAdmin.rows.length > 0) {
+    socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_pending_action', {
+      actionType,
+      targetName,
+      requestedBy: req.user.full_name
+    });
+  }
+
+  return false; // Action différée (nécessite approbation)
+};
+
+/**
+ * @desc    Lister les actions en attente d'approbation
+ */
+const getPendingActions = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+
+  const result = await query(`
+    SELECT apa.*, p.full_name as requester_name
+    FROM public.admin_pending_actions apa
+    JOIN public.profiles p ON apa.requested_by = p.id
+    WHERE apa.status = 'pending'
+    ORDER BY apa.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Approuver ou rejeter une action sensible
+ */
+const handlePendingAction = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const { id } = req.params;
+  const { decision } = req.body; // 'approved' or 'rejected'
+
+  const actionRes = await query('SELECT * FROM public.admin_pending_actions WHERE id = $1', [id]);
+  if (actionRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Action non trouvée' });
+  const action = actionRes.rows[0];
+
+  if (decision === 'approved') {
+    try {
+      switch (action.action_type) {
+        case 'delete_user':
+          await query('DELETE FROM public.profiles WHERE id = $1', [action.target_id]);
+          break;
+        case 'toggle_user_lock':
+          await query('UPDATE public.profiles SET is_locked = $1 WHERE id = $2', [action.details.isLocked, action.target_id]);
+          break;
+        case 'delete_group':
+          await query('DELETE FROM public.chats WHERE id = $1', [action.target_id]);
+          break;
+        case 'toggle_group_ban':
+          await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [action.details.isBanned, action.target_id]);
+          break;
+        case 'delete_market':
+          await query('DELETE FROM public.market_businesses WHERE id = $1', [action.target_id]);
+          break;
+        case 'toggle_market_block':
+          await query('UPDATE public.market_businesses SET status = $1 WHERE id = $2', [action.details.status, action.target_id]);
+          break;
+      }
+      await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1 WHERE id = $2', [req.userId, id]);
+    } catch (err) {
+      return res.status(500).json({ success: false, error: 'Erreur lors de l\'exécution de l\'action approuvée' });
+    }
+  } else {
+    await query('UPDATE public.admin_pending_actions SET status = \'rejected\', processed_at = NOW(), processed_by = $1 WHERE id = $2', [req.userId, id]);
+  }
+
+  socketService.sendToUser(action.requested_by, 'admin:action_processed', { actionType: action.action_type, decision });
+  res.json({ success: true, message: `Action ${decision === 'approved' ? 'approuvée et exécutée' : 'rejetée'}.` });
+});
+
+/**
+ * @desc    Lister les délégations (Atributions)
+ */
+const getDelegations = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT ad.*, p.full_name, p.email, p.avatar_url
+    FROM public.admin_delegations ad
+    JOIN public.profiles p ON ad.user_id = p.id
+    ORDER BY ad.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Créer ou mettre à jour une délégation
+ */
+const saveDelegation = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const { userEmail, modules, isActive = true } = req.body;
+
+  const userRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [userEmail.toLowerCase()]);
+  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Meet Me non trouvé avec cet email' });
+  const userId = userRes.rows[0].id;
+
+  await query(
+    `INSERT INTO public.admin_delegations (user_id, modules, is_active, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (user_id) DO UPDATE
+     SET modules = EXCLUDED.modules, is_active = EXCLUDED.is_active, updated_at = NOW()`,
+    [userId, modules, isActive]
+  );
+
+  const mailService = require('../services/mail.service');
+  await mailService.sendAdminPrivilegeEmail(userEmail, userRes.rows[0].full_name, modules);
+
+  res.json({ success: true, message: 'Privilèges enregistrés et email envoyé.' });
+});
+
+/**
  * @desc    Supprimer un utilisateur
  */
 const deleteUser = asyncHandler(async (req, res) => {
   const { userId } = req.params;
+  const user = await query('SELECT full_name, is_global_admin FROM public.profiles WHERE id = $1', [userId]);
+  if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  if (user.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
 
-  // 1. Vérifier si la cible est un admin
-  const target = await query('SELECT is_global_admin FROM public.profiles WHERE id = $1', [userId]);
-  if (!target.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
-  if (target.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
+  const canExecute = await processSensitiveAction(req, 'delete_user', userId, user.rows[0].full_name);
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression envoyée à l\'admin principal.' });
 
-  // 2. Nettoyage manuel des dépendances critiques (au cas où CASCADE manque)
   await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
   await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
-  await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]); // Résout le bug de contrainte
-  await query('DELETE FROM public.appeals WHERE user_id = $1', [userId]);
-  await query('DELETE FROM public.verification_requests WHERE user_id = $1', [userId]);
-  await query('DELETE FROM public.reported_content WHERE reporter_id = $1 OR target_id = $1', [userId]);
-  await query('UPDATE public.notification_campaigns SET created_by = NULL WHERE created_by = $1', [userId]);
-
-  // 3. Suppression finale du profil
+  await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [userId]);
   await query('DELETE FROM public.profiles WHERE id = $1', [userId]);
 
   await logAdminAction(req, 'delete_user', 'user', userId, { deleted: true });
-  res.json({ success: true, message: 'Utilisateur et toutes ses données supprimés' });
+  res.json({ success: true, message: 'Utilisateur supprimé' });
 });
 
 /**
@@ -439,6 +559,12 @@ const deleteUser = asyncHandler(async (req, res) => {
 const toggleUserLock = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { isLocked } = req.body;
+  const user = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
+  if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+
+  const canExecute = await processSensitiveAction(req, 'toggle_user_lock', userId, user.rows[0].full_name, { isLocked });
+  if (!canExecute) return res.json({ success: true, pending: true, message: `Demande de ${isLocked ? 'blocage' : 'déblocage'} envoyée.` });
+
   await query('UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3', [isLocked, isLocked ? 3 : 0, userId]);
   await logAdminAction(req, isLocked ? 'lock_user' : 'unlock_user', 'user', userId, { isLocked });
   res.json({ success: true });

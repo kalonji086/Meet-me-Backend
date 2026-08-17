@@ -496,4 +496,28 @@ CREATE TABLE IF NOT EXISTS public.market_quotes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Admin Delegations (Atributions)
+CREATE TABLE IF NOT EXISTS public.admin_delegations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
+  modules TEXT[] NOT NULL DEFAULT '{}',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Admin Pending Actions (Approval System)
+CREATE TABLE IF NOT EXISTS public.admin_pending_actions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  requested_by UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  action_type TEXT NOT NULL,
+  target_id TEXT,
+  target_name TEXT,
+  details JSONB DEFAULT '{}'::jsonb,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  processed_at TIMESTAMP WITH TIME ZONE,
+  processed_by UUID REFERENCES public.profiles(id)
+);
+
 ALTER TABLE public.messages REPLICA IDENTITY FULL;

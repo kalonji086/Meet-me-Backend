@@ -36,6 +36,21 @@ router.post('/posts', marketController.createPost);
 router.get('/feed', marketController.getDiscoveryFeed);
 
 /**
+ * @route   POST /api/market/posts/:postId/like
+ */
+router.post('/posts/:postId/like', marketController.toggleLike);
+
+/**
+ * @route   POST /api/market/posts/:postId/comment
+ */
+router.post('/posts/:postId/comment', marketController.addComment);
+
+/**
+ * @route   POST /api/market/business/:businessId/subscribe
+ */
+router.post('/business/:businessId/subscribe', marketController.toggleSubscription);
+
+/**
  * @route   GET /api/market/business/:id
  * @desc    Get business details
  */

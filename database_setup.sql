@@ -444,6 +444,33 @@ CREATE TABLE IF NOT EXISTS public.market_reviews (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Market Post Likes
+CREATE TABLE IF NOT EXISTS public.market_post_likes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id UUID REFERENCES public.market_posts(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(post_id, user_id)
+);
+
+-- Market Post Comments
+CREATE TABLE IF NOT EXISTS public.market_post_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id UUID REFERENCES public.market_posts(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Market Business Subscriptions (Followers)
+CREATE TABLE IF NOT EXISTS public.market_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID REFERENCES public.market_businesses(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(business_id, user_id)
+);
+
 -- Market Documents (Portfolio)
 CREATE TABLE IF NOT EXISTS public.market_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

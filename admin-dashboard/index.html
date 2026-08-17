@@ -912,6 +912,7 @@
         const Alert = {
             showCustomModal: function(title, html, onConfirm) {
                 const modal = document.getElementById('impact-modal');
+                if (!modal) return;
                 const header = document.getElementById('impact-header');
                 const icon = document.getElementById('impact-icon');
                 const titleEl = document.getElementById('impact-title');
@@ -931,26 +932,20 @@
             }
         };
 
-        // Global Chart Registry to prevent memory leaks and conflicts
-        const charts = {
-            trend: null,
-            pie: null,
-            status: null,
-            radial: null,
-            master: null,
-            userActivity: null,
-            analyticsTopUsers: null
-        };
+        // Global Chart Registry
+        const charts = { trend: null, pie: null, status: null, radial: null, master: null, userActivity: null, analyticsTopUsers: null };
 
         window.onload = () => {
-            lucide.createIcons();
-            initRichEditors();
-            if (token) showDashboard();
+            try {
+                if (window.lucide) lucide.createIcons();
+                initRichEditors();
+                if (token) showDashboard();
+            } catch (err) { console.warn("Init error:", err); }
         };
 
         async function login() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
             const btn = document.getElementById('login-btn');
 
             if (!email || !password) {
@@ -967,39 +962,39 @@
 
                 if (res.data.success) {
                     const tempToken = res.data.data.token;
-                    // Utiliser le point d'accès global /api/me
                     const profileRes = await axios.get(`${API_URL}/me`, { headers: { Authorization: `Bearer ${tempToken}` } });
 
                     const userData = profileRes.data.data;
 
-                    // Vérifier si l'utilisateur est admin ou délégué
                     if (userData.is_global_admin) {
                         token = tempToken;
                         localStorage.setItem('admin_token', token);
                         localStorage.setItem('admin_user', JSON.stringify(userData));
                         showDashboard();
                     } else {
-                        // Vérifier s'il est délégué
+                        // Check delegation
                         try {
-                            const delegationRes = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${tempToken}` } });
-                            if (delegationRes.data.success) {
+                            const delRes = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${tempToken}` } });
+                            if (delRes.data.success) {
                                 token = tempToken;
                                 localStorage.setItem('admin_token', token);
                                 localStorage.setItem('admin_user', JSON.stringify(userData));
                                 showDashboard();
                             }
                         } catch (err) {
-                            alert("Accès refusé. Ce compte n'a pas de privilèges Admin.");
+                            alert("Accès refusé. Privilèges Admin manquants.");
                             btn.disabled = false;
                             btn.innerText = 'ENTRER DANS LE DASHBOARD';
+                            if (window.lucide) lucide.createIcons();
                         }
                     }
                 }
             } catch (e) {
                 console.error("Login Error:", e);
-                alert("Identifiants incorrects ou problème de connexion au serveur.");
+                alert("Identifiants incorrects ou serveur injoignable.");
                 btn.disabled = false;
                 btn.innerText = 'ENTRER DANS LE DASHBOARD';
+                if (window.lucide) lucide.createIcons();
             }
         }
 

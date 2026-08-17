@@ -401,6 +401,77 @@ const getGroups = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Membres d'un groupe
+ */
+const getGroupMembers = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const result = await query(`
+    SELECT p.id, p.full_name, p.username, p.email, p.avatar_url, cp.role, cp.joined_at
+    FROM public.chat_participants cp
+    JOIN public.profiles p ON cp.user_id = p.id
+    WHERE cp.chat_id = $1
+    ORDER BY cp.joined_at DESC
+  `, [chatId]);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Mettre à jour le rôle d'un membre (Nommer Admin, etc.)
+ */
+const updateMemberRole = asyncHandler(async (req, res) => {
+  const { chatId, userId } = req.params;
+  const { role } = req.body; // 'admin' or 'member'
+
+  await query(
+    'UPDATE public.chat_participants SET role = $1 WHERE chat_id = $2 AND user_id = $3',
+    [role, chatId, userId]
+  );
+
+  res.json({ success: true });
+});
+
+/**
+ * @desc    Déplacer un membre vers un autre groupe
+ */
+const moveMemberToGroup = asyncHandler(async (req, res) => {
+  const { userId, fromChatId, toChatId } = req.body;
+
+  // 1. Retirer de l'ancien groupe
+  await query('DELETE FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2', [fromChatId, userId]);
+
+  // 2. Ajouter au nouveau groupe
+  await query(
+    'INSERT INTO public.chat_participants (chat_id, user_id, role) VALUES ($1, $2, \'member\') ON CONFLICT DO NOTHING',
+    [toChatId, userId]
+  );
+
+  res.json({ success: true });
+});
+
+/**
+ * @desc    Lister tous les groupes (pour sélection dans le déplacement)
+ */
+const getAllGroupsList = asyncHandler(async (req, res) => {
+  const result = await query('SELECT id, name FROM public.chats WHERE type = \'group\' ORDER BY name ASC');
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Mettre à jour les informations du groupe (Logo, Description)
+ */
+const updateGroupInfo = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { name, description, avatar_url } = req.body;
+
+  await query(
+    'UPDATE public.chats SET name = $1, description = $2, avatar_url = $3, updated_at = NOW() WHERE id = $4',
+    [name, description, avatar_url, chatId]
+  );
+
+  res.json({ success: true });
+});
+
+/**
  * @desc    Bannir/Débannir un groupe
  */
 const toggleGroupBan = asyncHandler(async (req, res) => {
@@ -922,10 +993,36 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
       ['approved', id]
     );
 
-    // 2. Notifier l'utilisateur par Socket et EMAIL
+    // --- NOUVELLE LOGIQUE D'AJOUT AUTOMATIQUE AU GROUPE ---
+    const groupName = `${business.category} Meet Me`;
+
+    // Vérifier si le groupe de catégorie existe déjà
+    let groupRes = await query("SELECT id FROM public.chats WHERE name = $1 AND type = 'group'", [groupName]);
+    let chatId;
+
+    if (groupRes.rows.length === 0) {
+      // Créer le groupe s'il n'existe pas
+      const newGroup = await query(
+        "INSERT INTO public.chats (name, description, type, avatar_url) VALUES ($1, $2, 'group', $3) RETURNING id",
+        [groupName, `Groupe officiel des professionnels : ${business.category}`, 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png']
+      );
+      chatId = newGroup.rows[0].id;
+    } else {
+      chatId = groupRes.rows[0].id;
+    }
+
+    // Ajouter l'utilisateur au groupe
+    await query(
+      "INSERT INTO public.chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+      [chatId, userId]
+    );
+    // -----------------------------------------------------
+
+    // 3. Notifier l'utilisateur par Socket et EMAIL
     const socketService = require('../services/socket.service');
     socketService.sendToUser(userId, 'market:approved', {
-      businessName: business.business_name
+      businessName: business.business_name,
+      chatId
     });
 
     const mailService = require('../services/mail.service');
@@ -934,7 +1031,7 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
       business.owner_name || 'Utilisateur',
       business.business_name,
       business.category,
-      'Dashboard' // On remplace le nom du groupe par une mention générique
+      groupName
     );
 
   } else {
@@ -1119,6 +1216,10 @@ module.exports = {
   toggleUserLock,
   getGroups,
   getGroupMembers,
+  updateMemberRole,
+  moveMemberToGroup,
+  getAllGroupsList,
+  updateGroupInfo,
   toggleGroupBan,
   deleteGroup,
   getAppeals,

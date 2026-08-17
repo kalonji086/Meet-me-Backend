@@ -773,10 +773,64 @@
     </div>
 
     <!-- MODAL MEMBRES GROUPE -->
-    <div id="modal-members" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
-            <div class="p-6 border-b flex justify-between items-center bg-gray-50"><h3 class="text-xl font-bold text-gray-800">Membres du groupe</h3><button onclick="closeModal()" class="p-2 hover:bg-gray-200 rounded-full"><i data-lucide="x" class="w-6 h-6 text-gray-500"></i></button></div>
-            <div id="members-list" class="max-h-[60vh] overflow-y-auto p-4 space-y-4"></div>
+    <div id="modal-members" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[250] p-4 backdrop-blur-md">
+        <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
+            <div class="p-8 border-b bg-purple-50 flex justify-between items-center">
+                <div>
+                    <h3 id="members-modal-title" class="text-2xl font-black text-purple-800 tracking-tighter">Membres du Groupe</h3>
+                    <p id="members-modal-subtitle" class="text-xs font-bold text-purple-400 uppercase tracking-widest mt-1">Gestion des accès</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="showEditGroupModal()" class="p-2 bg-white text-purple-600 rounded-xl shadow-sm border border-purple-100 hover:bg-purple-600 hover:text-white transition-all"><i data-lucide="settings" class="w-5 h-5"></i></button>
+                    <button onclick="closeModal()" class="p-2 hover:bg-purple-100 rounded-full"><i data-lucide="x" class="w-6 h-6 text-purple-400"></i></button>
+                </div>
+            </div>
+            <div id="members-list" class="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar">
+                <!-- Members list injected via JS -->
+            </div>
+            <div class="p-8 border-t bg-gray-50">
+                <button onclick="closeModal()" class="w-full py-4 font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-all">FERMER</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDIT GROUP INFO -->
+    <div id="modal-edit-group" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[310] p-4 backdrop-blur-md">
+        <div class="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in">
+            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
+                <h3 class="text-xl font-black text-gray-800 tracking-tighter">Modifier le Groupe</h3>
+                <button onclick="closeEditGroupModal()" class="p-2 hover:bg-gray-200 rounded-full"><i data-lucide="x" class="w-6 h-6 text-gray-400"></i></button>
+            </div>
+            <div class="p-10 space-y-6">
+                <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Nom du groupe</label><input id="edit-group-name" type="text" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+                <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Description</label><textarea id="edit-group-desc" rows="3" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></textarea></div>
+                <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">URL du Logo (Avatar)</label><input id="edit-group-avatar" type="text" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none"></div>
+            </div>
+            <div class="p-8 border-t bg-gray-50">
+                <button onclick="saveGroupInfo()" class="w-full bg-purple-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-purple-700 transition-all">ENREGISTRER LES MODIFICATIONS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL MOVE MEMBER -->
+    <div id="modal-move-member" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[320] p-4 backdrop-blur-md">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in">
+            <div class="p-8 border-b bg-orange-50 flex justify-between items-center">
+                <h3 class="text-xl font-black text-orange-800 tracking-tighter">Déplacer le Membre</h3>
+                <button onclick="closeMoveModal()" class="p-2 hover:bg-orange-100 rounded-full"><i data-lucide="x" class="w-6 h-6 text-orange-400"></i></button>
+            </div>
+            <div class="p-10 space-y-6">
+                <p id="move-member-name" class="text-sm font-bold text-gray-600 text-center"></p>
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Choisir le nouveau groupe</label>
+                    <select id="move-group-select" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold">
+                        <!-- Groups injected via JS -->
+                    </select>
+                </div>
+            </div>
+            <div class="p-8 border-t bg-gray-50">
+                <button id="btn-confirm-move" class="w-full bg-orange-500 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-orange-600 transition-all">DÉPLACER MAINTENANT</button>
+            </div>
         </div>
     </div>
 
@@ -1890,12 +1944,124 @@
             } catch (e) {}
         }
 
+        let currentViewingChatId = null;
+
         async function viewMembers(chatId) {
-            const res = await axios.get(`${API_URL}/admin/groups/${chatId}/members`, { headers: { Authorization: `Bearer ${token}` } });
-            const list = document.getElementById('members-list'); list.innerHTML = '';
-            res.data.data.forEach(m => { const div = document.createElement('div'); div.className = "flex items-center p-3 bg-gray-50 rounded-xl mb-2"; div.innerHTML = `<img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+m.full_name}" class="w-8 h-8 rounded-full mr-4"><div class="flex-1"><p class="font-bold text-gray-800 text-sm">${m.full_name}</p><p class="text-[10px] text-gray-500">@${m.username || 'n/a'}</p></div>`; list.appendChild(div); });
-            document.getElementById('modal-members').classList.remove('hidden'); lucide.createIcons();
+            currentViewingChatId = chatId;
+            try {
+                const res = await axios.get(`${API_URL}/admin/groups/${chatId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+                const list = document.getElementById('members-list'); list.innerHTML = '';
+
+                res.data.data.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center p-4 bg-gray-50 rounded-2xl mb-3 border border-gray-100 hover:border-purple-200 transition-all";
+                    div.innerHTML = `
+                        <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+m.full_name}" class="w-10 h-10 rounded-xl mr-4 shadow-sm">
+                        <div class="flex-1">
+                            <p class="font-bold text-gray-800 text-sm">${m.full_name}</p>
+                            <div class="flex items-center mt-1">
+                                <span class="px-2 py-0.5 ${m.role === 'admin' ? 'bg-purple-600' : 'bg-gray-400'} text-white rounded text-[8px] font-black uppercase mr-2">${m.role}</span>
+                                <p class="text-[9px] text-gray-500 font-bold">@${m.username || 'n/a'}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="changeRole('${chatId}', '${m.id}', '${m.role === 'admin' ? 'member' : 'admin'}')" class="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition-all" title="Changer Rôle (Admin/Membre)">
+                                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="showMoveMemberModal('${m.id}', '${m.full_name}', '${chatId}')" class="p-2 text-orange-500 hover:bg-orange-100 rounded-lg transition-all" title="Déplacer vers un autre groupe">
+                                <i data-lucide="external-link" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="removeMember('${chatId}', '${m.id}')" class="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-all" title="Retirer du groupe">
+                                <i data-lucide="user-minus" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+                document.getElementById('modal-members').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) { alert("Erreur chargement membres."); }
         }
+
+        async function changeRole(chatId, userId, newRole) {
+            try {
+                await axios.put(`${API_URL}/admin/groups/${chatId}/members/${userId}/role`, { role: newRole }, { headers: { Authorization: `Bearer ${token}` } });
+                viewMembers(chatId);
+            } catch (e) { alert("Erreur changement rôle."); }
+        }
+
+        async function removeMember(chatId, userId) {
+            if (!confirm("Retirer ce membre du groupe ?")) return;
+            try {
+                // On utilise l'API de suppression de membre existante ou générique
+                await axios.delete(`${API_URL}/admin/groups/${chatId}/members/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+                viewMembers(chatId);
+            } catch (e) { alert("Erreur suppression."); }
+        }
+
+        async function showEditGroupModal() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
+                const g = res.data.data.find(item => item.id === currentViewingChatId);
+                if (!g) return;
+
+                document.getElementById('edit-group-name').value = g.name;
+                document.getElementById('edit-group-desc').value = g.description || '';
+                document.getElementById('edit-group-avatar').value = g.avatar_url || '';
+
+                document.getElementById('modal-edit-group').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function saveGroupInfo() {
+            const data = {
+                name: document.getElementById('edit-group-name').value,
+                description: document.getElementById('edit-group-desc').value,
+                avatar_url: document.getElementById('edit-group-avatar').value
+            };
+            try {
+                await axios.put(`${API_URL}/admin/admin/groups/${currentViewingChatId}/info`, data, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Groupe mis à jour !");
+                closeEditGroupModal();
+                loadGroups();
+                viewMembers(currentViewingChatId);
+            } catch (e) { alert("Erreur mise à jour."); }
+        }
+
+        async function showMoveMemberModal(userId, userName, fromChatId) {
+            document.getElementById('move-member-name').innerText = `Déplacer ${userName}`;
+            try {
+                const res = await axios.get(`${API_URL}/admin/groups/list`, { headers: { Authorization: `Bearer ${token}` } });
+                const select = document.getElementById('move-group-select');
+                select.innerHTML = '';
+                res.data.data.forEach(g => {
+                    if (g.id !== fromChatId) {
+                        const opt = document.createElement('option');
+                        opt.value = g.id;
+                        opt.text = g.name;
+                        select.appendChild(opt);
+                    }
+                });
+
+                document.getElementById('btn-confirm-move').onclick = async () => {
+                    const toChatId = select.value;
+                    try {
+                        await axios.post(`${API_URL}/admin/groups/move-member`, { userId, fromChatId, toChatId }, { headers: { Authorization: `Bearer ${token}` } });
+                        alert("Membre déplacé !");
+                        closeMoveModal();
+                        viewMembers(fromChatId);
+                    } catch (e) { alert("Erreur déplacement."); }
+                };
+
+                document.getElementById('modal-move-member').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        function closeEditGroupModal() { document.getElementById('modal-edit-group').classList.add('hidden'); }
+        function closeMoveModal() { document.getElementById('modal-move-member').classList.add('hidden'); }
+        function closeMembersModal() { document.getElementById('modal-members').classList.add('hidden'); currentViewingChatId = null; }
 
         let allBroadcastsData = [];
         let currentBroadcastsView = 'sent';

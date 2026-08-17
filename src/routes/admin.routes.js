@@ -12,7 +12,11 @@ router.delete('/users/:userId', adminController.deleteUser);
 router.put('/users/:userId/lock', adminController.toggleUserLock);
 
 router.get('/groups', adminController.getGroups);
+router.get('/groups/list', adminController.getAllGroupsList);
 router.get('/groups/:chatId/members', adminController.getGroupMembers);
+router.put('/groups/:chatId/members/:userId/role', adminController.updateMemberRole);
+router.post('/groups/move-member', adminController.moveMemberToGroup);
+router.put('/groups/:chatId/info', adminController.updateGroupInfo);
 router.put('/groups/:chatId/ban', adminController.toggleGroupBan);
 router.delete('/groups/:chatId', adminController.deleteGroup);
 

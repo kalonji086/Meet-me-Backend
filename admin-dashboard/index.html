@@ -908,6 +908,29 @@
         let selectedAppeal = null;
         let appeals_data = [];
 
+        // Global Alert Helper for custom modals
+        const Alert = {
+            showCustomModal: function(title, html, onConfirm) {
+                const modal = document.getElementById('impact-modal');
+                const header = document.getElementById('impact-header');
+                const icon = document.getElementById('impact-icon');
+                const titleEl = document.getElementById('impact-title');
+                const messageEl = document.getElementById('impact-message');
+                const confirmBtn = document.getElementById('impact-confirm-btn');
+
+                header.className = "h-40 flex items-center justify-center bg-orange-500";
+                icon.setAttribute('data-lucide', 'settings');
+                titleEl.innerText = title;
+                messageEl.innerHTML = html; // Injection HTML pour les checkboxes
+
+                confirmBtn.onclick = onConfirm;
+                confirmBtn.className = "flex-1 py-4 bg-orange-500 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all";
+
+                modal.classList.remove('hidden');
+                if (window.lucide) lucide.createIcons();
+            }
+        };
+
         // Global Chart Registry to prevent memory leaks and conflicts
         const charts = {
             trend: null,

@@ -20,11 +20,13 @@ const runMigrations = async () => {
     const sql = fs.readFileSync(sqlPath, 'utf8');
 
     // On exécute le script SQL
-    // Note: Utiliser pool.query avec tout le contenu du fichier
-    // Pour Postgres, on peut envoyer plusieurs commandes séparées par des points-virgules
     await pool.query(sql);
 
-    logger.info('✅ Migrations terminées avec succès (Tables créées ou déjà existantes)');
+    // Initialisation des tables admin et du compte admin principal
+    const adminController = require('../controllers/admin.controller');
+    await adminController.ensureAdminTables();
+
+    logger.info('✅ Migrations et initialisation Admin terminées avec succès');
   } catch (error) {
     logger.error('❌ Erreur lors de l\'exécution des migrations:');
     logger.error(error.message);

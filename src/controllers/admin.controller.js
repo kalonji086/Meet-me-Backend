@@ -530,6 +530,9 @@ const saveDelegation = asyncHandler(async (req, res) => {
   const mailService = require('../services/mail.service');
   await mailService.sendAdminPrivilegeEmail(user.email, user.full_name, modules);
 
+  // Mise à jour temps réel via Socket
+  socketService.emitToUser(userId, 'admin:delegation_updated', { modules, isActive });
+
   res.json({ success: true, message: 'Privilèges enregistrés et invitation envoyée.' });
 });
 

@@ -363,83 +363,76 @@
         }
 
         function showDashboard() {
-            document.getElementById('login-container').classList.add('hidden');
-            document.getElementById('main-container').classList.remove('hidden');
-            document.getElementById('blocked-container').classList.add('hidden');
-
             const user = JSON.parse(localStorage.getItem('admin_user'));
+            if (!user) return logout();
+
             document.getElementById('admin-name').innerText = (user.full_name || user.name).toUpperCase();
 
-            initSocket();
-            initRichEditors();
-
-            // Permission Enforcement for Delegates
-            if (user && !user.isGlobalAdmin) {
+            if (user.isGlobalAdmin) {
+                document.getElementById('login-container').classList.add('hidden');
+                document.getElementById('main-container').classList.remove('hidden');
+                document.getElementById('blocked-container').classList.add('hidden');
+                initSocket();
+                initRichEditors();
+                showSection('stats');
+            } else {
+                // Delegate check before showing main-container
                 axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
                     .then(res => {
                         const myDelegation = res.data.data.find(d => d.user_id === user.id);
-                        if (myDelegation && myDelegation.is_active) {
-                            const allowed = myDelegation.modules; // Array of module names
-
-                            // Mapping: module in DB -> Sidebar Nav ID
-                            const sidebarMapping = {
-                                'stats': 'nav-stats',
-                                'users': 'nav-users',
-                                'groups': 'nav-groups',
-                                'support': 'nav-appeals',
-                                'reports': 'nav-appeals',
-                                'market-requests': 'nav-market-requests',
-                                'verifications': 'nav-verifications',
-                                'campaigns': 'nav-campaigns',
-                                'legal': 'nav-legal',
-                                'config': 'nav-config'
-                            };
-
-                            // Hide everything first
-                            Object.values(sidebarMapping).forEach(id => {
-                                const nav = document.getElementById(id);
-                                if (nav) nav.classList.add('hidden');
-                            });
-
-                            // Show only allowed ones
-                            allowed.forEach(m => {
-                                const navId = sidebarMapping[m];
-                                if (navId) {
-                                    const nav = document.getElementById(navId);
-                                    if (nav) nav.classList.remove('hidden');
-                                }
-                            });
-
-                            // Hide admin only tools div
-                            const adminTools = document.getElementById('admin-only-tools');
-                            if (adminTools) adminTools.classList.add('hidden');
-
-                            // Redirect to first allowed module
-                            if (allowed.length > 0) {
-                                const sectionMap = { 'market-requests': 'market-requests', 'support': 'appeals', 'reports': 'appeals' };
-                                const first = sectionMap[allowed[0]] || allowed[0];
-                                showSection(first);
-                            } else {
-                                // Rediriger vers l'écran bloqué si aucun module n'est autorisé
-                                document.getElementById('main-container').classList.add('hidden');
-                                document.getElementById('blocked-container').classList.remove('hidden');
-                            }
+                        if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
+                            document.getElementById('login-container').classList.add('hidden');
+                            document.getElementById('main-container').classList.remove('hidden');
+                            document.getElementById('blocked-container').classList.add('hidden');
+                            initSocket();
+                            initRichEditors();
+                            filterSidebar(myDelegation.modules);
                         } else {
-                            // Rediriger vers l'écran bloqué si le délégué est inactif
+                            document.getElementById('login-container').classList.add('hidden');
                             document.getElementById('main-container').classList.add('hidden');
                             document.getElementById('blocked-container').classList.remove('hidden');
                         }
-                    }).catch(() => { logout(); });
-            } else {
-                // Main Admin sees everything
-                showSection('stats');
+                    }).catch(() => {
+                        document.getElementById('login-container').classList.add('hidden');
+                        document.getElementById('main-container').classList.add('hidden');
+                        document.getElementById('blocked-container').classList.remove('hidden');
+                    });
             }
+        }
+
+        function filterSidebar(allowed) {
+            const sidebarMapping = {
+                'stats': 'nav-stats', 'users': 'nav-users', 'groups': 'nav-groups',
+                'support': 'nav-appeals', 'reports': 'nav-appeals',
+                'market-requests': 'nav-market-requests', 'verifications': 'nav-verifications',
+                'campaigns': 'nav-campaigns', 'legal': 'nav-legal', 'config': 'nav-config'
+            };
+            Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
+            allowed.forEach(m => { const navId = sidebarMapping[m]; if (navId) { const nav = document.getElementById(navId); if (nav) nav.classList.remove('hidden'); } });
+            const adminTools = document.getElementById('admin-only-tools'); if (adminTools) adminTools.classList.add('hidden');
+            const sectionMap = { 'market-requests': 'market-requests', 'support': 'appeals', 'reports': 'appeals' };
+            const first = sectionMap[allowed[0]] || allowed[0];
+            showSection(first);
         }
 
         function initSocket() {
             if (socket) return;
             socket = io(BASE_URL, { query: { token } });
             socket.on('connect', () => console.log("Socket connected"));
+
+            socket.on('admin:delegation_updated', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (user && !user.isGlobalAdmin) {
+                    if (data.isActive && data.modules.length > 0) {
+                        filterSidebar(data.modules);
+                        addNotification('security', 'Privilèges mis à jour', 'Vos accès au panel ont été modifiés.', 'shield-check');
+                    } else {
+                        document.getElementById('main-container').classList.add('hidden');
+                        document.getElementById('blocked-container').classList.remove('hidden');
+                    }
+                }
+            });
+
             socket.on('admin_new_user', (data) => addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus'));
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
             socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));

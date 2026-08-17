@@ -158,6 +158,7 @@ const getDiscoveryFeed = asyncHandler(async (req, res) => {
     `SELECT p.*, b.business_name, b.logo_url, b.category, b.national_id_number, b.status as business_status,
      (SELECT COUNT(*) FROM public.market_post_likes WHERE post_id = p.id) as likes_count,
      (SELECT COUNT(*) FROM public.market_post_comments WHERE post_id = p.id) as comments_count,
+     (SELECT COUNT(*) FROM public.market_subscriptions WHERE business_id = b.id) as followers_count,
      EXISTS(SELECT 1 FROM public.market_post_likes WHERE post_id = p.id AND user_id = $1) as is_liked
      FROM public.market_posts p
      JOIN public.market_businesses b ON p.business_id = b.id

@@ -49,31 +49,31 @@
 
     <!-- LOGIN SCREEN -->
     <div id="login-container" class="flex-1 flex items-center justify-center bg-gray-100 p-4">
-        <div class="max-w-md w-full bg-white p-10 rounded-3xl shadow-2xl border border-gray-100 animate-fade-in">
+        <div class="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in">
             <div class="text-center mb-10">
-                <div class="w-20 h-20 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="shield-check" class="w-10 h-10 text-purple-600"></i>
+                <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-16 h-16" alt="Logo">
                 </div>
-                <h3 class="text-3xl font-extrabold text-gray-900">Meet Me Admin</h3>
-                <p class="text-gray-500 mt-2">Authentification requise</p>
+                <h3 class="text-4xl font-black text-gray-900 tracking-tighter">Meet Me Admin</h3>
+                <p class="text-gray-400 font-bold uppercase text-[10px] tracking-widest mt-2">Accès Sécurisé</p>
             </div>
 
-            <div class="space-y-5">
+            <div class="space-y-6">
                 <div>
-                    <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Adresse Email</label>
+                    <label class="text-[10px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Identifiant (Email)</label>
                     <div class="relative">
-                        <i data-lucide="mail" class="absolute left-4 top-3.5 w-5 h-5 text-gray-400"></i>
-                        <input type="email" id="email" placeholder="votre@email.com" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+                        <i data-lucide="mail" class="absolute left-4 top-4 w-5 h-5 text-gray-300"></i>
+                        <input type="email" id="email" placeholder="votre@email.com" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
                     </div>
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-gray-400 uppercase mb-2 block tracking-widest">Mot de passe</label>
+                    <label class="text-[10px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Clé d'accès</label>
                     <div class="relative">
-                        <i data-lucide="lock" class="absolute left-4 top-3.5 w-5 h-5 text-gray-400"></i>
-                        <input type="password" id="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+                        <i data-lucide="lock" class="absolute left-4 top-4 w-5 h-5 text-gray-300"></i>
+                        <input type="password" id="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
                     </div>
                 </div>
-                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold shadow-xl shadow-purple-200 transition-all active:scale-95">SE CONNECTER</button>
+                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all active:scale-95 uppercase tracking-widest text-xs">ENTRER DANS LE DASHBOARD</button>
             </div>
         </div>
     </div>
@@ -934,12 +934,35 @@
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
                 if (res.data.success) {
                     const tempToken = res.data.data.token;
-                    const profileRes = await axios.get(`/api/me`, { headers: { Authorization: `Bearer ${tempToken}` } });
+                    const profileRes = await axios.get(`${API_URL}/me`, { headers: { Authorization: `Bearer ${tempToken}` } });
+
+                    // Check for main admin or delegate access
                     if (profileRes.data.data.is_global_admin) {
-                        token = tempToken; localStorage.setItem('admin_token', token); localStorage.setItem('admin_user', JSON.stringify(profileRes.data.data)); showDashboard();
-                    } else { alert("Accès refusé."); }
+                        token = tempToken;
+                        localStorage.setItem('admin_token', token);
+                        localStorage.setItem('admin_user', JSON.stringify(profileRes.data.data));
+                        showDashboard();
+                    } else {
+                        // Check if the user is a delegate
+                        try {
+                            const delegationRes = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${tempToken}` } });
+                            if (delegationRes.data.success) {
+                                token = tempToken;
+                                localStorage.setItem('admin_token', token);
+                                localStorage.setItem('admin_user', JSON.stringify(profileRes.data.data));
+                                showDashboard();
+                                return;
+                            }
+                        } catch (err) {
+                            alert("Accès refusé. Vous n'avez pas de privilèges Admin.");
+                        }
+                    }
                 }
-            } catch (e) { alert("Identifiants incorrects."); } finally { btn.innerText = 'SE CONNECTER'; }
+            } catch (e) {
+                alert("Identifiants incorrects ou accès refusé.");
+            } finally {
+                btn.innerText = 'SE CONNECTER';
+            }
         }
 
         let notifications_list = [];

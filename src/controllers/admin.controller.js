@@ -1421,5 +1421,9 @@ module.exports = {
   createOfficialGroup,
   getMarketGroupMembers,
   removeMarketGroupMember,
+  getPendingActions,
+  handlePendingAction,
+  getDelegations,
+  saveDelegation,
   ensureAdminTables
 };

@@ -446,6 +446,20 @@ const updateInventory = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Delete inventory item
+ */
+const deleteInventoryItem = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { itemId } = req.params;
+
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  await query('DELETE FROM public.market_inventory WHERE id = $1 AND business_id = $2', [itemId, business.rows[0].id]);
+  res.json({ success: true });
+});
+
+/**
  * @desc    Get inventory logs
  */
 const getInventoryLogs = asyncHandler(async (req, res) => {
@@ -570,6 +584,7 @@ module.exports = {
   updateOrder,
   getRequests,
   getInventory,
+  deleteInventoryItem,
   getInventoryLogs,
   updateInventory,
   getBusinessChats,

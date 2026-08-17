@@ -97,6 +97,11 @@ router.get('/inventory/logs', marketController.getInventoryLogs);
 router.post('/inventory', marketController.updateInventory);
 
 /**
+ * @route   DELETE /api/market/inventory/:itemId
+ */
+router.delete('/inventory/:itemId', marketController.deleteInventoryItem);
+
+/**
  * @route   GET /api/market/chats
  */
 router.get('/chats', marketController.getBusinessChats);

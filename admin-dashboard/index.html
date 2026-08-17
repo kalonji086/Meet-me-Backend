@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meet Me Admin - Panel Officiel</title>
+    <title>Meet Me Admin - Dashboard Premium</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,7 +22,10 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
         .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
     </style>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 </head>
 <body class="bg-gray-50 flex h-screen overflow-hidden">
 
@@ -31,47 +34,84 @@
     <!-- LOGIN SCREEN -->
     <div id="login-container" class="flex-1 flex items-center justify-center bg-gray-100 p-4">
         <div class="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in text-center">
-            <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+            <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
                 <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-16 h-16" alt="Logo">
             </div>
             <h3 class="text-4xl font-black text-gray-900 tracking-tighter mb-10 uppercase">Meet Me Admin</h3>
             <div class="space-y-6 text-left">
-                <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Identifiant Email</label><input type="email" id="email" value="wecanconcept@gmail.com" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm"></div>
-                <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label><input type="password" id="password" value="Proverbe:19!?@" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm"></div>
-                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest active:scale-95 transition-all">ENTRER DANS LE DASHBOARD</button>
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Identifiant Email</label>
+                    <input type="email" id="email" value="wecanconcept@gmail.com" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Email">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label>
+                    <input type="password" id="password" value="Proverbe:19!?@" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe">
+                </div>
+                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
             </div>
         </div>
     </div>
 
     <!-- MAIN DASHBOARD -->
     <div id="main-container" class="hidden flex flex-1 h-screen overflow-hidden animate-fade-in">
+        <!-- Sidebar -->
         <aside class="w-72 amazon-bg text-gray-300 flex flex-col shadow-2xl shrink-0">
             <div class="p-8 text-center border-b border-gray-800">
-                <div class="flex items-center justify-center mb-2"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-8 h-8 mr-2" alt="Logo"><h1 class="text-2xl font-bold text-white tracking-tight">Meet Me</h1></div>
+                <div class="flex items-center justify-center mb-2">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-8 h-8 mr-2" alt="Logo">
+                    <h1 class="text-2xl font-bold text-white tracking-tight uppercase">Meet Me</h1>
+                </div>
                 <p class="text-[9px] text-gray-500 uppercase tracking-widest font-black">Official Admin Panel</p>
             </div>
             <nav class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll custom-scrollbar">
-                <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="layout-dashboard" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vue d'ensemble</span></a>
-                <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="users" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Utilisateurs</span></a>
-                <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="users-2" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Groupes Chat</span></a>
-                <a href="#" onclick="showSection('appeals')" id="nav-appeals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="life-buoy" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Support & Appeals</span></a>
-                <a href="#" onclick="showSection('market')" id="nav-market" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="shopping-bag" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Demandes Market</span></a>
-                <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="check-circle" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vérifications</span></a>
-                <a href="#" onclick="showSection('campaigns')" id="nav-campaigns" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="send" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Campagnes Push</span></a>
-                <a href="#" onclick="showSection('legal')" id="nav-legal" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="file-text" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Légal (CGU/Privacy)</span></a>
-                <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="settings" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Config App</span></a>
+                <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vue d'ensemble</span>
+                </a>
+                <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="users" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Utilisateurs</span>
+                </a>
+                <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="users-2" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Groupes Chat</span>
+                </a>
+                <a href="#" onclick="showSection('appeals')" id="nav-appeals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="life-buoy" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Support & Appeals</span>
+                </a>
+                <a href="#" onclick="showSection('market')" id="nav-market" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="shopping-bag" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Demandes Market</span>
+                </a>
+                <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="check-circle" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vérifications</span>
+                </a>
+                <a href="#" onclick="showSection('campaigns')" id="nav-campaigns" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="send" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Campagnes Push</span>
+                </a>
+                <a href="#" onclick="showSection('legal')" id="nav-legal" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="file-text" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Légal (CGU/Privacy)</span>
+                </a>
+                <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="settings" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Config App</span>
+                </a>
                 <div class="border-t border-gray-800 my-4 pt-4">
-                    <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400"><i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span></a>
-                    <a href="#" onclick="showSection('approvals')" id="nav-approvals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-green-400"><i data-lucide="check-square" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Approbations</span></a>
+                    <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
+                        <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span>
+                    </a>
+                    <a href="#" onclick="showSection('approvals')" id="nav-approvals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-green-400 transition-all">
+                        <i data-lucide="check-square" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Approbations</span>
+                    </a>
                 </div>
             </nav>
-            <div class="p-6 border-t border-gray-800"><button onclick="logout()" class="w-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-3 rounded-xl font-bold transition-all"><i data-lucide="log-out" class="w-5 h-5 mr-2"></i>Déconnexion</button></div>
+            <div class="p-6 border-t border-gray-800">
+                <button onclick="logout()" class="w-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-3 rounded-xl font-bold transition-all">
+                    <i data-lucide="log-out" class="w-5 h-5 mr-2"></i>Déconnexion
+                </button>
+            </div>
         </aside>
 
+        <!-- Content Area -->
         <div class="flex-1 flex flex-col overflow-hidden bg-gray-50">
             <header class="bg-white border-b border-gray-200 px-8 py-5 flex justify-between items-center shadow-sm">
                 <h2 id="section-title" class="text-xl font-black text-gray-800 tracking-tighter uppercase">Tableau de bord</h2>
-                <p id="admin-name" class="text-sm font-black text-purple-600 bg-purple-50 px-4 py-1.5 rounded-full">ADMINISTRATEUR</p>
+                <p id="admin-name" class="text-sm font-black text-purple-600 bg-purple-50 px-4 py-1.5 rounded-full uppercase">Admin</p>
             </header>
 
             <main class="flex-1 overflow-y-auto p-8 custom-scrollbar">
@@ -96,62 +136,133 @@
                         </div>
                     </div>
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center">
-                        <div class="w-full max-w-[450px] h-[450px]"><canvas id="overviewMasterChart"></canvas></div>
-                        <div id="master-legend" class="grid grid-cols-2 gap-4 mt-8 w-full max-w-2xl"></div>
+                         <div class="w-full max-w-[450px] h-[450px]"><canvas id="overviewMasterChart"></canvas></div>
+                         <div id="master-legend" class="grid grid-cols-2 gap-4 mt-8 w-full max-w-2xl"></div>
                     </div>
                 </div>
 
+                <!-- SECTION USERS -->
                 <div id="section-users" class="hidden animate-fade-in">
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
                         <table class="w-full text-left">
-                            <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5 text-gray-500">Profil</th><th class="px-8 py-5">Email & Identifiant</th><th class="px-8 py-5">Sécurité</th><th class="px-8 py-5 text-right">Contrôle</th></tr></thead>
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th class="px-8 py-5">Profil</th>
+                                    <th class="px-8 py-5">Email & Username</th>
+                                    <th class="px-8 py-5">Sécurité</th>
+                                    <th class="px-8 py-5 text-right">Contrôle</th>
+                                </tr>
+                            </thead>
                             <tbody id="users-table-body"></tbody>
                         </table>
                     </div>
                 </div>
 
+                <!-- SECTION MARKET REQUESTS -->
                 <div id="section-market" class="hidden animate-fade-in">
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
                         <table class="w-full text-left">
-                            <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5">Business</th><th class="px-8 py-5">Propriétaire</th><th class="px-8 py-5">Catégorie</th><th class="px-8 py-5 text-right">Action</th></tr></thead>
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th class="px-8 py-5">Business</th>
+                                    <th class="px-8 py-5">Propriétaire</th>
+                                    <th class="px-8 py-5">Catégorie</th>
+                                    <th class="px-8 py-5 text-right">Action</th>
+                                </tr>
+                            </thead>
                             <tbody id="market-requests-table-body"></tbody>
                         </table>
                     </div>
                 </div>
 
+                <!-- SECTION APPEALS (SUPPORT) -->
                 <div id="section-appeals" class="hidden animate-fade-in">
-                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left"><tbody id="appeals-table-body"></tbody></table></div>
-                </div>
-
-                <div id="section-groups" class="hidden animate-fade-in">
-                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left" id="groups-table"></table></div>
-                </div>
-
-                <div id="section-delegations" class="hidden animate-fade-in max-w-5xl mx-auto">
-                    <div class="flex justify-between items-center mb-8"><h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Atribus</h3><button onclick="showAddDelegationModal()" class="bg-orange-500 text-white px-8 py-4 rounded-2xl font-black text-xs shadow-lg shadow-orange-100">NOUVELLE DÉLÉGATION</button></div>
-                    <div class="grid grid-cols-1 gap-4" id="delegations-list"></div>
-                </div>
-
-                <div id="section-approvals" class="hidden animate-fade-in max-w-4xl mx-auto">
-                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Approbations Pendues</h3>
-                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden" id="approvals-list"></div>
-                </div>
-
-                <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto space-y-8 pb-20">
-                    <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
-                        <h4 class="font-black text-gray-800 mb-8 uppercase tracking-widest text-xs opacity-50">Éditeur de documents légaux</h4>
-                        <textarea id="legal-content" class="w-full h-64 p-6 bg-gray-50 border border-gray-200 rounded-[2rem] outline-none font-medium text-sm mb-6" placeholder="Saisir le contenu légal ici..."></textarea>
-                        <div class="flex space-x-4"><button onclick="saveLegal('tos')" class="flex-1 bg-purple-600 text-white py-5 rounded-2xl font-black uppercase text-xs">Mettre à jour TOS</button><button onclick="saveLegal('privacy')" class="flex-1 bg-black text-white py-5 rounded-2xl font-black uppercase text-xs">Mettre à jour Privacy</button></div>
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th class="px-8 py-5">Type</th>
+                                    <th class="px-8 py-5">Demandeur</th>
+                                    <th class="px-8 py-5">Motif / Problème</th>
+                                    <th class="px-8 py-5 text-right">Contrôle</th>
+                                </tr>
+                            </thead>
+                            <tbody id="appeals-table-body"></tbody>
+                        </table>
                     </div>
                 </div>
 
+                <!-- SECTION CAMPAIGNS (CAMPAIGN PUSH) -->
+                <div id="section-campaigns" class="hidden animate-fade-in max-w-5xl mx-auto space-y-10 pb-20">
+                    <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
+                        <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Lancer une Campagne</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Cible de la campagne</label>
+                                <select id="campaign-target" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                                    <option value="all">Tous les utilisateurs Meet Me</option>
+                                    <option value="specific">Email spécifique</option>
+                                </select>
+                            </div>
+                            <div id="specific-email-container" class="hidden">
+                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Adresse Email</label>
+                                <input type="email" id="campaign-target-email" placeholder="email@exemple.com" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Titre de la notification</label>
+                                <input type="text" id="campaign-title" placeholder="Ex: Nouvelle fonctionnalité dispo !" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Contenu du message (Style Amazon)</label>
+                                <div class="quill-editor-container"><div id="campaign-editor"></div></div>
+                            </div>
+                            <button onclick="sendCampaign()" id="campaign-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest transition-all">DIFFUSER LA CAMPAGNE</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION GROUPS -->
+                <div id="section-groups" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left" id="groups-table"></table>
+                    </div>
+                </div>
+
+                <!-- SECTION ATRIBUS (DELEGATIONS) -->
+                <div id="section-delegations" class="hidden animate-fade-in max-w-5xl mx-auto pb-20">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Atribus (Délégués)</h3>
+                        <button onclick="showAddDelegationModal()" class="bg-orange-500 text-white px-8 py-4 rounded-2xl font-black text-xs shadow-lg shadow-orange-100 uppercase tracking-widest">Nouvelle Délégation</button>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4" id="delegations-list"></div>
+                </div>
+
+                <!-- SECTION APPROVALS -->
+                <div id="section-approvals" class="hidden animate-fade-in max-w-4xl mx-auto pb-20">
+                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Actions à approuver</h3>
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden" id="approvals-list"></div>
+                </div>
+
+                <!-- SECTION LEGAL -->
+                <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto space-y-8 pb-20">
+                    <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 text-center">
+                        <h3 class="text-2xl font-black mb-8 uppercase tracking-tighter">Légal & Confidentialité</h3>
+                        <textarea id="legal-content" class="w-full h-80 p-6 bg-gray-50 border border-gray-200 rounded-[2rem] outline-none font-medium text-sm mb-8"></textarea>
+                        <div class="flex space-x-4">
+                            <button onclick="saveLegal('tos')" class="flex-1 bg-purple-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-purple-100">MAJ Conditions (TOS)</button>
+                            <button onclick="saveLegal('privacy')" class="flex-1 bg-black text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-gray-200">MAJ Confidentialité</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION CONFIG -->
                 <div id="section-config" class="hidden animate-fade-in max-w-xl mx-auto pb-20">
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 text-center">
-                        <h3 class="text-3xl font-black text-gray-800 mb-8 tracking-tighter uppercase">Mise à jour Système</h3>
+                        <h3 class="text-2xl font-black text-gray-800 mb-8 tracking-tighter uppercase">Mise à jour App</h3>
                         <div class="space-y-6 text-left">
-                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Numéro de Version</label><input type="text" id="up-version" placeholder="40.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
-                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Lien Fichier (AAB/APK)</label><input type="text" id="up-url" placeholder="https://..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
-                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Release Notes</label><textarea id="up-notes" class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl"></textarea></div>
+                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Version Cible</label><input type="text" id="up-version" placeholder="40.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
+                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Lien Fichier (AAB/APK)</label><input type="text" id="up-url" placeholder="https://..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
+                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Release Notes</label><textarea id="up-notes" class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl font-medium"></textarea></div>
                             <button onclick="saveAppUpdate()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest">PUBLIER LA MISE À JOUR</button>
                         </div>
                     </div>
@@ -160,14 +271,17 @@
         </div>
     </div>
 
-    <!-- IMPACT MODAL (Global Dialog) -->
+    <!-- GLOBAL IMPACT MODAL -->
     <div id="impact-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[500] p-6 backdrop-blur-xl">
         <div class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
             <div id="impact-header" class="h-40 flex items-center justify-center bg-purple-600"><i id="impact-icon" data-lucide="alert-circle" class="w-16 h-16 text-white"></i></div>
             <div class="p-12 text-center">
                 <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-6 uppercase tracking-tighter">EXAMEN DÉTAILLÉ</h3>
                 <div id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-12 max-h-[40vh] overflow-y-auto custom-scrollbar px-4 text-left"></div>
-                <div class="flex space-x-4"><button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all">Retour</button><button id="impact-confirm-btn" class="flex-[2] py-4 bg-purple-600 text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">Confirmer l'Action</button></div>
+                <div class="flex space-x-4">
+                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all">RETOUR</button>
+                    <button id="impact-confirm-btn" class="flex-[2] py-4 bg-purple-600 text-white font-black rounded-2xl shadow-lg uppercase text-xs tracking-widest">CONFIRMER</button>
+                </div>
             </div>
         </div>
     </div>
@@ -176,6 +290,7 @@
         const API_URL = window.location.origin + '/api';
         let token = localStorage.getItem('admin_token');
         let socket = null;
+        let campaignEditor = null;
         const charts = { master: null };
 
         const Alert = {
@@ -198,8 +313,9 @@
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
             const btn = document.getElementById('login-btn');
+            if (!email || !password) return alert("Champs obligatoires.");
             try {
-                btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>'; lucide.createIcons();
+                btn.disabled = true; btn.innerHTML = 'CONNEXION...';
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
                 if (res.data.success) {
                     token = res.data.data.token;
@@ -215,13 +331,23 @@
             document.getElementById('main-container').classList.remove('hidden');
             const u = JSON.parse(localStorage.getItem('admin_user'));
             document.getElementById('admin-name').innerText = (u.full_name || u.name).toUpperCase();
-            initSocket(); showSection('stats');
+            initSocket();
+            initRichEditors();
+            showSection('stats');
         }
 
         function initSocket() {
             if (socket) return;
             socket = io(window.location.origin, { query: { token } });
-            socket.on('connect', () => console.log("Connected"));
+            socket.on('connect', () => console.log("Socket connected"));
+            socket.on('admin:new_appeal', () => { if(!document.getElementById('section-appeals').classList.contains('hidden')) loadAppeals(); });
+            socket.on('admin:new_market', () => { if(!document.getElementById('section-market').classList.contains('hidden')) loadMarket(); });
+        }
+
+        function initRichEditors() {
+            if (!campaignEditor && document.getElementById('campaign-editor')) {
+                campaignEditor = new Quill('#campaign-editor', { theme: 'snow', modules: { toolbar: [['bold', 'italic', 'underline'], ['link', 'image'], [{ 'list': 'ordered'}, { 'list': 'bullet' }]] } });
+            }
         }
 
         function showSection(name) {
@@ -237,12 +363,13 @@
             if (name === 'stats') loadStats();
             if (name === 'users') loadUsers();
             if (name === 'market-requests') loadMarket();
+            if (name === 'appeals') loadAppeals();
+            if (name === 'groups') loadGroups();
             if (name === 'delegations') loadDelegations();
             if (name === 'approvals') loadApprovals();
-            if (name === 'appeals') loadAppeals();
             if (name === 'legal') loadLegal();
             if (name === 'config') loadConfig();
-            if (name === 'groups') loadGroups();
+
             lucide.createIcons();
         }
 
@@ -259,7 +386,7 @@
                 const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6'];
                 charts.master = new Chart(ctx, { type: 'polarArea', data: { labels: ['Users', 'Online', 'Groups', 'Messages'], datasets: [{ data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages], backgroundColor: colors.map(c => c + 'CC'), borderColor: '#fff', borderWidth: 4 }] } });
                 const legend = document.getElementById('master-legend');
-                legend.innerHTML = ['Inscrits', 'En ligne', 'Groupes Chat', 'Messages'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div class="flex items-center"><div class="w-3 h-3 rounded-full mr-3" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages][i]}</p></div>`).join('');
+                legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes', 'Messages'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages][i]}</p></div>`).join('');
             } catch (e) {}
         }
 
@@ -269,8 +396,8 @@
                 document.getElementById('users-table-body').innerHTML = res.data.data.map(u => `
                     <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
                         <td class="px-8 py-5 flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-11 h-11 rounded-xl mr-4 shadow-md"><p class="font-bold text-sm text-gray-800">${u.full_name}</p></td>
-                        <td class="px-8 py-5 text-sm"><p class="font-medium text-gray-700">${u.email}</p><p class="text-[10px] text-gray-400 font-bold tracking-tight">@${u.username}</p></td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'COMPTE BLOQUÉ' : 'ACTIF'}</span></td>
+                        <td class="px-8 py-5 text-sm">${u.email}</td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
                         <td class="px-8 py-5 text-right space-x-2">
                             <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
                             <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -281,20 +408,11 @@
             } catch (e) {}
         }
 
-        async function confirmDeleteUser(id, name) {
-            Alert.show("Désintégration Totale", `<div class="bg-red-50 p-6 rounded-3xl border border-red-100 text-center"><p class="text-red-600 font-bold mb-2">ATTENTION : Action irréversible</p><p class="text-sm text-red-800">Vous allez supprimer <b>${name}</b> et toutes ses discussions, messages et activités de Meet Me. Confirmer ?</p></div>`, async () => {
-                try {
-                    await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-                    alert("Utilisateur supprimé !"); closeImpactModal(); loadUsers();
-                } catch (e) { alert("Erreur lors de la suppression."); }
-            }, "Supprimer Définitivement", "red");
-        }
-
         async function loadMarket() {
             try {
                 const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('market-requests-table-body').innerHTML = res.data.data.map(m => `
-                    <tr class="border-b border-gray-50">
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
                         <td class="px-8 py-5 flex items-center"><img src="${m.logo_url}" class="w-11 h-11 rounded-2xl mr-4 shadow-md"><p class="font-bold text-sm text-gray-800">${m.business_name}</p></td>
                         <td class="px-8 py-5 text-sm text-gray-600">${m.owner_name}</td>
                         <td class="px-8 py-5"><span class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-[10px] font-black uppercase">${m.category}</span></td>
@@ -315,30 +433,23 @@
                             <img src="${m.logo_url}" class="w-16 h-16 rounded-2xl mr-6 shadow-xl">
                             <div><p class="text-2xl font-black text-gray-800 tracking-tighter">${m.business_name}</p><p class="text-xs text-purple-500 font-bold uppercase tracking-widest">${m.category}</p></div>
                         </div>
+                        <div class="p-6 bg-gray-50 rounded-3xl"><p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Description</p><p class="text-sm font-medium text-gray-600 leading-relaxed">${m.full_description || 'Pas de description.'}</p></div>
                         <div class="grid grid-cols-2 gap-4">
-                            <div class="p-6 bg-purple-50 rounded-3xl border border-purple-100"><p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1">ID National</p><p class="font-bold text-sm text-purple-800">${m.national_id_number || 'N/A'}</p></div>
-                            <div class="p-6 bg-purple-50 rounded-3xl border border-purple-100"><p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1">RCCM</p><p class="font-bold text-sm text-purple-800">${m.rccm_number || 'N/A'}</p></div>
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">ID National</p><p class="text-sm font-black text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-100">${m.national_id_number || 'N/A'}</p></div>
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">RCCM</p><p class="text-sm font-black text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-100">${m.rccm_number || 'N/A'}</p></div>
                         </div>
-                        <div class="p-6 bg-gray-50 rounded-3xl"><p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Description du Business</p><p class="text-sm font-medium text-gray-600 leading-relaxed">${m.full_description || 'Aucune description fournie.'}</p></div>
                         <div class="grid grid-cols-2 gap-4">
-                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Pièce d'Identité</p><img src="${m.id_card_url}" class="w-full rounded-2xl shadow-md border border-gray-100 cursor-zoom-in"></div>
-                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Bannière Pub</p><img src="${m.banner_url}" class="w-full rounded-2xl shadow-md border border-gray-100 cursor-zoom-in"></div>
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Pièce d'Identité</p><img src="${m.id_card_url}" class="w-full rounded-2xl shadow-md border border-gray-100"></div>
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Bannière Pub</p><img src="${m.banner_url}" class="w-full rounded-2xl shadow-md border border-gray-100"></div>
                         </div>
                     </div>
                 `;
                 Alert.show("Examen de la Demande Market", html, async () => {
                     try {
                         await axios.put(`${API_URL}/admin/market-requests/${id}`, { status: 'approved' }, { headers: { Authorization: `Bearer ${token}` } });
-                        alert("Business approuvé et publié !"); closeImpactModal(); loadMarket();
-                    } catch (e) { alert("Erreur d'approbation."); }
-                }, "Approuver et Publier", "green");
-            } catch (e) {}
-        }
-
-        async function toggleUserLock(id, lock) {
-            try {
-                await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
-                loadUsers();
+                        alert("Business approuvé !"); closeImpactModal(); loadMarket();
+                    } catch (e) { alert("Erreur."); }
+                }, "Approuver Business", "green");
             } catch (e) {}
         }
 
@@ -347,23 +458,67 @@
                 const res = await axios.get(`${API_URL}/admin/appeals`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('appeals-table-body').innerHTML = res.data.data.map(a => `
                     <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all p-6 flex items-center justify-between">
-                        <td class="flex-1"><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">${a.type}</p><p class="font-bold text-gray-800 text-sm mb-1">${a.full_name || 'Utilisateur'}</p><p class="text-xs text-gray-400 font-medium italic">${a.reason}</p></td>
-                        <td class="text-right shrink-0"><button class="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase shadow-md hover:bg-purple-700 transition-all">Répondre</button></td>
+                        <td class="flex-1"><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">${a.type}</p><p class="font-bold text-gray-800 text-sm mb-1">${a.full_name || 'Anonyme'}</p><p class="text-xs text-gray-400 font-medium italic">${a.reason}</p></td>
+                        <td class="text-right"><button onclick="examineAppeal('${a.id}')" class="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase shadow-md hover:bg-purple-700 transition-all">Répondre</button></td>
                     </tr>
-                `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune demande en attente</div>';
+                `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune demande</div>';
+                lucide.createIcons();
             } catch (e) {}
+        }
+
+        function examineAppeal(id) {
+            axios.get(`${API_URL}/admin/appeals`, { headers: { Authorization: `Bearer ${token}` } }).then(res => {
+                const a = res.data.data.find(x => x.id === id);
+                let html = `
+                    <div class="space-y-6">
+                        <div class="p-6 bg-gray-50 rounded-3xl border border-gray-100"><p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Message de l'utilisateur</p><p class="text-sm font-medium text-gray-700 leading-relaxed">${a.reason}</p></div>
+                        <div class="space-y-2"><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Votre réponse (sera envoyée par e-mail)</label><textarea id="appeal-reply-text" class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-medium" placeholder="Bonjour, votre demande a été..."></textarea></div>
+                    </div>
+                `;
+                Alert.show("Répondre à l'utilisateur", html, async () => {
+                    const reply = document.getElementById('appeal-reply-text').value;
+                    if(!reply) return alert("Saisir une réponse.");
+                    try {
+                        await axios.post(`${API_URL}/admin/appeals/${id}/reply`, { reply, action: 'resolved' }, { headers: { Authorization: `Bearer ${token}` } });
+                        alert("Réponse envoyée !"); closeImpactModal(); loadAppeals();
+                    } catch (e) { alert("Erreur."); }
+                }, "Envoyer la Réponse", "purple");
+            });
+        }
+
+        async function sendCampaign() {
+            const target = document.getElementById('campaign-target').value;
+            const targetValue = document.getElementById('campaign-target-email').value.trim();
+            const title = document.getElementById('campaign-title').value.trim();
+            const message = campaignEditor.root.innerHTML;
+            const btn = document.getElementById('campaign-btn');
+            if(!title || !campaignEditor.getText().trim()) return alert("Titre et message requis.");
+            try {
+                btn.disabled = true; btn.innerHTML = 'DIFFUSION...';
+                await axios.post(`${API_URL}/admin/campaigns`, { title, message, target, targetValue }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Campagne lancée avec succès !");
+                document.getElementById('campaign-title').value = '';
+                campaignEditor.setContents([]);
+            } catch (e) { alert("Erreur lors de l'envoi."); } finally { btn.disabled = false; btn.innerText = 'DIFFUSER LA CAMPAGNE'; }
         }
 
         async function loadGroups() {
             try {
                 const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('groups-table').innerHTML = res.data.data.map(g => `
-                    <tr class="border-b border-gray-50 p-6 flex items-center justify-between">
-                        <td class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-11 h-11 rounded-xl mr-4 shadow-sm"><div><p class="font-black text-gray-800 text-sm">${g.name}</p><p class="text-[10px] text-gray-400 font-bold uppercase">${g.members_count} membres</p></div></td>
+                    <tr class="border-b border-gray-50 p-6 flex items-center justify-between hover:bg-gray-50 transition-all">
+                        <td class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-11 h-11 rounded-xl mr-4 shadow-md"><div><p class="font-black text-gray-800 text-sm">${g.name}</p><p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">${g.members_count} membres</p></div></td>
                         <td class="text-right space-x-2"><button onclick="deleteGroup('${g.id}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
                     </tr>
                 `).join('');
                 lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function toggleUserLock(id, lock) {
+            try {
+                await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
+                loadUsers();
             } catch (e) {}
         }
 
@@ -378,7 +533,7 @@
             const content = document.getElementById('legal-content').value;
             try {
                 await axios.post(`${API_URL}/admin/legal`, { type, content, version: '40.0.0', force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Publié avec succès !");
+                alert("Sauvegardé !");
             } catch (e) { alert("Erreur."); }
         }
 
@@ -386,11 +541,7 @@
             try {
                 const res = await axios.get(`${API_URL}/admin/app-config`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data;
-                if(d) {
-                    document.getElementById('up-version').value = d.current_version;
-                    document.getElementById('up-url').value = d.update_url || '';
-                    document.getElementById('up-notes').value = d.release_notes || '';
-                }
+                if(d) { document.getElementById('up-version').value = d.current_version; document.getElementById('up-url').value = d.update_url || ''; document.getElementById('up-notes').value = d.release_notes || ''; }
             } catch (e) {}
         }
 
@@ -407,7 +558,7 @@
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('delegations-list').innerHTML = res.data.data.map(d => `
                     <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm mb-3 animate-fade-in">
-                        <div class="flex items-center"><img src="${d.avatar_url || 'https://ui-avatars.com/api/?name='+d.full_name}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">${d.email}</p></div></div>
+                        <div class="flex items-center"><img src="${d.avatar_url || 'https://ui-avatars.com/api/?name='+d.full_name}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">${d.email}</p></div></div>
                         <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
                     </div>
                 `).join('');
@@ -420,8 +571,8 @@
                 const res = await axios.get(`${API_URL}/admin/pending-actions`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('approvals-list').innerHTML = res.data.data.map(a => `
                     <div class="p-8 border-b border-gray-50 flex items-center justify-between animate-fade-in hover:bg-gray-50 transition-all">
-                        <div><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">Requête de ${a.requester_name}</p><p class="text-lg font-black text-gray-800 mb-1">Action: ${a.action_type}</p><p class="text-xs font-bold text-gray-400">Cible: ${a.target_name} (${a.target_id})</p></div>
-                        <div class="flex space-x-3"><button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-100">Approuver</button></div>
+                        <div><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">Délégué: ${a.requester_name}</p><p class="text-lg font-black text-gray-800 mb-1">Action: ${a.action_type}</p><p class="text-xs font-bold text-gray-400">Cible: ${a.target_name}</p></div>
+                        <div class="flex space-x-3"><button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-100 transition-all">Approuver</button></div>
                     </div>
                 `).join('') || '<div class="p-20 text-center text-gray-400 font-black uppercase text-xs tracking-widest opacity-50">Aucune action sensible en attente</div>';
             } catch (e) {}
@@ -437,27 +588,32 @@
                 let html = `<div class="space-y-2 max-h-[50vh] overflow-y-auto pr-4 custom-scrollbar">` + res.data.data.map(u => `
                     <label class="flex items-center p-5 bg-gray-50 hover:bg-purple-50 rounded-[1.5rem] cursor-pointer border border-transparent transition-all"><input type="radio" name="selected-user-id" value="${u.id}" data-name="${u.full_name}" class="w-6 h-6 accent-purple-600 mr-4"><div class="flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-10 h-10 rounded-xl mr-3 shadow-sm"><p class="text-sm font-black text-gray-800">${u.full_name}</p></div></label>
                 `).join('') + `</div>`;
-                Alert.show("Choisir un Collaborateur", html, () => {
+                Alert.show("Délégué un Collaborateur", html, () => {
                     const sel = document.querySelector('input[name="selected-user-id"]:checked');
                     if (sel) editDelegation(sel.value, sel.getAttribute('data-name'), "", true);
-                }, "Sélectionner", "purple");
+                }, "Suivant", "purple");
             } catch (e) { alert("Erreur."); }
         }
 
         function editDelegation(userId, userName, modules = "", active = true) {
             const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
-            const currentModules = modules ? modules.split(',') : [];
-            let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4">Attribuer les accès pour ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
-                <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all"><input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3"><span class="text-[10px] font-black text-gray-700 uppercase">${m}</span></label>
+            let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest">Choisir les accès pour ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
+                <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all"><input type="checkbox" value="${m}" class="mod-checkbox w-5 h-5 accent-purple-600 mr-3"><span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m}</span></label>
             `).join('') + `</div>`;
             Alert.show("Droits d'Administration", html, async () => {
                 const selected = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
                 try {
                     await axios.post(`${API_URL}/admin/delegations`, { userId, modules: selected, isActive: true }, { headers: { Authorization: `Bearer ${token}` } });
-                    alert("Invitation envoyée !"); location.reload();
+                    alert("Accès délégués avec succès !"); closeImpactModal(); loadDelegations();
                 } catch (e) { alert("Erreur."); }
-            }, "Enregistrer & Inviter", "purple");
+            }, "Valider la Délégation", "purple");
         }
+
+        function toggleCampaignSpecificEmail() {
+            const target = document.getElementById('campaign-target').value;
+            document.getElementById('specific-email-container').className = target === 'specific' ? 'block animate-fade-in' : 'hidden';
+        }
+        document.getElementById('campaign-target')?.addEventListener('change', toggleCampaignSpecificEmail);
 
         function logout() { localStorage.clear(); location.reload(); }
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }

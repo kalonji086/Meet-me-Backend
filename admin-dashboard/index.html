@@ -156,8 +156,8 @@
                         </div>
                     </div>
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center">
-                        <div class="w-full max-w-[450px] h-[450px]"><canvas id="overviewMasterChart"></canvas></div>
-                        <div id="master-legend" class="grid grid-cols-2 gap-4 mt-8 w-full max-w-2xl"></div>
+                         <div class="w-full max-w-[450px] h-[450px]"><canvas id="overviewMasterChart"></canvas></div>
+                         <div id="master-legend" class="grid grid-cols-2 gap-4 mt-8 w-full max-w-2xl"></div>
                     </div>
                 </div>
 
@@ -192,6 +192,7 @@
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left" id="groups-table"></table></div>
                 </div>
 
+                <!-- SECTION CAMPAIGNS -->
                 <div id="section-campaigns" class="hidden animate-fade-in max-w-5xl mx-auto space-y-10 pb-20">
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
                         <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Lancer une Campagne</h3>
@@ -338,7 +339,7 @@
             const password = document.getElementById('password').value.trim();
             const btn = document.getElementById('login-btn');
             try {
-                btn.disabled = true; btn.innerHTML = 'CONNEXION...';
+                btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>'; lucide.createIcons();
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
                 if (res.data.success) {
                     token = res.data.data.token;
@@ -365,31 +366,48 @@
                         const myDelegation = res.data.data.find(d => d.user_id === user.id);
                         if (myDelegation && myDelegation.is_active) {
                             const allowed = myDelegation.modules; // Array of module names
-                            const menuItems = ['stats', 'users', 'groups', 'appeals', 'market', 'verifications', 'campaigns', 'legal', 'config'];
 
-                            menuItems.forEach(m => {
-                                const navId = m === 'market' ? 'nav-market-requests' : 'nav-' + m;
-                                const nav = document.getElementById(navId);
-                                if (nav) {
-                                    if (allowed.includes(m) || (m === 'market' && allowed.includes('market-requests'))) {
-                                        nav.classList.remove('hidden');
-                                    } else {
-                                        nav.classList.add('hidden');
-                                    }
+                            // Mapping: module in DB -> Sidebar Nav ID
+                            const mapping = {
+                                'stats': 'nav-stats',
+                                'users': 'nav-users',
+                                'groups': 'nav-groups',
+                                'support': 'nav-appeals',
+                                'reports': 'nav-appeals',
+                                'market-requests': 'nav-market-requests',
+                                'verifications': 'nav-verifications',
+                                'campaigns': 'nav-campaigns',
+                                'legal': 'nav-legal',
+                                'config': 'nav-config'
+                            };
+
+                            // Hide everything first
+                            Object.values(mapping).forEach(id => {
+                                const nav = document.getElementById(id);
+                                if (nav) nav.classList.add('hidden');
+                            });
+
+                            // Show allowed
+                            allowed.forEach(m => {
+                                const navId = mapping[m];
+                                if (navId) {
+                                    const nav = document.getElementById(navId);
+                                    if (nav) nav.classList.remove('hidden');
                                 }
                             });
 
-                            // Hide the Administration tools section for delegates
+                            // Hide admin only tools div
                             const adminTools = document.getElementById('admin-only-tools');
                             if (adminTools) adminTools.classList.add('hidden');
 
-                            // Redirect to the first allowed section
+                            // Redirect to first allowed module
                             if (allowed.length > 0) {
-                                const first = allowed[0] === 'market-requests' ? 'market-requests' : allowed[0];
+                                const sectionMap = { 'market-requests': 'market-requests', 'support': 'appeals', 'reports': 'appeals' };
+                                const first = sectionMap[allowed[0]] || allowed[0];
                                 showSection(first);
                             }
                         } else {
-                            alert("Accès révoqué."); logout();
+                            alert("Accès révoqué ou inactif."); logout();
                         }
                     }).catch(() => { logout(); });
             } else {
@@ -404,6 +422,7 @@
             socket.on('connect', () => console.log("Socket connected"));
             socket.on('admin_new_user', (data) => addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus'));
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
+            socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));
         }
 
         function addNotification(type, title, message, icon = 'bell') {
@@ -437,13 +456,15 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market', 'verifications', 'campaigns', 'legal', 'config', 'delegations', 'approvals'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'campaigns', 'legal', 'config', 'delegations', 'approvals'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
-                const nav = document.getElementById('nav-' + (s === 'market' ? 'market-requests' : s)); if (nav) nav.classList.remove('active');
+                const navId = s === 'market-requests' ? 'nav-market-requests' : 'nav-' + s;
+                const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
             });
-            const target = document.getElementById(name === 'market-requests' ? 'section-market' : 'section-' + name);
+            const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            const nav = document.getElementById('nav-' + name); if (nav) nav.classList.add('active');
+            const navId = name === 'market-requests' ? 'nav-market-requests' : 'nav-' + name;
+            const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
             document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 
             if (name === 'stats') loadStats();
@@ -470,7 +491,7 @@
                 const ctx = document.getElementById('overviewMasterChart').getContext('2d');
                 if (charts.master) charts.master.destroy();
                 const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6'];
-                charts.master = new Chart(ctx, { type: 'polarArea', data: { labels: ['Users', 'Online', 'Groups', 'Messages'], datasets: [{ data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages], backgroundColor: colors.map(c => c + 'CC'), borderColor: '#fff', borderWidth: 4 }] } });
+                charts.master = new Chart(ctx, { type: 'polarArea', data: { labels: ['Utilisateurs', 'En ligne', 'Groupes', 'Messages'], datasets: [{ data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages], backgroundColor: colors.map(c => c + 'CC'), borderColor: '#fff', borderWidth: 4 }] } });
                 const legend = document.getElementById('master-legend');
                 legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes Chat', 'Messages'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages][i]}</p></div>`).join('');
             } catch (e) {}
@@ -543,7 +564,6 @@
                     </div>
                 `;
 
-                // Pied de page dynamique avec tous les boutons
                 footer.innerHTML = `
                     <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
                     ${m.status === 'pending' ? `
@@ -644,13 +664,13 @@
         function examineAppeal(id) {
             axios.get(`${API_URL}/admin/appeals`, { headers: { Authorization: `Bearer ${token}` } }).then(res => {
                 const a = res.data.data.find(x => x.id === id);
-                let html = `<div class="space-y-6"><div class="p-6 bg-gray-50 rounded-3xl"><p class="text-sm font-medium text-gray-700">${a.reason}</p></div><textarea id="appeal-reply-text" class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-medium" placeholder="Votre réponse..."></textarea></div>`;
+                let html = `<div class="space-y-6 text-left"><div class="p-6 bg-gray-50 rounded-3xl"><p class="text-sm font-medium text-gray-700 leading-relaxed">${a.reason}</p></div><textarea id="appeal-reply-text" class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-medium" placeholder="Votre réponse..."></textarea></div>`;
                 Alert.show("Répondre au Ticket", html, async () => {
                     const reply = document.getElementById('appeal-reply-text').value;
                     if(!reply) return alert("Réponse vide.");
                     await axios.post(`${API_URL}/admin/appeals/${id}/reply`, { reply, action: 'resolved' }, { headers: { Authorization: `Bearer ${token}` } });
-                    closeImpactModal(); loadAppeals();
-                }, "Envoyer", "purple");
+                    alert("Réponse envoyée !"); closeImpactModal(); loadAppeals();
+                }, "Envoyer la Réponse", "purple");
             });
         }
 
@@ -666,7 +686,7 @@
                 await axios.post(`${API_URL}/admin/campaigns`, { title, message, target, targetValue }, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Campagne lancée !");
                 document.getElementById('campaign-title').value = ''; campaignEditor.setContents([]);
-            } catch (e) { alert("Erreur lors de l'envoi."); } finally { btn.disabled = false; btn.innerText = 'DIFFUSER LA CAMPAGNE'; }
+            } catch (e) { alert("Erreur."); } finally { btn.disabled = false; btn.innerText = 'DIFFUSER LA CAMPAGNE'; }
         }
 
         async function loadGroups() {
@@ -757,16 +777,18 @@
         }
 
         async function loadDelegations() {
-            const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
-            document.getElementById('delegations-list').innerHTML = res.data.data.map(d => `
-                <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm animate-fade-in mb-2">
-                    <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
-                    <div class="flex items-center space-x-3">
-                        <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
-                        <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="shield-off" class="w-4 h-4"></i></button>
+            try {
+                const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('delegations-list').innerHTML = res.data.data.map(d => `
+                    <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm animate-fade-in mb-2">
+                        <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
+                        <div class="flex items-center space-x-3">
+                            <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
+                            <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="shield-off" class="w-4 h-4"></i></button>
+                        </div>
                     </div>
-                </div>
-            `).join(''); lucide.createIcons();
+                `).join(''); lucide.createIcons();
+            } catch (e) {}
         }
 
         async function revokeDelegation(userId, name) {
@@ -780,11 +802,11 @@
         async function loadApprovals() {
             const res = await axios.get(`${API_URL}/admin/pending-actions`, { headers: { Authorization: `Bearer ${token}` } });
             document.getElementById('approvals-list').innerHTML = res.data.data.map(a => `
-                <div class="p-8 border-b border-gray-50 flex items-center justify-between">
-                    <div><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">Requête de ${a.requester_name}</p><p class="text-lg font-black text-gray-800">Action: ${a.action_type}</p><p class="text-xs font-bold text-gray-400">Cible: ${a.target_name}</p></div>
-                    <button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-100 transition-all">Approuver</button>
+                <div class="p-8 border-b border-gray-50 flex items-center justify-between animate-fade-in hover:bg-gray-50 transition-all">
+                    <div><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">Délégué: ${a.requester_name}</p><p class="text-lg font-black text-gray-800 mb-1">Action: ${a.action_type}</p><p class="text-xs font-bold text-gray-400">Cible: ${a.target_name}</p></div>
+                    <div class="flex space-x-3"><button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-100 transition-all">Approuver</button></div>
                 </div>
-            `).join('') || '<div class="p-20 text-center text-gray-400 font-black uppercase text-xs tracking-widest">Rien en attente</div>';
+            `).join('') || '<div class="p-20 text-center text-gray-400 font-black uppercase text-xs tracking-widest opacity-50">Aucune action sensible en attente</div>';
         }
 
         async function handleApproval(id, decision) {
@@ -793,30 +815,31 @@
         }
 
         async function showAddDelegationModal() {
-            const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
-            let html = `<div class="space-y-2 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">` + res.data.data.map(u => `
-                <label class="flex items-center p-5 bg-gray-50 hover:bg-purple-50 rounded-[1.5rem] cursor-pointer border border-transparent transition-all"><input type="radio" name="selected-user-id" value="${u.id}" data-name="${u.full_name}" class="w-6 h-6 accent-purple-600 mr-4"><div class="flex items-center"><img src="${getFullUrl(u.avatar_url)}" class="w-10 h-10 rounded-xl mr-3 shadow-sm"><p class="text-sm font-black text-gray-800">${u.full_name}</p></div></label>
-            `).join('') + `</div>`;
-            Alert.show("Délégué un Collaborateur", html, () => {
-                const sel = document.querySelector('input[name="selected-user-id"]:checked');
-                if (sel) editDelegation(sel.value, sel.getAttribute('data-name'), "", true);
-            }, "Suivant", "purple");
+            try {
+                const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+                let html = `<div class="space-y-2 max-h-[50vh] overflow-y-auto pr-4 custom-scrollbar">` + res.data.data.map(u => `
+                    <label class="flex items-center p-5 bg-gray-50 hover:bg-purple-50 rounded-[1.5rem] cursor-pointer border border-transparent transition-all"><input type="radio" name="selected-user-id" value="${u.id}" data-name="${u.full_name}" class="w-6 h-6 accent-purple-600 mr-4"><div class="flex items-center"><img src="${getFullUrl(u.avatar_url)}" class="w-10 h-10 rounded-xl mr-3 shadow-sm"><p class="text-sm font-black text-gray-800">${u.full_name}</p></div></label>
+                `).join('') + `</div>`;
+                Alert.show("Délégué un Collaborateur", html, () => {
+                    const sel = document.querySelector('input[name="selected-user-id"]:checked');
+                    if (sel) editDelegation(sel.value, sel.getAttribute('data-name'), "", true);
+                }, "Suivant", "purple");
+            } catch (e) { alert("Erreur."); }
         }
 
         function editDelegation(userId, userName, modules = "", active = true) {
             const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
-            let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3">` + allModules.map(m => `
+            let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
                 <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all"><input type="checkbox" value="${m}" class="mod-checkbox w-5 h-5 accent-purple-600 mr-3"><span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m}</span></label>
             `).join('') + `</div>`;
             Alert.show("Droits Admin", html, async () => {
                 const selected = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
-                await axios.post(`${API_URL}/admin/delegations`, { userId, modules: selected, isActive: true }, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Invitation envoyée !"); location.reload();
-            }, "Valider", "purple");
+                try {
+                    await axios.post(`${API_URL}/admin/delegations`, { userId, modules: selected, isActive: true }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Délégation validée !"); closeImpactModal(); loadDelegations();
+                } catch (e) { alert("Erreur."); }
+            }, "Valider la Délégation", "purple");
         }
-
-        function toggleCampaignSpecificEmail() { document.getElementById('specific-email-container').className = document.getElementById('campaign-target').value === 'specific' ? 'block animate-fade-in' : 'hidden'; }
-        document.getElementById('campaign-target')?.addEventListener('change', toggleCampaignSpecificEmail);
 
         function logout() { localStorage.clear(); location.reload(); }
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }

@@ -493,20 +493,6 @@ const deleteGroup = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Membres d'un groupe
- */
-const getGroupMembers = asyncHandler(async (req, res) => {
-  const result = await query(`
-    SELECT p.full_name, p.username, p.email, p.avatar_url, cp.role, cp.joined_at
-    FROM public.chat_participants cp
-    JOIN public.profiles p ON cp.user_id = p.id
-    WHERE cp.chat_id = $1
-    ORDER BY cp.role ASC, p.full_name ASC
-  `, [req.params.chatId]);
-  res.json({ success: true, data: result.rows });
-});
-
-/**
  * @desc    Lister les contestations
  */
 const getAppeals = asyncHandler(async (req, res) => {

@@ -333,12 +333,13 @@ const getInventory = asyncHandler(async (req, res) => {
  */
 const updateInventory = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const { itemName, quantity, price, action } = req.body; // action: 'add', 'remove', 'create'
+  const { itemName, quantity, price, action, reason } = req.body;
 
   const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
   if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
   const bId = business.rows[0].id;
 
+  // 1. Gérer l'état actuel du stock
   const existing = await query('SELECT id, quantity FROM public.market_inventory WHERE business_id = $1 AND item_name = $2', [bId, itemName]);
 
   if (action === 'create' || existing.rows.length === 0) {
@@ -346,15 +347,41 @@ const updateInventory = asyncHandler(async (req, res) => {
       'INSERT INTO public.market_inventory (business_id, item_name, quantity, price) VALUES ($1, $2, $3, $4)',
       [bId, itemName, quantity, price || 0]
     );
+    // Log initial
+    await query(
+      'INSERT INTO public.market_inventory_logs (business_id, item_name, quantity, type, reason) VALUES ($1, $2, $3, $4, $5)',
+      [bId, itemName, quantity, 'in', 'Création du produit']
+    );
   } else {
     const newQty = action === 'add' ? existing.rows[0].quantity + quantity : Math.max(0, existing.rows[0].quantity - quantity);
     await query(
       'UPDATE public.market_inventory SET quantity = $1, updated_at = NOW() WHERE id = $2',
       [newQty, existing.rows[0].id]
     );
+    // Log transaction
+    await query(
+      'INSERT INTO public.market_inventory_logs (business_id, item_name, quantity, type, reason) VALUES ($1, $2, $3, $4, $5)',
+      [bId, itemName, quantity, action === 'add' ? 'in' : 'out', reason || (action === 'add' ? 'Approvisionnement' : 'Vente/Sortie')]
+    );
   }
 
   res.json({ success: true });
+});
+
+/**
+ * @desc    Get inventory logs
+ */
+const getInventoryLogs = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    'SELECT * FROM public.market_inventory_logs WHERE business_id = $1 ORDER BY created_at DESC LIMIT 50',
+    [business.rows[0].id]
+  );
+
+  res.json({ success: true, data: result.rows });
 });
 
 /**
@@ -449,6 +476,7 @@ module.exports = {
   getOrders,
   getRequests,
   getInventory,
+  getInventoryLogs,
   updateInventory,
   getBusinessChats,
   getDocuments,

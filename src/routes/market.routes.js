@@ -72,6 +72,11 @@ router.get('/requests', marketController.getRequests);
 router.get('/inventory', marketController.getInventory);
 
 /**
+ * @route   GET /api/market/inventory/logs
+ */
+router.get('/inventory/logs', marketController.getInventoryLogs);
+
+/**
  * @route   POST /api/market/inventory
  */
 router.post('/inventory', marketController.updateInventory);

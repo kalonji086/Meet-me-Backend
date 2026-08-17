@@ -290,6 +290,27 @@ const ensureAdminTables = async () => {
   } catch (e) {
     logger.error('Error updating market_businesses status constraint:', e);
   }
+
+  // S'assurer que les tables d'inventaire sont complètes
+  try {
+    await query('ALTER TABLE public.market_inventory ADD COLUMN IF NOT EXISTS price DECIMAL DEFAULT 0');
+    await query('ALTER TABLE public.market_inventory ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
+
+    // Table pour l'historique des entrées/sorties
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.market_inventory_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id UUID REFERENCES public.market_businesses(id) ON DELETE CASCADE,
+        item_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        type TEXT CHECK (type IN ('in', 'out')),
+        reason TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+  } catch (e) {
+    logger.error('Error updating inventory tables:', e);
+  }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {

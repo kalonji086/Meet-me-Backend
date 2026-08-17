@@ -56,6 +56,16 @@ const registerBusiness = asyncHandler(async (req, res) => {
     ]
   );
 
+  const business = result.rows[0];
+
+  // Notifier l'admin en temps réel
+  const socketService = require('../services/socket.service');
+  socketService.broadcast('admin:new_market', {
+    id: business.id,
+    business_name: business.business_name,
+    owner_id: userId
+  });
+
   res.status(201).json({
     success: true,
     data: result.rows[0],

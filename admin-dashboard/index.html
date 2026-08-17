@@ -53,11 +53,11 @@
             <div class="space-y-6 text-left">
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Identifiant Email</label>
-                    <input type="email" id="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="votre@email.com" autocomplete="off" value="">
+                    <input type="email" id="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="votre@email.com" autocomplete="off">
                 </div>
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label>
-                    <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password" value="">
+                    <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password">
                 </div>
                 <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
             </div>
@@ -150,19 +150,19 @@
                 <!-- SECTION STATS -->
                 <div id="section-stats" class="animate-fade-in">
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10" id="stats-summary">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center">
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users" class="w-7 h-7 text-purple-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Utilisateurs</p><h4 id="stat-users" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
                         </div>
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center">
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="zap" class="w-7 h-7 text-green-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">En ligne</p><h4 id="stat-online" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
                         </div>
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center">
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="message-circle" class="w-7 h-7 text-blue-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Messages</p><h4 id="stat-messages" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
                         </div>
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center">
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users-2" class="w-7 h-7 text-orange-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Groupes</p><h4 id="stat-groups" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
                         </div>
@@ -204,7 +204,6 @@
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left" id="groups-table"></table></div>
                 </div>
 
-                <!-- SECTION CAMPAIGNS -->
                 <div id="section-campaigns" class="hidden animate-fade-in max-w-5xl mx-auto space-y-10 pb-20">
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
                         <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Lancer une Campagne</h3>
@@ -699,7 +698,7 @@
                 await axios.post(`${API_URL}/admin/campaigns`, { title, message, target, targetValue }, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Campagne lancée !");
                 document.getElementById('campaign-title').value = ''; campaignEditor.setContents([]);
-            } catch (e) { alert("Erreur."); } finally { btn.disabled = false; btn.innerText = 'DIFFUSER LA CAMPAGNE'; }
+            } catch (e) { alert("Erreur lors de l'envoi."); } finally { btn.disabled = false; btn.innerText = 'DIFFUSER LA CAMPAGNE'; }
         }
 
         async function loadGroups() {
@@ -798,7 +797,7 @@
                         <div class="flex items-center space-x-3">
                             <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
                             <button onclick="editDelegation('${d.user_id}', '${d.full_name}', '${d.modules.join(',')}', ${d.is_active})" class="p-3 bg-gray-50 text-gray-400 hover:text-purple-600 rounded-xl transition-all" title="Modifier les accès"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                            <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}', ${d.is_active})" class="p-3 ${d.is_active ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'} rounded-xl hover:shadow-lg transition-all" title="${d.is_active ? 'Révoquer' : 'Rétablir'}"><i data-lucide="${d.is_active ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
+                            <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}', ${d.is_active})" class="p-3 ${d.is_active ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'} rounded-xl hover:shadow-lg transition-all" title="${d.is_active ? 'Révoquer' : 'Rétablir'}"><i data-lucide="${d.is_active ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                         </div>
                     </div>
                 `).join(''); lucide.createIcons();
@@ -809,8 +808,6 @@
             const action = currentlyActive ? "RÉVOQUER" : "RÉTABLIR";
             if (!confirm(`${action} les privilèges de ${name} ?`)) return;
             try {
-                // Pour révoquer, on garde les modules mais on passe isActive à false
-                // Pour rétablir, on passe isActive à true
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data.find(x => x.user_id === userId);
                 await axios.post(`${API_URL}/admin/delegations`, { userId, modules: d.modules, isActive: !currentlyActive }, { headers: { Authorization: `Bearer ${token}` } });
@@ -865,6 +862,9 @@
                 } catch (e) { alert("Erreur."); }
             }, "Valider la Délégation", "purple");
         }
+
+        function toggleCampaignSpecificEmail() { document.getElementById('specific-email-container').className = document.getElementById('campaign-target').value === 'specific' ? 'block animate-fade-in' : 'hidden'; }
+        document.getElementById('campaign-target')?.addEventListener('change', toggleCampaignSpecificEmail);
 
         function logout() { localStorage.clear(); location.reload(); }
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }

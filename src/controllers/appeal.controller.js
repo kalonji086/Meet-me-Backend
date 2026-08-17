@@ -34,7 +34,7 @@ const submitAppeal = asyncHandler(async (req, res) => {
     [userId, reason]
   );
 
-  socketService.broadcast('admin_new_appeal', { appealId: result.rows[0].id, userId, type: 'appeal', reason });
+  socketService.broadcast('admin:new_appeal', { appealId: result.rows[0].id, userId, type: 'appeal', reason });
   res.json({ success: true, message: 'Votre contestation a été envoyée.' });
 });
 
@@ -79,7 +79,7 @@ const submitHelpdesk = asyncHandler(async (req, res) => {
     [userId, email || null, category, reason]
   );
 
-  socketService.broadcast('admin_new_appeal', { appealId: result.rows[0].id, type: 'helpdesk', reason, category });
+  socketService.broadcast('admin:new_appeal', { appealId: result.rows[0].id, type: 'helpdesk', reason, category });
 
   res.json({ success: true, message: 'Votre demande a été transmise avec succès.' });
 });
@@ -115,7 +115,7 @@ const requestDeletion = asyncHandler(async (req, res) => {
   );
 
   await query('UPDATE public.profiles SET is_locked = TRUE WHERE id = $1', [user.id]);
-  socketService.broadcast('admin_new_appeal', { userId: user.id, type: 'deletion', reason: fullReason });
+  socketService.broadcast('admin:new_appeal', { userId: user.id, type: 'deletion', reason: fullReason });
 
   res.json({ success: true, message: 'Votre demande de suppression a été enregistrée. Votre compte est désormais verrouillé.' });
 });

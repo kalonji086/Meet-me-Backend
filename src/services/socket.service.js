@@ -746,9 +746,16 @@ class SocketService {
   }
 
   /**
-   * Envoyer un message à un utilisateur spécifique
+   * Envoyer un message à un utilisateur spécifique (alias pour emitToUser)
    */
   sendToUser(userId, event, data) {
+    return this.emitToUser(userId, event, data);
+  }
+
+  /**
+   * Émettre un événement à un utilisateur spécifique
+   */
+  emitToUser(userId, event, data) {
     const socketId = this.userSockets.get(userId.toString());
     
     if (socketId) {

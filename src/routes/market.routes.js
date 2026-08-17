@@ -46,6 +46,11 @@ router.post('/posts/:postId/like', marketController.toggleLike);
 router.post('/posts/:postId/comment', marketController.addComment);
 
 /**
+ * @route   GET /api/market/posts/:postId/comments
+ */
+router.get('/posts/:postId/comments', marketController.getPostComments);
+
+/**
  * @route   POST /api/market/business/:businessId/subscribe
  */
 router.post('/business/:businessId/subscribe', marketController.toggleSubscription);

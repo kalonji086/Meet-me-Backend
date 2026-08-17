@@ -539,6 +539,21 @@ const getBusinessChats = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Get comments for a post
+ */
+const getPostComments = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+  const result = await query(
+    `SELECT c.*, p.full_name, p.avatar_url
+     FROM public.market_post_comments c
+     JOIN public.profiles p ON c.user_id = p.id
+     WHERE c.post_id = $1 ORDER BY c.created_at ASC`,
+    [postId]
+  );
+  res.json({ success: true, data: result.rows });
+});
+
 module.exports = {
   registerBusiness,
   getMyBusiness,
@@ -559,5 +574,6 @@ module.exports = {
   getBusinessChats,
   getDocuments,
   uploadDocument,
+  getPostComments,
   createQuote
 };

@@ -264,10 +264,28 @@
             <div class="p-12 text-center">
                 <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-6 uppercase tracking-tighter">EXAMEN DÉTAILLÉ</h3>
                 <div id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-12 max-h-[40vh] overflow-y-auto custom-scrollbar px-4 text-left"></div>
-                <div class="flex space-x-4">
+                <div class="flex space-x-4" id="impact-footer">
                     <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all">RETOUR</button>
                     <button id="impact-confirm-btn" class="flex-[2] py-4 bg-purple-600 text-white font-black rounded-2xl shadow-lg uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">Confirmer l'Action</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL MANAGE MARKET GROUP -->
+    <div id="modal-manage-group" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[550] p-6 backdrop-blur-xl">
+        <div class="max-w-md w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
+            <div class="p-10 border-b bg-blue-50 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-black text-blue-900 tracking-tighter">Groupe Officiel</h3>
+                    <p id="group-modal-subtitle" class="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-1"></p>
+                </div>
+                <button onclick="closeGroupModal()" class="p-2 hover:bg-blue-100 rounded-full transition-all"><i data-lucide="x" class="w-6 h-6 text-blue-400"></i></button>
+            </div>
+            <div class="p-8">
+                <button id="btn-add-to-group" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-xs shadow-lg shadow-blue-100 mb-8 hover:bg-blue-700 transition-all uppercase tracking-widest">Ajouter ce pro au groupe</button>
+                <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 px-2">Membres actuels</h4>
+                <div id="group-members-list" class="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar"></div>
             </div>
         </div>
     </div>
@@ -440,14 +458,119 @@
         }
 
         async function examineMarket(id) {
-            const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
-            const m = res.data.data.find(x => x.id === id);
-            let html = `<div class="space-y-6"><div class="flex items-center"><img src="${getFullUrl(m.logo_url)}" class="w-20 h-20 rounded-2xl mr-6 shadow-xl"><div><p class="text-2xl font-black">${m.business_name}</p><p class="text-xs uppercase text-purple-500 font-bold">${m.category}</p></div></div><div class="p-6 bg-gray-50 rounded-3xl"><p class="text-sm leading-relaxed">${m.full_description || 'N/A'}</p></div><div class="grid grid-cols-2 gap-4"><img src="${getFullUrl(m.id_card_url)}" class="w-full rounded-2xl border"><img src="${getFullUrl(m.banner_url)}" class="w-full rounded-2xl border"></div></div>`;
-            Alert.show("Examen Market", html, async () => {
-                await axios.put(`${API_URL}/admin/market-requests/${id}`, { status: 'approved' }, { headers: { Authorization: `Bearer ${token}` } });
-                closeImpactModal(); loadMarket();
-            }, "Approuver", "green");
+            try {
+                const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
+                const m = res.data.data.find(x => x.id === id);
+                if (!m) return;
+
+                const messageEl = document.getElementById('impact-message');
+                const footer = document.getElementById('impact-footer');
+                const titleEl = document.getElementById('impact-title');
+
+                titleEl.innerText = "EXAMEN BUSINESS : " + m.business_name;
+                messageEl.innerHTML = `
+                    <div class="space-y-6 text-left">
+                        <div class="flex items-center bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                            <img src="${getFullUrl(m.logo_url)}" class="w-16 h-16 rounded-2xl mr-6 shadow-xl">
+                            <div><p class="text-2xl font-black text-gray-800 tracking-tighter">${m.business_name}</p><p class="text-xs text-purple-500 font-bold uppercase tracking-widest">${m.category}</p></div>
+                        </div>
+                        <div class="p-6 bg-gray-50 rounded-3xl"><p class="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Description</p><p class="text-sm font-medium text-gray-600 leading-relaxed">${m.full_description || 'Pas de description.'}</p></div>
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="p-4 bg-purple-50 rounded-2xl"><p class="text-[9px] font-black text-purple-400 uppercase mb-1">ID National</p><p class="font-bold text-gray-800">${m.national_id_number || 'N/A'}</p></div>
+                            <div class="p-4 bg-purple-50 rounded-2xl"><p class="text-[9px] font-black text-purple-400 uppercase mb-1">RCCM</p><p class="font-bold text-gray-800">${m.rccm_number || 'N/A'}</p></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Carte d'Identité</p><img src="${getFullUrl(m.id_card_url)}" class="w-full h-32 object-cover rounded-2xl shadow-md border border-gray-100"></div>
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Bannière</p><img src="${getFullUrl(m.banner_url)}" class="w-full h-32 object-cover rounded-2xl shadow-md border border-gray-100"></div>
+                        </div>
+                    </div>
+                `;
+
+                // Pied de page dynamique avec tous les boutons
+                footer.innerHTML = `
+                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
+                    ${m.status === 'pending' ? `
+                        <button onclick="handleMarketAction('${m.id}', 'rejected')" class="flex-1 bg-red-50 text-red-600 py-4 rounded-2xl font-black text-[10px] hover:bg-red-600 hover:text-white transition-all uppercase">Rejeter</button>
+                        <button onclick="handleMarketAction('${m.id}', 'approved')" class="flex-[2] bg-green-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-100 text-[10px] uppercase">Approuver</button>
+                    ` : `
+                        <button onclick="manageMarketGroup('${m.id}', '${m.category}')" class="flex-1 bg-blue-500 text-white py-4 rounded-2xl font-black text-[9px] shadow-lg shadow-blue-100 uppercase">Groupe</button>
+                        <button onclick="toggleMarketBlock('${m.id}', ${m.status !== 'blocked'})" class="flex-1 ${m.status === 'blocked' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'} py-4 rounded-2xl font-black text-[9px] uppercase">
+                            ${m.status === 'blocked' ? 'Débloquer' : 'Bloquer'}
+                        </button>
+                        <button onclick="deleteMarketBusiness('${m.id}')" class="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black text-[9px] uppercase">Supprimer</button>
+                    `}
+                `;
+
+                document.getElementById('impact-modal').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) {}
         }
+
+        async function handleMarketAction(id, status) {
+            if (!confirm(`Confirmer la décision : ${status.toUpperCase()} ?`)) return;
+            try {
+                await axios.put(`${API_URL}/admin/market-requests/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Action réussie !"); closeImpactModal(); loadMarket();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function toggleMarketBlock(id, block) {
+            if (!confirm(`Confirmer : ${block ? 'BLOQUER' : 'DÉBLOQUER'} ce business ?`)) return;
+            try {
+                await axios.put(`${API_URL}/admin/market-requests/${id}/toggle-block`, { block }, { headers: { Authorization: `Bearer ${token}` } });
+                alert(block ? "Business suspendu." : "Business réactivé.");
+                closeImpactModal(); loadMarket();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function deleteMarketBusiness(id) {
+            if (!confirm("⚠️ SUPPRIMER DÉFINITIVEMENT ce business ? Cette action est irréversible.")) return;
+            try {
+                await axios.delete(`${API_URL}/admin/market-requests/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Business supprimé."); closeImpactModal(); loadMarket();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function manageMarketGroup(businessId, category) {
+            document.getElementById('group-modal-subtitle').innerText = `CATÉGORIE : ${category}`;
+            const btnAdd = document.getElementById('btn-add-to-group');
+            btnAdd.onclick = async () => {
+                try {
+                    await axios.post(`${API_URL}/admin/market-groups`, { businessId, category }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Utilisateur ajouté au groupe officiel !");
+                    loadGroupMembers(category);
+                } catch (e) { alert("Erreur lors de l'ajout."); }
+            };
+            loadGroupMembers(category);
+            document.getElementById('modal-manage-group').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        async function loadGroupMembers(category) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/market-groups/members`, { params: { category }, headers: { Authorization: `Bearer ${token}` } });
+                const list = document.getElementById('group-members-list');
+                list.innerHTML = res.data.data.map(m => `
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div class="flex items-center">
+                            <img src="${getFullUrl(m.avatar_url)}" class="w-8 h-8 rounded-lg mr-3 shadow-sm"><div><p class="text-xs font-bold text-gray-800">${m.full_name}</p><p class="text-[9px] text-gray-400 font-bold">${m.business_name}</p></div>
+                        </div>
+                        <button onclick="removeGroupMember('${m.business_id}', '${category}')" class="p-2 text-red-400 hover:bg-red-50 rounded-lg"><i data-lucide="user-minus" class="w-4 h-4"></i></button>
+                    </div>
+                `).join('') || '<p class="text-center text-gray-400 py-10 text-xs font-bold uppercase">Aucun membre</p>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function removeGroupMember(businessId, category) {
+            if (!confirm("Retirer ce professionnel du groupe officiel ?")) return;
+            try {
+                await axios.post(`${API_URL}/admin/market-groups/remove-member`, { businessId, category }, { headers: { Authorization: `Bearer ${token}` } });
+                loadGroupMembers(category);
+            } catch (e) { alert("Erreur."); }
+        }
+
+        function closeGroupModal() { document.getElementById('modal-manage-group').classList.add('hidden'); }
 
         async function loadAppeals() {
             try {

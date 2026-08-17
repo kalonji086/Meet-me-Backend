@@ -283,7 +283,7 @@ const getOrders = asyncHandler(async (req, res) => {
   if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
 
   const result = await query(
-    `SELECT o.*, p.full_name as customer_name, p.avatar_url as customer_avatar
+    `SELECT o.*, p.full_name as customer_name, p.avatar_url as customer_avatar, p.phone_number as customer_phone
      FROM public.market_orders o
      JOIN public.profiles p ON o.user_id = p.id
      WHERE o.business_id = $1 ORDER BY o.created_at DESC`,
@@ -291,6 +291,56 @@ const getOrders = asyncHandler(async (req, res) => {
   );
 
   res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Update order status or details
+ */
+const updateOrder = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { orderId } = req.params;
+  const { status, trackingNumber, adminNotes } = req.body;
+
+  const business = await query('SELECT id FROM public.market_businesses WHERE user_id = $1', [userId]);
+  if (business.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  // On s'assure que la colonne tracking_number existe
+  try {
+    await query('ALTER TABLE public.market_orders ADD COLUMN IF NOT EXISTS tracking_number TEXT');
+    await query('ALTER TABLE public.market_orders ADD COLUMN IF NOT EXISTS admin_notes TEXT');
+    await query('ALTER TABLE public.market_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
+
+    // Mettre à jour la contrainte status pour inclure 'shipped'
+    await query(`
+      ALTER TABLE public.market_orders
+      DROP CONSTRAINT IF EXISTS market_orders_status_check;
+      ALTER TABLE public.market_orders
+      ADD CONSTRAINT market_orders_status_check
+      CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled'));
+    `);
+  } catch (e) {}
+
+  const result = await query(
+    `UPDATE public.market_orders
+     SET status = COALESCE($1, status),
+         tracking_number = COALESCE($2, tracking_number),
+         admin_notes = COALESCE($3, admin_notes),
+         updated_at = NOW()
+     WHERE id = $4 AND business_id = $5
+     RETURNING *`,
+    [status, trackingNumber, adminNotes, orderId, business.rows[0].id]
+  );
+
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Commande introuvable' });
+
+  // Notifier le client
+  const socketService = require('../services/socket.service');
+  socketService.sendToUser(result.rows[0].user_id, 'market:order_updated', {
+    orderId,
+    status: result.rows[0].status
+  });
+
+  res.json({ success: true, data: result.rows[0] });
 });
 
 /**
@@ -474,6 +524,7 @@ module.exports = {
   toggleSubscription,
   getBusinessById,
   getOrders,
+  updateOrder,
   getRequests,
   getInventory,
   getInventoryLogs,

@@ -260,6 +260,27 @@ class MailService {
       return false;
     }
   }
+  /**
+   * Envoyer un email de privilège Admin (Délégation)
+   */
+  async sendAdminPrivilegeEmail(email, name, modules) {
+    const modulesList = modules.map(m => `<li><strong>${m.toUpperCase()}</strong></li>`).join('');
+    const content = `
+      <p>Bonjour ${name},</p>
+      <p>L'administrateur principal de <strong>Meet Me</strong> vous a accordé des privilèges d'administration sur le panneau de contrôle Web.</p>
+      <p><strong>Vous avez désormais accès aux modules suivants :</strong></p>
+      <ul>
+        ${modulesList}
+      </ul>
+      <p>Veuillez noter que toutes vos actions sont enregistrées dans le journal d'audit et que les actions sensibles (suppression, blocage) nécessitent une validation de l'administrateur principal.</p>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="https://meet-me-backend-sg5c.onrender.com/admin-portal" class="btn">ACCÉDER AU PANEL ADMIN</a>
+      </div>
+      <p style="margin-top: 30px; font-size: 12px; color: #666;">Si vous ne reconnaissez pas cette action, veuillez contacter immédiatement le support technique.</p>
+    `;
+
+    return this.sendSystemEmail(email, "Nouveau privilège Admin : Meet Me", content, 'minimal', name);
+  }
 }
 
 module.exports = new MailService();

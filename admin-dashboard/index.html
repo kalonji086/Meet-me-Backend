@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meet Me Admin - Dashboard</title>
+    <title>Meet Me Admin - Panel Officiel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,183 +15,69 @@
         .sidebar-item:hover { background-color: rgba(255,255,255,0.05); }
         .sidebar-item.active { background-color: #673AB7; color: white !important; }
         .amazon-bg { background-color: #1a222f; }
-        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-        .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
         .animate-fade-in { animation: fadeIn 0.3s ease-in; }
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .meme-shadow { text-shadow: 2px 2px 0px #000; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #673AB7; }
-        .toast-notification { position: fixed; top: 20px; right: 20px; z-index: 9999; animation: slideIn 0.5s ease-out; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .toast-exit { animation: slideOut 0.5s ease-in forwards; }
-        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
-
-        /* Quill Editor Customization */
-        .quill-editor-container { background: white; border-radius: 12px; overflow: hidden; margin-top: 8px; }
-        .ql-toolbar { border: 1px solid #e5e7eb !important; border-radius: 12px 12px 0 0; background: #f9fafb; }
-        .ql-container { border: 1px solid #e5e7eb !important; border-top: none !important; border-radius: 0 0 12px 12px; height: 250px; font-size: 16px; }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
     </style>
-    <!-- Quill Editor CDN -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 </head>
 <body class="bg-gray-50 flex h-screen overflow-hidden">
 
-    <!-- TOAST CONTAINER -->
     <div id="toast-container" class="fixed top-5 right-5 space-y-4 z-[9999]"></div>
 
     <!-- LOGIN SCREEN -->
     <div id="login-container" class="flex-1 flex items-center justify-center bg-gray-100 p-4">
-        <div class="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in">
-            <div class="text-center mb-10">
-                <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
-                    <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-16 h-16" alt="Logo">
-                </div>
-                <h3 class="text-4xl font-black text-gray-900 tracking-tighter">Meet Me Admin</h3>
-                <p class="text-gray-400 font-bold uppercase text-[10px] tracking-widest mt-2">Accès Sécurisé</p>
+        <div class="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in text-center">
+            <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-16 h-16" alt="Logo">
             </div>
-
-            <div class="space-y-6">
-                <div>
-                    <label class="text-[10px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Identifiant (Email)</label>
-                    <div class="relative">
-                        <i data-lucide="mail" class="absolute left-4 top-4 w-5 h-5 text-gray-300"></i>
-                        <input type="email" id="email" value="wecanconcept@gmail.com" placeholder="votre@email.com" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
-                    </div>
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Clé d'accès</label>
-                    <div class="relative">
-                        <i data-lucide="lock" class="absolute left-4 top-4 w-5 h-5 text-gray-300"></i>
-                        <input type="password" id="password" value="Proverbe:19!?@" placeholder="••••••••" class="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-bold text-sm">
-                    </div>
-                </div>
-                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all active:scale-95 uppercase tracking-widest text-xs">ENTRER DANS LE DASHBOARD</button>
+            <h3 class="text-4xl font-black text-gray-900 tracking-tighter mb-10 uppercase">Meet Me Admin</h3>
+            <div class="space-y-6 text-left">
+                <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Identifiant Email</label><input type="email" id="email" value="wecanconcept@gmail.com" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm"></div>
+                <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label><input type="password" id="password" value="Proverbe:19!?@" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm"></div>
+                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest active:scale-95 transition-all">ENTRER DANS LE DASHBOARD</button>
             </div>
         </div>
     </div>
 
     <!-- MAIN DASHBOARD -->
-    <div id="main-container" class="hidden flex flex-1 h-screen overflow-hidden">
-
-        <!-- Sidebar -->
-        <div class="w-72 amazon-bg text-gray-300 flex flex-col shadow-2xl shrink-0">
+    <div id="main-container" class="hidden flex flex-1 h-screen overflow-hidden animate-fade-in">
+        <aside class="w-72 amazon-bg text-gray-300 flex flex-col shadow-2xl shrink-0">
             <div class="p-8 text-center border-b border-gray-800">
-                <div class="flex items-center justify-center mb-2">
-                    <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-8 h-8 mr-2" alt="Logo">
-                    <h1 class="text-2xl font-bold text-white tracking-tight">Meet Me</h1>
-                </div>
-                <p class="text-xs text-gray-500 uppercase tracking-widest font-semibold">Administration</p>
+                <div class="flex items-center justify-center mb-2"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" class="w-8 h-8 mr-2" alt="Logo"><h1 class="text-2xl font-bold text-white tracking-tight">Meet Me</h1></div>
+                <p class="text-[9px] text-gray-500 uppercase tracking-widest font-black">Official Admin Panel</p>
             </div>
-
-            <nav class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll">
-                <div class="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-4 px-4">Menu Principal</div>
-                <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Vue d'ensemble</span>
-                </a>
-                <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="users" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Utilisateurs</span>
-                </a>
-                <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="users-2" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Groupes</span>
-                </a>
-                <a href="#" onclick="showSection('support')" id="nav-support" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="life-buoy" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Support (Helpdesk)</span>
-                    <span id="support-badge" class="hidden ml-auto bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                </a>
-                <a href="#" onclick="showSection('contestation')" id="nav-contestation" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="shield-alert" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Contestations</span>
-                    <span id="contestation-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                </a>
-                <a href="#" onclick="showSection('reports')" id="nav-reports" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="triangle-alert" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Signalements Contenu</span>
-                </a>
-                <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="check-circle" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Vérifications (Badge)</span>
-                    <span id="verif-badge" class="hidden ml-auto bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                </a>
-                <a href="#" onclick="showSection('market-requests')" id="nav-market-requests" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="shopping-bag" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Demandes Market</span>
-                    <span id="market-requests-badge" class="hidden ml-auto bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                </a>
-                <a href="#" onclick="showSection('analytics')" id="nav-analytics" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="bar-chart-3" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Analytics</span>
-                </a>
-                <a href="#" onclick="showSection('campaigns')" id="nav-campaigns" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="send" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Campagnes</span>
-                </a>
-                <a href="#" onclick="showSection('audit')" id="nav-audit" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="shield-check" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Audit</span>
-                </a>
-                <a href="#" onclick="showSection('broadcast')" id="nav-broadcast" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="megaphone" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Diffusion</span>
-                </a>
-
-                <a href="#" onclick="showSection('legal')" id="nav-legal" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="file-text" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Légal (CGU/Privacy)</span>
-                </a>
-                <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                    <i data-lucide="settings" class="w-5 h-5 mr-4"></i>
-                    <span class="font-medium">Configuration</span>
-                </a>
+            <nav class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll custom-scrollbar">
+                <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="layout-dashboard" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vue d'ensemble</span></a>
+                <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="users" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Utilisateurs</span></a>
+                <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="users-2" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Groupes Chat</span></a>
+                <a href="#" onclick="showSection('appeals')" id="nav-appeals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="life-buoy" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Support & Appeals</span></a>
+                <a href="#" onclick="showSection('market')" id="nav-market" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="shopping-bag" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Demandes Market</span></a>
+                <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="check-circle" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vérifications</span></a>
+                <a href="#" onclick="showSection('campaigns')" id="nav-campaigns" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="send" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Campagnes Push</span></a>
+                <a href="#" onclick="showSection('legal')" id="nav-legal" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="file-text" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Légal (CGU/Privacy)</span></a>
+                <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1"><i data-lucide="settings" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Config App</span></a>
                 <div class="border-t border-gray-800 my-4 pt-4">
-                    <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest px-4 mb-4 block">Administration</span>
-                    <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                        <i data-lucide="shield-plus" class="w-5 h-5 mr-4 text-orange-500"></i>
-                        <span class="font-medium">Atribus (Délégation)</span>
-                    </a>
-                    <a href="#" onclick="showSection('approvals')" id="nav-approvals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-2 transition-all">
-                        <i data-lucide="check-square" class="w-5 h-5 mr-4 text-green-500"></i>
-                        <span class="font-medium">Approbations</span>
-                        <span id="pending-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                    </a>
+                    <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400"><i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span></a>
+                    <a href="#" onclick="showSection('approvals')" id="nav-approvals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-green-400"><i data-lucide="check-square" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Approbations</span></a>
                 </div>
             </nav>
+            <div class="p-6 border-t border-gray-800"><button onclick="logout()" class="w-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-3 rounded-xl font-bold transition-all"><i data-lucide="log-out" class="w-5 h-5 mr-2"></i>Déconnexion</button></div>
+        </aside>
 
-            <div class="p-6 border-t border-gray-800">
-                <button onclick="logout()" class="w-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-3 rounded-xl font-bold transition-all">
-                    <i data-lucide="log-out" class="w-5 h-5 mr-2"></i>
-                    Déconnexion
-                </button>
-            </div>
-        </div>
-
-        <!-- Content Area -->
         <div class="flex-1 flex flex-col overflow-hidden bg-gray-50">
             <header class="bg-white border-b border-gray-200 px-8 py-5 flex justify-between items-center shadow-sm">
-                <h2 id="section-title" class="text-xl font-bold text-gray-800 tracking-tight">Tableau de bord</h2>
-                <div class="flex items-center space-x-6">
-                    <div class="flex items-center">
-                        <p id="admin-name" class="text-sm font-bold text-gray-800 tracking-tight mr-4">Admin</p>
-                        <div class="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white"><i data-lucide="user" class="w-5 h-5"></i></div>
-                    </div>
-                </div>
+                <h2 id="section-title" class="text-xl font-black text-gray-800 tracking-tighter uppercase">Tableau de bord</h2>
+                <p id="admin-name" class="text-sm font-black text-purple-600 bg-purple-50 px-4 py-1.5 rounded-full">ADMINISTRATEUR</p>
             </header>
 
-            <main class="flex-1 overflow-y-auto p-8">
-                <!-- Section Vue d'ensemble -->
+            <main class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                <!-- SECTION STATS -->
                 <div id="section-stats" class="animate-fade-in">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10" id="stats-summary">
                         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center">
                             <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users" class="w-7 h-7 text-purple-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Utilisateurs</p><h4 id="stat-users" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
@@ -209,84 +95,64 @@
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Groupes</p><h4 id="stat-groups" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
                         </div>
                     </div>
-                    <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center">
-                         <div class="w-full max-w-[450px] h-[450px]"><canvas id="overviewMasterChart"></canvas></div>
-                         <div id="master-legend" class="grid grid-cols-2 gap-4 mt-8 w-full max-w-2xl"></div>
+                    <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center">
+                        <div class="w-full max-w-[450px] h-[450px]"><canvas id="overviewMasterChart"></canvas></div>
+                        <div id="master-legend" class="grid grid-cols-2 gap-4 mt-8 w-full max-w-2xl"></div>
                     </div>
                 </div>
 
-                <!-- AUTRES SECTIONS -->
                 <div id="section-users" class="hidden animate-fade-in">
-                    <div class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
                         <table class="w-full text-left">
-                            <thead class="bg-gray-50 border-b border-gray-100">
-                                <tr><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Identité</th><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</th><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Statut</th><th class="px-8 py-5 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th></tr>
-                            </thead>
+                            <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5 text-gray-500">Profil</th><th class="px-8 py-5">Email & Identifiant</th><th class="px-8 py-5">Sécurité</th><th class="px-8 py-5 text-right">Contrôle</th></tr></thead>
                             <tbody id="users-table-body"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <div id="section-appeals" class="hidden animate-fade-in">
-                    <div class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+                <div id="section-market" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
                         <table class="w-full text-left">
-                            <thead class="bg-gray-50 border-b border-gray-100">
-                                <tr><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Type</th><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Utilisateur</th><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Motif</th><th class="px-8 py-5 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Action</th></tr>
-                            </thead>
-                            <tbody id="appeals-table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div id="section-market-requests" class="hidden animate-fade-in">
-                    <div class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                        <table class="w-full text-left">
-                            <thead class="bg-gray-50 border-b border-gray-100">
-                                <tr><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Business</th><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Propriétaire</th><th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Catégorie</th><th class="px-8 py-5 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th></tr>
-                            </thead>
+                            <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5">Business</th><th class="px-8 py-5">Propriétaire</th><th class="px-8 py-5">Catégorie</th><th class="px-8 py-5 text-right">Action</th></tr></thead>
                             <tbody id="market-requests-table-body"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <div id="section-delegations" class="hidden animate-fade-in">
-                    <div class="flex justify-between items-center mb-8">
-                        <h3 class="text-2xl font-black text-gray-800 tracking-tighter uppercase">Atribus</h3>
-                        <button onclick="showAddDelegationModal()" class="bg-orange-500 text-white px-6 py-3 rounded-2xl font-black text-xs">NOUVELLE DÉLÉGATION</button>
-                    </div>
+                <div id="section-appeals" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left"><tbody id="appeals-table-body"></tbody></table></div>
+                </div>
+
+                <div id="section-groups" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left" id="groups-table"></table></div>
+                </div>
+
+                <div id="section-delegations" class="hidden animate-fade-in max-w-5xl mx-auto">
+                    <div class="flex justify-between items-center mb-8"><h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Atribus</h3><button onclick="showAddDelegationModal()" class="bg-orange-500 text-white px-8 py-4 rounded-2xl font-black text-xs shadow-lg shadow-orange-100">NOUVELLE DÉLÉGATION</button></div>
                     <div class="grid grid-cols-1 gap-4" id="delegations-list"></div>
                 </div>
 
-                <div id="section-approvals" class="hidden animate-fade-in">
-                    <h3 class="text-2xl font-black text-gray-800 tracking-tighter uppercase mb-8">Approbations</h3>
-                    <div class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                        <table class="w-full text-left">
-                            <tbody id="approvals-table-body"></tbody>
-                        </table>
-                    </div>
+                <div id="section-approvals" class="hidden animate-fade-in max-w-4xl mx-auto">
+                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter uppercase mb-8">Approbations Pendues</h3>
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden" id="approvals-list"></div>
                 </div>
 
-                <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto space-y-8">
-                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                        <h4 class="font-black text-gray-800 mb-6 uppercase tracking-tighter">Conditions (TOS)</h4>
-                        <textarea id="legal-tos-content" class="w-full h-48 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm mb-4"></textarea>
-                        <button onclick="saveLegal('tos')" class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold uppercase text-xs">Mettre à jour</button>
-                    </div>
-                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                        <h4 class="font-black text-gray-800 mb-6 uppercase tracking-tighter">Confidentialité</h4>
-                        <textarea id="legal-privacy-content" class="w-full h-48 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm mb-4"></textarea>
-                        <button onclick="saveLegal('privacy')" class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold uppercase text-xs">Mettre à jour</button>
-                    </div>
-                </div>
-
-                <div id="section-config" class="hidden animate-fade-in max-w-xl mx-auto">
+                <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto space-y-8 pb-20">
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
-                        <h3 class="text-2xl font-black text-gray-800 mb-8 uppercase tracking-tighter">Mise à jour App</h3>
-                        <div class="space-y-6">
-                            <input type="text" id="up-version" placeholder="Version (ex: 40.0.0)" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold">
-                            <input type="text" id="up-url" placeholder="URL du fichier AAB/APK" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold">
-                            <textarea id="up-notes" placeholder="Notes..." class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl"></textarea>
-                            <button onclick="saveAppUpdate()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs">Publier</button>
+                        <h4 class="font-black text-gray-800 mb-8 uppercase tracking-widest text-xs opacity-50">Éditeur de documents légaux</h4>
+                        <textarea id="legal-content" class="w-full h-64 p-6 bg-gray-50 border border-gray-200 rounded-[2rem] outline-none font-medium text-sm mb-6" placeholder="Saisir le contenu légal ici..."></textarea>
+                        <div class="flex space-x-4"><button onclick="saveLegal('tos')" class="flex-1 bg-purple-600 text-white py-5 rounded-2xl font-black uppercase text-xs">Mettre à jour TOS</button><button onclick="saveLegal('privacy')" class="flex-1 bg-black text-white py-5 rounded-2xl font-black uppercase text-xs">Mettre à jour Privacy</button></div>
+                    </div>
+                </div>
+
+                <div id="section-config" class="hidden animate-fade-in max-w-xl mx-auto pb-20">
+                    <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 text-center">
+                        <h3 class="text-3xl font-black text-gray-800 mb-8 tracking-tighter uppercase">Mise à jour Système</h3>
+                        <div class="space-y-6 text-left">
+                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Numéro de Version</label><input type="text" id="up-version" placeholder="40.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
+                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Lien Fichier (AAB/APK)</label><input type="text" id="up-url" placeholder="https://..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
+                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Release Notes</label><textarea id="up-notes" class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl"></textarea></div>
+                            <button onclick="saveAppUpdate()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest">PUBLIER LA MISE À JOUR</button>
                         </div>
                     </div>
                 </div>
@@ -294,113 +160,89 @@
         </div>
     </div>
 
-    <!-- MODAL IMPACT -->
-    <div id="impact-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[250] p-6 backdrop-blur-md">
-        <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-pop-in">
-            <div id="impact-header" class="h-40 flex items-center justify-center relative overflow-hidden bg-red-600"><i id="impact-icon" data-lucide="alert-triangle" class="w-16 h-16 text-white"></i></div>
-            <div class="p-10 text-center">
-                <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-4 uppercase tracking-tighter">ATTENTION !</h3>
-                <div id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-10"></div>
-                <div class="flex space-x-4"><button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-bold rounded-2xl">ANNULER</button><button id="impact-confirm-btn" class="flex-1 py-4 bg-purple-600 text-white font-black rounded-2xl shadow-lg">CONFIRMER</button></div>
+    <!-- IMPACT MODAL (Global Dialog) -->
+    <div id="impact-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[500] p-6 backdrop-blur-xl">
+        <div class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
+            <div id="impact-header" class="h-40 flex items-center justify-center bg-purple-600"><i id="impact-icon" data-lucide="alert-circle" class="w-16 h-16 text-white"></i></div>
+            <div class="p-12 text-center">
+                <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-6 uppercase tracking-tighter">EXAMEN DÉTAILLÉ</h3>
+                <div id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-12 max-h-[40vh] overflow-y-auto custom-scrollbar px-4 text-left"></div>
+                <div class="flex space-x-4"><button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all">Retour</button><button id="impact-confirm-btn" class="flex-[2] py-4 bg-purple-600 text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">Confirmer l'Action</button></div>
             </div>
         </div>
     </div>
 
     <script>
-        const BASE_URL = window.location.origin;
-        const API_URL = BASE_URL + '/api';
+        const API_URL = window.location.origin + '/api';
         let token = localStorage.getItem('admin_token');
         let socket = null;
         const charts = { master: null };
 
         const Alert = {
-            showCustomModal: function(title, html, onConfirm) {
+            show: function(title, html, onConfirm, confirmText = "Confirmer", color = "purple") {
                 const modal = document.getElementById('impact-modal');
-                const titleEl = document.getElementById('impact-title');
-                const messageEl = document.getElementById('impact-message');
-                const confirmBtn = document.getElementById('impact-confirm-btn');
-                titleEl.innerText = title;
-                messageEl.innerHTML = html;
-                confirmBtn.onclick = onConfirm;
+                document.getElementById('impact-title').innerText = title;
+                document.getElementById('impact-message').innerHTML = html;
+                const btn = document.getElementById('impact-confirm-btn');
+                btn.innerText = confirmText;
+                btn.className = `flex-[2] py-4 bg-${color}-600 text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-${color}-700 transition-all`;
+                btn.onclick = onConfirm;
                 modal.classList.remove('hidden');
                 if (window.lucide) lucide.createIcons();
             }
         };
 
-        window.onload = () => {
-            lucide.createIcons();
-            if (token) showDashboard();
-        };
+        window.onload = () => { if (token) showDashboard(); else lucide.createIcons(); };
 
         async function login() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
             const btn = document.getElementById('login-btn');
-            if (!email || !password) return alert("Veuillez remplir les champs.");
             try {
-                btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>'; lucide.createIcons();
+                btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>'; lucide.createIcons();
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
                 if (res.data.success) {
-                    const userData = res.data.data.user;
-                    const loginToken = res.data.data.token;
-                    if (userData.isGlobalAdmin) {
-                        token = loginToken; localStorage.setItem('admin_token', token); localStorage.setItem('admin_user', JSON.stringify(userData)); showDashboard();
-                    } else {
-                        try {
-                            const delRes = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${loginToken}` } });
-                            if (delRes.data.success) {
-                                token = loginToken; localStorage.setItem('admin_token', token); localStorage.setItem('admin_user', JSON.stringify(userData)); showDashboard();
-                                return;
-                            }
-                        } catch (err) { alert("Accès refusé."); }
-                    }
+                    token = res.data.data.token;
+                    localStorage.setItem('admin_token', token);
+                    localStorage.setItem('admin_user', JSON.stringify(res.data.data.user));
+                    showDashboard();
                 }
-            } catch (e) { alert("Identifiants incorrects."); } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; if(window.lucide) lucide.createIcons(); }
+            } catch (e) { alert("Identifiants incorrects."); } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; lucide.createIcons(); }
         }
 
         function showDashboard() {
             document.getElementById('login-container').classList.add('hidden');
             document.getElementById('main-container').classList.remove('hidden');
-            const adminUser = JSON.parse(localStorage.getItem('admin_user'));
-            document.getElementById('admin-name').innerText = adminUser ? (adminUser.full_name || adminUser.name) : 'Admin';
-            initSocket();
-            showSection('stats');
+            const u = JSON.parse(localStorage.getItem('admin_user'));
+            document.getElementById('admin-name').innerText = (u.full_name || u.name).toUpperCase();
+            initSocket(); showSection('stats');
         }
 
         function initSocket() {
             if (socket) return;
-            socket = io(BASE_URL, { query: { token } });
-            socket.on('connect', () => console.log("Admin Socket connected"));
+            socket = io(window.location.origin, { query: { token } });
+            socket.on('connect', () => console.log("Connected"));
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'support', 'contestation', 'market-requests', 'legal', 'config', 'delegations', 'approvals'].forEach(s => {
-                const el = document.getElementById(`section-${s}`);
-                const nav = document.getElementById(`nav-${s}`);
-                if (el) el.classList.add('hidden');
-                if (nav) nav.classList.remove('active');
+            ['stats', 'users', 'groups', 'appeals', 'market', 'verifications', 'campaigns', 'legal', 'config', 'delegations', 'approvals'].forEach(s => {
+                const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
+                const nav = document.getElementById('nav-' + (s === 'market' ? 'market-requests' : s)); if (nav) nav.classList.remove('active');
             });
+            const target = document.getElementById(name === 'market-requests' ? 'section-market' : 'section-' + name);
+            if (target) target.classList.remove('hidden');
+            const nav = document.getElementById('nav-' + name); if (nav) nav.classList.add('active');
+            document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 
-            const sectionAppeals = document.getElementById('section-appeals');
-            if (name === 'support' || name === 'contestation') {
-                if (sectionAppeals) sectionAppeals.classList.remove('hidden');
-                document.getElementById(`nav-${name}`).classList.add('active');
-                loadAppeals(name === 'support' ? 'helpdesk' : 'appeal');
-            } else {
-                if (sectionAppeals) sectionAppeals.classList.add('hidden');
-                const target = document.getElementById(`section-${name}`);
-                if (target) target.classList.remove('hidden');
-                const nav = document.getElementById(`nav-${name}`);
-                if (nav) nav.classList.add('active');
-
-                if (name === 'stats') loadStats();
-                if (name === 'users') loadUsers();
-                if (name === 'market-requests') loadMarketRequests();
-                if (name === 'legal') loadLegalDocs();
-                if (name === 'config') loadAppConfig();
-                if (name === 'delegations') loadDelegations();
-                if (name === 'approvals') loadApprovals();
-            }
+            if (name === 'stats') loadStats();
+            if (name === 'users') loadUsers();
+            if (name === 'market-requests') loadMarket();
+            if (name === 'delegations') loadDelegations();
+            if (name === 'approvals') loadApprovals();
+            if (name === 'appeals') loadAppeals();
+            if (name === 'legal') loadLegal();
+            if (name === 'config') loadConfig();
+            if (name === 'groups') loadGroups();
             lucide.createIcons();
         }
 
@@ -408,112 +250,152 @@
             try {
                 const res = await axios.get(`${API_URL}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data;
-                document.getElementById('stat-users').innerText = d.totalUsers || 0;
-                document.getElementById('stat-online').innerText = d.onlineUsers || 0;
-                document.getElementById('stat-messages').innerText = d.totalMessages || 0;
-                document.getElementById('stat-groups').innerText = d.totalGroups || 0;
-                renderChart(d);
-            } catch (e) { console.error(e); }
-        }
-
-        function renderChart(stats) {
-            const ctx = document.getElementById('overviewMasterChart').getContext('2d');
-            if (charts.master) charts.master.destroy();
-            const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6'];
-            const data = [stats.totalUsers, stats.onlineUsers, stats.totalGroups, stats.totalMessages];
-            const labels = ['Inscrits', 'Connectés', 'Groupes', 'Messages'];
-            charts.master = new Chart(ctx, {
-                type: 'polarArea',
-                data: { labels, datasets: [{ data, backgroundColor: colors.map(c => c + 'CC'), borderColor: '#fff', borderWidth: 4 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-            const legend = document.getElementById('master-legend');
-            legend.innerHTML = labels.map((l, i) => `<div class="bg-gray-50 p-4 rounded-2xl flex justify-between"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-xl font-black text-gray-900">${data[i]}</p></div>`).join('');
+                document.getElementById('stat-users').innerText = d.totalUsers;
+                document.getElementById('stat-online').innerText = d.onlineUsers;
+                document.getElementById('stat-messages').innerText = d.totalMessages;
+                document.getElementById('stat-groups').innerText = d.totalGroups;
+                const ctx = document.getElementById('overviewMasterChart').getContext('2d');
+                if (charts.master) charts.master.destroy();
+                const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6'];
+                charts.master = new Chart(ctx, { type: 'polarArea', data: { labels: ['Users', 'Online', 'Groups', 'Messages'], datasets: [{ data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages], backgroundColor: colors.map(c => c + 'CC'), borderColor: '#fff', borderWidth: 4 }] } });
+                const legend = document.getElementById('master-legend');
+                legend.innerHTML = ['Inscrits', 'En ligne', 'Groupes Chat', 'Messages'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div class="flex items-center"><div class="w-3 h-3 rounded-full mr-3" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages][i]}</p></div>`).join('');
+            } catch (e) {}
         }
 
         async function loadUsers() {
             try {
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
-                const body = document.getElementById('users-table-body');
-                body.innerHTML = res.data.data.map(u => `
-                    <tr class="border-b border-gray-50 hover:bg-gray-50">
-                        <td class="px-8 py-5 flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-10 h-10 rounded-xl mr-3 shadow-sm"><p class="font-bold text-sm text-gray-800">${u.full_name}</p></td>
-                        <td class="px-8 py-5 text-sm">${u.email}</td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
-                        <td class="px-8 py-5 text-right"><button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-2.5 rounded-xl bg-gray-50 text-gray-400 hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button></td>
+                document.getElementById('users-table-body').innerHTML = res.data.data.map(u => `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                        <td class="px-8 py-5 flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-11 h-11 rounded-xl mr-4 shadow-md"><p class="font-bold text-sm text-gray-800">${u.full_name}</p></td>
+                        <td class="px-8 py-5 text-sm"><p class="font-medium text-gray-700">${u.email}</p><p class="text-[10px] text-gray-400 font-bold tracking-tight">@${u.username}</p></td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'COMPTE BLOQUÉ' : 'ACTIF'}</span></td>
+                        <td class="px-8 py-5 text-right space-x-2">
+                            <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
+                            <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
                     </tr>
                 `).join('');
                 lucide.createIcons();
-            } catch (e) { console.error(e); }
+            } catch (e) {}
         }
 
-        async function loadAppeals(type) {
-            try {
-                const res = await axios.get(`${API_URL}/admin/appeals`, { headers: { Authorization: `Bearer ${token}` } });
-                const filtered = res.data.data.filter(a => a.type === type || (type === 'appeal' && a.type !== 'helpdesk'));
-                const body = document.getElementById('appeals-table-body');
-                body.innerHTML = filtered.map(a => `
-                    <tr class="border-b border-gray-50 hover:bg-gray-50">
-                        <td class="px-8 py-5 text-[9px] font-black text-purple-600 tracking-widest uppercase">${a.type}</td>
-                        <td class="px-8 py-5 font-bold text-gray-800 text-sm">${a.full_name || 'Utilisateur'}</td>
-                        <td class="px-8 py-5 text-sm text-gray-500 italic truncate max-w-xs">${a.reason}</td>
-                        <td class="px-8 py-5 text-right"><button class="px-5 py-2.5 bg-purple-600 text-white text-xs font-black rounded-xl hover:bg-purple-700 shadow-md uppercase">Répondre</button></td>
-                    </tr>
-                `).join('');
-                lucide.createIcons();
-            } catch (e) { console.error(e); }
+        async function confirmDeleteUser(id, name) {
+            Alert.show("Désintégration Totale", `<div class="bg-red-50 p-6 rounded-3xl border border-red-100 text-center"><p class="text-red-600 font-bold mb-2">ATTENTION : Action irréversible</p><p class="text-sm text-red-800">Vous allez supprimer <b>${name}</b> et toutes ses discussions, messages et activités de Meet Me. Confirmer ?</p></div>`, async () => {
+                try {
+                    await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Utilisateur supprimé !"); closeImpactModal(); loadUsers();
+                } catch (e) { alert("Erreur lors de la suppression."); }
+            }, "Supprimer Définitivement", "red");
         }
 
-        async function loadMarketRequests() {
+        async function loadMarket() {
             try {
                 const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
-                const body = document.getElementById('market-requests-table-body');
-                body.innerHTML = res.data.data.map(m => `
-                    <tr class="border-b border-gray-50 hover:bg-gray-50">
-                        <td class="px-8 py-5 font-bold text-sm">${m.business_name}</td>
-                        <td class="px-8 py-5 text-sm">${m.owner_name}</td>
+                document.getElementById('market-requests-table-body').innerHTML = res.data.data.map(m => `
+                    <tr class="border-b border-gray-50">
+                        <td class="px-8 py-5 flex items-center"><img src="${m.logo_url}" class="w-11 h-11 rounded-2xl mr-4 shadow-md"><p class="font-bold text-sm text-gray-800">${m.business_name}</p></td>
+                        <td class="px-8 py-5 text-sm text-gray-600">${m.owner_name}</td>
                         <td class="px-8 py-5"><span class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-[10px] font-black uppercase">${m.category}</span></td>
-                        <td class="px-8 py-5 text-right"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${m.status === 'approved' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}">${m.status.toUpperCase()}</span></td>
+                        <td class="px-8 py-5 text-right"><button onclick="examineMarket('${m.id}')" class="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-purple-700 transition-all">Examiner</button></td>
                     </tr>
                 `).join('');
-            } catch (e) { console.error(e); }
+                lucide.createIcons();
+            } catch (e) {}
         }
 
-        async function loadLegalDocs() {
+        async function examineMarket(id) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
+                const m = res.data.data.find(x => x.id === id);
+                let html = `
+                    <div class="space-y-6">
+                        <div class="flex items-center bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                            <img src="${m.logo_url}" class="w-16 h-16 rounded-2xl mr-6 shadow-xl">
+                            <div><p class="text-2xl font-black text-gray-800 tracking-tighter">${m.business_name}</p><p class="text-xs text-purple-500 font-bold uppercase tracking-widest">${m.category}</p></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-6 bg-purple-50 rounded-3xl border border-purple-100"><p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1">ID National</p><p class="font-bold text-sm text-purple-800">${m.national_id_number || 'N/A'}</p></div>
+                            <div class="p-6 bg-purple-50 rounded-3xl border border-purple-100"><p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1">RCCM</p><p class="font-bold text-sm text-purple-800">${m.rccm_number || 'N/A'}</p></div>
+                        </div>
+                        <div class="p-6 bg-gray-50 rounded-3xl"><p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Description du Business</p><p class="text-sm font-medium text-gray-600 leading-relaxed">${m.full_description || 'Aucune description fournie.'}</p></div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Pièce d'Identité</p><img src="${m.id_card_url}" class="w-full rounded-2xl shadow-md border border-gray-100 cursor-zoom-in"></div>
+                            <div><p class="text-[9px] font-black text-gray-400 uppercase mb-2">Bannière Pub</p><img src="${m.banner_url}" class="w-full rounded-2xl shadow-md border border-gray-100 cursor-zoom-in"></div>
+                        </div>
+                    </div>
+                `;
+                Alert.show("Examen de la Demande Market", html, async () => {
+                    try {
+                        await axios.put(`${API_URL}/admin/market-requests/${id}`, { status: 'approved' }, { headers: { Authorization: `Bearer ${token}` } });
+                        alert("Business approuvé et publié !"); closeImpactModal(); loadMarket();
+                    } catch (e) { alert("Erreur d'approbation."); }
+                }, "Approuver et Publier", "green");
+            } catch (e) {}
+        }
+
+        async function toggleUserLock(id, lock) {
+            try {
+                await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
+                loadUsers();
+            } catch (e) {}
+        }
+
+        async function loadAppeals() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/appeals`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('appeals-table-body').innerHTML = res.data.data.map(a => `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all p-6 flex items-center justify-between">
+                        <td class="flex-1"><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">${a.type}</p><p class="font-bold text-gray-800 text-sm mb-1">${a.full_name || 'Utilisateur'}</p><p class="text-xs text-gray-400 font-medium italic">${a.reason}</p></td>
+                        <td class="text-right shrink-0"><button class="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase shadow-md hover:bg-purple-700 transition-all">Répondre</button></td>
+                    </tr>
+                `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune demande en attente</div>';
+            } catch (e) {}
+        }
+
+        async function loadGroups() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('groups-table').innerHTML = res.data.data.map(g => `
+                    <tr class="border-b border-gray-50 p-6 flex items-center justify-between">
+                        <td class="flex items-center"><img src="${g.avatar_url || 'https://ui-avatars.com/api/?name='+g.name}" class="w-11 h-11 rounded-xl mr-4 shadow-sm"><div><p class="font-black text-gray-800 text-sm">${g.name}</p><p class="text-[10px] text-gray-400 font-bold uppercase">${g.members_count} membres</p></div></td>
+                        <td class="text-right space-x-2"><button onclick="deleteGroup('${g.id}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+                    </tr>
+                `).join('');
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function loadLegal() {
             try {
                 const res = await axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } });
-                res.data.data.forEach(d => {
-                    const el = document.getElementById(`legal-${d.type}-content`);
-                    if (el) el.value = d.content;
-                });
-            } catch (e) { console.error(e); }
+                res.data.data.forEach(d => { if(d.type === 'tos') document.getElementById('legal-content').value = d.content; });
+            } catch (e) {}
         }
 
         async function saveLegal(type) {
-            const content = document.getElementById(`legal-${type}-content`).value;
+            const content = document.getElementById('legal-content').value;
             try {
                 await axios.post(`${API_URL}/admin/legal`, { type, content, version: '40.0.0', force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Publié avec succès !");
             } catch (e) { alert("Erreur."); }
         }
 
-        async function loadAppConfig() {
+        async function loadConfig() {
             try {
                 const res = await axios.get(`${API_URL}/admin/app-config`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data;
-                document.getElementById('up-version').value = d.current_version;
-                document.getElementById('up-url').value = d.update_url || '';
-                document.getElementById('up-notes').value = d.release_notes || '';
-            } catch (e) { console.error(e); }
+                if(d) {
+                    document.getElementById('up-version').value = d.current_version;
+                    document.getElementById('up-url').value = d.update_url || '';
+                    document.getElementById('up-notes').value = d.release_notes || '';
+                }
+            } catch (e) {}
         }
 
         async function saveAppUpdate() {
-            const data = {
-                current_version: document.getElementById('up-version').value,
-                update_url: document.getElementById('up-url').value,
-                release_notes: document.getElementById('up-notes').value,
-                force_update: true
-            };
+            const data = { current_version: document.getElementById('up-version').value, update_url: document.getElementById('up-url').value, release_notes: document.getElementById('up-notes').value, force_update: true };
             try {
                 await axios.post(`${API_URL}/admin/app-config`, data, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Mise à jour publiée !");
@@ -523,83 +405,60 @@
         async function loadDelegations() {
             try {
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
-                const list = document.getElementById('delegations-list');
-                list.innerHTML = res.data.data.map(d => `
-                    <div class="bg-white p-6 rounded-3xl border border-gray-100 flex items-center justify-between shadow-sm mb-3">
-                        <div class="flex items-center">
-                            <img src="${d.avatar_url || 'https://ui-avatars.com/api/?name='+d.full_name}" class="w-12 h-12 rounded-xl mr-4 shadow-sm">
-                            <div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div>
-                        </div>
-                        <span class="px-3 py-1 rounded-lg text-[10px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
+                document.getElementById('delegations-list').innerHTML = res.data.data.map(d => `
+                    <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm mb-3 animate-fade-in">
+                        <div class="flex items-center"><img src="${d.avatar_url || 'https://ui-avatars.com/api/?name='+d.full_name}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">${d.email}</p></div></div>
+                        <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
                     </div>
                 `).join('');
                 lucide.createIcons();
-            } catch (e) { console.error(e); }
+            } catch (e) {}
+        }
+
+        async function loadApprovals() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/pending-actions`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('approvals-list').innerHTML = res.data.data.map(a => `
+                    <div class="p-8 border-b border-gray-50 flex items-center justify-between animate-fade-in hover:bg-gray-50 transition-all">
+                        <div><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">Requête de ${a.requester_name}</p><p class="text-lg font-black text-gray-800 mb-1">Action: ${a.action_type}</p><p class="text-xs font-bold text-gray-400">Cible: ${a.target_name} (${a.target_id})</p></div>
+                        <div class="flex space-x-3"><button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-100">Approuver</button></div>
+                    </div>
+                `).join('') || '<div class="p-20 text-center text-gray-400 font-black uppercase text-xs tracking-widest opacity-50">Aucune action sensible en attente</div>';
+            } catch (e) {}
+        }
+
+        async function handleApproval(id, decision) {
+            try { await axios.put(`${API_URL}/admin/pending-actions/${id}`, { decision }, { headers: { Authorization: `Bearer ${token}` } }); loadApprovals(); loadStats(); } catch (e) { alert("Erreur."); }
         }
 
         async function showAddDelegationModal() {
             try {
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
-                const users = res.data.data;
-                let html = `<div class="space-y-2 max-h-[40vh] overflow-y-auto">` + users.map(u => `
-                    <label class="flex items-center p-4 hover:bg-gray-50 rounded-2xl cursor-pointer">
-                        <input type="radio" name="selected-user-id" value="${u.id}" data-name="${u.full_name}" class="w-5 h-5 accent-orange-500 mr-4">
-                        <p class="text-sm font-black text-gray-800">${u.full_name}</p>
-                    </label>
+                let html = `<div class="space-y-2 max-h-[50vh] overflow-y-auto pr-4 custom-scrollbar">` + res.data.data.map(u => `
+                    <label class="flex items-center p-5 bg-gray-50 hover:bg-purple-50 rounded-[1.5rem] cursor-pointer border border-transparent transition-all"><input type="radio" name="selected-user-id" value="${u.id}" data-name="${u.full_name}" class="w-6 h-6 accent-purple-600 mr-4"><div class="flex items-center"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-10 h-10 rounded-xl mr-3 shadow-sm"><p class="text-sm font-black text-gray-800">${u.full_name}</p></div></label>
                 `).join('') + `</div>`;
-                Alert.showCustomModal("Choisir un collaborateur", html, () => {
+                Alert.show("Choisir un Collaborateur", html, () => {
                     const sel = document.querySelector('input[name="selected-user-id"]:checked');
                     if (sel) editDelegation(sel.value, sel.getAttribute('data-name'), "", true);
-                });
+                }, "Sélectionner", "purple");
             } catch (e) { alert("Erreur."); }
         }
 
         function editDelegation(userId, userName, modules = "", active = true) {
             const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
             const currentModules = modules ? modules.split(',') : [];
-            let html = `<div class="grid grid-cols-2 gap-3 mb-6">` + allModules.map(m => `
-                <label class="flex items-center p-3 bg-gray-50 rounded-xl cursor-pointer">
-                    <input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-4 h-4 accent-orange-500 mr-3">
-                    <span class="text-[10px] font-black text-gray-700 uppercase">${m}</span>
-                </label>
+            let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4">Attribuer les accès pour ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
+                <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all"><input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3"><span class="text-[10px] font-black text-gray-700 uppercase">${m}</span></label>
             `).join('') + `</div>`;
-            Alert.showCustomModal("Paramétrer Atribus", html, async () => {
+            Alert.show("Droits d'Administration", html, async () => {
                 const selected = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
                 try {
                     await axios.post(`${API_URL}/admin/delegations`, { userId, modules: selected, isActive: true }, { headers: { Authorization: `Bearer ${token}` } });
-                    alert("Privilèges enregistrés !"); location.reload();
+                    alert("Invitation envoyée !"); location.reload();
                 } catch (e) { alert("Erreur."); }
-            });
+            }, "Enregistrer & Inviter", "purple");
         }
 
-        async function loadApprovals() {
-            try {
-                const res = await axios.get(`${API_URL}/admin/pending-actions`, { headers: { Authorization: `Bearer ${token}` } });
-                const body = document.getElementById('approvals-table-body');
-                body.innerHTML = res.data.data.map(a => `
-                    <tr class="border-b border-gray-50 p-6 flex items-center justify-between">
-                        <td><p class="font-bold text-sm text-gray-800">${a.requester_name}</p><p class="text-[9px] font-black text-red-600 uppercase">${a.action_type}</p></td>
-                        <td class="text-right"><button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-md">APPROUVER</button></td>
-                    </tr>
-                `).join('') || '<div class="p-10 text-center text-gray-400 font-bold uppercase text-xs">Aucune action</div>';
-            } catch (e) {}
-        }
-
-        async function handleApproval(id, decision) {
-            try {
-                await axios.put(`${API_URL}/admin/pending-actions/${id}`, { decision }, { headers: { Authorization: `Bearer ${token}` } });
-                loadApprovals();
-            } catch (e) { alert("Erreur."); }
-        }
-
-        async function toggleUserLock(userId, lock) {
-            try {
-                await axios.put(`${API_URL}/admin/users/${userId}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
-                loadUsers();
-            } catch (e) { alert("Erreur."); }
-        }
-
-        async function initRichEditors() {}
         function logout() { localStorage.clear(); location.reload(); }
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }
     </script>

@@ -512,11 +512,12 @@ const getDelegations = asyncHandler(async (req, res) => {
  */
 const saveDelegation = asyncHandler(async (req, res) => {
   if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
-  const { userEmail, modules, isActive = true } = req.body;
+  const { userId, modules, isActive = true } = req.body;
 
-  const userRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [userEmail.toLowerCase()]);
-  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Meet Me non trouvé avec cet email' });
-  const userId = userRes.rows[0].id;
+  const userRes = await query('SELECT id, full_name, email FROM public.profiles WHERE id = $1', [userId]);
+  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Meet Me non trouvé' });
+
+  const user = userRes.rows[0];
 
   await query(
     `INSERT INTO public.admin_delegations (user_id, modules, is_active, updated_at)
@@ -527,9 +528,9 @@ const saveDelegation = asyncHandler(async (req, res) => {
   );
 
   const mailService = require('../services/mail.service');
-  await mailService.sendAdminPrivilegeEmail(userEmail, userRes.rows[0].full_name, modules);
+  await mailService.sendAdminPrivilegeEmail(user.email, user.full_name, modules);
 
-  res.json({ success: true, message: 'Privilèges enregistrés et email envoyé.' });
+  res.json({ success: true, message: 'Privilèges enregistrés et invitation envoyée.' });
 });
 
 /**

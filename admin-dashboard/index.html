@@ -2142,7 +2142,7 @@
                         </div>
                         <div class="flex items-center space-x-4">
                             <span class="px-3 py-1 ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'} rounded-lg text-[10px] font-black uppercase">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
-                            <button onclick="editDelegation('${d.email}', '${d.modules.join(',')}', ${d.is_active})" class="p-3 bg-gray-50 text-gray-400 hover:text-orange-500 rounded-xl transition-all"><i data-lucide="edit-3" class="w-5 h-5"></i></button>
+                            <button onclick="editDelegation('${d.user_id}', '${d.full_name}', '${d.modules.join(',')}', ${d.is_active})" class="p-3 bg-gray-50 text-gray-400 hover:text-orange-500 rounded-xl transition-all"><i data-lucide="edit-3" class="w-5 h-5"></i></button>
                         </div>
                     `;
                     list.appendChild(div);
@@ -2152,33 +2152,79 @@
         }
 
         async function showAddDelegationModal() {
-            const email = prompt("Entrez l'e-mail de l'utilisateur Meet Me à inviter :");
-            if (!email) return;
-            editDelegation(email, "", true);
+            try {
+                const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+                const users = res.data.data;
+
+                let html = `
+                    <div class="mb-6">
+                        <input type="text" id="user-search-atribus" onkeyup="filterAtribusUsers()" placeholder="Rechercher un utilisateur (nom, email...)" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-bold">
+                    </div>
+                    <div class="max-h-[40vh] overflow-y-auto custom-scrollbar space-y-2" id="atribus-user-list">
+                `;
+
+                users.forEach(u => {
+                    html += `
+                        <label class="flex items-center p-4 hover:bg-gray-50 rounded-2xl cursor-pointer border border-transparent hover:border-orange-200 transition-all user-item-atribus" data-search="${u.full_name.toLowerCase()} ${u.email.toLowerCase()}">
+                            <input type="radio" name="selected-user-id" value="${u.id}" data-name="${u.full_name}" class="w-5 h-5 accent-orange-500 mr-4">
+                            <img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+u.full_name}" class="w-10 h-10 rounded-xl mr-4">
+                            <div>
+                                <p class="text-sm font-black text-gray-800">${u.full_name}</p>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase">${u.email}</p>
+                            </div>
+                        </label>
+                    `;
+                });
+
+                html += `</div>`;
+
+                Alert.showCustomModal("Sélectionner l'utilisateur à inviter", html, () => {
+                    const selected = document.querySelector('input[name="selected-user-id"]:checked');
+                    if (!selected) return alert("Veuillez choisir un utilisateur.");
+                    editDelegation(selected.value, selected.getAttribute('data-name'), "", true);
+                });
+            } catch (e) { alert("Erreur chargement utilisateurs."); }
         }
 
-        function editDelegation(email, modules = "", active = true) {
-            // Pour simplifier, on utilise une petite modal custom ou des checkbox
+        function filterAtribusUsers() {
+            const query = document.getElementById('user-search-atribus').value.toLowerCase();
+            document.querySelectorAll('.user-item-atribus').forEach(item => {
+                const searchData = item.getAttribute('data-search');
+                item.style.display = searchData.includes(query) ? 'flex' : 'none';
+            });
+        }
+
+        function editDelegation(userId, userName, modules = "", active = true) {
             const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
             const currentModules = modules ? modules.split(',') : [];
 
-            let html = `<div class="grid grid-cols-2 gap-4">`;
+            let html = `
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Utilisateur : <span class="text-orange-600">${userName}</span></p>
+                <div class="grid grid-cols-2 gap-3 mb-6">
+            `;
+
             allModules.forEach(m => {
                 html += `
                     <label class="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer">
                         <input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-4 h-4 accent-orange-500 mr-3">
-                        <span class="text-xs font-bold text-gray-700 uppercase">${m}</span>
+                        <span class="text-[10px] font-black text-gray-700 uppercase">${m}</span>
                     </label>
                 `;
             });
-            html += `</div>`;
 
-            // On réutilise une structure de modal existante ou on en crée une simple
-            Alert.showCustomModal("Paramétrer les accès : " + email, html, async () => {
+            html += `</div>
+                <div class="flex items-center p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                    <input type="checkbox" id="delegation-active-check" ${active ? 'checked' : ''} class="w-5 h-5 accent-orange-500 mr-3">
+                    <label for="delegation-active-check" class="text-xs font-black text-orange-800 uppercase">Compte Administrateur Actif</label>
+                </div>
+            `;
+
+            Alert.showCustomModal("Paramétrer les privilèges", html, async () => {
                 const selected = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
+                const isActive = document.getElementById('delegation-active-check').checked;
                 try {
-                    await axios.post(`${API_URL}/admin/delegations`, { userEmail: email, modules: selected, isActive: active }, { headers: { Authorization: `Bearer ${token}` } });
-                    alert("Privilèges accordés et invitation envoyée !");
+                    await axios.post(`${API_URL}/admin/delegations`, { userId, modules: selected, isActive }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Privilèges mis à jour et invitation envoyée !");
                     loadDelegations();
                 } catch (e) { alert("Erreur : " + (e.response?.data?.error || "Impossible d'atribuer les droits.")); }
             });

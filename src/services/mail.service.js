@@ -267,19 +267,32 @@ class MailService {
     const modulesList = modules.map(m => `<li><strong>${m.toUpperCase()}</strong></li>`).join('');
     const content = `
       <p>Bonjour ${name},</p>
-      <p>L'administrateur principal de <strong>Meet Me</strong> vous a accordé des privilèges d'administration sur le panneau de contrôle Web.</p>
-      <p><strong>Vous avez désormais accès aux modules suivants :</strong></p>
-      <ul>
-        ${modulesList}
-      </ul>
-      <p>Veuillez noter que toutes vos actions sont enregistrées dans le journal d'audit et que les actions sensibles (suppression, blocage) nécessitent une validation de l'administrateur principal.</p>
-      <div style="text-align: center; margin-top: 30px;">
+      <p>L'administrateur principal de <strong>Meet Me</strong> vous a accordé des privilèges d'administration sur le panneau de contrôle Web officiel.</p>
+
+      <div style="background-color: #f9f9f9; padding: 25px; border-radius: 15px; margin: 20px 0; border-left: 5px solid #FF9900;">
+        <p style="margin-top: 0;"><strong>Vos accès autorisés :</strong></p>
+        <ul style="margin-bottom: 0;">
+          ${modulesList}
+        </ul>
+      </div>
+
+      <p><strong>Comment vous connecter ?</strong></p>
+      <ol>
+        <li>Cliquez sur le bouton ci-dessous pour accéder à la page de connexion Admin.</li>
+        <li>Utilisez votre <strong>e-mail habituel</strong> (${email}) et votre mot de passe Meet Me habituel.</li>
+        <li>Une fois connecté, vous ne verrez que les modules listés ci-dessus.</li>
+      </ol>
+
+      <div style="text-align: center; margin-top: 35px;">
         <a href="https://meet-me-backend-sg5c.onrender.com/admin-portal" class="btn">ACCÉDER AU PANEL ADMIN</a>
       </div>
-      <p style="margin-top: 30px; font-size: 12px; color: #666;">Si vous ne reconnaissez pas cette action, veuillez contacter immédiatement le support technique.</p>
+
+      <p style="margin-top: 35px; font-size: 11px; color: #777; line-height: 1.5;">
+        <em>Note : Toutes vos actions sur le panel sont tracées en temps réel. Les actions sensibles comme la suppression de compte nécessitent une validation finale de l'administrateur principal.</em>
+      </p>
     `;
 
-    return this.sendSystemEmail(email, "Nouveau privilège Admin : Meet Me", content, 'minimal', name);
+    return this.sendSystemEmail(email, "Invitation : Vous avez des privilèges Admin sur Meet Me", content, 'minimal', name);
   }
 }
 

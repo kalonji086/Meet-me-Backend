@@ -538,6 +538,12 @@
                 addNotification('security', 'Action à Approuver', `${data.requestedBy} veut ${data.actionType} sur ${data.targetName}`, 'check-square');
             });
 
+            socket.on('admin:action_processed', (data) => {
+                const statusLabels = { 'approved': 'APPROUVÉE', 'rejected': 'REJETÉE', 'sent_back': 'RENVOYÉE POUR CORRECTION' };
+                const label = statusLabels[data.decision] || data.decision.toUpperCase();
+                addNotification('security', 'Statut de votre demande', `Votre action ${data.actionType} a été ${label}.`, 'info');
+            });
+
             socket.on('admin_new_user', (data) => addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus'));
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
             socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));

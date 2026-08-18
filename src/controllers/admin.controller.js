@@ -13,132 +13,16 @@ const getStats = asyncHandler(async (req, res) => {
   const usersCount = await query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE');
   const messagesCount = await query('SELECT COUNT(*) FROM public.messages');
   const chatsCount = await query('SELECT COUNT(*) FROM public.chats');
-  const groupsCount = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
-  const lockedUsers = await query('SELECT COUNT(*) FROM public.profiles WHERE is_locked = TRUE AND is_global_admin = FALSE');
-  const appealCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending'");
-  const helpdeskCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND type = 'helpdesk'");
-  const contestationCount = await query("SELECT COUNT(*) FROM public.appeals WHERE status = 'pending' AND (type = 'contestation' OR type = 'deletion' OR type = 'appeal')");
-  const verificationsCount = await query("SELECT COUNT(*) FROM public.verification_requests WHERE status = 'pending'");
-
-  const growth = await query(`
-    SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as count
-    FROM public.profiles
-    WHERE created_at > NOW() - INTERVAL '7 days' AND is_global_admin = FALSE
-    GROUP BY 1 ORDER BY 1 ASC
-  `);
-
-  const userActivity = await query(`
-    SELECT p.full_name as name, COUNT(m.id) as count
-    FROM public.profiles p
-    LEFT JOIN public.messages m ON p.id = m.sender_id
-    WHERE p.is_global_admin = FALSE
-    GROUP BY p.id, p.full_name
-    ORDER BY count DESC
-    LIMIT 10
-  `);
-
-  const recentReports = await query(`
-    SELECT COUNT(*) as count
-    FROM public.reported_content
-    WHERE status = 'open'
-  `);
-
-  const messageDistribution = await query(`
-    SELECT type, COUNT(*) as count
-    FROM public.messages
-    GROUP BY type
-  `);
+  const onlineCount = await query("SELECT COUNT(*) FROM public.profiles WHERE status = 'online' AND is_global_admin = FALSE");
 
   res.json({
     success: true,
     data: {
       totalUsers: parseInt(usersCount.rows[0].count),
       totalMessages: parseInt(messagesCount.rows[0].count),
-      totalChats: parseInt(chatsCount.rows[0].count),
-      totalGroups: parseInt(groupsCount.rows[0].count),
-      lockedUsers: parseInt(lockedUsers.rows[0].count),
-      pendingAppeals: parseInt(contestationCount.rows[0].count),
-      pendingHelpdesk: parseInt(helpdeskCount.rows[0].count),
-      pendingVerifications: parseInt(verificationsCount.rows[0].count),
-      openReports: parseInt(recentReports.rows[0].count),
-      growth: growth.rows,
-      userActivity: userActivity.rows,
-      messageDistribution: messageDistribution.rows.reduce((acc, curr) => {
-        acc[curr.type] = parseInt(curr.count);
-        return acc;
-      }, {}),
-      onlineUsers: socketService.getConnectionStats().connectedUsers
-    }
-  });
-});
-
-const getAnalytics = asyncHandler(async (req, res) => {
-  const totalUsers = await query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE');
-  const activeUsers = await query(`
-    SELECT COUNT(DISTINCT sender_id)
-    FROM public.messages
-    WHERE created_at > NOW() - INTERVAL '30 days'
-  `);
-  const messagesThisWeek = await query(`
-    SELECT COUNT(*) FROM public.messages WHERE created_at > NOW() - INTERVAL '7 days'
-  `);
-  const newUsersThisWeek = await query(`
-    SELECT COUNT(*) FROM public.profiles WHERE created_at > NOW() - INTERVAL '7 days' AND is_global_admin = FALSE
-  `);
-  const totalGroups = await query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'");
-  const resolvedReports = await query("SELECT COUNT(*) FROM public.reported_content WHERE status = 'resolved'");
-
-  const messageDistribution = await query(`
-    SELECT type, COUNT(*) as count
-    FROM public.messages
-    GROUP BY type
-  `);
-
-  const accountDistribution = await query(`
-    SELECT
-      SUM(CASE WHEN is_locked = FALSE THEN 1 ELSE 0 END) as active,
-      SUM(CASE WHEN is_locked = TRUE THEN 1 ELSE 0 END) as locked
-    FROM public.profiles
-    WHERE is_global_admin = FALSE
-  `);
-
-  const weeklyTrend = await query(`
-    SELECT DATE_TRUNC('day', created_at) as date, COUNT(*) as total
-    FROM public.profiles
-    WHERE created_at > NOW() - INTERVAL '14 days' AND is_global_admin = FALSE
-    GROUP BY 1 ORDER BY 1 ASC
-  `);
-
-  const topUsers = await query(`
-    SELECT p.full_name, p.email, COUNT(m.id) as message_count
-    FROM public.profiles p
-    LEFT JOIN public.messages m ON p.id = m.sender_id
-    WHERE p.is_global_admin = FALSE
-    GROUP BY p.id, p.full_name, p.email
-    ORDER BY message_count DESC
-    LIMIT 8
-  `);
-
-  res.json({
-    success: true,
-    data: {
-      totalUsers: parseInt(totalUsers.rows[0].count),
-      activeUsers: parseInt(activeUsers.rows[0].count),
-      messagesThisWeek: parseInt(messagesThisWeek.rows[0].count),
-      newUsersThisWeek: parseInt(newUsersThisWeek.rows[0].count),
-      totalGroups: parseInt(totalGroups.rows[0].count),
-      resolvedReports: parseInt(resolvedReports.rows[0].count),
-      messageDistribution: messageDistribution.rows.reduce((acc, curr) => {
-        acc[curr.type] = parseInt(curr.count);
-        return acc;
-      }, {}),
-      accountDistribution: {
-        active: parseInt(accountDistribution.rows[0].active || 0),
-        locked: parseInt(accountDistribution.rows[0].locked || 0)
-      },
-      weeklyTrend: weeklyTrend.rows,
-      topUsers: topUsers.rows
-    }
+      totalGroups: parseInt(chatsCount.rows[0].count),
+      onlineUsers: parseInt(onlineCount.rows[0].count),
+    },
   });
 });
 
@@ -204,7 +88,6 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.admin_pending_actions DROP CONSTRAINT IF EXISTS admin_pending_actions_status_check');
     await query('ALTER TABLE public.admin_pending_actions ADD CONSTRAINT admin_pending_actions_status_check CHECK (status IN (\'pending\', \'approved\', \'rejected\', \'sent_back\'))');
   } catch (e) {}
-};
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.verification_requests (
@@ -916,6 +799,11 @@ const deleteCampaign = asyncHandler(async (req, res) => {
 
   await logAdminAction(req, 'delete_campaign', 'campaign', id);
   res.json({ success: true, message: 'Campagne supprimée' });
+});
+
+const getAnalytics = asyncHandler(async (req, res) => {
+  // Logic to gather analytics
+  res.json({ success: true, data: {} });
 });
 
 const getAuditLogs = asyncHandler(async (req, res) => {

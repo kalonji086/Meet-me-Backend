@@ -6,6 +6,7 @@ const axios = require('axios');
 const { asyncHandler } = require('../middleware/error.middleware');
 const notificationService = require('../services/notification.service');
 const translationService = require('../services/translation.service');
+const socketService = require('../services/socket.service');
 
 /**
  * @desc    Obtenir la liste des conversations
@@ -120,13 +121,21 @@ const createChat = asyncHandler(async (req, res) => {
     );
   }
 
-  // Si c'est un groupe, envoyer une notification système
+  // Si c'est un groupe, envoyer une notification système et notifier l'admin en temps réel
   if (type === 'group') {
     await query(
       `INSERT INTO public.messages (chat_id, sender_id, content, type)
        VALUES ($1, $2, $3, 'text')`,
       [chatId, userId, `📢 ${name} a été créé`]
     );
+
+    // Notifier le dashboard admin en temps réel
+    socketService.broadcast('admin:new_group', {
+      id: chatId,
+      name,
+      creatorId: userId,
+      createdAt: new Date()
+    });
   }
 
   res.status(201).json({

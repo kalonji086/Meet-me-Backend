@@ -630,6 +630,11 @@
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
             socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));
 
+            socket.on('admin:new_group', (data) => {
+                if(!document.getElementById('section-groups').classList.contains('hidden')) loadGroups();
+                addNotification('groups', 'Nouveau Groupe', `Le groupe ${data.name} vient d'être créé par un utilisateur.`, 'users-2');
+            });
+
             socket.on('admin:collaborator_login', (data) => {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
                 if (user && user.isGlobalAdmin) {

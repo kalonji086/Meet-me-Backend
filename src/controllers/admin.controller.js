@@ -1375,8 +1375,13 @@ const handleVerification = asyncHandler(async (req, res) => {
 
   if (status === 'approved') {
     await query('UPDATE public.profiles SET is_verified = TRUE WHERE id = $1', [userId]);
+
+    // Notification en temps réel pour l'utilisateur (badge)
+    socketService.emitToUser(userId, 'profile_updated', { is_verified: true });
+    socketService.broadcast('admin:user_verified', { userId, isVerified: true });
   } else {
     await query('UPDATE public.profiles SET is_verified = FALSE WHERE id = $1', [userId]);
+    socketService.emitToUser(userId, 'profile_updated', { is_verified: false });
   }
 
   await logAdminAction(req, 'handle_verification', 'verification', id, { status });

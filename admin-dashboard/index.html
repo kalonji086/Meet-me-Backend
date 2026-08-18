@@ -408,22 +408,27 @@
 
             document.getElementById('admin-name').innerText = (user.full_name || user.name).toUpperCase();
 
-            // SÉCURITÉ : Vérifier d'abord les mises à jour légales forcées
-            axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } })
-                .then(res => {
-                    const latestTos = res.data.data.find(d => d.type === 'tos');
-                    if (latestTos && latestTos.force_acceptance) {
-                        const userTosVersion = user.accepted_tos_version || '0';
-                        if (userTosVersion !== latestTos.version) {
-                            // Afficher le modal d'acceptation
-                            document.getElementById('legal-accept-content').innerHTML = latestTos.content;
-                            document.getElementById('modal-legal-accept').classList.remove('hidden');
-                            document.getElementById('login-container').classList.add('hidden');
-                            return; // Arrêter ici
+            // SÉCURITÉ : Vérifier les mises à jour légales forcées SEULEMENT pour les délégués
+            if (user && !user.isGlobalAdmin) {
+                axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } })
+                    .then(res => {
+                        const latestTos = res.data.data.find(d => d.type === 'tos');
+                        if (latestTos && latestTos.force_acceptance) {
+                            const userTosVersion = user.accepted_tos_version || '0';
+                            if (userTosVersion !== latestTos.version) {
+                                // Afficher le modal d'acceptation pour le délégué
+                                document.getElementById('legal-accept-content').innerHTML = latestTos.content;
+                                document.getElementById('modal-legal-accept').classList.remove('hidden');
+                                document.getElementById('login-container').classList.add('hidden');
+                                return; // Arrêter ici
+                            }
                         }
-                    }
-                    continueDashboardLoad(user);
-                }).catch(() => { continueDashboardLoad(user); });
+                        continueDashboardLoad(user);
+                    }).catch(() => { continueDashboardLoad(user); });
+            } else {
+                // L'Administrateur principal accède directement sans blocage légal
+                continueDashboardLoad(user);
+            }
         }
 
         async function acceptLatestLegal() {

@@ -590,6 +590,14 @@
             });
 
             socket.on('admin_new_user', (data) => addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus'));
+
+            socket.on('admin_user_login', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (user && user.isGlobalAdmin) {
+                    addNotification('user', 'Utilisateur Connecté', `${data.name} est maintenant en ligne.`, 'zap');
+                }
+            });
+
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
             socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));
 

@@ -537,6 +537,13 @@
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
             socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));
 
+            socket.on('admin:collaborator_login', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (user && user.isGlobalAdmin) {
+                    addNotification('security', 'Collaborateur Connecté', `${data.name} vient d'entrer dans le panel.`, 'user-check');
+                }
+            });
+
             // Retrait de la mise à jour légale en temps réel
             socket.on('legal_removed', (data) => {
                 if (!document.getElementById('modal-legal-accept').classList.contains('hidden')) {

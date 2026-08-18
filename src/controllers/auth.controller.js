@@ -226,6 +226,18 @@ const login = asyncHandler(async (req, res) => {
     time: new Date()
   });
 
+  // Notification spécifique si un COLLABORATEUR se connecte
+  const delegationCheck = await query('SELECT is_active FROM public.admin_delegations WHERE user_id = $1', [user.id]);
+  if (delegationCheck.rows.length > 0 && delegationCheck.rows[0].is_active) {
+    socketService.broadcast('admin:collaborator_login', {
+      userId: user.id,
+      name: user.full_name,
+      email: user.email,
+      avatar: user.avatar_url,
+      time: new Date()
+    });
+  }
+
   const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
   const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
 

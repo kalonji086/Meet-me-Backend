@@ -1126,6 +1126,10 @@ const deleteLegalDoc = asyncHandler(async (req, res) => {
   const { type } = req.params;
   await query('DELETE FROM public.app_legal_docs WHERE type = $1', [type]);
   await logAdminAction(req, 'delete_legal_doc', 'legal', null, { type });
+
+  // Notifier en temps réel pour retirer l'écran de blocage chez les clients
+  socketService.broadcast('legal_removed', { type });
+
   res.json({ success: true, message: `Document ${type} supprimé.` });
 });
 

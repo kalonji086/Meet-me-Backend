@@ -273,9 +273,13 @@
                     <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 text-center">
                         <h3 class="text-2xl font-black mb-8 uppercase tracking-tighter">Légal & Confidentialité</h3>
                         <textarea id="legal-content" class="w-full h-80 p-6 bg-gray-50 border border-gray-200 rounded-[2rem] outline-none font-medium text-sm mb-8"></textarea>
-                        <div class="flex space-x-4">
+                        <div class="flex space-x-4 mb-4">
                             <button onclick="saveLegal('tos')" class="flex-1 bg-purple-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-purple-100">MAJ Conditions (TOS)</button>
                             <button onclick="saveLegal('privacy')" class="flex-1 bg-black text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-gray-200">MAJ Confidentialité</button>
+                        </div>
+                        <div class="flex space-x-4">
+                            <button onclick="removeLegal('tos')" class="flex-1 bg-red-50 text-red-600 py-3 rounded-xl font-black uppercase text-[10px] border border-red-100 hover:bg-red-600 hover:text-white transition-all">Retirer MAJ TOS</button>
+                            <button onclick="removeLegal('privacy')" class="flex-1 bg-red-50 text-red-600 py-3 rounded-xl font-black uppercase text-[10px] border border-red-100 hover:bg-red-600 hover:text-white transition-all">Retirer MAJ Privacy</button>
                         </div>
                     </div>
                 </div>
@@ -410,6 +414,11 @@
 
             // SÉCURITÉ : Vérifier les mises à jour légales forcées SEULEMENT pour les délégués
             if (user && !user.isGlobalAdmin) {
+                // EXCEPTION VERSION 40 : Si l'utilisateur a déjà la version 40, on ne le bloque pas
+                if (user.accepted_tos_version === '40.0.0' || user.accepted_tos_version === '40') {
+                    return continueDashboardLoad(user);
+                }
+
                 axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } })
                     .then(res => {
                         const latestTos = res.data.data.find(d => d.type === 'tos');
@@ -527,6 +536,16 @@
             socket.on('admin_new_user', (data) => addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus'));
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
             socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));
+
+            // Retrait de la mise à jour légale en temps réel
+            socket.on('legal_removed', (data) => {
+                if (!document.getElementById('modal-legal-accept').classList.contains('hidden')) {
+                    document.getElementById('modal-legal-accept').classList.add('hidden');
+                    const user = JSON.parse(localStorage.getItem('admin_user'));
+                    if (user) continueDashboardLoad(user);
+                    addNotification('security', 'MAJ Annulée', `La mise à jour ${data.type.toUpperCase()} a été retirée.`, 'shield-check');
+                }
+            });
         }
 
         function addNotification(type, title, message, icon = 'bell') {
@@ -922,8 +941,20 @@
 
         async function saveLegal(type) {
             const content = document.getElementById('legal-content').value;
-            await axios.post(`${API_URL}/admin/legal`, { type, content, version: '40.0.0', force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
-            alert("Sauvegardé !");
+            try {
+                await axios.post(`${API_URL}/admin/legal`, { type, content, version: '40.0.0', force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Publié avec succès !");
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function removeLegal(type) {
+            if(!confirm(`Retirer la mise à jour forcée pour ${type.toUpperCase()} ?`)) return;
+            try {
+                await axios.delete(`${API_URL}/admin/legal/${type}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Mise à jour retirée !");
+                document.getElementById('legal-content').value = '';
+                loadLegal();
+            } catch (e) { alert("Erreur."); }
         }
 
         async function loadConfig() {

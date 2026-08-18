@@ -75,7 +75,7 @@ const updateProfile = asyncHandler(async (req, res) => {
          accepted_privacy_version = COALESCE($7, accepted_privacy_version),
          updated_at = NOW()
      WHERE id = $9
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token`,
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, is_verified, accepted_tos_version, accepted_privacy_version, accepted_legal_version`,
     [
       name,
       status,

@@ -533,6 +533,11 @@
                 addNotification('security', 'Demande Badge', `${data.name} a soumis ses documents.`, 'check-circle');
             });
 
+            socket.on('admin:new_pending_action', (data) => {
+                if(!document.getElementById('section-approvals').classList.contains('hidden')) loadApprovals();
+                addNotification('security', 'Action à Approuver', `${data.requestedBy} veut ${data.actionType} sur ${data.targetName}`, 'check-square');
+            });
+
             socket.on('admin_new_user', (data) => addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus'));
             socket.on('admin:new_appeal', (data) => addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy'));
             socket.on('admin:new_market', (data) => addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag'));
@@ -1007,15 +1012,37 @@
             const res = await axios.get(`${API_URL}/admin/pending-actions`, { headers: { Authorization: `Bearer ${token}` } });
             document.getElementById('approvals-list').innerHTML = res.data.data.map(a => `
                 <div class="p-8 border-b border-gray-50 flex items-center justify-between animate-fade-in hover:bg-gray-50 transition-all">
-                    <div><p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">Délégué: ${a.requester_name}</p><p class="text-lg font-black text-gray-800 mb-1">Action: ${a.action_type}</p><p class="text-xs font-bold text-gray-400">Cible: ${a.target_name}</p></div>
-                    <div class="flex space-x-3"><button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-100 transition-all">Approuver</button></div>
+                    <div>
+                        <p class="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1">Délégué: ${a.requester_name}</p>
+                        <p class="text-lg font-black text-gray-800 mb-1">Action: ${a.action_type}</p>
+                        <p class="text-xs font-bold text-gray-400">Cible: ${a.target_name}</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button onclick="handleApproval('${a.id}', 'sent_back')" class="bg-blue-500 text-white px-5 py-3 rounded-2xl font-black text-[9px] uppercase shadow-lg shadow-blue-100 transition-all">Renvoyer</button>
+                        <button onclick="handleApproval('${a.id}', 'rejected')" class="bg-orange-500 text-white px-5 py-3 rounded-2xl font-black text-[9px] uppercase shadow-lg shadow-orange-100 transition-all">Rejeter</button>
+                        <button onclick="handleApproval('${a.id}', 'approved')" class="bg-green-500 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-100 transition-all">Approuver</button>
+                        <button onclick="deleteApproval('${a.id}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
                 </div>
             `).join('') || '<div class="p-20 text-center text-gray-400 font-black uppercase text-xs tracking-widest opacity-50">Aucune action sensible en attente</div>';
+            lucide.createIcons();
         }
 
         async function handleApproval(id, decision) {
-            await axios.put(`${API_URL}/admin/pending-actions/${id}`, { decision }, { headers: { Authorization: `Bearer ${token}` } });
-            loadApprovals(); loadStats();
+            const labels = { 'approved': 'Approuver', 'rejected': 'Rejeter', 'sent_back': 'Renvoyer pour correction' };
+            if (!confirm(`${labels[decision]} cette action ?`)) return;
+            try {
+                await axios.put(`${API_URL}/admin/pending-actions/${id}`, { decision }, { headers: { Authorization: `Bearer ${token}` } });
+                loadApprovals(); loadStats();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function deleteApproval(id) {
+            if (!confirm("Supprimer définitivement cette demande d'approbation ?")) return;
+            try {
+                await axios.delete(`${API_URL}/admin/pending-actions/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                loadApprovals();
+            } catch (e) { alert("Erreur."); }
         }
 
         async function showAddDelegationModal() {

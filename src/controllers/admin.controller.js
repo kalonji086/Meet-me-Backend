@@ -461,7 +461,7 @@ const getPendingActions = asyncHandler(async (req, res) => {
 const handlePendingAction = asyncHandler(async (req, res) => {
   if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
   const { id } = req.params;
-  const { decision } = req.body; // 'approved' or 'rejected'
+  const { decision } = req.body; // 'approved', 'rejected', or 'sent_back'
 
   const actionRes = await query('SELECT * FROM public.admin_pending_actions WHERE id = $1', [id]);
   if (actionRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Action non trouvée' });
@@ -494,11 +494,26 @@ const handlePendingAction = asyncHandler(async (req, res) => {
       return res.status(500).json({ success: false, error: 'Erreur lors de l\'exécution de l\'action approuvée' });
     }
   } else {
-    await query('UPDATE public.admin_pending_actions SET status = \'rejected\', processed_at = NOW(), processed_by = $1 WHERE id = $2', [req.userId, id]);
+    // rejected or sent_back
+    await query('UPDATE public.admin_pending_actions SET status = $1, processed_at = NOW(), processed_by = $2 WHERE id = $3', [decision, req.userId, id]);
   }
 
   socketService.sendToUser(action.requested_by, 'admin:action_processed', { actionType: action.action_type, decision });
-  res.json({ success: true, message: `Action ${decision === 'approved' ? 'approuvée et exécutée' : 'rejetée'}.` });
+
+  await logAdminAction(req, `handle_pending_${decision}`, 'pending_action', id, { decision });
+
+  res.json({ success: true, message: `Action ${decision}.` });
+});
+
+/**
+ * @desc    Supprimer une action pendante
+ */
+const deletePendingAction = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const { id } = req.params;
+  await query('DELETE FROM public.admin_pending_actions WHERE id = $1', [id]);
+  await logAdminAction(req, 'delete_pending_action', 'pending_action', id);
+  res.json({ success: true, message: 'Action supprimée.' });
 });
 
 /**

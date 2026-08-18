@@ -61,6 +61,7 @@ router.post('/market-groups/remove-member', adminController.removeMarketGroupMem
 // Pending Actions (Approvals)
 router.get('/pending-actions', adminController.getPendingActions);
 router.put('/pending-actions/:id', adminController.handlePendingAction);
+router.delete('/pending-actions/:id', adminController.deletePendingAction);
 
 // Delegations (Atribus)
 router.get('/delegations', adminController.getDelegations);

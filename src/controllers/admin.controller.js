@@ -618,7 +618,17 @@ const updateGroupInfo = asyncHandler(async (req, res) => {
 const toggleGroupBan = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const { isBanned } = req.body;
+  const group = await query('SELECT name FROM public.chats WHERE id = $1', [chatId]);
+  if (!group.rows[0]) return res.status(404).json({ success: false, error: 'Groupe non trouvé' });
+
+  const canExecute = await processSensitiveAction(req, 'toggle_group_ban', chatId, group.rows[0].name, { isBanned });
+  if (!canExecute) return res.json({ success: true, pending: true, message: `Demande de ${isBanned ? 'bannissement' : 'débannissement'} envoyée.` });
+
   await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [isBanned, chatId]);
+
+  // Notification Socket temps réel pour le groupe
+  socketService.broadcast('group_status_changed', { chatId, isBanned });
+
   await logAdminAction(req, isBanned ? 'ban_group' : 'unban_group', 'group', chatId, { isBanned });
   res.json({ success: true });
 });
@@ -628,9 +638,39 @@ const toggleGroupBan = asyncHandler(async (req, res) => {
  */
 const deleteGroup = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
+  const group = await query('SELECT name FROM public.chats WHERE id = $1', [chatId]);
+  if (!group.rows[0]) return res.status(404).json({ success: false, error: 'Groupe non trouvé' });
+
+  const canExecute = await processSensitiveAction(req, 'delete_group', chatId, group.rows[0].name);
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression envoyée à l\'admin principal.' });
+
   await query('DELETE FROM public.chats WHERE id = $1', [chatId]);
+
+  // Notification Socket temps réel
+  socketService.broadcast('group_deleted', { chatId });
+
   await logAdminAction(req, 'delete_group', 'group', chatId, { deleted: true });
   res.json({ success: true });
+});
+
+/**
+ * @desc    Retirer un membre d'un groupe
+ */
+const removeGroupMember = asyncHandler(async (req, res) => {
+  const { chatId, userId } = req.params;
+
+  const result = await query('DELETE FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2 RETURNING *', [chatId, userId]);
+
+  if (result.rows.length > 0) {
+    // Notifier le membre et le groupe du retrait
+    socketService.emitToUser(userId, 'removed_from_group', { chatId });
+    socketService.broadcast('member_removed', { chatId, userId });
+
+    await logAdminAction(req, 'remove_member', 'chat_member', userId, { chatId });
+    res.json({ success: true, message: 'Membre retiré.' });
+  } else {
+    res.status(404).json({ success: false, error: 'Membre non trouvé dans ce groupe.' });
+  }
 });
 
 /**
@@ -1358,6 +1398,7 @@ module.exports = {
   updateGroupInfo,
   toggleGroupBan,
   deleteGroup,
+  removeGroupMember,
   getAppeals,
   replyToAppeal,
   getAnalytics,

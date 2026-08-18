@@ -19,6 +19,7 @@ router.post('/groups/move-member', adminController.moveMemberToGroup);
 router.put('/groups/:chatId/info', adminController.updateGroupInfo);
 router.put('/groups/:chatId/ban', adminController.toggleGroupBan);
 router.delete('/groups/:chatId', adminController.deleteGroup);
+router.delete('/groups/:chatId/members/:userId', adminController.removeGroupMember);
 
 router.get('/appeals', adminController.getAppeals);
 router.post('/appeals/:id/reply', adminController.replyToAppeal);

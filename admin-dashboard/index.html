@@ -961,7 +961,8 @@
 
         async function toggleGroupBan(chatId, ban) {
             try {
-                await axios.put(`${API_URL}/admin/groups/${chatId}/ban`, { isBanned: ban }, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.put(`${API_URL}/admin/groups/${chatId}/ban`, { isBanned: ban }, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.pending) alert(res.data.message);
                 loadGroups();
             } catch (e) { alert("Erreur."); }
         }
@@ -969,7 +970,8 @@
         function confirmDeleteGroup(id, name) {
             Alert.show("Supprimer Groupe", `Supprimer le groupe <b>${name}</b> définitivement ?`, async () => {
                 try {
-                    await axios.delete(`${API_URL}/admin/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                    const res = await axios.delete(`${API_URL}/admin/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                    if (res.data.pending) alert(res.data.message);
                     closeImpactModal(); loadGroups();
                 } catch (e) { alert("Erreur."); }
             }, "Supprimer", "red");

@@ -12,7 +12,7 @@ const logger = require('../utils/logger');
 const getStats = asyncHandler(async (req, res) => {
   const usersCount = await query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE');
   const messagesCount = await query('SELECT COUNT(*) FROM public.messages');
-  const chatsCount = await query('SELECT COUNT(*) FROM public.chats');
+  const chatsCount = await query('SELECT COUNT(*) FROM public.chats WHERE type = \'group\'');
   const onlineCount = await query("SELECT COUNT(*) FROM public.profiles WHERE status = 'online' AND is_global_admin = FALSE");
 
   res.json({

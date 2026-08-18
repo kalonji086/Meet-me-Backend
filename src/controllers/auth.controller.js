@@ -284,6 +284,10 @@ const refreshToken = asyncHandler(async (req, res) => {
 const logout = asyncHandler(async (req, res) => {
   const userId = req.userId;
   await query("UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1", [userId]);
+
+  const socketService = require('../services/socket.service');
+  socketService.broadcast('admin_user_logout', { userId, time: new Date() });
+
   res.json({ success: true, message: 'Déconnexion réussie' });
 });
 

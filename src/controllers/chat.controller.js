@@ -249,6 +249,13 @@ const sendMessage = asyncHandler(async (req, res) => {
     }
   }
 
+  // Notifier le dashboard admin en temps réel pour les statistiques
+  socketService.broadcast('admin:new_message', {
+    id: message.id,
+    type: message.type,
+    time: new Date()
+  });
+
   res.status(201).json({
     success: true,
     data: message,

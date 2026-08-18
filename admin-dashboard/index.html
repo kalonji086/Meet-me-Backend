@@ -516,7 +516,7 @@
 
             socket.on('admin:new_audit', (data) => {
                 if(!document.getElementById('section-audit').classList.contains('hidden')) loadAuditLogs();
-                addNotification('security', 'Action Admin', `${data.actor} : ${data.action}`, 'shield');
+                addNotification('security', 'Action Admin', `${data.actor_name} : ${data.action_type}`, 'shield');
             });
 
             socket.on('admin:new_verification', (data) => {

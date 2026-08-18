@@ -426,8 +426,8 @@
 
             // SÉCURITÉ : Vérifier les mises à jour légales forcées SEULEMENT pour les délégués
             if (user && !user.isGlobalAdmin) {
-                // EXCEPTION VERSION 40 : Si l'utilisateur a déjà la version 40, on ne le bloque pas
-                if (user.accepted_tos_version === '40.0.0' || user.accepted_tos_version === '40') {
+                // EXCEPTION VERSION 41 : Si l'utilisateur a déjà la version 41, on ne le bloque pas
+                if (user.accepted_tos_version === '41.0.0' || user.accepted_tos_version === '41') {
                     return continueDashboardLoad(user);
                 }
 
@@ -457,10 +457,10 @@
             try {
                 // Simuler l'acceptation (Mettre à jour le profil utilisateur côté backend)
                 // Normalement, vous auriez une route /api/users/accept-legal
-                await axios.put(`${API_URL}/users/profile`, { accepted_tos_version: '40.0.0' }, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.put(`${API_URL}/users/profile`, { accepted_tos_version: '41.0.0' }, { headers: { Authorization: `Bearer ${token}` } });
 
                 // Mettre à jour l'utilisateur local
-                user.accepted_tos_version = '40.0.0';
+                user.accepted_tos_version = '41.0.0';
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('modal-legal-accept').classList.add('hidden');
@@ -1048,7 +1048,7 @@
         async function saveLegal(type) {
             const content = document.getElementById('legal-content').value;
             try {
-                await axios.post(`${API_URL}/admin/legal`, { type, content, version: '40.0.0', force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.post(`${API_URL}/admin/legal`, { type, content, version: '41.0.0', force_acceptance: true }, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Publié avec succès !");
             } catch (e) { alert("Erreur."); }
         }

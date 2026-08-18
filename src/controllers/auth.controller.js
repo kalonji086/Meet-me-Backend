@@ -158,11 +158,11 @@ const login = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Identifiants requis' });
   }
 
-  const emailLower = email?.toLowerCase();
+  const emailLower = email?.toLowerCase().trim();
 
-  // 1. Trouver l'utilisateur
+  // 1. Trouver l'utilisateur (Case-insensitive search)
   const result = await query(
-    'SELECT * FROM public.profiles WHERE email = $1',
+    'SELECT * FROM public.profiles WHERE LOWER(email) = LOWER($1)',
     [emailLower]
   );
 

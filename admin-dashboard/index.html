@@ -444,7 +444,10 @@
                     localStorage.setItem('admin_user', JSON.stringify(res.data.data.user));
                     showDashboard();
                 }
-            } catch (e) { alert("Identifiants incorrects."); } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; lucide.createIcons(); }
+            } catch (e) {
+                const msg = e.response?.data?.error || "Identifiants incorrects.";
+                alert(msg);
+            } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; lucide.createIcons(); }
         }
 
         function showDashboard() {

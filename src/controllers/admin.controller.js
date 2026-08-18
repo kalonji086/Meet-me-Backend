@@ -105,32 +105,33 @@ const ensureAdminTables = async () => {
   try {
     const adminEmail = 'wecanconcept@gmail.com';
     const adminPass = 'Proverbe:19!?@';
-    const hashedPass = await bcrypt.hash(adminPass, 10);
 
-    const existingAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', [adminEmail]);
+    const existingAdminRes = await query('SELECT id, password FROM public.profiles WHERE email = $1', [adminEmail]);
 
-    if (existingAdmin.rows.length === 0) {
-      // Créer l'admin s'il n'existe pas
+    if (existingAdminRes.rows.length === 0) {
+      const hashedPass = await bcrypt.hash(adminPass, 10);
       await query(
         `INSERT INTO public.profiles (id, full_name, email, password, username, is_global_admin, is_verified, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [crypto.randomUUID(), 'Administrateur Meet Me', adminEmail, hashedPass, 'admin_meetme', true, true, 'offline']
       );
-      logger.info('✅ Compte Admin créé avec succès.');
+      logger.info('✅ Compte Admin principal créé.');
     } else {
-      // Mettre à jour le mot de passe et le statut admin pour être sûr
+      const admin = existingAdminRes.rows[0];
+      // Vérifier si on doit forcer la mise à jour (par précaution)
+      const hashedPass = await bcrypt.hash(adminPass, 10);
       await query(
-        'UPDATE public.profiles SET password = $1, is_global_admin = TRUE, is_locked = FALSE WHERE email = $2',
-        [hashedPass, adminEmail]
+        'UPDATE public.profiles SET password = $1, is_global_admin = TRUE, is_locked = FALSE, login_attempts = 0 WHERE id = $2',
+        [hashedPass, admin.id]
       );
-      logger.info('✅ Compte Admin synchronisé.');
+      logger.info('✅ Compte Admin synchronisé et débloqué.');
     }
 
-    // Supprimer les privilèges admin de tous les autres comptes
+    // Retirer les droits admin des autres
     await query('UPDATE public.profiles SET is_global_admin = FALSE WHERE email != $1', [adminEmail]);
 
   } catch (e) {
-    logger.error('❌ Erreur lors de la configuration de l\'admin:', e);
+    logger.error('❌ Erreur lors de la configuration de l\'admin:', e.message);
   }
 
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE');

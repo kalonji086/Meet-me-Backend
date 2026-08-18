@@ -1452,6 +1452,7 @@ module.exports = {
   removeMarketGroupMember,
   getPendingActions,
   handlePendingAction,
+  deletePendingAction,
   getDelegations,
   saveDelegation,
   ensureAdminTables

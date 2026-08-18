@@ -94,6 +94,9 @@
                 <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="check-circle" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vérifications</span>
                 </a>
+                <a href="#" onclick="showSection('audit')" id="nav-audit" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="shield-check" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Audit (Logs)</span>
+                </a>
                 <a href="#" onclick="showSection('campaigns')" id="nav-campaigns" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="send" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Campagnes Push</span>
                 </a>
@@ -202,6 +205,30 @@
 
                 <div id="section-groups" class="hidden animate-fade-in">
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden"><table class="w-full text-left" id="groups-table"></table></div>
+                </div>
+
+                <!-- SECTION VERIFICATIONS -->
+                <div id="section-verifications" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5">Utilisateur</th><th class="px-8 py-5">Identité</th><th class="px-8 py-5">Date</th><th class="px-8 py-5 text-right">Action</th></tr>
+                            </thead>
+                            <tbody id="verif-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SECTION AUDIT LOGS -->
+                <div id="section-audit" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5">Acteur</th><th class="px-8 py-5">Action</th><th class="px-8 py-5">Détails</th><th class="px-8 py-5">Date</th></tr>
+                            </thead>
+                            <tbody id="audit-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div id="section-campaigns" class="hidden animate-fade-in max-w-5xl mx-auto space-y-10 pb-20">
@@ -317,6 +344,20 @@
         </div>
     </div>
 
+    <!-- MODAL LEGAL ACCEPTANCE -->
+    <div id="modal-legal-accept" class="hidden fixed inset-0 bg-gray-900/95 flex items-center justify-center z-[600] p-6 backdrop-blur-md">
+        <div class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
+            <div class="p-10 border-b bg-gray-50 flex justify-between items-center">
+                <h3 class="text-xl font-black text-gray-900 tracking-tighter uppercase">Mise à jour Légale Obligatoire</h3>
+            </div>
+            <div class="p-10">
+                <p class="text-sm text-gray-500 mb-6 font-medium">Nos conditions d'utilisation ont été mises à jour. Vous devez les accepter pour continuer à utiliser le panel d'administration.</p>
+                <div id="legal-accept-content" class="h-64 overflow-y-auto custom-scrollbar p-6 bg-gray-50 rounded-2xl border border-gray-100 text-xs leading-relaxed text-gray-600 mb-8"></div>
+                <button onclick="acceptLatestLegal()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">J'ACCEPTE LES NOUVELLES CONDITIONS</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const BASE_URL = window.location.origin;
         const API_URL = BASE_URL + '/api';
@@ -367,6 +408,41 @@
 
             document.getElementById('admin-name').innerText = (user.full_name || user.name).toUpperCase();
 
+            // SÉCURITÉ : Vérifier d'abord les mises à jour légales forcées
+            axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(res => {
+                    const latestTos = res.data.data.find(d => d.type === 'tos');
+                    if (latestTos && latestTos.force_acceptance) {
+                        const userTosVersion = user.accepted_tos_version || '0';
+                        if (userTosVersion !== latestTos.version) {
+                            // Afficher le modal d'acceptation
+                            document.getElementById('legal-accept-content').innerHTML = latestTos.content;
+                            document.getElementById('modal-legal-accept').classList.remove('hidden');
+                            document.getElementById('login-container').classList.add('hidden');
+                            return; // Arrêter ici
+                        }
+                    }
+                    continueDashboardLoad(user);
+                }).catch(() => { continueDashboardLoad(user); });
+        }
+
+        async function acceptLatestLegal() {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            try {
+                // Simuler l'acceptation (Mettre à jour le profil utilisateur côté backend)
+                // Normalement, vous auriez une route /api/users/accept-legal
+                await axios.put(`${API_URL}/users/profile`, { accepted_tos_version: '40.0.0' }, { headers: { Authorization: `Bearer ${token}` } });
+
+                // Mettre à jour l'utilisateur local
+                user.accepted_tos_version = '40.0.0';
+                localStorage.setItem('admin_user', JSON.stringify(user));
+
+                document.getElementById('modal-legal-accept').classList.add('hidden');
+                continueDashboardLoad(user);
+            } catch (e) { alert("Erreur d'acceptation."); }
+        }
+
+        function continueDashboardLoad(user) {
             if (user.isGlobalAdmin) {
                 document.getElementById('login-container').classList.add('hidden');
                 document.getElementById('main-container').classList.remove('hidden');
@@ -404,6 +480,7 @@
                 'stats': 'nav-stats', 'users': 'nav-users', 'groups': 'nav-groups',
                 'support': 'nav-appeals', 'reports': 'nav-appeals',
                 'market-requests': 'nav-market-requests', 'verifications': 'nav-verifications',
+                'audit': 'nav-audit',
                 'campaigns': 'nav-campaigns', 'legal': 'nav-legal', 'config': 'nav-config'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
@@ -430,6 +507,16 @@
                         document.getElementById('blocked-container').classList.remove('hidden');
                     }
                 }
+            });
+
+            socket.on('admin:new_audit', (data) => {
+                if(!document.getElementById('section-audit').classList.contains('hidden')) loadAuditLogs();
+                addNotification('security', 'Action Admin', `${data.actor} : ${data.action}`, 'shield');
+            });
+
+            socket.on('admin:new_verification', (data) => {
+                if(!document.getElementById('section-verifications').classList.contains('hidden')) loadVerifications();
+                addNotification('security', 'Demande Badge', `${data.name} a soumis ses documents.`, 'check-circle');
             });
 
             socket.on('admin_new_user', (data) => addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus'));
@@ -468,7 +555,7 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'campaigns', 'legal', 'config', 'delegations', 'approvals'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
                 const navId = s === 'market-requests' ? 'nav-market-requests' : 'nav-' + s;
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
@@ -483,6 +570,8 @@
             if (name === 'users') loadUsers();
             if (name === 'market-requests') loadMarket();
             if (name === 'appeals') loadAppeals();
+            if (name === 'verifications') loadVerifications();
+            if (name === 'audit') loadAuditLogs();
             if (name === 'delegations') loadDelegations();
             if (name === 'approvals') loadApprovals();
             if (name === 'groups') loadGroups();
@@ -760,6 +849,62 @@
 
         function closeMembersModal() { document.getElementById('modal-members').classList.add('hidden'); }
 
+        async function loadVerifications() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/verifications`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('verif-table-body').innerHTML = res.data.data.map(v => `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                        <td class="px-8 py-5 flex items-center">
+                            <img src="${getFullUrl(v.avatar_url)}" class="w-10 h-10 rounded-xl mr-3 shadow-sm">
+                            <div><p class="font-bold text-sm text-gray-800">${v.full_name}</p><p class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">${v.email}</p></div>
+                        </td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase">${v.id_type || 'ID CARD'}</span></td>
+                        <td class="px-8 py-5 text-xs text-gray-400 font-bold">${new Date(v.created_at).toLocaleString()}</td>
+                        <td class="px-8 py-5 text-right"><button onclick="examineVerification('${v.id}')" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700">Examiner</button></td>
+                    </tr>
+                `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune demande de badge</div>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function examineVerification(id) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/verifications`, { headers: { Authorization: `Bearer ${token}` } });
+                const v = res.data.data.find(x => x.id === id);
+                let html = `
+                    <div class="space-y-6">
+                        <div class="flex items-center bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                            <img src="${getFullUrl(v.avatar_url)}" class="w-16 h-16 rounded-2xl mr-6 shadow-xl">
+                            <div><p class="text-2xl font-black text-gray-800 tracking-tighter">${v.full_name}</p><p class="text-xs text-blue-500 font-bold uppercase tracking-widest">Demande de Badge Vérifié</p></div>
+                        </div>
+                        <div class="p-6 bg-gray-50 rounded-3xl"><p class="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Documents d'Identité</p><img src="${getFullUrl(v.id_card_url)}" class="w-full h-48 object-cover rounded-2xl shadow-md border border-gray-100"></div>
+                        <div class="p-6 bg-blue-50 rounded-3xl border border-blue-100"><p class="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Status Actuel</p><p class="font-bold text-sm text-blue-800 uppercase">${v.status}</p></div>
+                    </div>
+                `;
+                Alert.show("Examen de Vérification", html, async () => {
+                    await axios.put(`${API_URL}/admin/verifications/${id}`, { status: 'approved' }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Utilisateur vérifié !"); closeImpactModal(); loadVerifications();
+                }, "Accorder le Badge", "blue");
+            } catch (e) {}
+        }
+
+        async function loadAuditLogs() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/audit-logs`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('audit-table-body').innerHTML = res.data.data.map(l => `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                        <td class="px-8 py-5 flex items-center">
+                            <img src="${getFullUrl(l.actor_avatar)}" class="w-8 h-8 rounded-lg mr-3 shadow-sm">
+                            <p class="font-bold text-sm text-gray-800">${l.actor_name}</p>
+                        </td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-black uppercase">${l.action_type}</span></td>
+                        <td class="px-8 py-5 text-xs text-gray-500 font-medium truncate max-w-xs">${JSON.stringify(l.details)}</td>
+                        <td class="px-8 py-5 text-xs text-gray-400 font-bold">${new Date(l.created_at).toLocaleString()}</td>
+                    </tr>
+                `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucun log d\'audit</div>';
+            } catch (e) {}
+        }
+
         async function toggleUserLock(id, lock) {
             await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
             loadUsers();
@@ -844,7 +989,7 @@
         }
 
         function editDelegation(userId, userName, modules = "", active = true) {
-            const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
+            const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'audit', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
             const currentModules = modules ? modules.split(',') : [];
 
             let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `

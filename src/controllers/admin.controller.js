@@ -355,13 +355,20 @@ const ensureAdminTables = async () => {
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
   const adminId = req.user?.id || null;
   const adminName = req.user?.full_name || 'Admin';
+  const adminAvatar = req.user?.avatar_url || null;
   try {
     const res = await query(
       'INSERT INTO public.admin_audit_logs (admin_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [adminId, action, entityType, entityId, JSON.stringify(details)]
     );
 
-    socketService.broadcast('admin_new_audit', { ...res.rows[0], admin_name: adminName });
+    // Diffusion en temps réel
+    socketService.broadcast('admin:new_audit', {
+      ...res.rows[0],
+      actor_name: adminName,
+      actor_avatar: adminAvatar,
+      action_type: action
+    });
   } catch (error) {
     console.error('Audit log error:', error.message);
   }

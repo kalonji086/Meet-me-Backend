@@ -222,7 +222,15 @@ const getBadges = asyncHandler(async (req, res) => {
 });
 
 const submitVerification = asyncHandler(async (req, res) => {
-  await query('INSERT INTO public.verification_requests (user_id, document_url) VALUES ($1, $2)', [req.userId, req.body.documentUrl]);
+  const result = await query('INSERT INTO public.verification_requests (user_id, document_url) VALUES ($1, $2) RETURNING id', [req.userId, req.body.documentUrl]);
+  const user = await query('SELECT full_name FROM public.profiles WHERE id = $1', [req.userId]);
+
+  socketService.broadcast('admin:new_verification', {
+    id: result.rows[0].id,
+    userId: req.userId,
+    name: user.rows[0]?.full_name
+  });
+
   res.json({ success: true, message: 'Demande envoyée' });
 });
 

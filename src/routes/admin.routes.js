@@ -60,6 +60,7 @@ router.post('/market-groups/remove-member', adminController.removeMarketGroupMem
 
 // Pending Actions (Approvals)
 router.get('/pending-actions', adminController.getPendingActions);
+router.get('/my-requests', adminController.getMyRequests);
 router.put('/pending-actions/:id', adminController.handlePendingAction);
 router.delete('/pending-actions/:id', adminController.deletePendingAction);
 

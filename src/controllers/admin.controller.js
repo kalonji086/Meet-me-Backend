@@ -198,6 +198,14 @@ const ensureAdminTables = async () => {
     `);
   }
 
+  // S'assurer que les colonnes nécessaires existent pour les approbations
+  try {
+    await query('ALTER TABLE public.admin_pending_actions ADD COLUMN IF NOT EXISTS admin_notes TEXT');
+    await query('ALTER TABLE public.admin_pending_actions DROP CONSTRAINT IF EXISTS admin_pending_actions_status_check');
+    await query('ALTER TABLE public.admin_pending_actions ADD CONSTRAINT admin_pending_actions_status_check CHECK (status IN (\'pending\', \'approved\', \'rejected\', \'sent_back\'))');
+  } catch (e) {}
+};
+
   await query(`
     CREATE TABLE IF NOT EXISTS public.verification_requests (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -455,19 +463,40 @@ const getPendingActions = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+const getMyRequests = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT apa.*, p.full_name as processor_name
+    FROM public.admin_pending_actions apa
+    LEFT JOIN public.profiles p ON apa.processed_by = p.id
+    WHERE apa.requested_by = $1
+    ORDER BY apa.created_at DESC
+  `, [req.userId]);
+  res.json({ success: true, data: result.rows });
+});
+
 /**
  * @desc    Approuver ou rejeter une action sensible
  */
 const handlePendingAction = asyncHandler(async (req, res) => {
-  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
   const { id } = req.params;
-  const { decision } = req.body; // 'approved', 'rejected', or 'sent_back'
+  const { decision, comment } = req.body; // 'approved', 'rejected', 'sent_back', or 'pending'
 
   const actionRes = await query('SELECT * FROM public.admin_pending_actions WHERE id = $1', [id]);
   if (actionRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Action non trouvée' });
   const action = actionRes.rows[0];
 
+  // SÉCURITÉ : Seul l'admin principal peut approuver/rejeter/renvoyer
+  if (decision !== 'pending' && !req.user.is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Accès réservé' });
+  }
+
+  // SÉCURITÉ : Un délégué peut seulement resoumettre SA PROPRE demande
+  if (decision === 'pending' && action.requested_by !== req.userId) {
+    return res.status(403).json({ success: false, error: 'Vous ne pouvez resoumettre que vos propres demandes' });
+  }
+
   if (decision === 'approved') {
+    // ... (Same switch logic)
     try {
       switch (action.action_type) {
         case 'delete_user':
@@ -489,18 +518,35 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           await query('UPDATE public.market_businesses SET status = $1 WHERE id = $2', [action.details.status, action.target_id]);
           break;
       }
-      await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1 WHERE id = $2', [req.userId, id]);
+      await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1, admin_notes = $2 WHERE id = $3', [req.userId, comment || null, id]);
     } catch (err) {
       return res.status(500).json({ success: false, error: 'Erreur lors de l\'exécution de l\'action approuvée' });
     }
+  } else if (decision === 'pending') {
+    // Resoumission par le délégué
+    await query('UPDATE public.admin_pending_actions SET status = \'pending\', processed_at = NULL, processed_by = NULL WHERE id = $1', [id]);
+
+    // Notifier l'admin principal
+    const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
+    if (mainAdmin.rows.length > 0) {
+      socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_pending_action', {
+        actionType: action.action_type,
+        targetName: action.target_name,
+        requestedBy: req.user.full_name
+      });
+    }
   } else {
     // rejected or sent_back
-    await query('UPDATE public.admin_pending_actions SET status = $1, processed_at = NOW(), processed_by = $2 WHERE id = $3', [decision, req.userId, id]);
+    await query('UPDATE public.admin_pending_actions SET status = $1, processed_at = NOW(), processed_by = $2, admin_notes = $3 WHERE id = $4', [decision, req.userId, comment || null, id]);
   }
 
-  socketService.sendToUser(action.requested_by, 'admin:action_processed', { actionType: action.action_type, decision });
+  socketService.sendToUser(action.requested_by, 'admin:action_processed', {
+    actionType: action.action_type,
+    decision,
+    comment: comment || null
+  });
 
-  await logAdminAction(req, `handle_pending_${decision}`, 'pending_action', id, { decision });
+  await logAdminAction(req, `handle_pending_${decision}`, 'pending_action', id, { decision, comment });
 
   res.json({ success: true, message: `Action ${decision}.` });
 });
@@ -1451,6 +1497,7 @@ module.exports = {
   getMarketGroupMembers,
   removeMarketGroupMember,
   getPendingActions,
+  getMyRequests,
   handlePendingAction,
   deletePendingAction,
   getDelegations,

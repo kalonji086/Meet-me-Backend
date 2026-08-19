@@ -479,11 +479,17 @@ const saveDelegation = asyncHandler(async (req, res) => {
     [userId, modules, isActive]
   );
 
+  // Si révoqué, on retire aussi des équipes de collaboration
+  if (!isActive) {
+    await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [userId]);
+    socketService.broadcast('collab:member_moved', { userId, toTeamId: null }); // Force UI update
+  }
+
   const mailService = require('../services/mail.service');
   await mailService.sendAdminPrivilegeEmail(user.email, user.full_name, modules);
 
   // Mise à jour temps réel via Socket
-  socketService.emitToUser(userId, 'admin:delegation_updated', { modules, isActive });
+  socketService.emitToUser(userId, 'admin:delegation_updated', { userId, modules, isActive });
 
   res.json({ success: true, message: 'Privilèges enregistrés et invitation envoyée.' });
 });

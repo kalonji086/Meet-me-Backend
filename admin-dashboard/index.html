@@ -38,7 +38,7 @@
                 <i data-lucide="shield-off" class="w-12 h-12 text-red-600"></i>
             </div>
             <h3 class="text-3xl font-black text-gray-900 tracking-tighter mb-4 uppercase">ACCÈS RÉVOQUÉ</h3>
-            <p class="text-gray-500 font-medium leading-relaxed mb-10">Vos privilèges d'administration ont été suspendus par l'administrateur principal. Veuillez contacter le support pour toute réclamation.</p>
+            <p id="blocked-message" class="text-gray-500 font-medium leading-relaxed mb-10">Vos privilèges d'administration ont été suspendus par l'administrateur principal. Veuillez contacter le support pour toute réclamation.</p>
             <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Retour à l'accueil</button>
         </div>
     </div>
@@ -767,12 +767,13 @@
 
             socket.on('admin:delegation_updated', (data) => {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
-                if (user && !user.isGlobalAdmin) {
+                if (user && user.id === data.userId && !user.isGlobalAdmin) {
                     if (data.isActive && data.modules.length > 0) {
                         filterSidebar(data.modules);
                         addNotification('security', 'Privilèges mis à jour', 'Vos accès au panel ont été modifiés.', 'shield-check');
                     } else {
                         document.getElementById('main-container').classList.add('hidden');
+                        document.getElementById('blocked-message').innerText = "Vous n'avez plus droit, veuillez contacter l'Admin.";
                         document.getElementById('blocked-container').classList.remove('hidden');
                     }
                 }
@@ -1878,9 +1879,24 @@
             try {
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data.find(x => x.user_id === userId);
-                await axios.post(`${API_URL}/admin/delegations`, { userId, modules: d.modules, isActive: !currentlyActive }, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`Privilèges ${currentlyActive ? 'révoqués' : 'rétablis'} !`); loadDelegations();
-            } catch (e) { alert("Erreur."); }
+                if (!d) return alert("Utilisateur non trouvé.");
+
+                await axios.post(`${API_URL}/admin/delegations`, {
+                    userId,
+                    modules: d.modules,
+                    isActive: !currentlyActive
+                }, { headers: { Authorization: `Bearer ${token}` } });
+
+                alert(`Privilèges ${currentlyActive ? 'révoqués' : 'rétablis'} avec succès !`);
+
+                // Refresh local lists
+                if (typeof loadDelegations === 'function') loadDelegations();
+                if (!document.getElementById('collab-tab-config').classList.contains('hidden')) loadCollabLiveManagement();
+
+            } catch (e) {
+                console.error(e);
+                alert(e.response?.data?.error || "Erreur lors de la modification des privilèges.");
+            }
         }
 
         async function loadApprovals() {

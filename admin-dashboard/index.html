@@ -1188,8 +1188,8 @@
                     <div class="flex items-start justify-between mb-4">
                         <div class="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl flex items-center justify-center shadow-sm"><i data-lucide="file-text" class="w-6 h-6"></i></div>
                         <div class="flex flex-col items-end">
-                            <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase ${d.status === 'approved' ? 'bg-green-50 text-green-600' : (d.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600')}">${d.status}</span>
-                            <span class="text-[8px] text-gray-400 font-bold mt-2">v${d.version}.0</span>
+                            <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase ${d.is_archived ? 'bg-gray-100 text-gray-500' : (d.status === 'approved' ? 'bg-green-50 text-green-600' : (d.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'))}">${d.is_archived ? 'archivé' : d.status}</span>
+                            ${d.is_archived && d.archive_expires_at ? `<span class="text-[7px] text-red-400 font-bold mt-1 uppercase">Expire le ${new Date(d.archive_expires_at).toLocaleDateString()}</span>` : `<span class="text-[8px] text-gray-400 font-bold mt-2">v${d.version}.0</span>`}
                         </div>
                     </div>
                     <h5 class="font-black text-gray-800 text-sm truncate mb-1" title="${d.file_name}">${d.file_name}</h5>

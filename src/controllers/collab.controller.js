@@ -294,7 +294,7 @@ const savePermissions = asyncHandler(async (req, res) => {
 module.exports = {
   getTeams, createTeam, getTeamMembers,
   getTasks, createTask, updateTaskStatus,
-  getMessages, sendMessage,
+  getMessages, sendMessage, deleteMessage,
   getDocuments, uploadDocument, handleDocumentStatus,
   submitRequest, getRequests, handleRequest,
   getPermissions, savePermissions

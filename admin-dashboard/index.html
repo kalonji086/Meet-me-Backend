@@ -453,12 +453,34 @@
 
                     <!-- TAB: CONFIG -->
                     <div id="collab-tab-config" class="collab-content hidden space-y-8 animate-fade-in">
-                        <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
-                            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
-                                <h4 class="font-black text-gray-800 uppercase text-sm tracking-widest">Configuration des Rôles & Permissions</h4>
-                                <button onclick="saveCollabPermissions()" class="px-6 py-3 bg-cyan-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all">Enregistrer les Droits</button>
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                            <!-- Left: Global Roles (Small) -->
+                            <div class="lg:col-span-1 space-y-6">
+                                <div class="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
+                                    <div class="p-6 border-b bg-gray-50 flex justify-between items-center">
+                                        <h4 class="font-black text-gray-800 uppercase text-[10px] tracking-widest">Rôles par défaut</h4>
+                                        <button onclick="saveCollabPermissions()" class="text-[9px] font-black text-cyan-600">SAVE</button>
+                                    </div>
+                                    <div id="collab-permissions-list" class="p-6 space-y-6"></div>
+                                </div>
                             </div>
-                            <div id="collab-permissions-list" class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8"></div>
+
+                            <!-- Right: Live Personnel Management (Large) -->
+                            <div class="lg:col-span-3">
+                                <div class="bg-white rounded-[3rem] shadow-xl border border-gray-100 overflow-hidden">
+                                    <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
+                                        <div>
+                                            <h4 class="font-black text-gray-800 uppercase text-sm tracking-widest">Gestion des Collaborateurs en Direct</h4>
+                                            <p class="text-[9px] text-gray-400 font-bold uppercase mt-1">Affectations d'équipes et droits d'accès temps réel</p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                            <span class="text-[10px] font-black text-gray-400 uppercase">Live Sync</span>
+                                        </div>
+                                    </div>
+                                    <div id="collab-live-management" class="divide-y divide-gray-50"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -843,6 +865,18 @@
             socket.on('collab:task_created', (data) => { if (activeCollabTeamId === data.teamId) loadCollabTasks(); });
             socket.on('collab:task_updated', (data) => { if (activeCollabTeamId === data.teamId) loadCollabTasks(); });
             socket.on('collab:document_uploaded', (data) => { if (activeCollabTeamId === data.teamId) loadCollabDocs(); });
+
+            socket.on('collab:member_moved', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (user.id === data.userId) {
+                    activeCollabTeamId = data.toTeamId;
+                    loadCollaboration(); // Reload everything to show new team
+                    addNotification('security', 'Équipe Modifiée', 'Vous avez été déplacé vers une nouvelle équipe projet.', 'briefcase');
+                } else if (!document.getElementById('section-collaboration').classList.contains('hidden')) {
+                    loadCollaboration();
+                }
+            });
+
             socket.on('collab:new_request', (data) => {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
                 if (user.isGlobalAdmin) {
@@ -960,9 +994,94 @@
             if (tab === 'directory') loadCollabDirectory();
             if (tab === 'documents') loadCollabGlobalDocs();
             if (tab === 'requests') loadCollabRequests();
-            if (tab === 'config') loadCollabPermissions();
+            if (tab === 'config') { loadCollabPermissions(); loadCollabLiveManagement(); }
 
             lucide.createIcons();
+        }
+
+        async function loadCollabLiveManagement() {
+            try {
+                const [delRes, teamsRes] = await Promise.all([
+                    axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } })
+                ]);
+
+                const teams = teamsRes.data.data;
+                const membersPromises = teams.map(t => axios.get(`${API_URL}/collab/teams/${t.id}/members`, { headers: { Authorization: `Bearer ${token}` } }));
+                const membersRes = await Promise.all(membersPromises);
+
+                // Map user to their team
+                const userTeams = {};
+                membersRes.forEach((res, i) => {
+                    res.data.data.forEach(m => { userTeams[m.id] = { id: teams[i].id, name: teams[i].name }; });
+                });
+
+                document.getElementById('collab-live-management').innerHTML = delRes.data.data.filter(d => d.modules.includes('collaboration')).map(d => `
+                    <div class="p-8 flex items-center justify-between hover:bg-gray-50 transition-all">
+                        <div class="flex items-center">
+                            <img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-5 shadow-sm">
+                            <div>
+                                <p class="text-sm font-black text-gray-800 uppercase tracking-tight">${d.full_name}</p>
+                                <p class="text-[9px] text-cyan-600 font-bold uppercase mb-1">Équipe actuelle : ${userTeams[d.user_id]?.name || 'SANS ÉQUIPE'}</p>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    ${['stats', 'users', 'groups', 'support', 'verifications', 'collaboration'].map(m => `
+                                        <button onclick="toggleUserModule('${d.user_id}', '${m}', ${d.modules.includes(m)})" class="px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${d.modules.includes(m) ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-cyan-50 hover:text-cyan-600'}">${m}</button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="moveCollaboratorModal('${d.user_id}', '${d.full_name}', '${userTeams[d.user_id]?.id || ''}')" class="px-4 py-3 bg-white border border-gray-100 rounded-xl text-[9px] font-black text-gray-600 hover:border-cyan-500 hover:text-cyan-600 transition-all uppercase">Changer Équipe</button>
+                            <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}', true)" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="shield-off" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="p-20 text-center text-gray-400 text-xs font-black uppercase tracking-widest opacity-50">Aucun collaborateur actif</p>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function toggleUserModule(userId, moduleName, hasAccess) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
+                const d = res.data.data.find(x => x.user_id === userId);
+                let modules = d.modules;
+                if (hasAccess) {
+                    modules = modules.filter(m => m !== moduleName);
+                } else {
+                    modules.push(moduleName);
+                }
+                await axios.post(`${API_URL}/admin/delegations`, { userId, modules, isActive: d.is_active }, { headers: { Authorization: `Bearer ${token}` } });
+                loadCollabLiveManagement();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function moveCollaboratorModal(userId, name, currentTeamId) {
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } });
+                const teams = res.data.data;
+                let html = `<div class="space-y-4">` + teams.map(t => `
+                    <label class="flex items-center p-5 bg-gray-50 hover:bg-cyan-50 rounded-[1.5rem] cursor-pointer border ${t.id === currentTeamId ? 'border-cyan-500 bg-cyan-50' : 'border-transparent'} transition-all">
+                        <input type="radio" name="move-team-id" value="${t.id}" ${t.id === currentTeamId ? 'checked' : ''} class="w-6 h-6 accent-cyan-600 mr-4">
+                        <span class="text-sm font-black text-gray-800">${t.name}</span>
+                    </label>
+                `).join('') + `</div>`;
+
+                Alert.show("Déplacer Collaborateur", `<p class="text-xs text-gray-500 mb-6 text-center">Assigner <b>${name}</b> à un nouveau projet :</p>` + html, async () => {
+                    const sel = document.querySelector('input[name="move-team-id"]:checked');
+                    if (!sel) return alert("Sélectionnez une équipe.");
+                    if (sel.value === currentTeamId) return closeImpactModal();
+
+                    await axios.post(`${API_URL}/collab/move-member`, {
+                        userId,
+                        fromTeamId: currentTeamId,
+                        toTeamId: sel.value
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+
+                    alert("Déplacement réussi !");
+                    closeImpactModal();
+                    loadCollabLiveManagement();
+                }, "Confirmer le Déplacement", "cyan");
+            } catch (e) { alert("Erreur."); }
         }
 
         async function loadCollabTeams() {

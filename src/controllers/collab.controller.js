@@ -172,6 +172,21 @@ const getDocuments = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get all documents across all teams (Admin only)
+ */
+const getAllDocuments = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const result = await query(`
+    SELECT d.*, p.full_name as uploader_name, t.name as team_name
+    FROM public.collab_documents d
+    LEFT JOIN public.profiles p ON d.uploader_id = p.id
+    JOIN public.collab_teams t ON d.team_id = t.id
+    ORDER BY d.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
  * @desc    Upload a document record
  */
 const uploadDocument = asyncHandler(async (req, res) => {
@@ -351,7 +366,7 @@ module.exports = {
   getTeams, createTeam, getTeamMembers,
   getTasks, createTask, updateTaskStatus,
   getMessages, sendMessage, deleteMessage,
-  getDocuments, uploadDocument, handleDocumentStatus,
+  getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
   getPermissions, savePermissions
 };

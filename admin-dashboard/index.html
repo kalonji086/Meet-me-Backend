@@ -406,7 +406,7 @@
                                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8">
                                         <div class="flex justify-between items-center mb-6">
                                             <h4 class="font-black text-gray-800 uppercase text-xs tracking-widest">Tâches en cours</h4>
-                                            <button onclick="showAddTaskModal()" class="text-[10px] font-black text-cyan-600 hover:underline">NOUVELLE TÂCHE</button>
+                                            ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="showAddTaskModal()" class="text-[10px] font-black text-cyan-600 hover:underline">NOUVELLE TÂCHE</button>` : ''}
                                         </div>
                                         <div id="collab-tasks-list" class="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar"></div>
                                     </div>
@@ -864,6 +864,7 @@
 
             socket.on('collab:task_created', (data) => { if (activeCollabTeamId === data.teamId) loadCollabTasks(); });
             socket.on('collab:task_updated', (data) => { if (activeCollabTeamId === data.teamId) loadCollabTasks(); });
+            socket.on('collab:task_deleted', (data) => { if (activeCollabTeamId === data.teamId) loadCollabTasks(); });
             socket.on('collab:document_uploaded', (data) => { if (activeCollabTeamId === data.teamId) loadCollabDocs(); });
 
             socket.on('collab:member_moved', (data) => {
@@ -969,6 +970,8 @@
         }
 
         let activeCollabTeamId = null;
+        let activeCollabUserRole = 'collaborator';
+        let collabTeamsData = [];
 
         async function loadCollaboration() {
             const user = JSON.parse(localStorage.getItem('admin_user'));
@@ -1088,20 +1091,21 @@
             const user = JSON.parse(localStorage.getItem('admin_user'));
             try {
                 const res = await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } });
+                collabTeamsData = res.data.data;
                 const selector = document.getElementById('collab-team-selector');
-                selector.innerHTML = res.data.data.map(t => `
+                selector.innerHTML = collabTeamsData.map(t => `
                     <button onclick="selectCollabTeam('${t.id}', '${t.name}')" class="team-btn px-6 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center shrink-0">
                         <div class="w-3 h-3 rounded-full bg-cyan-500 mr-3"></div>
                         <span class="text-xs font-black text-gray-800 uppercase tracking-tight">${t.name}</span>
                     </button>
                 `).join('') + (user.isGlobalAdmin ? `<button onclick="createNewTeam()" class="px-6 py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:border-cyan-400 hover:text-cyan-500 transition-all text-xs font-bold uppercase tracking-widest">+ Créer Équipe</button>` : '');
 
-                if (res.data.data.length === 0 && !user.isGlobalAdmin) {
+                if (collabTeamsData.length === 0 && !user.isGlobalAdmin) {
                     selector.innerHTML = `<button onclick="submitCollabJoinRequest()" class="px-8 py-4 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-cyan-600 transition-all">SOUMETTRE UNE DEMANDE DE COLLABORATION</button>`;
                 }
 
-                if (res.data.data.length > 0 && !activeCollabTeamId) {
-                    selectCollabTeam(res.data.data[0].id, res.data.data[0].name);
+                if (collabTeamsData.length > 0 && !activeCollabTeamId) {
+                    selectCollabTeam(collabTeamsData[0].id, collabTeamsData[0].name);
                 }
             } catch (e) {}
         }
@@ -1118,7 +1122,7 @@
                         <p class="font-black text-gray-800 uppercase text-xs tracking-tight mb-1">${u.full_name}</p>
                         <p class="text-[9px] text-gray-400 font-bold uppercase mb-4">${u.email}</p>
                         <div class="flex space-x-2">
-                            <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-2 bg-cyan-50 text-cyan-600 rounded-xl hover:bg-cyan-600 hover:text-white transition-all"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
+                            ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-2 bg-cyan-50 text-cyan-600 rounded-xl hover:bg-cyan-600 hover:text-white transition-all"><i data-lucide="user-plus" class="w-4 h-4"></i></button>` : ''}
                             <button class="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-800 hover:text-white transition-all"><i data-lucide="mail" class="w-4 h-4"></i></button>
                         </div>
                     </div>
@@ -1130,7 +1134,6 @@
         async function loadCollabGlobalDocs() {
             try {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
-                // Use centralized endpoint if admin, otherwise team endpoint (handled by switch logic or backend filter)
                 const endpoint = user.isGlobalAdmin ? `${API_URL}/collab/documents` : `${API_URL}/collab/teams/${activeCollabTeamId}/documents`;
 
                 const res = await axios.get(endpoint, { headers: { Authorization: `Bearer ${token}` } });
@@ -1157,29 +1160,6 @@
                 `).join('') || '<div class="col-span-3 p-20 text-center text-gray-400 text-xs font-black uppercase tracking-widest opacity-50">Aucun document dans la centralisation</div>';
                 lucide.createIcons();
             } catch (e) {}
-        }
-
-        async function uploadCollabDocument(input, context = 'team') {
-            if (!input.files[0]) return;
-            const file = input.files[0];
-            const teamId = activeCollabTeamId || (await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } })).data.data[0]?.id;
-
-            if (!teamId) return alert("Veuillez d'abord rejoindre ou sélectionner une équipe.");
-
-            try {
-                const uploadRes = await apiService_upload(file);
-                if (uploadRes.success) {
-                    await axios.post(`${API_URL}/collab/documents`, {
-                        teamId: teamId,
-                        fileUrl: uploadRes.data.fileUrl,
-                        fileName: file.name,
-                        fileSize: file.size,
-                        mimeType: file.type
-                    }, { headers: { Authorization: `Bearer ${token}` } });
-                    alert("Document soumis pour examen !");
-                    if (context === 'global') loadCollabGlobalDocs(); else loadCollabDocs();
-                }
-            } catch (e) { alert("Erreur upload document."); }
         }
 
         async function loadCollabPermissions() {
@@ -1224,18 +1204,21 @@
             const teams = teamRes.data.data;
             if (teams.length === 0) return alert("Aucune équipe disponible.");
 
-            const teamId = teams[0].id; // Simple for now
+            const teamId = teams[0].id;
             const message = prompt("Pourquoi voulez-vous rejoindre l'équipe de collaboration ?", "Je souhaite aider à la modération.");
             if (!message) return;
 
             try {
-                await axios.post(`${API_URL}/collab/requests`, { teamId, message }, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.post(`${API_URL}/collab/requests`, { teamId, motivation: message, objectives: "Aider le projet", skills: "Modération" }, { headers: { Authorization: `Bearer ${token}` } });
                 alert("Votre demande a été envoyée à l'administrateur !");
             } catch (e) { alert("Demande déjà en cours ou erreur."); }
         }
 
         async function selectCollabTeam(id, name) {
             activeCollabTeamId = id;
+            const team = collabTeamsData.find(t => t.id === id);
+            activeCollabUserRole = (team && team.my_role) ? team.my_role : 'collaborator';
+
             document.getElementById('active-team-name').innerText = name.toUpperCase();
             document.getElementById('collab-team-dashboard').classList.remove('hidden');
 
@@ -1267,20 +1250,33 @@
         async function loadCollabTasks() {
             try {
                 const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
-                document.getElementById('collab-tasks-list').innerHTML = res.data.data.map(t => `
-                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <div>
-                            <p class="text-sm font-bold text-gray-800">${t.title}</p>
-                            <p class="text-[10px] text-gray-400 font-medium">${t.assignee_name || 'Non assigné'}</p>
+                document.getElementById('collab-tasks-list').innerHTML = res.data.data.map(t => {
+                    let statusClass = "bg-orange-50 text-orange-600";
+                    if (t.status === 'in_progress') statusClass = "bg-blue-50 text-blue-600";
+                    if (t.status === 'completed') statusClass = "bg-green-50 text-green-600";
+
+                    return `
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                            <div>
+                                <p class="text-sm font-bold text-gray-800">${t.title}</p>
+                                <p class="text-[10px] text-gray-400 font-medium">${t.assignee_name || 'Non assigné'} • <span class="${statusClass} px-2 py-0.5 rounded-md text-[8px] font-black uppercase">${t.status.replace('_', ' ')}</span></p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                ${t.status === 'pending' ? `<button onclick="updateTaskStatus('${t.id}', 'in_progress')" class="p-2 bg-white text-blue-500 rounded-xl shadow-sm hover:bg-blue-500 hover:text-white transition-all" title="Démarrer"><i data-lucide="play" class="w-3 h-3"></i></button>` : ''}
+                                ${t.status !== 'completed' ? `<button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2 bg-white text-green-500 rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all" title="Terminer"><i data-lucide="check" class="w-3 h-3"></i></button>` : ''}
+                                ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="deleteCollabTask('${t.id}')" class="p-2 bg-white text-red-400 rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                            </div>
                         </div>
-                        <div class="flex items-center space-x-3">
-                            <span class="text-[9px] font-black uppercase px-2 py-1 rounded-lg ${t.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}">${t.status}</span>
-                            <button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2 bg-white rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all"><i data-lucide="check" class="w-3 h-3"></i></button>
-                        </div>
-                    </div>
-                `).join('') || '<p class="p-10 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest">Aucune tâche</p>';
+                    `;
+                }).join('') || '<p class="p-10 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest">Aucune tâche</p>';
                 lucide.createIcons();
             } catch (e) {}
+        }
+
+        async function deleteCollabTask(id) {
+            if(!confirm("Supprimer cette tâche ?")) return;
+            axios.delete(`${API_URL}/collab/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(() => loadCollabTasks());
         }
 
         async function loadCollabDocs() {

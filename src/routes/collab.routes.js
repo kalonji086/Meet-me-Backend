@@ -23,6 +23,7 @@ router.post('/move-member', collabController.moveTeamMember);
 router.get('/teams/:teamId/tasks', collabController.getTasks);
 router.post('/tasks', collabController.createTask);
 router.put('/tasks/:taskId/status', collabController.updateTaskStatus);
+router.delete('/tasks/:taskId', collabController.deleteTask);
 
 // Messages
 router.get('/teams/:teamId/messages', collabController.getMessages);

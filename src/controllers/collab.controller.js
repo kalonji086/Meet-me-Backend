@@ -9,10 +9,12 @@ const logger = require('../utils/logger');
 const getTeams = asyncHandler(async (req, res) => {
   const result = await query(`
     SELECT t.*,
-    (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count
+    (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
+    tm.role as my_role
     FROM public.collab_teams t
+    LEFT JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
     ORDER BY t.created_at DESC
-  `);
+  `, [req.userId]);
   res.json({ success: true, data: result.rows });
 });
 
@@ -102,9 +104,23 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     [status, taskId]
   );
 
-  socketService.broadcast('collab:task_updated', { taskId, status });
+  socketService.broadcast('collab:task_updated', { taskId, status, teamId: result.rows[0].team_id });
 
   res.json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Delete a task
+ */
+const deleteTask = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const task = await query('SELECT team_id FROM public.collab_tasks WHERE id = $1', [taskId]);
+  if (!task.rows[0]) return res.status(404).json({ success: false, error: 'Tâche non trouvée' });
+
+  await query('DELETE FROM public.collab_tasks WHERE id = $1', [taskId]);
+  socketService.broadcast('collab:task_deleted', { taskId, teamId: task.rows[0].team_id });
+
+  res.json({ success: true, message: 'Tâche supprimée.' });
 });
 
 /**
@@ -386,7 +402,7 @@ const savePermissions = asyncHandler(async (req, res) => {
 
 module.exports = {
   getTeams, createTeam, getTeamMembers,
-  getTasks, createTask, updateTaskStatus,
+  getTasks, createTask, updateTaskStatus, deleteTask,
   getMessages, sendMessage, deleteMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,

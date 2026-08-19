@@ -169,7 +169,25 @@ const sendMessage = asyncHandler(async (req, res) => {
 const deleteMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
   await query('DELETE FROM public.collab_messages WHERE id = $1', [messageId]);
+  socketService.broadcast('collab:message_deleted', { messageId });
   res.json({ success: true, message: 'Message supprimé.' });
+});
+
+/**
+ * @desc    Update a collaboration message
+ */
+const updateMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const { content } = req.body;
+
+  const result = await query(
+    'UPDATE public.collab_messages SET content = $1 WHERE id = $2 RETURNING *',
+    [content, messageId]
+  );
+
+  socketService.broadcast('collab:message_updated', { messageId, content });
+
+  res.json({ success: true, data: result.rows[0] });
 });
 
 /**
@@ -403,7 +421,7 @@ const savePermissions = asyncHandler(async (req, res) => {
 module.exports = {
   getTeams, createTeam, getTeamMembers,
   getTasks, createTask, updateTaskStatus, deleteTask,
-  getMessages, sendMessage, deleteMessage,
+  getMessages, sendMessage, deleteMessage, updateMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
   moveTeamMember,

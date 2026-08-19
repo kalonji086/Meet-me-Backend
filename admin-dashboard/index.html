@@ -387,9 +387,14 @@
                                         </div>
                                     </div>
                                     <div id="collab-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"></div>
-                                    <div class="p-4 border-t flex space-x-2">
-                                        <input type="text" id="collab-chat-input" class="flex-1 bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm outline-none" placeholder="Message...">
-                                        <button onclick="sendCollabMessage()" class="p-3 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 transition-all"><i data-lucide="send" class="w-5 h-5"></i></button>
+                                    <div class="p-6 border-t bg-gray-50 flex flex-col space-y-3">
+                                        <textarea id="collab-chat-input" class="w-full bg-white border border-gray-200 p-4 rounded-[1.5rem] text-sm outline-none focus:border-cyan-500 transition-all shadow-inner custom-scrollbar h-32" placeholder="Écrivez un message long ici (Style Word)..."></textarea>
+                                        <div class="flex justify-between items-center px-2">
+                                            <p class="text-[8px] text-gray-400 font-bold uppercase">Appuyez sur Envoyer pour diffuser à l'équipe</p>
+                                            <button onclick="sendCollabMessage()" class="px-8 py-3 bg-cyan-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all flex items-center">
+                                                <i data-lucide="send" class="w-4 h-4 mr-2"></i> DIFFUSER
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -852,20 +857,22 @@
             // Collaboration Events
             socket.on('collab:new_message', (data) => {
                 if (activeCollabTeamId === data.teamId) {
-                    const chatContainer = document.getElementById('collab-chat-messages');
-                    const m = data.message;
-                    const isMe = m.sender_id === JSON.parse(localStorage.getItem('admin_user')).id;
-                    const msgHtml = `
-                        <div class="flex items-start ${isMe ? 'flex-row-reverse' : ''} animate-pop-in">
-                            <img src="${getFullUrl(m.sender_avatar)}" class="w-8 h-8 rounded-lg mx-2 shadow-sm">
-                            <div class="max-w-[70%] p-3 rounded-2xl text-xs ${isMe ? 'bg-cyan-500 text-white rounded-tr-none' : 'bg-gray-100 text-gray-700 rounded-tl-none'}">
-                                <p class="font-bold mb-1 opacity-60 text-[9px]">${m.sender_name}</p>
-                                <p class="font-medium leading-relaxed">${m.content}</p>
-                            </div>
-                        </div>
-                    `;
-                    chatContainer.insertAdjacentHTML('beforeend', msgHtml);
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    renderSingleCollabMessage(data.message);
+                }
+            });
+
+            socket.on('collab:message_deleted', (data) => {
+                const el = document.getElementById(`collab-msg-${data.messageId}`);
+                if (el) el.classList.add('opacity-0', 'scale-90');
+                setTimeout(() => el?.remove(), 300);
+            });
+
+            socket.on('collab:message_updated', (data) => {
+                const textEl = document.querySelector(`#collab-msg-${data.messageId} .msg-content`);
+                if (textEl) {
+                    textEl.innerText = data.content;
+                    textEl.classList.add('text-cyan-600');
+                    setTimeout(() => textEl.classList.remove('text-cyan-600'), 1000);
                 }
             });
 
@@ -1336,26 +1343,54 @@
                 const user = JSON.parse(localStorage.getItem('admin_user'));
                 const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/messages`, { headers: { Authorization: `Bearer ${token}` } });
                 const chatContainer = document.getElementById('collab-chat-messages');
-                chatContainer.innerHTML = res.data.data.map(m => `
-                    <div class="flex items-start ${m.sender_id === user.id ? 'flex-row-reverse' : ''}">
-                        <img src="${getFullUrl(m.sender_avatar)}" class="w-8 h-8 rounded-lg mx-2 shadow-sm">
-                        <div class="group relative max-w-[70%] p-3 rounded-2xl text-xs ${m.sender_id === user.id ? 'bg-cyan-500 text-white rounded-tr-none' : 'bg-gray-100 text-gray-700 rounded-tl-none'}">
-                            <p class="font-bold mb-1 opacity-60 text-[9px]">${m.sender_name}</p>
-                            <p class="font-medium leading-relaxed">${m.content}</p>
-                            ${user.isGlobalAdmin ? `<button onclick="deleteCollabMessage('${m.id}')" class="hidden group-hover:block absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg"><i data-lucide="x" class="w-2 h-2"></i></button>` : ''}
-                        </div>
-                    </div>
-                `).join('');
+                chatContainer.innerHTML = "";
+                res.data.data.forEach(m => renderSingleCollabMessage(m));
                 chatContainer.scrollTop = chatContainer.scrollHeight;
-                lucide.createIcons();
             } catch (e) {}
         }
 
+        function renderSingleCollabMessage(m) {
+            const chatContainer = document.getElementById('collab-chat-messages');
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            const isMe = m.sender_id === user.id;
+
+            const msgHtml = `
+                <div id="collab-msg-${m.id}" class="flex items-start ${isMe ? 'flex-row-reverse' : ''} animate-pop-in group mb-4">
+                    <img src="${getFullUrl(m.sender_avatar)}" class="w-8 h-8 rounded-lg mx-2 shadow-sm">
+                    <div class="relative max-w-[80%] p-4 rounded-[1.5rem] text-sm shadow-sm ${isMe ? 'bg-cyan-500 text-white rounded-tr-none' : 'bg-gray-100 text-gray-700 rounded-tl-none border border-gray-200'}">
+                        <p class="font-black mb-1 opacity-50 text-[9px] uppercase tracking-widest">${m.sender_name}</p>
+                        <p class="msg-content leading-relaxed font-medium whitespace-pre-wrap">${m.content}</p>
+
+                        <div class="absolute ${isMe ? 'right-full mr-2' : 'left-full ml-2'} top-2 hidden group-hover:flex space-x-1">
+                            ${isMe || user.isGlobalAdmin ? `
+                                <button onclick="editCollabMessage('${m.id}')" class="p-2 bg-white text-gray-400 rounded-lg shadow-md hover:text-cyan-600 transition-all"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                                <button onclick="deleteCollabMessage('${m.id}')" class="p-2 bg-white text-gray-400 rounded-lg shadow-md hover:text-red-500 transition-all"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatContainer.insertAdjacentHTML('beforeend', msgHtml);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            lucide.createIcons();
+        }
+
+        async function editCollabMessage(id) {
+            const el = document.querySelector(`#collab-msg-${id} .msg-content`);
+            const oldText = el.innerText;
+            const newText = prompt("Modifier votre message :", oldText);
+            if (newText === null || newText === oldText) return;
+
+            try {
+                await axios.put(`${API_URL}/collab/messages/${id}`, { content: newText }, { headers: { Authorization: `Bearer ${token}` } });
+            } catch (e) { alert("Erreur modification."); }
+        }
+
         async function deleteCollabMessage(id) {
-            if(!confirm("Supprimer ce message de collaboration ?")) return;
-            // I'll need a backend endpoint for this
-            axios.delete(`${API_URL}/collab/messages/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-                .then(() => loadCollabChat());
+            if(!confirm("Supprimer ce message ?")) return;
+            try {
+                await axios.delete(`${API_URL}/collab/messages/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+            } catch (e) { alert("Erreur suppression."); }
         }
 
         async function sendCollabMessage() {

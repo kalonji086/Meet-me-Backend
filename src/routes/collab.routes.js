@@ -28,6 +28,7 @@ router.delete('/tasks/:taskId', collabController.deleteTask);
 // Messages
 router.get('/teams/:teamId/messages', collabController.getMessages);
 router.post('/messages', collabController.sendMessage);
+router.put('/messages/:messageId', collabController.updateMessage);
 router.delete('/messages/:messageId', collabController.deleteMessage);
 
 // Documents

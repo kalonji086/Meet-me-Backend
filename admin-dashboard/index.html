@@ -686,9 +686,11 @@
                                         document.getElementById('main-container').classList.add('hidden');
                                         document.getElementById('blocked-container').classList.remove('hidden');
                                         document.getElementById('pending-collab-container').classList.add('hidden');
+                                        initSocket(); // Permettre le déblocage en temps réel même sur l'écran révoqué
                                     }
                                 }).catch(() => {
                                     document.getElementById('blocked-container').classList.remove('hidden');
+                                    initSocket();
                                 });
                         }
                     }).catch(() => {
@@ -704,10 +706,12 @@
                                     initSocket();
                                 } else {
                                     document.getElementById('blocked-container').classList.remove('hidden');
+                                    initSocket();
                                 }
                             }).catch(() => {
                                 document.getElementById('login-container').classList.add('hidden');
                                 document.getElementById('blocked-container').classList.remove('hidden');
+                                initSocket();
                             });
                     });
             }
@@ -769,8 +773,10 @@
                 const user = JSON.parse(localStorage.getItem('admin_user'));
                 if (user && user.id === data.userId && !user.isGlobalAdmin) {
                     if (data.isActive && data.modules.length > 0) {
+                        document.getElementById('blocked-container').classList.add('hidden');
+                        document.getElementById('main-container').classList.remove('hidden');
                         filterSidebar(data.modules);
-                        addNotification('security', 'Privilèges mis à jour', 'Vos accès au panel ont été modifiés.', 'shield-check');
+                        addNotification('security', 'Privilèges Rétablis', 'Vos accès au panel ont été réactivés.', 'shield-check');
                     } else {
                         document.getElementById('main-container').classList.add('hidden');
                         document.getElementById('blocked-message').innerText = "Vous n'avez plus droit, veuillez contacter l'Admin.";

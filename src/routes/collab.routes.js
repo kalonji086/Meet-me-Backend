@@ -36,6 +36,8 @@ router.get('/documents', collabController.getAllDocuments); // Centralized for A
 router.get('/teams/:teamId/documents', collabController.getDocuments);
 router.post('/documents', collabController.uploadDocument);
 router.put('/documents/:docId/status', collabController.handleDocumentStatus);
+router.put('/documents/:docId/archive', collabController.archiveDocument);
+router.post('/documents/:docId/delete', collabController.deleteDocument);
 
 // Requests / Applications Management
 router.get('/requests', collabController.getRequests);

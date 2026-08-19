@@ -55,9 +55,26 @@ CREATE TABLE IF NOT EXISTS public.collab_documents (
   version INTEGER DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   admin_comment TEXT,
+  is_archived BOOLEAN DEFAULT FALSE,
+  archive_expires_at TIMESTAMP WITH TIME ZONE,
+  deleted_for_users UUID[] DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure columns exist (Migration for existing tables)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_documents' AND column_name='is_archived') THEN
+    ALTER TABLE public.collab_documents ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_documents' AND column_name='archive_expires_at') THEN
+    ALTER TABLE public.collab_documents ADD COLUMN archive_expires_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_documents' AND column_name='deleted_for_users') THEN
+    ALTER TABLE public.collab_documents ADD COLUMN deleted_for_users UUID[] DEFAULT '{}';
+  END IF;
+END $$;
 
 -- 6. Collaboration Requests (Applications)
 CREATE TABLE IF NOT EXISTS public.collab_requests (

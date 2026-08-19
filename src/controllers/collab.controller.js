@@ -200,8 +200,10 @@ const getDocuments = asyncHandler(async (req, res) => {
     FROM public.collab_documents d
     LEFT JOIN public.profiles p ON d.uploader_id = p.id
     WHERE d.team_id = $1
+      AND NOT ($2 = ANY(COALESCE(d.deleted_for_users, '{}')))
+      AND (d.is_archived = FALSE OR d.archive_expires_at > NOW())
     ORDER BY d.created_at DESC
-  `, [teamId]);
+  `, [teamId, req.userId]);
   res.json({ success: true, data: result.rows });
 });
 
@@ -215,9 +217,54 @@ const getAllDocuments = asyncHandler(async (req, res) => {
     FROM public.collab_documents d
     LEFT JOIN public.profiles p ON d.uploader_id = p.id
     JOIN public.collab_teams t ON d.team_id = t.id
+    WHERE NOT ($1 = ANY(COALESCE(d.deleted_for_users, '{}')))
     ORDER BY d.created_at DESC
-  `);
+  `, [req.userId]);
   res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Archive a document
+ */
+const archiveDocument = asyncHandler(async (req, res) => {
+  const { docId } = req.params;
+  const { days } = req.body; // Duration in days
+
+  const expiry = days ? `NOW() + INTERVAL '${days} days'` : 'NULL';
+
+  await query(
+    `UPDATE public.collab_documents
+     SET is_archived = TRUE, archive_expires_at = ${expiry}, updated_at = NOW()
+     WHERE id = $1`,
+    [docId]
+  );
+
+  socketService.broadcast('collab:document_archived', { docId });
+  res.json({ success: true, message: 'Document archivé.' });
+});
+
+/**
+ * @desc    Delete a document (Self or All)
+ */
+const deleteDocument = asyncHandler(async (req, res) => {
+  const { docId } = req.params;
+  const { mode } = req.body; // 'self' or 'all'
+
+  if (mode === 'all') {
+    if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Seul l\'admin peut supprimer pour tous.' });
+    await query('DELETE FROM public.collab_documents WHERE id = $1', [docId]);
+    socketService.broadcast('collab:document_deleted', { docId, mode: 'all' });
+  } else {
+    // Mode self: Add to deleted_for_users array
+    await query(
+      'UPDATE public.collab_documents SET deleted_for_users = array_append(COALESCE(deleted_for_users, \'{}\'), $1) WHERE id = $2',
+      [req.userId, docId]
+    );
+    res.json({ success: true, message: 'Masqué pour vous.' });
+    return;
+  }
+
+  res.json({ success: true, message: 'Document supprimé.' });
 });
 
 /**
@@ -429,6 +476,7 @@ module.exports = {
   getTasks, createTask, updateTaskStatus, deleteTask,
   getMessages, sendMessage, deleteMessage, updateMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,
+  archiveDocument, deleteDocument,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
   moveTeamMember,
   getPermissions, savePermissions

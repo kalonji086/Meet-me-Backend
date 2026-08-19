@@ -4,7 +4,13 @@ const collabController = require('../controllers/collab.controller');
 const { authenticate, isAdmin } = require('../middleware/auth.middleware');
 
 router.use(authenticate);
-router.use(isAdmin); // Ensure only admins/delegates access collab features in dashboard
+
+// Public status check (logged in but not yet admin)
+router.get('/my-status', collabController.getMyRequestStatus);
+router.post('/requests', collabController.submitRequest);
+
+// Restrict these to Admins/Delegates
+router.use(isAdmin);
 
 // Teams
 router.get('/teams', collabController.getTeams);
@@ -27,9 +33,8 @@ router.get('/teams/:teamId/documents', collabController.getDocuments);
 router.post('/documents', collabController.uploadDocument);
 router.put('/documents/:docId/status', collabController.handleDocumentStatus);
 
-// Requests / Applications
+// Requests / Applications Management
 router.get('/requests', collabController.getRequests);
-router.post('/requests', collabController.submitRequest);
 router.put('/requests/:requestId', collabController.handleRequest);
 
 // Permissions

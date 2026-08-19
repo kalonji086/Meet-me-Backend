@@ -257,6 +257,17 @@ const getRequests = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get my own request status
+ */
+const getMyRequestStatus = asyncHandler(async (req, res) => {
+  const result = await query(
+    'SELECT status, admin_comment FROM public.collab_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [req.userId]
+  );
+  res.json({ success: true, data: result.rows[0] || null });
+});
+
+/**
  * @desc    Process a request
  */
 const handleRequest = asyncHandler(async (req, res) => {
@@ -273,10 +284,35 @@ const handleRequest = asyncHandler(async (req, res) => {
   );
 
   if (status === 'approved') {
+    // 1. Add to team members
     await query(
       'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
       [colReq.team_id, colReq.user_id]
     );
+
+    // 2. IMPORTANT: Create or update admin delegation so they can access the panel
+    // We check if the user already has some delegations to avoid duplicates
+    const existingDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [colReq.user_id]);
+
+    if (existingDel.rows.length === 0) {
+      await query(
+        `INSERT INTO public.admin_delegations (user_id, modules, is_active, updated_at)
+         VALUES ($1, $2, TRUE, NOW())`,
+        [colReq.user_id, ['collaboration']]
+      );
+    } else {
+      await query(
+        `UPDATE public.admin_delegations
+         SET modules = CASE
+           WHEN NOT ('collaboration' = ANY(modules)) THEN array_append(modules, 'collaboration')
+           ELSE modules
+         END,
+         is_active = TRUE,
+         updated_at = NOW()
+         WHERE user_id = $1`,
+        [colReq.user_id]
+      );
+    }
   }
 
   socketService.emitToUser(colReq.user_id, 'collab:request_processed', { status, comment });
@@ -316,6 +352,6 @@ module.exports = {
   getTasks, createTask, updateTaskStatus,
   getMessages, sendMessage, deleteMessage,
   getDocuments, uploadDocument, handleDocumentStatus,
-  submitRequest, inviteUser, getRequests, handleRequest,
+  submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
   getPermissions, savePermissions
 };

@@ -598,38 +598,58 @@
                 initRichEditors();
                 showSection('stats');
             } else {
-                // Double check : Delegation OR Pending Collab Request
-                Promise.all([
-                    axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get(`${API_URL}/collab/requests`, { headers: { Authorization: `Bearer ${token}` } })
-                ]).then(([delRes, reqRes]) => {
-                    const myDelegation = delRes.data.data.find(d => d.user_id === user.id);
-                    const myRequest = reqRes.data.data.find(r => r.user_id === user.id && r.status === 'pending');
+                // Check if user has explicit delegation
+                axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
+                    .then(res => {
+                        const myDelegation = res.data.data.find(d => d.user_id === user.id);
 
-                    document.getElementById('login-container').classList.add('hidden');
+                        document.getElementById('login-container').classList.add('hidden');
 
-                    if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
-                        document.getElementById('main-container').classList.remove('hidden');
-                        document.getElementById('blocked-container').classList.add('hidden');
-                        document.getElementById('pending-collab-container').classList.add('hidden');
-                        initSocket();
-                        initRichEditors();
-                        filterSidebar(myDelegation.modules);
-                    } else if (myRequest) {
-                        document.getElementById('main-container').classList.add('hidden');
-                        document.getElementById('blocked-container').classList.add('hidden');
-                        document.getElementById('pending-collab-container').classList.remove('hidden');
-                        initSocket(); // Still join socket to receive real-time approval
-                    } else {
-                        document.getElementById('main-container').classList.add('hidden');
-                        document.getElementById('blocked-container').classList.remove('hidden');
-                        document.getElementById('pending-collab-container').classList.add('hidden');
-                    }
-                }).catch(() => {
-                    document.getElementById('login-container').classList.add('hidden');
-                    document.getElementById('main-container').classList.add('hidden');
-                    document.getElementById('blocked-container').classList.remove('hidden');
-                });
+                        if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
+                            document.getElementById('main-container').classList.remove('hidden');
+                            document.getElementById('blocked-container').classList.add('hidden');
+                            document.getElementById('pending-collab-container').classList.add('hidden');
+                            initSocket();
+                            initRichEditors();
+                            filterSidebar(myDelegation.modules);
+                        } else {
+                            // No active delegation found, check for pending collaboration request
+                            axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
+                                .then(reqRes => {
+                                    const myRequest = reqRes.data.data;
+                                    if (myRequest && myRequest.status === 'pending') {
+                                        document.getElementById('main-container').classList.add('hidden');
+                                        document.getElementById('blocked-container').classList.add('hidden');
+                                        document.getElementById('pending-collab-container').classList.remove('hidden');
+                                        initSocket();
+                                    } else {
+                                        document.getElementById('main-container').classList.add('hidden');
+                                        document.getElementById('blocked-container').classList.remove('hidden');
+                                        document.getElementById('pending-collab-container').classList.add('hidden');
+                                    }
+                                }).catch(() => {
+                                    document.getElementById('blocked-container').classList.remove('hidden');
+                                });
+                        }
+                    }).catch(() => {
+                        // If delegation check fails (403), it means not an admin/delegate yet, check collab status
+                        axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
+                            .then(reqRes => {
+                                const myRequest = reqRes.data.data;
+                                document.getElementById('login-container').classList.add('hidden');
+                                if (myRequest && myRequest.status === 'pending') {
+                                    document.getElementById('main-container').classList.add('hidden');
+                                    document.getElementById('blocked-container').classList.add('hidden');
+                                    document.getElementById('pending-collab-container').classList.remove('hidden');
+                                    initSocket();
+                                } else {
+                                    document.getElementById('blocked-container').classList.remove('hidden');
+                                }
+                            }).catch(() => {
+                                document.getElementById('login-container').classList.add('hidden');
+                                document.getElementById('blocked-container').classList.remove('hidden');
+                            });
+                    });
             }
         }
 

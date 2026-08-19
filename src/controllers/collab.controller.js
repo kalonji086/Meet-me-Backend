@@ -206,10 +206,10 @@ const handleDocumentStatus = asyncHandler(async (req, res) => {
  * @desc    Submit a collaboration request
  */
 const submitRequest = asyncHandler(async (req, res) => {
-  const { teamId, message } = req.body;
+  const { teamId, motivation, objectives, skills } = req.body;
   const result = await query(
-    'INSERT INTO public.collab_requests (user_id, team_id, message) VALUES ($1, $2, $3) RETURNING *',
-    [req.userId, teamId, message]
+    'INSERT INTO public.collab_requests (user_id, team_id, motivation, objectives, skills) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [req.userId, teamId, motivation, objectives, skills]
   );
 
   // Notify main admin
@@ -222,11 +222,31 @@ const submitRequest = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Invite a user to collaborate
+ */
+const inviteUser = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const { userId, teamId } = req.body;
+
+  const userRes = await query('SELECT full_name, email FROM public.profiles WHERE id = $1', [userId]);
+  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  const user = userRes.rows[0];
+
+  const teamRes = await query('SELECT name FROM public.collab_teams WHERE id = $1', [teamId]);
+  const teamName = teamRes.rows[0]?.name || "l'équipe";
+
+  const mailService = require('../services/mail.service');
+  await mailService.sendCollabInvitationEmail(user.email, user.full_name, teamName, teamId);
+
+  res.json({ success: true, message: `Invitation envoyée à ${user.full_name}.` });
+});
+
+/**
  * @desc    Get all collaboration requests
  */
 const getRequests = asyncHandler(async (req, res) => {
   const result = await query(`
-    SELECT r.*, p.full_name, p.email, t.name as team_name
+    SELECT r.*, p.full_name, p.email, p.avatar_url, t.name as team_name
     FROM public.collab_requests r
     JOIN public.profiles p ON r.user_id = p.id
     JOIN public.collab_teams t ON r.team_id = t.id
@@ -296,6 +316,6 @@ module.exports = {
   getTasks, createTask, updateTaskStatus,
   getMessages, sendMessage, deleteMessage,
   getDocuments, uploadDocument, handleDocumentStatus,
-  submitRequest, getRequests, handleRequest,
+  submitRequest, inviteUser, getRequests, handleRequest,
   getPermissions, savePermissions
 };

@@ -10,6 +10,7 @@ router.use(isAdmin); // Ensure only admins/delegates access collab features in d
 router.get('/teams', collabController.getTeams);
 router.post('/teams', collabController.createTeam);
 router.get('/teams/:teamId/members', collabController.getTeamMembers);
+router.post('/invite', collabController.inviteUser);
 
 // Tasks
 router.get('/teams/:teamId/tasks', collabController.getTasks);

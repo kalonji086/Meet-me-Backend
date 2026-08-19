@@ -156,6 +156,9 @@ class Server {
     this.app.get('/support/helpdesk', (req, res) => {
       res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'support.html'));
     });
+    this.app.get('/collab-apply', (req, res) => {
+      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'collab-apply.html'));
+    });
 
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/upload', uploadRoutes);

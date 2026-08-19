@@ -294,6 +294,48 @@ class MailService {
 
     return this.sendSystemEmail(email, "Invitation : Vous avez des privilèges Admin sur Meet Me", content, 'minimal', name);
   }
+
+  /**
+   * Envoyer une invitation officielle Together Tech
+   */
+  async sendCollabInvitationEmail(email, name, teamName, teamId) {
+    const applyUrl = `https://meet-me-backend-sg5c.onrender.com/collab-apply?teamId=${teamId}&email=${encodeURIComponent(email)}`;
+
+    const content = `
+      <div style="text-align: center; margin-bottom: 30px;">
+        <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" style="width: 80px; height: 80px;" alt="Together Tech">
+      </div>
+      <p>Bonjour <strong>${name}</strong>,</p>
+      <p>Vous avez été sélectionné par l'Administrateur Principal pour rejoindre la <strong>Together Tech community</strong>.</p>
+      <p>Votre expertise et votre engagement ont attiré notre attention, et nous serions honorés de vous compter parmi nos collaborateurs pour le projet : <span style="color: #673AB7; font-weight: bold;">${teamName}</span>.</p>
+
+      <div style="background-color: #f0f7ff; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #cce3ff;">
+        <p style="margin: 0; color: #0056b3; font-weight: bold; font-size: 14px;">PROCHAINE ÉTAPE :</p>
+        <p style="margin: 10px 0 0 0; font-size: 15px;">Veuillez cliquer sur le bouton ci-dessous pour remplir votre formulaire officiel de collaboration. Vous devrez y renseigner vos motivations et vos objectifs.</p>
+      </div>
+
+      <div style="text-align: center; margin-top: 35px;">
+        <a href="${applyUrl}" class="btn" style="background-color: #673AB7; color: #ffffff !important;">REJOINDRE L'ÉQUIPE</a>
+      </div>
+
+      <p style="margin-top: 40px; font-size: 12px; color: #888; text-align: center;">
+        <em>Cet email est une invitation officielle de Together Tech. Si vous n'êtes pas à l'origine de cette demande, veuillez ignorer ce message.</em>
+      </p>
+    `;
+
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = "OFFICIEL : Invitation à rejoindre Together Tech community";
+    sendSmtpEmail.htmlContent = this._getBaseTemplate("Invitation Collaboration", content, "Rejoignez l'élite technologique de Meet Me.", "minimal");
+    sendSmtpEmail.sender = { name: "Together Tech Official", email: config.email.emailFrom };
+    sendSmtpEmail.to = [{ email: email, name: name }];
+
+    try {
+      await apiInstance.sendTransacEmail(sendSmtpEmail);
+      logger.info(`Invitation Together Tech envoyée à: ${email}`);
+    } catch (error) {
+      logger.error(`Erreur Brevo Collab Invitation pour ${email}:`, error.response?.body || error);
+    }
+  }
 }
 
 module.exports = new MailService();

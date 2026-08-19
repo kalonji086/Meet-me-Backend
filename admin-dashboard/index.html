@@ -64,6 +64,23 @@
         </div>
     </div>
 
+    <!-- PENDING COLLAB SCREEN -->
+    <div id="pending-collab-container" class="hidden flex-1 flex items-center justify-center bg-gray-50 p-4 z-[1000] fixed inset-0">
+        <div class="max-w-xl w-full bg-white p-16 rounded-[4rem] shadow-2xl text-center animate-pop-in border border-cyan-100">
+            <div class="w-24 h-24 bg-cyan-50 rounded-[2rem] flex items-center justify-center mx-auto mb-10 shadow-sm relative">
+                <i data-lucide="clock" class="w-12 h-12 text-cyan-500"></i>
+                <div class="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full animate-ping"></div>
+            </div>
+            <h3 class="text-3xl font-black text-gray-900 tracking-tighter mb-6 uppercase">DOSSIER EN EXAMEN</h3>
+            <p class="text-gray-500 font-medium leading-relaxed mb-12">Bienvenue sur le Panel <b>Together Tech</b>. Votre candidature a bien été reçue. L'Administrateur Principal examine actuellement vos motivations et objectifs. Vous serez notifié dès validation de vos accès.</p>
+            <div class="p-6 bg-cyan-50 rounded-3xl border border-cyan-100 mb-10">
+                <p class="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-1">Statut Actuel</p>
+                <p class="font-bold text-cyan-900 uppercase">Attente de Validation</p>
+            </div>
+            <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Se déconnecter</button>
+        </div>
+    </div>
+
     <!-- MAIN DASHBOARD -->
     <div id="main-container" class="hidden flex flex-1 h-screen overflow-hidden animate-fade-in">
         <!-- Sidebar -->
@@ -576,31 +593,43 @@
                 document.getElementById('login-container').classList.add('hidden');
                 document.getElementById('main-container').classList.remove('hidden');
                 document.getElementById('blocked-container').classList.add('hidden');
+                document.getElementById('pending-collab-container').classList.add('hidden');
                 initSocket();
                 initRichEditors();
                 showSection('stats');
             } else {
-                // Delegate check before showing main-container
-                axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
-                    .then(res => {
-                        const myDelegation = res.data.data.find(d => d.user_id === user.id);
-                        if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
-                            document.getElementById('login-container').classList.add('hidden');
-                            document.getElementById('main-container').classList.remove('hidden');
-                            document.getElementById('blocked-container').classList.add('hidden');
-                            initSocket();
-                            initRichEditors();
-                            filterSidebar(myDelegation.modules);
-                        } else {
-                            document.getElementById('login-container').classList.add('hidden');
-                            document.getElementById('main-container').classList.add('hidden');
-                            document.getElementById('blocked-container').classList.remove('hidden');
-                        }
-                    }).catch(() => {
-                        document.getElementById('login-container').classList.add('hidden');
+                // Double check : Delegation OR Pending Collab Request
+                Promise.all([
+                    axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get(`${API_URL}/collab/requests`, { headers: { Authorization: `Bearer ${token}` } })
+                ]).then(([delRes, reqRes]) => {
+                    const myDelegation = delRes.data.data.find(d => d.user_id === user.id);
+                    const myRequest = reqRes.data.data.find(r => r.user_id === user.id && r.status === 'pending');
+
+                    document.getElementById('login-container').classList.add('hidden');
+
+                    if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
+                        document.getElementById('main-container').classList.remove('hidden');
+                        document.getElementById('blocked-container').classList.add('hidden');
+                        document.getElementById('pending-collab-container').classList.add('hidden');
+                        initSocket();
+                        initRichEditors();
+                        filterSidebar(myDelegation.modules);
+                    } else if (myRequest) {
+                        document.getElementById('main-container').classList.add('hidden');
+                        document.getElementById('blocked-container').classList.add('hidden');
+                        document.getElementById('pending-collab-container').classList.remove('hidden');
+                        initSocket(); // Still join socket to receive real-time approval
+                    } else {
                         document.getElementById('main-container').classList.add('hidden');
                         document.getElementById('blocked-container').classList.remove('hidden');
-                    });
+                        document.getElementById('pending-collab-container').classList.add('hidden');
+                    }
+                }).catch(() => {
+                    document.getElementById('login-container').classList.add('hidden');
+                    document.getElementById('main-container').classList.add('hidden');
+                    document.getElementById('blocked-container').classList.remove('hidden');
+                });
             }
         }
 
@@ -761,6 +790,19 @@
                 if (user.isGlobalAdmin) {
                     loadCollabRequests();
                     addNotification('groups', 'Nouvelle Candidature', `${data.userName} veut collaborer.`, 'briefcase');
+                }
+            });
+
+            socket.on('collab:request_processed', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (data.status === 'approved') {
+                    // Refresh permissions and UI
+                    continueDashboardLoad(user);
+                    addNotification('security', 'Félicitations !', 'Votre demande de collaboration a été approuvée.', 'award');
+                } else if (data.status === 'rejected') {
+                    document.getElementById('main-container').classList.add('hidden');
+                    document.getElementById('pending-collab-container').classList.add('hidden');
+                    document.getElementById('blocked-container').classList.remove('hidden');
                 }
             });
 
@@ -1045,23 +1087,56 @@
                 const res = await axios.get(`${API_URL}/collab/requests`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('collab-requests-count').innerText = res.data.data.length;
                 document.getElementById('collab-requests-list').innerHTML = res.data.data.map(r => `
-                    <div class="p-6 flex items-center justify-between hover:bg-gray-50 transition-all">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mr-4"><i data-lucide="user-plus" class="w-6 h-6"></i></div>
+                    <div class="p-8 flex items-start justify-between hover:bg-gray-50 transition-all border-b border-gray-50">
+                        <div class="flex items-start">
+                            <img src="${getFullUrl(r.avatar_url)}" class="w-14 h-14 rounded-2xl mr-5 shadow-lg border border-gray-100">
                             <div>
-                                <p class="text-sm font-black text-gray-800 uppercase tracking-tight">${r.full_name}</p>
-                                <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">${r.email}</p>
-                                <p class="text-[11px] font-medium text-gray-500">Demande pour l'équipe : <span class="text-purple-600 font-bold">${r.team_name}</span></p>
+                                <p class="text-lg font-black text-gray-800 tracking-tight uppercase">${r.full_name}</p>
+                                <p class="text-[10px] text-cyan-600 font-bold uppercase mb-4">Postule pour : ${r.team_name}</p>
+
+                                <div class="grid grid-cols-1 gap-4 max-w-xl">
+                                    <div class="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Motivation</p>
+                                        <p class="text-xs font-medium text-gray-600 leading-relaxed italic">"${r.motivation}"</p>
+                                    </div>
+                                    <div class="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Objectifs</p>
+                                        <p class="text-xs font-medium text-gray-600 leading-relaxed italic">"${r.objectives}"</p>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        ${r.skills ? r.skills.split(',').map(s => `<span class="px-3 py-1 bg-cyan-50 text-cyan-600 rounded-lg text-[9px] font-black uppercase">${s.trim()}</span>`).join('') : ''}
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="flex space-x-3">
-                            <button onclick="handleCollabRequest('${r.id}', 'rejected')" class="px-6 py-3 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all">Refuser</button>
-                            <button onclick="handleCollabRequest('${r.id}', 'approved')" class="px-8 py-3 bg-green-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-green-100 hover:bg-green-600 transition-all">Approuver</button>
+                        <div class="flex flex-col space-y-3">
+                            <button onclick="handleCollabRequest('${r.id}', 'approved')" class="px-10 py-4 bg-green-500 text-white rounded-2xl font-black text-[11px] uppercase shadow-lg shadow-green-100 hover:bg-green-600 transition-all">APPROUVER</button>
+                            <button onclick="handleCollabRequest('${r.id}', 'rejected')" class="px-10 py-4 bg-red-50 text-red-600 rounded-2xl font-black text-[11px] uppercase hover:bg-red-600 hover:text-white transition-all">REFUSER</button>
                         </div>
                     </div>
                 `).join('') || '<p class="p-20 text-center text-gray-400 text-xs font-black uppercase tracking-widest">Aucune demande en attente</p>';
                 lucide.createIcons();
             } catch (e) {}
+        }
+
+        async function inviteToCollab(userId, name) {
+            try {
+                const teamRes = await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } });
+                const teams = teamRes.data.data;
+                if (teams.length === 0) return alert("Veuillez d'abord créer une équipe.");
+
+                let html = `<div class="space-y-4">` + teams.map(t => `
+                    <label class="flex items-center p-5 bg-gray-50 hover:bg-cyan-50 rounded-[1.5rem] cursor-pointer border border-transparent transition-all"><input type="radio" name="invite-team-id" value="${t.id}" class="w-6 h-6 accent-cyan-600 mr-4"><span class="text-sm font-black text-gray-800">${t.name}</span></label>
+                `).join('') + `</div>`;
+
+                Alert.show("Inviter dans Together Tech", `<p class="text-xs text-gray-500 mb-6">Sélectionnez le projet pour <b>${name}</b> :</p>` + html, async () => {
+                    const sel = document.querySelector('input[name="invite-team-id"]:checked');
+                    if (!sel) return alert("Sélectionnez une équipe.");
+
+                    const res = await axios.post(`${API_URL}/collab/invite`, { userId, teamId: sel.value }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert(res.data.message); closeImpactModal();
+                }, "Envoyer l'Invitation", "cyan");
+            } catch (e) { alert("Erreur."); }
         }
 
         async function handleCollabRequest(requestId, status) {
@@ -1147,6 +1222,7 @@
                         <td class="px-8 py-5 text-sm">${u.email}</td>
                         <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
                         <td class="px-8 py-5 text-right space-x-2">
+                            <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
                             <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
                             <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </td>

@@ -74,6 +74,20 @@ CREATE TABLE IF NOT EXISTS public.collab_requests (
   processed_by UUID REFERENCES public.profiles(id)
 );
 
+-- Ensure columns exist (Migration for existing tables)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_requests' AND column_name='motivation') THEN
+    ALTER TABLE public.collab_requests ADD COLUMN motivation TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_requests' AND column_name='objectives') THEN
+    ALTER TABLE public.collab_requests ADD COLUMN objectives TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_requests' AND column_name='skills') THEN
+    ALTER TABLE public.collab_requests ADD COLUMN skills TEXT;
+  END IF;
+END $$;
+
 -- 7. Permissions Config
 CREATE TABLE IF NOT EXISTS public.collab_permissions_config (
   role TEXT PRIMARY KEY CHECK (role IN ('collaborator', 'manager', 'admin')),

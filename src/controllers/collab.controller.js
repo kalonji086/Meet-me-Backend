@@ -374,16 +374,22 @@ const handleRequest = asyncHandler(async (req, res) => {
  */
 const moveTeamMember = asyncHandler(async (req, res) => {
   if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
-  const { userId, fromTeamId, toTeamId } = req.body;
+  const { userId, fromTeamId, toTeamId } = req.params.userId ? { ...req.body, userId: req.params.userId } : req.body;
 
-  // 1. Remove from old team
-  await query('DELETE FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [fromTeamId, userId]);
+  // 1. Remove from old team (if exists) or all teams to be sure
+  if (fromTeamId && fromTeamId !== 'null' && fromTeamId !== '') {
+    await query('DELETE FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [fromTeamId, userId]);
+  } else {
+    await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [userId]);
+  }
 
   // 2. Add to new team
-  await query(
-    'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
-    [toTeamId, userId]
-  );
+  if (toTeamId) {
+    await query(
+      'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
+      [toTeamId, userId]
+    );
+  }
 
   // 3. Notify real-time
   socketService.broadcast('collab:member_moved', { userId, fromTeamId, toTeamId });

@@ -576,7 +576,10 @@
                 const btn = document.getElementById('impact-confirm-btn');
                 btn.innerText = confirmText;
                 btn.className = `flex-[2] py-4 bg-${color}-600 text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-${color}-700 transition-all`;
-                btn.onclick = onConfirm;
+
+                // Fix: Default to close if no callback
+                btn.onclick = onConfirm || (() => closeImpactModal());
+
                 modal.classList.remove('hidden');
                 if (window.lucide) lucide.createIcons();
             }
@@ -1086,17 +1089,19 @@
                 Alert.show("Déplacer Collaborateur", `<p class="text-xs text-gray-500 mb-6 text-center">Assigner <b>${name}</b> à un nouveau projet :</p>` + html, async () => {
                     const sel = document.querySelector('input[name="move-team-id"]:checked');
                     if (!sel) return alert("Sélectionnez une équipe.");
-                    if (sel.value === currentTeamId) return closeImpactModal();
 
-                    await axios.post(`${API_URL}/collab/move-member`, {
-                        userId,
-                        fromTeamId: currentTeamId,
-                        toTeamId: sel.value
-                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    try {
+                        const fromTeam = (currentTeamId === 'null' || !currentTeamId) ? null : currentTeamId;
+                        await axios.post(`${API_URL}/collab/move-member`, {
+                            userId,
+                            fromTeamId: fromTeam,
+                            toTeamId: sel.value
+                        }, { headers: { Authorization: `Bearer ${token}` } });
 
-                    alert("Déplacement réussi !");
-                    closeImpactModal();
-                    loadCollabLiveManagement();
+                        alert("Déplacement réussi !");
+                        closeImpactModal();
+                        loadCollabLiveManagement();
+                    } catch (err) { alert("Erreur lors du déplacement."); }
                 }, "Confirmer le Déplacement", "cyan");
             } catch (e) { alert("Erreur."); }
         }

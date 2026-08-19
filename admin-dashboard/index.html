@@ -478,9 +478,12 @@
                                             <h4 class="font-black text-gray-800 uppercase text-sm tracking-widest">Gestion des Collaborateurs en Direct</h4>
                                             <p class="text-[9px] text-gray-400 font-bold uppercase mt-1">Affectations d'équipes et droits d'accès temps réel</p>
                                         </div>
-                                        <div class="flex items-center space-x-2">
-                                            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                            <span class="text-[10px] font-black text-gray-400 uppercase">Live Sync</span>
+                                        <div class="flex items-center space-x-4">
+                                            <button onclick="showAddCollabFromDirectory()" class="bg-cyan-500 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all">+ AJOUTER</button>
+                                            <div class="flex items-center space-x-2">
+                                                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                                <span class="text-[10px] font-black text-gray-400 uppercase">Live Sync</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <div id="collab-live-management" class="divide-y divide-gray-50"></div>
@@ -1068,6 +1071,61 @@
                 `).join('') || '<p class="p-20 text-center text-gray-400 text-xs font-black uppercase tracking-widest opacity-50">Aucun collaborateur actif</p>';
                 lucide.createIcons();
             } catch (e) {}
+        }
+
+        async function showAddCollabFromDirectory() {
+            try {
+                const [usersRes, delRes] = await Promise.all([
+                    axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
+                ]);
+
+                const delegations = delRes.data.data;
+                let html = `<div class="grid grid-cols-1 gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">` + usersRes.data.data.map(u => {
+                    const d = delegations.find(del => del.user_id === u.id);
+                    const isCollab = d && d.modules.includes('collaboration') && d.is_active;
+
+                    return `
+                        <div class="p-5 bg-gray-50 rounded-[1.5rem] border border-gray-100 flex items-center justify-between">
+                            <div class="flex items-center">
+                                <img src="${getFullUrl(u.avatar_url)}" class="w-10 h-10 rounded-xl mr-3 shadow-sm">
+                                <div>
+                                    <p class="text-xs font-black text-gray-800 uppercase">${u.full_name}</p>
+                                    <p class="text-[9px] text-gray-400 font-bold tracking-tighter">${u.email}</p>
+                                </div>
+                            </div>
+                            ${isCollab ? `
+                                <span class="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-[8px] font-black uppercase">DÉJÀ ACTIF</span>
+                            ` : `
+                                <button onclick="restoreCollabAccess('${u.id}', '${u.full_name}')" class="px-4 py-2 bg-cyan-500 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-cyan-600 transition-all">RÉTABLIR / AJOUTER</button>
+                            `}
+                        </div>
+                    `;
+                }).join('') + `</div>`;
+
+                Alert.show("Ajouter un Collaborateur", html, null, "Fermer", "cyan");
+            } catch (e) { alert("Erreur chargement."); }
+        }
+
+        async function restoreCollabAccess(userId, name) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
+                const delegations = res.data.data;
+                const d = delegations.find(x => x.user_id === userId);
+
+                let modules = d ? d.modules : [];
+                if (!modules.includes('collaboration')) modules.push('collaboration');
+
+                await axios.post(`${API_URL}/admin/delegations`, {
+                    userId,
+                    modules,
+                    isActive: true
+                }, { headers: { Authorization: `Bearer ${token}` } });
+
+                alert(`Accès rétabli pour ${name} !`);
+                closeImpactModal();
+                loadCollabLiveManagement();
+            } catch (e) { alert("Erreur."); }
         }
 
         async function toggleUserModule(userId, moduleName, hasAccess) {

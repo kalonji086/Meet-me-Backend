@@ -406,7 +406,7 @@
                                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8">
                                         <div class="flex justify-between items-center mb-6">
                                             <h4 class="font-black text-gray-800 uppercase text-xs tracking-widest">Tâches en cours</h4>
-                                            ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="showAddTaskModal()" class="text-[10px] font-black text-cyan-600 hover:underline">NOUVELLE TÂCHE</button>` : ''}
+                                            <div id="collab-add-task-container"></div>
                                         </div>
                                         <div id="collab-tasks-list" class="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar"></div>
                                     </div>
@@ -1222,6 +1222,14 @@
 
             document.getElementById('active-team-name').innerText = name.toUpperCase();
             document.getElementById('collab-team-dashboard').classList.remove('hidden');
+
+            // Dynamic Task Button based on role
+            const taskBtnContainer = document.getElementById('collab-add-task-container');
+            if (taskBtnContainer) {
+                taskBtnContainer.innerHTML = (activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager')
+                    ? `<button onclick="showAddTaskModal()" class="text-[10px] font-black text-cyan-600 hover:underline">NOUVELLE TÂCHE</button>`
+                    : '';
+            }
 
             // UI Visual update
             document.querySelectorAll('.team-btn').forEach(btn => btn.classList.remove('border-cyan-500', 'bg-cyan-50'));

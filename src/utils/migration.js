@@ -18,9 +18,15 @@ const runMigrations = async () => {
     }
 
     const sql = fs.readFileSync(sqlPath, 'utf8');
-
-    // On exécute le script SQL
     await pool.query(sql);
+
+    // Migration Collaboration
+    const collabSqlPath = path.join(__dirname, '..', '..', 'scripts', 'migration_collaboration.sql');
+    if (fs.existsSync(collabSqlPath)) {
+      const collabSql = fs.readFileSync(collabSqlPath, 'utf8');
+      await pool.query(collabSql);
+      logger.info('✅ Migration Collaboration terminée');
+    }
 
     // Initialisation des tables admin et du compte admin principal
     const adminController = require('../controllers/admin.controller');

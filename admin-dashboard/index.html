@@ -106,6 +106,10 @@
                 <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="settings" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Config App</span>
                 </a>
+                <a href="#" onclick="showSection('collaboration')" id="nav-collaboration" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all text-cyan-400">
+                    <i data-lucide="briefcase" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm font-black">Collaboration</span>
+                    <span id="collab-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                </a>
                 <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
                         <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span>
@@ -336,6 +340,73 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- SECTION COLLABORATION -->
+                <div id="section-collaboration" class="hidden animate-fade-in space-y-8 pb-20">
+                    <div id="collab-team-selector" class="flex overflow-x-auto space-x-4 pb-4 custom-scrollbar">
+                        <!-- Dynamic team buttons -->
+                    </div>
+
+                    <div id="collab-team-dashboard" class="hidden space-y-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <!-- Left: Team Chat -->
+                            <div class="lg:col-span-1 bg-white rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col h-[600px]">
+                                <div class="p-6 border-b flex items-center justify-between">
+                                    <h4 class="font-black text-gray-800 uppercase text-xs tracking-widest">Chat d'Équipe</h4>
+                                    <div class="flex items-center space-x-2">
+                                        <button onclick="showMyCollabPermissions()" class="p-2 hover:bg-gray-100 rounded-lg text-cyan-600" title="Mes Permissions"><i data-lucide="shield-check" class="w-4 h-4"></i></button>
+                                        <span id="active-team-name" class="text-[9px] bg-cyan-50 text-cyan-600 px-3 py-1 rounded-full font-bold">PROJET X</span>
+                                    </div>
+                                </div>
+                                <div id="collab-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"></div>
+                                <div class="p-4 border-t flex space-x-2">
+                                    <input type="text" id="collab-chat-input" class="flex-1 bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm outline-none" placeholder="Message...">
+                                    <button onclick="sendCollabMessage()" class="p-3 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 transition-all"><i data-lucide="send" class="w-5 h-5"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- Right: Tasks & Documents -->
+                            <div class="lg:col-span-2 space-y-8">
+                                <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8">
+                                    <div class="flex justify-between items-center mb-6">
+                                        <h4 class="font-black text-gray-800 uppercase text-xs tracking-widest">Membres de l'Équipe</h4>
+                                        <button onclick="showAllAppUsersForCollab()" class="text-[10px] font-black text-cyan-600 hover:underline">VOIR TOUT LE PERSONNEL</button>
+                                    </div>
+                                    <div id="collab-members-list" class="flex overflow-x-auto space-x-4 pb-2 custom-scrollbar"></div>
+                                </div>
+
+                                <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8">
+                                    <div class="flex justify-between items-center mb-6">
+                                        <h4 class="font-black text-gray-800 uppercase text-xs tracking-widest">Tâches en cours</h4>
+                                        <button onclick="showAddTaskModal()" class="text-[10px] font-black text-cyan-600 hover:underline">NOUVELLE TÂCHE</button>
+                                    </div>
+                                    <div id="collab-tasks-list" class="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Only: Requests & Team Management -->
+                    <div id="collab-admin-section" class="hidden space-y-8">
+                        <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+                            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
+                                <h4 class="font-black text-gray-800 uppercase text-sm tracking-widest">Configuration des Rôles & Permissions</h4>
+                                <button onclick="saveCollabPermissions()" class="px-6 py-3 bg-cyan-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all">Enregistrer les Droits</button>
+                            </div>
+                            <div id="collab-permissions-list" class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <!-- Roles list -->
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+                            <div class="p-8 border-b bg-gray-50 flex justify-between items-center">
+                                <h4 class="font-black text-gray-800 uppercase text-sm tracking-widest">Demandes de Collaboration</h4>
+                                <span id="collab-requests-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                            </div>
+                            <div id="collab-requests-list" class="divide-y divide-gray-50"></div>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
@@ -540,7 +611,7 @@
                 'market-requests': 'nav-market-requests', 'verifications': 'nav-verifications',
                 'audit': 'nav-audit',
                 'campaigns': 'nav-campaigns', 'legal': 'nav-legal', 'config': 'nav-config',
-                'my-requests': 'nav-my-requests'
+                'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
 
@@ -662,6 +733,37 @@
                 loadStats();
             });
 
+            // Collaboration Events
+            socket.on('collab:new_message', (data) => {
+                if (activeCollabTeamId === data.teamId) {
+                    const chatContainer = document.getElementById('collab-chat-messages');
+                    const m = data.message;
+                    const isMe = m.sender_id === JSON.parse(localStorage.getItem('admin_user')).id;
+                    const msgHtml = `
+                        <div class="flex items-start ${isMe ? 'flex-row-reverse' : ''} animate-pop-in">
+                            <img src="${getFullUrl(m.sender_avatar)}" class="w-8 h-8 rounded-lg mx-2 shadow-sm">
+                            <div class="max-w-[70%] p-3 rounded-2xl text-xs ${isMe ? 'bg-cyan-500 text-white rounded-tr-none' : 'bg-gray-100 text-gray-700 rounded-tl-none'}">
+                                <p class="font-bold mb-1 opacity-60 text-[9px]">${m.sender_name}</p>
+                                <p class="font-medium leading-relaxed">${m.content}</p>
+                            </div>
+                        </div>
+                    `;
+                    chatContainer.insertAdjacentHTML('beforeend', msgHtml);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            });
+
+            socket.on('collab:task_created', (data) => { if (activeCollabTeamId === data.teamId) loadCollabTasks(); });
+            socket.on('collab:task_updated', (data) => { if (activeCollabTeamId === data.teamId) loadCollabTasks(); });
+            socket.on('collab:document_uploaded', (data) => { if (activeCollabTeamId === data.teamId) loadCollabDocs(); });
+            socket.on('collab:new_request', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (user.isGlobalAdmin) {
+                    loadCollabRequests();
+                    addNotification('groups', 'Nouvelle Candidature', `${data.userName} veut collaborer.`, 'briefcase');
+                }
+            });
+
             // Retrait de la mise à jour légale en temps réel
             socket.on('legal_removed', (data) => {
                 if (!document.getElementById('modal-legal-accept').classList.contains('hidden')) {
@@ -704,7 +806,7 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
                 const navId = s === 'market-requests' ? 'nav-market-requests' : 'nav-' + s;
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
@@ -727,8 +829,256 @@
             if (name === 'groups') loadGroups();
             if (name === 'legal') loadLegal();
             if (name === 'config') loadConfig();
+            if (name === 'collaboration') loadCollaboration();
 
             lucide.createIcons();
+        }
+
+        let activeCollabTeamId = null;
+
+        async function loadCollaboration() {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            if (user.isGlobalAdmin) {
+                document.getElementById('collab-admin-section').classList.remove('hidden');
+                loadCollabRequests();
+                loadCollabPermissions();
+            }
+
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } });
+                const selector = document.getElementById('collab-team-selector');
+                selector.innerHTML = res.data.data.map(t => `
+                    <button onclick="selectCollabTeam('${t.id}', '${t.name}')" class="team-btn px-6 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center shrink-0">
+                        <div class="w-3 h-3 rounded-full bg-cyan-500 mr-3"></div>
+                        <span class="text-xs font-black text-gray-800 uppercase tracking-tight">${t.name}</span>
+                    </button>
+                `).join('') + (user.isGlobalAdmin ? `<button onclick="createNewTeam()" class="px-6 py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:border-cyan-400 hover:text-cyan-500 transition-all text-xs font-bold uppercase tracking-widest">+ Créer Équipe</button>` : '');
+
+                if (res.data.data.length === 0 && !user.isGlobalAdmin) {
+                    selector.innerHTML = `<button onclick="submitCollabJoinRequest()" class="px-8 py-4 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-cyan-600 transition-all">SOUMETTRE UNE DEMANDE DE COLLABORATION</button>`;
+                }
+
+                if (res.data.data.length > 0 && !activeCollabTeamId) {
+                    selectCollabTeam(res.data.data[0].id, res.data.data[0].name);
+                }
+            } catch (e) {}
+        }
+
+        async function loadCollabPermissions() {
+            try {
+                const res = await axios.get(`${API_URL}/collab/permissions`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('collab-permissions-list').innerHTML = res.data.data.map(p => `
+                    <div class="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-4">
+                        <h5 class="font-black text-cyan-600 uppercase text-xs tracking-widest text-center">${p.role}</h5>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-2 text-[10px] font-bold text-gray-600"><input type="checkbox" data-role="${p.role}" data-perm="can_read" ${p.can_read ? 'checked' : ''} class="perm-check"> <span>LECTURE</span></label>
+                            <label class="flex items-center space-x-2 text-[10px] font-bold text-gray-600"><input type="checkbox" data-role="${p.role}" data-perm="can_write" ${p.can_write ? 'checked' : ''} class="perm-check"> <span>ÉCRITURE</span></label>
+                            <label class="flex items-center space-x-2 text-[10px] font-bold text-gray-600"><input type="checkbox" data-role="${p.role}" data-perm="can_delete" ${p.can_delete ? 'checked' : ''} class="perm-check"> <span>SUPPRESSION</span></label>
+                        </div>
+                        <p class="text-[8px] text-gray-400 font-bold uppercase pt-2 border-t">Modules : ${p.modules.join(', ')}</p>
+                    </div>
+                `).join('');
+            } catch (e) {}
+        }
+
+        async function saveCollabPermissions() {
+            const checks = Array.from(document.querySelectorAll('.perm-check'));
+            const roles = [...new Set(checks.map(c => c.dataset.role))];
+            const permissions = roles.map(role => {
+                const roleChecks = checks.filter(c => c.dataset.role === role);
+                return {
+                    role,
+                    can_read: roleChecks.find(c => c.dataset.perm === 'can_read').checked,
+                    can_write: roleChecks.find(c => c.dataset.perm === 'can_write').checked,
+                    can_delete: roleChecks.find(c => c.dataset.perm === 'can_delete').checked,
+                    modules: role === 'admin' ? ['tasks', 'chat', 'documents', 'members', 'requests'] : ['tasks', 'chat', 'documents']
+                };
+            });
+
+            try {
+                await axios.post(`${API_URL}/collab/permissions`, { permissions }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Permissions mises à jour !");
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function submitCollabJoinRequest() {
+            const teamRes = await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } });
+            const teams = teamRes.data.data;
+            if (teams.length === 0) return alert("Aucune équipe disponible.");
+
+            const teamId = teams[0].id; // Simple for now
+            const message = prompt("Pourquoi voulez-vous rejoindre l'équipe de collaboration ?", "Je souhaite aider à la modération.");
+            if (!message) return;
+
+            try {
+                await axios.post(`${API_URL}/collab/requests`, { teamId, message }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Votre demande a été envoyée à l'administrateur !");
+            } catch (e) { alert("Demande déjà en cours ou erreur."); }
+        }
+
+        async function selectCollabTeam(id, name) {
+            activeCollabTeamId = id;
+            document.getElementById('active-team-name').innerText = name.toUpperCase();
+            document.getElementById('collab-team-dashboard').classList.remove('hidden');
+
+            // UI Visual update
+            document.querySelectorAll('.team-btn').forEach(btn => btn.classList.remove('border-cyan-500', 'bg-cyan-50'));
+
+            loadCollabMembers();
+            loadCollabTasks();
+            loadCollabDocs();
+            loadCollabChat();
+        }
+
+        async function loadCollabMembers() {
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('collab-members-list').innerHTML = res.data.data.map(m => `
+                    <div class="bg-gray-50 px-4 py-3 rounded-2xl border border-gray-100 flex items-center shrink-0 min-w-[150px]">
+                        <img src="${getFullUrl(m.avatar_url)}" class="w-6 h-6 rounded-lg mr-3 shadow-sm">
+                        <div>
+                            <p class="text-[10px] font-black text-gray-800 truncate">${m.full_name}</p>
+                            <p class="text-[8px] text-cyan-600 font-bold uppercase">${m.role}</p>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-gray-400 text-[10px] uppercase p-4">Aucun membre</p>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function loadCollabTasks() {
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('collab-tasks-list').innerHTML = res.data.data.map(t => `
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div>
+                            <p class="text-sm font-bold text-gray-800">${t.title}</p>
+                            <p class="text-[10px] text-gray-400 font-medium">${t.assignee_name || 'Non assigné'}</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-[9px] font-black uppercase px-2 py-1 rounded-lg ${t.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}">${t.status}</span>
+                            <button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2 bg-white rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all"><i data-lucide="check" class="w-3 h-3"></i></button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="p-10 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest">Aucune tâche</p>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function loadCollabDocs() {
+            try {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/documents`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('collab-docs-list').innerHTML = res.data.data.map(d => `
+                    <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-gray-400"><i data-lucide="file-text" class="w-5 h-5"></i></div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-[8px] font-black uppercase px-2 py-1 rounded-md ${d.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">${d.status}</span>
+                                <span class="text-[7px] text-gray-400 font-bold mt-1">VER. ${d.version}</span>
+                            </div>
+                        </div>
+                        <p class="text-[11px] font-black text-gray-800 truncate mb-1">${d.file_name}</p>
+                        <p class="text-[8px] text-gray-400 font-bold uppercase">Par ${d.uploader_name}</p>
+
+                        <div class="flex space-x-2 mt-3">
+                            <a href="${d.file_url}" target="_blank" class="flex-1 text-center py-2 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-cyan-600 hover:bg-cyan-600 hover:text-white transition-all uppercase">Ouvrir</a>
+                            ${user.isGlobalAdmin && d.status === 'pending' ? `
+                                <button onclick="handleCollabDoc('${d.id}', 'approved')" class="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"><i data-lucide="check" class="w-3 h-3"></i></button>
+                                <button onclick="handleCollabDoc('${d.id}', 'rejected')" class="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"><i data-lucide="x" class="w-3 h-3"></i></button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('') || '<p class="col-span-2 p-10 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest">Aucun document</p>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function handleCollabDoc(docId, status) {
+            const comment = prompt("Commentaire sur le document :");
+            try {
+                await axios.put(`${API_URL}/collab/documents/${docId}/status`, { status, comment }, { headers: { Authorization: `Bearer ${token}` } });
+                loadCollabDocs();
+            } catch (e) {}
+        }
+
+        async function loadCollabChat() {
+            try {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/messages`, { headers: { Authorization: `Bearer ${token}` } });
+                const chatContainer = document.getElementById('collab-chat-messages');
+                chatContainer.innerHTML = res.data.data.map(m => `
+                    <div class="flex items-start ${m.sender_id === user.id ? 'flex-row-reverse' : ''}">
+                        <img src="${getFullUrl(m.sender_avatar)}" class="w-8 h-8 rounded-lg mx-2 shadow-sm">
+                        <div class="group relative max-w-[70%] p-3 rounded-2xl text-xs ${m.sender_id === user.id ? 'bg-cyan-500 text-white rounded-tr-none' : 'bg-gray-100 text-gray-700 rounded-tl-none'}">
+                            <p class="font-bold mb-1 opacity-60 text-[9px]">${m.sender_name}</p>
+                            <p class="font-medium leading-relaxed">${m.content}</p>
+                            ${user.isGlobalAdmin ? `<button onclick="deleteCollabMessage('${m.id}')" class="hidden group-hover:block absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg"><i data-lucide="x" class="w-2 h-2"></i></button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function deleteCollabMessage(id) {
+            if(!confirm("Supprimer ce message de collaboration ?")) return;
+            // I'll need a backend endpoint for this
+            axios.delete(`${API_URL}/collab/messages/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(() => loadCollabChat());
+        }
+
+        async function sendCollabMessage() {
+            const input = document.getElementById('collab-chat-input');
+            const content = input.value.trim();
+            if (!content || !activeCollabTeamId) return;
+
+            try {
+                await axios.post(`${API_URL}/collab/messages`, { teamId: activeCollabTeamId, content }, { headers: { Authorization: `Bearer ${token}` } });
+                input.value = '';
+            } catch (e) {}
+        }
+
+        async function loadCollabRequests() {
+            try {
+                const res = await axios.get(`${API_URL}/collab/requests`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('collab-requests-count').innerText = res.data.data.length;
+                document.getElementById('collab-requests-list').innerHTML = res.data.data.map(r => `
+                    <div class="p-6 flex items-center justify-between hover:bg-gray-50 transition-all">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mr-4"><i data-lucide="user-plus" class="w-6 h-6"></i></div>
+                            <div>
+                                <p class="text-sm font-black text-gray-800 uppercase tracking-tight">${r.full_name}</p>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">${r.email}</p>
+                                <p class="text-[11px] font-medium text-gray-500">Demande pour l'équipe : <span class="text-purple-600 font-bold">${r.team_name}</span></p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="handleCollabRequest('${r.id}', 'rejected')" class="px-6 py-3 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all">Refuser</button>
+                            <button onclick="handleCollabRequest('${r.id}', 'approved')" class="px-8 py-3 bg-green-500 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-green-100 hover:bg-green-600 transition-all">Approuver</button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="p-20 text-center text-gray-400 text-xs font-black uppercase tracking-widest">Aucune demande en attente</p>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function handleCollabRequest(requestId, status) {
+            const comment = prompt("Commentaire optionnel :", "");
+            try {
+                await axios.put(`${API_URL}/collab/requests/${requestId}`, { status, comment }, { headers: { Authorization: `Bearer ${token}` } });
+                loadCollabRequests();
+                loadCollaboration();
+            } catch (e) {}
+        }
+
+        function createNewTeam() {
+            const name = prompt("Nom de l'équipe / projet :");
+            const description = prompt("Description :");
+            if (!name) return;
+            axios.post(`${API_URL}/collab/teams`, { name, description }, { headers: { Authorization: `Bearer ${token}` } })
+                .then(() => loadCollaboration());
         }
 
         async function loadMyRequests() {
@@ -1261,6 +1611,128 @@
 
         function toggleCampaignSpecificEmail() { document.getElementById('specific-email-container').className = document.getElementById('campaign-target').value === 'specific' ? 'block animate-fade-in' : 'hidden'; }
         document.getElementById('campaign-target')?.addEventListener('change', toggleCampaignSpecificEmail);
+
+        async function showMyCollabPermissions() {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            let html = `
+                <div class="space-y-6">
+                    <div class="p-6 bg-cyan-50 rounded-3xl border border-cyan-100 flex items-center">
+                        <div class="w-12 h-12 bg-white text-cyan-600 rounded-2xl flex items-center justify-center mr-4 shadow-sm"><i data-lucide="shield" class="w-6 h-6"></i></div>
+                        <div>
+                            <p class="text-xs font-black text-cyan-800 uppercase tracking-widest">Votre Rôle</p>
+                            <p class="text-lg font-black text-cyan-600 uppercase">${user.isGlobalAdmin ? 'Administrateur Principal' : 'Collaborateur'}</p>
+                        </div>
+                    </div>
+                    <div class="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Modules Autorisés</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            ${['Tâches', 'Documents', 'Chat', 'Membres', 'Approbations'].map(m => `
+                                <div class="flex items-center p-3 bg-white rounded-xl border border-gray-100">
+                                    <div class="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                                    <span class="text-[10px] font-bold text-gray-700 uppercase">${m}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <p class="text-[9px] text-gray-400 font-bold text-center italic">Vos droits sont synchronisés en temps réel avec l'administration.</p>
+                </div>
+            `;
+            Alert.show("Mes Habilitations", html, null, "Compris", "cyan");
+        }
+
+        async function showAllAppUsersForCollab() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+                let html = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">` + res.data.data.map(u => `
+                    <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                        <div class="flex items-center">
+                            <img src="${getFullUrl(u.avatar_url)}" class="w-10 h-10 rounded-xl mr-3 shadow-sm">
+                            <div>
+                                <p class="text-xs font-black text-gray-800 uppercase">${u.full_name}</p>
+                                <p class="text-[9px] text-gray-400 font-bold tracking-tighter">${u.email}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 rounded-full ${u.status === 'online' ? 'bg-green-500' : 'bg-gray-300'} mr-2"></div>
+                            <span class="text-[8px] font-black text-gray-400 uppercase">${u.status}</span>
+                        </div>
+                    </div>
+                `).join('') + `</div>`;
+
+                Alert.show("Annuaire du Personnel", html, null, "Fermer", "cyan");
+            } catch (e) { alert("Erreur chargement utilisateurs."); }
+        }
+
+        async function updateTaskStatus(taskId, status) {
+            try {
+                await axios.put(`${API_URL}/collab/tasks/${taskId}/status`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+            } catch (e) {}
+        }
+
+        async function uploadCollabDocument(input) {
+            if (!input.files[0] || !activeCollabTeamId) return;
+            const file = input.files[0];
+            try {
+                const uploadRes = await apiService_upload(file); // I'll need to define a generic upload helper or use the existing logic
+                if (uploadRes.success) {
+                    await axios.post(`${API_URL}/collab/documents`, {
+                        teamId: activeCollabTeamId,
+                        fileUrl: uploadRes.data.fileUrl,
+                        fileName: file.name,
+                        fileSize: file.size,
+                        mimeType: file.type
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Document uploadé !");
+                }
+            } catch (e) { alert("Erreur upload document."); }
+        }
+
+        async function apiService_upload(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            return axios.post(`${API_URL}/upload`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
+            }).then(r => r.data);
+        }
+
+        async function showAddTaskModal() {
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+                const members = res.data.data;
+
+                let html = `
+                    <div class="space-y-4">
+                        <input type="text" id="task-title" placeholder="Titre de la tâche" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                        <textarea id="task-desc" placeholder="Description..." class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-medium"></textarea>
+                        <input type="date" id="task-deadline" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                        <select id="task-assignee" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                            <option value="">Attribuer à...</option>
+                            ${members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+
+                Alert.show("Créer une Tâche", html, async () => {
+                    const title = document.getElementById('task-title').value;
+                    const description = document.getElementById('task-desc').value;
+                    const deadline = document.getElementById('task-deadline').value;
+                    const assigneeId = document.getElementById('task-assignee').value;
+
+                    if (!title) return alert("Le titre est requis.");
+
+                    await axios.post(`${API_URL}/collab/tasks`, {
+                        teamId: activeCollabTeamId,
+                        title,
+                        description,
+                        deadline,
+                        assigneeId,
+                        priority: 'medium'
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+
+                    closeImpactModal();
+                }, "Créer", "cyan");
+            } catch (e) { alert("Erreur chargement membres."); }
+        }
 
         function logout() { localStorage.clear(); location.reload(); }
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }

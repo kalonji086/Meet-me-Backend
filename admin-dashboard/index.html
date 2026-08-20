@@ -1643,8 +1643,15 @@
 
         async function selectCollabTeam(id, name) {
             activeCollabTeamId = id;
+            const user = JSON.parse(localStorage.getItem('admin_user'));
             const team = collabTeamsData.find(t => t.id === id);
-            activeCollabUserRole = (team && team.my_role) ? team.my_role : 'collaborator';
+
+            // Force Admin role for Global Admin, otherwise use assigned role
+            if (user.isGlobalAdmin) {
+                activeCollabUserRole = 'admin';
+            } else {
+                activeCollabUserRole = (team && team.my_role) ? team.my_role : 'collaborator';
+            }
 
             document.getElementById('active-team-name').innerText = name.toUpperCase();
             document.getElementById('collab-team-dashboard').classList.remove('hidden');

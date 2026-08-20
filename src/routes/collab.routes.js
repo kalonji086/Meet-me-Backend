@@ -39,6 +39,11 @@ router.put('/documents/:docId/status', collabController.handleDocumentStatus);
 router.put('/documents/:docId/archive', collabController.archiveDocument);
 router.post('/documents/:docId/delete', collabController.deleteDocument);
 
+// Calendar
+router.get('/teams/:teamId/calendar', collabController.getCalendarEvents);
+router.post('/calendar', collabController.createCalendarEvent);
+router.delete('/calendar/:eventId', collabController.deleteCalendarEvent);
+
 // Requests / Applications Management
 router.get('/requests', collabController.getRequests);
 router.put('/requests/:requestId', collabController.handleRequest);

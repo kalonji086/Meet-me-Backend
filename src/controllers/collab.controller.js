@@ -491,12 +491,62 @@ const savePermissions = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Permissions mises à jour.' });
 });
 
+/**
+ * @desc    Get all calendar events for a team (including tasks as deadlines)
+ */
+const getCalendarEvents = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+
+  // 1. Fetch meetings and availabilities
+  const events = await query(
+    'SELECT * FROM public.collab_calendar_events WHERE team_id = $1 ORDER BY start_at ASC',
+    [teamId]
+  );
+
+  // 2. Fetch tasks as deadlines
+  const tasks = await query(
+    'SELECT id, title, description, deadline as start_at, deadline as end_at, status, \'deadline\' as type FROM public.collab_tasks WHERE team_id = $1 AND deadline IS NOT NULL',
+    [teamId]
+  );
+
+  const allEvents = [...events.rows, ...tasks.rows];
+
+  res.json({ success: true, data: allEvents });
+});
+
+/**
+ * @desc    Create a calendar event
+ */
+const createCalendarEvent = asyncHandler(async (req, res) => {
+  const { teamId, title, description, start_at, end_at, type } = req.body;
+
+  const result = await query(
+    `INSERT INTO public.collab_calendar_events (team_id, creator_id, title, description, start_at, end_at, type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [teamId, req.userId, title, description, start_at, end_at, type || 'meeting']
+  );
+
+  socketService.broadcast('collab:calendar_event_created', { teamId, event: result.rows[0] });
+
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Delete a calendar event
+ */
+const deleteCalendarEvent = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  await query('DELETE FROM public.collab_calendar_events WHERE id = $1', [eventId]);
+  res.json({ success: true, message: 'Événement supprimé.' });
+});
+
 module.exports = {
   getTeams, createTeam, getTeamMembers,
   getTasks, createTask, updateTaskStatus, deleteTask,
   getMessages, sendMessage, deleteMessage, updateMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,
   archiveDocument, deleteDocument,
+  getCalendarEvents, createCalendarEvent, deleteCalendarEvent,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
   moveTeamMember,
   getPermissions, savePermissions

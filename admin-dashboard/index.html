@@ -26,6 +26,8 @@
     </style>
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- FullCalendar -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 </head>
 <body class="bg-gray-50 flex h-screen overflow-hidden">
 
@@ -363,6 +365,7 @@
                     <!-- Sub-Navigation Collaboration -->
                     <div class="flex items-center space-x-2 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto custom-scrollbar">
                         <button onclick="showCollabTab('teams')" id="tab-collab-teams" class="collab-tab active px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">📂 Projets & Équipes</button>
+                        <button onclick="showCollabTab('calendar')" id="tab-collab-calendar" class="collab-tab px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">📅 Calendrier Équipe</button>
                         <button onclick="showCollabTab('directory')" id="tab-collab-directory" class="collab-tab px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">👥 Annuaire Personnel</button>
                         <button onclick="showCollabTab('documents')" id="tab-collab-documents" class="collab-tab px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">📄 Centralisation Documents</button>
                         <button onclick="showCollabTab('requests')" id="tab-collab-requests" class="collab-tab admin-only hidden px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">🗳️ Candidatures</button>
@@ -417,6 +420,23 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: CALENDAR -->
+                    <div id="collab-tab-calendar" class="collab-content hidden space-y-8 animate-fade-in">
+                        <div class="bg-white rounded-[3rem] shadow-xl border border-gray-100 p-10">
+                            <div class="flex justify-between items-center mb-10">
+                                <div>
+                                    <h4 class="font-black text-gray-800 uppercase text-lg tracking-tighter">Calendrier d'Équipe</h4>
+                                    <p class="text-xs text-gray-400 font-bold uppercase mt-1">Réunions, Deadlines & Disponibilités</p>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <button onclick="showAddEventModal('meeting')" class="bg-purple-600 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all">+ RÉUNION</button>
+                                    <button onclick="showAddEventModal('availability')" class="bg-cyan-500 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all">MA DISPONIBILITÉ</button>
+                                </div>
+                            </div>
+                            <div id="collab-calendar-container" class="h-[700px] border border-gray-50 rounded-3xl overflow-hidden p-6 bg-gray-50/30"></div>
                         </div>
                     </div>
 
@@ -891,6 +911,14 @@
                 if (el) el.classList.add('opacity-50', 'grayscale');
                 if (!document.getElementById('collab-tab-documents').classList.contains('hidden')) loadCollabGlobalDocs();
             });
+
+            socket.on('collab:calendar_event_created', (data) => {
+                if (activeCollabTeamId === data.teamId && !document.getElementById('collab-tab-calendar').classList.contains('hidden')) {
+                    loadCollabCalendar();
+                }
+                addNotification('groups', 'Calendrier', `Un nouvel événement d'équipe a été programmé.`, 'calendar');
+            });
+
             socket.on('collab:document_deleted', (data) => {
                 const el = document.getElementById(`collab-doc-${data.docId}`);
                 if (el) el.classList.add('opacity-0', 'scale-90');
@@ -1002,6 +1030,7 @@
         let activeCollabTeamId = null;
         let activeCollabUserRole = 'collaborator';
         let collabTeamsData = [];
+        let collabCalendar = null;
 
         async function loadCollaboration() {
             const user = JSON.parse(localStorage.getItem('admin_user'));
@@ -1024,6 +1053,7 @@
             document.getElementById('collab-tab-' + tab).classList.remove('hidden');
 
             if (tab === 'teams') loadCollabTeams();
+            if (tab === 'calendar') loadCollabCalendar();
             if (tab === 'directory') loadCollabDirectory();
             if (tab === 'documents') loadCollabGlobalDocs();
             if (tab === 'requests') loadCollabRequests();
@@ -1172,6 +1202,89 @@
                     } catch (err) { alert("Erreur lors du déplacement."); }
                 }, "Confirmer le Déplacement", "cyan");
             } catch (e) { alert("Erreur."); }
+        }
+
+        async function loadCollabCalendar() {
+            if (!activeCollabTeamId) return alert("Veuillez sélectionner une équipe.");
+
+            const container = document.getElementById('collab-calendar-container');
+            if (!collabCalendar) {
+                collabCalendar = new FullCalendar.Calendar(container, {
+                    initialView: 'dayGridMonth',
+                    locale: 'fr',
+                    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+                    themeSystem: 'standard',
+                    eventClick: function(info) {
+                        const e = info.event.extendedProps;
+                        let html = `
+                            <div class="space-y-4">
+                                <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                    <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Type</p>
+                                    <p class="font-bold text-cyan-600 uppercase text-xs">${info.event.display || info.event.title}</p>
+                                </div>
+                                <div class="p-4 bg-white rounded-2xl border border-gray-100">
+                                    <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Description</p>
+                                    <p class="text-sm font-medium text-gray-600">${e.description || 'Aucune description'}</p>
+                                </div>
+                            </div>
+                        `;
+                        Alert.show(info.event.title, html, null, "Fermer", "cyan");
+                    }
+                });
+                collabCalendar.render();
+            }
+
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/calendar`, { headers: { Authorization: `Bearer ${token}` } });
+                const events = res.data.data.map(e => ({
+                    id: e.id,
+                    title: e.title,
+                    start: e.start_at,
+                    end: e.end_at,
+                    color: e.type === 'deadline' ? '#06b6d4' : (e.type === 'meeting' ? '#8b5cf6' : '#10b981'),
+                    extendedProps: { description: e.description, type: e.type }
+                }));
+                collabCalendar.removeAllEvents();
+                collabCalendar.addEventSource(events);
+            } catch (e) {}
+        }
+
+        function showAddEventModal(type) {
+            let html = `
+                <div class="space-y-4">
+                    <input type="text" id="event-title" placeholder="Titre" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                    <textarea id="event-desc" placeholder="Description..." class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-medium"></textarea>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[8px] font-black text-gray-400 uppercase px-1">Début</label>
+                            <input type="datetime-local" id="event-start" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-xs">
+                        </div>
+                        <div>
+                            <label class="text-[8px] font-black text-gray-400 uppercase px-1">Fin</label>
+                            <input type="datetime-local" id="event-end" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-xs">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            Alert.show(`Programmer un(e) ${type === 'meeting' ? 'Réunion' : 'Disponibilité'}`, html, async () => {
+                const title = document.getElementById('event-title').value;
+                const description = document.getElementById('event-desc').value;
+                const start_at = document.getElementById('event-start').value;
+                const end_at = document.getElementById('event-end').value;
+
+                if (!title || !start_at || !end_at) return alert("Veuillez remplir tous les champs.");
+
+                try {
+                    await axios.post(`${API_URL}/collab/calendar`, {
+                        teamId: activeCollabTeamId, title, description, start_at, end_at, type
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+
+                    alert("Événement ajouté au calendrier !");
+                    closeImpactModal();
+                    loadCollabCalendar();
+                } catch (e) { alert("Erreur lors de la création."); }
+            }, "Programmer", "cyan");
         }
 
         async function loadCollabTeams() {

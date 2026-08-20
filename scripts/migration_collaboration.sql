@@ -114,7 +114,25 @@ BEGIN
   END IF;
 END $$;
 
--- 7. Permissions Config
+-- 7. Calendar Events (Meetings, Availability)
+CREATE TABLE IF NOT EXISTS public.collab_calendar_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id UUID REFERENCES public.collab_teams(id) ON DELETE CASCADE,
+  creator_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  start_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  end_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  type TEXT NOT NULL DEFAULT 'meeting' CHECK (type IN ('meeting', 'availability', 'deadline')),
+  status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'cancelled', 'completed')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for performance
+CREATE INDEX IF NOT EXISTS idx_collab_calendar_team ON public.collab_calendar_events(team_id);
+
+-- 8. Permissions Config
 CREATE TABLE IF NOT EXISTS public.collab_permissions_config (
   role TEXT PRIMARY KEY CHECK (role IN ('collaborator', 'manager', 'admin')),
   can_read BOOLEAN DEFAULT TRUE,

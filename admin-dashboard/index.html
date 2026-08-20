@@ -263,7 +263,17 @@
 
                 <div id="section-groups" class="hidden animate-fade-in">
                     <div class="bg-white rounded-[2rem] lg:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-x-auto custom-scrollbar">
-                        <table class="w-full text-left min-w-[600px]" id="groups-table"></table>
+                        <table class="w-full text-left min-w-[600px]">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th class="px-8 py-5">Groupe</th>
+                                    <th class="px-8 py-5">Créateur</th>
+                                    <th class="px-8 py-5">Membres</th>
+                                    <th class="px-8 py-5 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="groups-table-body"></tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -938,6 +948,10 @@
                     addNotification('security', 'Collaborateur Connecté', `${data.name} vient d'entrer dans le panel.`, 'user-check');
                 }
                 loadStats();
+            });
+
+            socket.on('admin:user_verification_updated', (data) => {
+                if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
 
             // Collaboration Events
@@ -1973,10 +1987,17 @@
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('users-table-body').innerHTML = res.data.data.map(u => `
                     <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
-                        <td class="px-8 py-5 flex items-center"><img src="${getFullUrl(u.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md"><p class="font-bold text-sm text-gray-800">${u.full_name}</p></td>
+                        <td class="px-8 py-5 flex items-center">
+                            <img src="${getFullUrl(u.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md">
+                            <div>
+                                <p class="font-bold text-sm text-gray-800">${u.full_name}</p>
+                                ${u.is_verified ? '<span class="flex items-center text-[8px] font-black text-blue-500 uppercase tracking-tighter"><i data-lucide="badge-check" class="w-2.5 h-2.5 mr-1 fill-blue-500 text-white"></i> Vérifié</span>' : ''}
+                            </div>
+                        </td>
                         <td class="px-8 py-5 text-sm">${u.email}</td>
                         <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
                         <td class="px-8 py-5 text-right space-x-2">
+                            <button onclick="toggleUserBadge('${u.id}', ${!u.is_verified})" class="p-3 ${u.is_verified ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'} rounded-xl hover:shadow-lg transition-all" title="${u.is_verified ? 'Retirer Badge' : 'Accorder Badge'}"><i data-lucide="${u.is_verified ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                             <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
                             <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
                             <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -1984,6 +2005,14 @@
                     </tr>
                 `).join(''); lucide.createIcons();
             } catch (e) {}
+        }
+
+        async function toggleUserBadge(id, verify) {
+            if(!confirm(`${verify ? 'Accorder' : 'Retirer'} le badge de vérification à cet utilisateur ?`)) return;
+            try {
+                await axios.put(`${API_URL}/admin/users/${id}/verify`, { isVerified: verify }, { headers: { Authorization: `Bearer ${token}` } });
+                loadUsers();
+            } catch (e) { alert("Erreur lors de la modification du badge."); }
         }
 
         function confirmDeleteUser(id, name) {
@@ -2164,16 +2193,25 @@
         async function loadGroups() {
             try {
                 const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
-                document.getElementById('groups-table').innerHTML = res.data.data.map(g => `
-                    <tr class="border-b border-gray-50 p-6 flex items-center justify-between hover:bg-gray-50 transition-all">
-                        <td class="flex items-center"><img src="${getFullUrl(g.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md"><div><p class="font-black text-gray-800 text-sm">${g.name}</p><p class="text-[10px] text-gray-400 font-bold uppercase">${g.members_count} membres</p></div></td>
-                        <td class="text-right space-x-2">
+                document.getElementById('groups-table-body').innerHTML = res.data.data.map(g => `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                        <td class="px-8 py-5 flex items-center">
+                            <img src="${getFullUrl(g.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md">
+                            <div>
+                                <p class="font-black text-gray-800 text-sm">${g.name}</p>
+                                <p class="text-[9px] text-gray-400 font-bold uppercase">${g.is_banned ? 'Banni' : 'Public'}</p>
+                            </div>
+                        </td>
+                        <td class="px-8 py-5 text-sm text-gray-600 font-medium">${g.creator_name || 'Inconnu'}</td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-[10px] font-black uppercase">${g.members_count} membres</span></td>
+                        <td class="px-8 py-5 text-right space-x-2">
                             <button onclick="viewMembers('${g.id}')" class="p-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all"><i data-lucide="users" class="w-4 h-4"></i></button>
                             <button onclick="toggleGroupBan('${g.id}', ${!g.is_banned})" class="p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${g.is_banned ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
                             <button onclick="confirmDeleteGroup('${g.id}', '${g.name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </td>
                     </tr>
-                `).join(''); lucide.createIcons();
+                `).join('') || '<tr class="p-20 text-center text-gray-400 font-bold uppercase text-xs"><td colspan="4">Aucun groupe trouvé</td></tr>';
+                lucide.createIcons();
             } catch (e) {}
         }
 
@@ -2231,9 +2269,13 @@
                             <img src="${getFullUrl(v.avatar_url)}" class="w-10 h-10 rounded-xl mr-3 shadow-sm">
                             <div><p class="font-bold text-sm text-gray-800">${v.full_name}</p><p class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">${v.email}</p></div>
                         </td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase">${v.id_type || 'ID CARD'}</span></td>
+                        <td class="px-8 py-5">
+                            <span class="px-3 py-1 ${v.status === 'approved' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'} rounded-lg text-[10px] font-black uppercase">${v.status === 'approved' ? 'TRAITÉ (VÉRIFIÉ)' : (v.id_type || 'ID CARD')}</span>
+                        </td>
                         <td class="px-8 py-5 text-xs text-gray-400 font-bold">${new Date(v.created_at).toLocaleString()}</td>
-                        <td class="px-8 py-5 text-right"><button onclick="examineVerification('${v.id}')" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700">Examiner</button></td>
+                        <td class="px-8 py-5 text-right">
+                            ${v.status === 'pending' ? `<button onclick="examineVerification('${v.id}')" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700">Examiner</button>` : `<span class="text-[9px] font-black text-gray-300 uppercase">Terminé</span>`}
+                        </td>
                     </tr>
                 `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune demande de badge</div>';
                 lucide.createIcons();

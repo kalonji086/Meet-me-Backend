@@ -10,6 +10,7 @@ router.get('/stats', adminController.getStats);
 router.get('/users', adminController.getUsers);
 router.delete('/users/:userId', adminController.deleteUser);
 router.put('/users/:userId/lock', adminController.toggleUserLock);
+router.put('/users/:userId/verify', adminController.toggleUserBadge);
 
 router.get('/groups', adminController.getGroups);
 router.get('/groups/list', adminController.getAllGroupsList);

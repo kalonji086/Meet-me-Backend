@@ -533,6 +533,23 @@ const toggleUserLock = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Toggle user verification badge
+ */
+const toggleUserBadge = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { isVerified } = req.body;
+
+  await query('UPDATE public.profiles SET is_verified = $1 WHERE id = $2', [isVerified, userId]);
+  await logAdminAction(req, isVerified ? 'verify_user' : 'unverify_user', 'user', userId, { isVerified });
+
+  // Real-time update via socket
+  const socketService = require('../services/socket.service');
+  socketService.broadcast('admin:user_verification_updated', { userId, isVerified });
+
+  res.json({ success: true });
+});
+
+/**
  * @desc    Lister les groupes
  */
 const getGroups = asyncHandler(async (req, res) => {
@@ -1402,6 +1419,7 @@ module.exports = {
   resolveReport,
   deleteUser,
   toggleUserLock,
+  toggleUserBadge,
   getGroups,
   getGroupMembers,
   updateMemberRole,

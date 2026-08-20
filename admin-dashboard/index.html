@@ -1639,6 +1639,10 @@
             document.getElementById('active-team-name').innerText = name.toUpperCase();
             document.getElementById('collab-team-dashboard').classList.remove('hidden');
 
+            // Synchronize Private selectors
+            if (chatMode === 'private') loadTeamMembersForPrivateChat();
+            if (!document.getElementById('collab-tab-documents').classList.contains('hidden')) loadTeamMembersForPrivateDoc();
+
             // Dynamic Task Button based on role
             const taskBtnContainer = document.getElementById('collab-add-task-container');
             if (taskBtnContainer) {
@@ -2638,6 +2642,24 @@
         async function updateTaskStatus(taskId, status) {
             try {
                 await axios.put(`${API_URL}/collab/tasks/${taskId}/status`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+            } catch (e) {}
+        }
+
+        async function loadTeamMembersForPrivateDoc() {
+            const select = document.getElementById('doc-recipient-id');
+            const container = document.getElementById('private-doc-selector-container');
+            if (!activeCollabTeamId) {
+                if(container) container.classList.add('hidden');
+                return;
+            }
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if(container) container.classList.remove('hidden');
+                if(select) {
+                    select.innerHTML = '<option value="">Public (Toute l\'équipe)</option>' +
+                        res.data.data.filter(m => m.id !== user.id).map(m => `<option value="${m.id}">${m.full_name} (${m.role})</option>`).join('');
+                }
             } catch (e) {}
         }
 

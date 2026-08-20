@@ -1391,21 +1391,40 @@
         async function loadCollabTasks() {
             try {
                 const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
-                document.getElementById('collab-tasks-list').innerHTML = res.data.data.map(t => {
+                const tasks = res.data.data;
+                document.getElementById('collab-tasks-list').innerHTML = tasks.map(t => {
                     let statusClass = "bg-orange-50 text-orange-600";
                     if (t.status === 'in_progress') statusClass = "bg-blue-50 text-blue-600";
                     if (t.status === 'completed') statusClass = "bg-green-50 text-green-600";
 
+                    const progress = t.progress || 0;
+
                     return `
-                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                            <div>
-                                <p class="text-sm font-bold text-gray-800">${t.title}</p>
-                                <p class="text-[10px] text-gray-400 font-medium">${t.assignee_name || 'Non assigné'} • <span class="${statusClass} px-2 py-0.5 rounded-md text-[8px] font-black uppercase">${t.status.replace('_', ' ')}</span></p>
+                        <div class="p-5 bg-gray-50 rounded-3xl border border-gray-100 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-black text-gray-800 uppercase tracking-tight">${t.title}</p>
+                                    <p class="text-[9px] text-gray-400 font-bold uppercase">${t.assignee_name || 'Non assigné'} • <span class="${statusClass} px-2 py-0.5 rounded-md text-[8px] font-black">${t.status.replace('_', ' ')}</span></p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="viewCollabTask('${t.id}')" class="p-2.5 bg-white text-cyan-600 rounded-xl shadow-sm hover:bg-cyan-500 hover:text-white transition-all" title="Voir détails"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+                                    ${t.status === 'pending' ? `<button onclick="updateTaskStatus('${t.id}', 'in_progress')" class="p-2.5 bg-white text-blue-500 rounded-xl shadow-sm hover:bg-blue-500 hover:text-white transition-all" title="Démarrer"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>` : ''}
+                                    ${t.status !== 'completed' ? `<button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2.5 bg-white text-green-500 rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all" title="Terminer"><i data-lucide="check" class="w-3.5 h-3.5"></i></button>` : ''}
+                                    ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="deleteCollabTask('${t.id}')" class="p-2.5 bg-white text-red-400 rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
+                                </div>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                ${t.status === 'pending' ? `<button onclick="updateTaskStatus('${t.id}', 'in_progress')" class="p-2 bg-white text-blue-500 rounded-xl shadow-sm hover:bg-blue-500 hover:text-white transition-all" title="Démarrer"><i data-lucide="play" class="w-3 h-3"></i></button>` : ''}
-                                ${t.status !== 'completed' ? `<button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2 bg-white text-green-500 rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all" title="Terminer"><i data-lucide="check" class="w-3 h-3"></i></button>` : ''}
-                                ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="deleteCollabTask('${t.id}')" class="p-2 bg-white text-red-400 rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+
+                            <!-- Progress Bar -->
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center px-1">
+                                    <span class="text-[8px] font-black text-gray-400 uppercase">Progression</span>
+                                    <span class="text-[9px] font-black text-cyan-600">${progress}%</span>
+                                </div>
+                                <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden relative">
+                                    <div class="h-full bg-cyan-500 transition-all duration-500" style="width: ${progress}%"></div>
+                                    ${t.status === 'in_progress' ? `<input type="range" min="0" max="100" value="${progress}" onchange="updateTaskProgress('${t.id}', this.value)" class="absolute inset-0 opacity-0 cursor-pointer">` : ''}
+                                </div>
+                                ${t.status === 'in_progress' ? `<p class="text-[7px] text-gray-300 text-center uppercase font-bold">Glissez la barre pour mettre à jour</p>` : ''}
                             </div>
                         </div>
                     `;
@@ -1414,10 +1433,43 @@
             } catch (e) {}
         }
 
-        async function deleteCollabTask(id) {
-            if(!confirm("Supprimer cette tâche ?")) return;
-            axios.delete(`${API_URL}/collab/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-                .then(() => loadCollabTasks());
+        async function viewCollabTask(id) {
+            try {
+                const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
+                const t = res.data.data.find(x => x.id === id);
+                if (!t) return;
+
+                let html = `
+                    <div class="space-y-6 text-left">
+                        <div class="p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+                            <p class="text-[9px] font-black text-cyan-600 uppercase tracking-widest mb-2">Titre de la Tâche</p>
+                            <h4 class="text-xl font-black text-gray-800 tracking-tight">${t.title}</h4>
+                        </div>
+                        <div class="p-6 bg-white rounded-3xl border border-gray-100">
+                            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Description détaillée</p>
+                            <p class="text-sm font-medium text-gray-600 leading-relaxed">${t.description || 'Pas de description fournie.'}</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                                <p class="text-[8px] font-black text-gray-400 uppercase mb-1">Assigné à</p>
+                                <p class="text-xs font-bold text-gray-800">${t.assignee_name || 'Non assigné'}</p>
+                            </div>
+                            <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                                <p class="text-[8px] font-black text-gray-400 uppercase mb-1">Deadline</p>
+                                <p class="text-xs font-bold text-red-500">${t.deadline ? new Date(t.deadline).toLocaleDateString() : 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                Alert.show("Détails de la Tâche", html, null, "Fermer", "cyan");
+            } catch (e) {}
+        }
+
+        async function updateTaskProgress(taskId, progress) {
+            try {
+                await axios.put(`${API_URL}/collab/tasks/${taskId}/status`, { progress: parseInt(progress) }, { headers: { Authorization: `Bearer ${token}` } });
+                // List will be updated by socket
+            } catch (e) { alert("Erreur lors de la mise à jour de la progression."); }
         }
 
         async function loadCollabDocs() {

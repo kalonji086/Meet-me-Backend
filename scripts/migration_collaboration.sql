@@ -30,9 +30,18 @@ CREATE TABLE IF NOT EXISTS public.collab_tasks (
   deadline TIMESTAMP WITH TIME ZONE,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
   priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+  progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure columns exist (Migration for existing tables)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_tasks' AND column_name='progress') THEN
+    ALTER TABLE public.collab_tasks ADD COLUMN progress INTEGER DEFAULT 0;
+  END IF;
+END $$;
 
 -- 4. Internal Messaging (Chat)
 CREATE TABLE IF NOT EXISTS public.collab_messages (

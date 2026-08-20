@@ -93,18 +93,38 @@ const createTask = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Update task status
+ * @desc    Update task status or progress
  */
 const updateTaskStatus = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
-  const { status } = req.body;
+  const { status, progress } = req.body;
 
-  const result = await query(
-    'UPDATE public.collab_tasks SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-    [status, taskId]
-  );
+  let queryStr = 'UPDATE public.collab_tasks SET updated_at = NOW()';
+  const params = [taskId];
+  let paramIdx = 2;
 
-  socketService.broadcast('collab:task_updated', { taskId, status, teamId: result.rows[0].team_id });
+  if (status) {
+    queryStr += `, status = $${paramIdx++}`;
+    params.push(status);
+  }
+
+  if (progress !== undefined) {
+    queryStr += `, progress = $${paramIdx++}`;
+    params.push(progress);
+  } else if (status === 'completed') {
+    queryStr += `, progress = 100`;
+  }
+
+  queryStr += ` WHERE id = $1 RETURNING *`;
+
+  const result = await query(queryStr, params);
+
+  socketService.broadcast('collab:task_updated', {
+    taskId,
+    status: result.rows[0].status,
+    progress: result.rows[0].progress,
+    teamId: result.rows[0].team_id
+  });
 
   res.json({ success: true, data: result.rows[0] });
 });

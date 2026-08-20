@@ -483,6 +483,41 @@ const moveTeamMember = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get detailed info about a collaborator
+ */
+const getMemberDetails = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  // 1. Basic Profile
+  const profile = await query('SELECT id, full_name, email, phone_number, avatar_url, status FROM public.profiles WHERE id = $1', [userId]);
+  if (profile.rows.length === 0) return res.status(404).json({ success: false, error: 'Membre non trouvé' });
+
+  // 2. Team
+  const team = await query(`
+    SELECT t.name, m.role, t.id as team_id
+    FROM public.collab_team_members m
+    JOIN public.collab_teams t ON m.team_id = t.id
+    WHERE m.user_id = $1 LIMIT 1
+  `, [userId]);
+
+  // 3. Pending Tasks
+  const tasks = await query('SELECT title, status, progress FROM public.collab_tasks WHERE assignee_id = $1 AND status != \'completed\'', [userId]);
+
+  // 4. Availability (Calendar)
+  const availability = await query('SELECT title, start_at, end_at FROM public.collab_calendar_events WHERE creator_id = $1 AND type = \'availability\' AND end_at > NOW()', [userId]);
+
+  res.json({
+    success: true,
+    data: {
+      profile: profile.rows[0],
+      team: team.rows[0] || null,
+      tasks: tasks.rows,
+      availability: availability.rows
+    }
+  });
+});
+
+/**
  * @desc    Get permissions config
  */
 const getPermissions = asyncHandler(async (req, res) => {
@@ -566,6 +601,6 @@ module.exports = {
   archiveDocument, deleteDocument,
   getCalendarEvents, createCalendarEvent, deleteCalendarEvent,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
-  moveTeamMember,
+  moveTeamMember, getMemberDetails,
   getPermissions, savePermissions
 };

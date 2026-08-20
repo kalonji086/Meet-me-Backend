@@ -929,8 +929,12 @@
                 const user = JSON.parse(localStorage.getItem('admin_user'));
                 if (user.id === data.userId) {
                     activeCollabTeamId = data.toTeamId;
+                    if (!data.toTeamId) {
+                        document.getElementById('collab-team-dashboard').classList.add('hidden');
+                        document.getElementById('active-team-name').innerText = "AUCUNE ÉQUIPE";
+                    }
                     loadCollaboration(); // Reload everything to show new team
-                    addNotification('security', 'Équipe Modifiée', 'Vous avez été déplacé vers une nouvelle équipe projet.', 'briefcase');
+                    addNotification('security', 'Équipe Modifiée', 'Votre affectation a été mise à jour par l\'Admin.', 'briefcase');
                 } else if (!document.getElementById('section-collaboration').classList.contains('hidden')) {
                     loadCollaboration();
                 }
@@ -1322,13 +1326,70 @@
                         <p class="font-black text-gray-800 uppercase text-xs tracking-tight mb-1">${u.full_name}</p>
                         <p class="text-[9px] text-gray-400 font-bold uppercase mb-4">${u.email}</p>
                         <div class="flex space-x-2">
+                            <button onclick="viewCollabMemberDetails('${u.id}')" class="p-2 bg-gray-50 text-gray-600 rounded-xl hover:bg-cyan-500 hover:text-white transition-all" title="Voir détails"><i data-lucide="eye" class="w-4 h-4"></i></button>
                             ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-2 bg-cyan-50 text-cyan-600 rounded-xl hover:bg-cyan-600 hover:text-white transition-all"><i data-lucide="user-plus" class="w-4 h-4"></i></button>` : ''}
-                            <button class="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-800 hover:text-white transition-all"><i data-lucide="mail" class="w-4 h-4"></i></button>
                         </div>
                     </div>
                 `).join('');
                 lucide.createIcons();
             } catch (e) {}
+        }
+
+        async function viewCollabMemberDetails(userId) {
+            try {
+                const res = await axios.get(`${API_URL}/collab/members/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+                const d = res.data.data;
+                const p = d.profile;
+
+                let html = `
+                    <div class="space-y-6 text-left">
+                        <div class="flex items-center bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                            <img src="${getFullUrl(p.avatar_url)}" class="w-16 h-16 rounded-2xl mr-6 shadow-xl">
+                            <div>
+                                <p class="text-xl font-black text-gray-800 tracking-tight uppercase">${p.full_name}</p>
+                                <p class="text-[9px] text-cyan-600 font-black uppercase tracking-widest">${d.team ? `Membre de : ${d.team.name}` : 'SANS ÉQUIPE'}</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-white rounded-3xl border border-gray-100">
+                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Téléphone</p>
+                                <p class="text-xs font-bold text-gray-800">${p.phone_number || 'Non renseigné'}</p>
+                            </div>
+                            <div class="p-4 bg-white rounded-3xl border border-gray-100">
+                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Rôle</p>
+                                <p class="text-xs font-bold text-cyan-600 uppercase">${d.team ? d.team.role : 'Utilisateur App'}</p>
+                            </div>
+                        </div>
+
+                        <div class="p-6 bg-white rounded-3xl border border-gray-100">
+                            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Tâches en cours (${d.tasks.length})</p>
+                            <div class="space-y-2">
+                                ${d.tasks.map(t => `
+                                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                                        <span class="text-[10px] font-bold text-gray-700">${t.title}</span>
+                                        <span class="text-[8px] font-black text-cyan-600 uppercase">${t.progress}%</span>
+                                    </div>
+                                `).join('') || '<p class="text-[9px] text-gray-300 italic text-center py-2">Aucune tâche en cours</p>'}
+                            </div>
+                        </div>
+
+                        <div class="p-6 bg-white rounded-3xl border border-gray-100">
+                            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Disponibilité à venir</p>
+                            <div class="space-y-2">
+                                ${d.availability.map(a => `
+                                    <div class="p-3 bg-green-50 rounded-xl border border-green-100">
+                                        <p class="text-[9px] font-bold text-green-700 uppercase">${a.title}</p>
+                                        <p class="text-[8px] text-green-600 opacity-70">${new Date(a.start_at).toLocaleString()} - ${new Date(a.end_at).toLocaleTimeString()}</p>
+                                    </div>
+                                `).join('') || '<p class="text-[9px] text-gray-300 italic text-center py-2">Aucune indisponibilité marquée</p>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                Alert.show("Fiche Collaborateur", html, null, "Fermer", "cyan");
+            } catch (e) { alert("Erreur chargement détails."); }
         }
 
         async function loadCollabGlobalDocs() {

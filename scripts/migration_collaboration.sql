@@ -52,20 +52,30 @@ BEGIN
   END IF;
 END $$;
 
--- 4. Internal Messaging (Chat)
+-- 4. Internal Messaging (Chat & Private)
 CREATE TABLE IF NOT EXISTS public.collab_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES public.collab_teams(id) ON DELETE CASCADE,
   sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  recipient_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE, -- NULL for team message
   content TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. Shared Documents
+-- Ensure recipient_id exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_messages' AND column_name='recipient_id') THEN
+    ALTER TABLE public.collab_messages ADD COLUMN recipient_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- 5. Shared Documents (Public & Private)
 CREATE TABLE IF NOT EXISTS public.collab_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES public.collab_teams(id) ON DELETE CASCADE,
   uploader_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  recipient_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE, -- NULL for team document
   file_url TEXT NOT NULL,
   file_name TEXT NOT NULL,
   file_size INTEGER,
@@ -79,6 +89,14 @@ CREATE TABLE IF NOT EXISTS public.collab_documents (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure recipient_id exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_documents' AND column_name='recipient_id') THEN
+    ALTER TABLE public.collab_documents ADD COLUMN recipient_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE;
+  END IF;
+END $$;
 
 -- Ensure columns exist (Migration for existing tables)
 DO $$

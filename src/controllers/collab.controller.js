@@ -162,41 +162,59 @@ const deleteTask = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Get team messages
+ * @desc    Get team messages (Public or Private)
  */
 const getMessages = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
-  const result = await query(`
+  const { recipientId } = req.query; // If present, it's a private chat
+
+  let queryStr = `
     SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar
     FROM public.collab_messages m
     JOIN public.profiles p ON m.sender_id = p.id
     WHERE m.team_id = $1
-    ORDER BY m.created_at ASC
-    LIMIT 100
-  `, [teamId]);
+  `;
+  const params = [teamId];
+
+  if (recipientId) {
+    // Private chat between req.userId and recipientId
+    queryStr += ` AND ((m.sender_id = $2 AND m.recipient_id = $3) OR (m.sender_id = $3 AND m.recipient_id = $2))`;
+    params.push(req.userId, recipientId);
+  } else {
+    // Public team chat
+    queryStr += ` AND m.recipient_id IS NULL`;
+  }
+
+  queryStr += ` ORDER BY m.created_at ASC LIMIT 200`;
+
+  const result = await query(queryStr, params);
   res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Send a message
+ * @desc    Send a message (Public or Private)
  */
 const sendMessage = asyncHandler(async (req, res) => {
-  const { teamId, content } = req.body;
+  const { teamId, content, recipientId } = req.body;
   const result = await query(
-    'INSERT INTO public.collab_messages (team_id, sender_id, content) VALUES ($1, $2, $3) RETURNING *',
-    [teamId, req.userId, content]
+    'INSERT INTO public.collab_messages (team_id, sender_id, recipient_id, content) VALUES ($1, $2, $3, $4) RETURNING *',
+    [teamId, req.userId, recipientId || null, content]
   );
 
   const sender = await query('SELECT full_name, avatar_url FROM public.profiles WHERE id = $1', [req.userId]);
+  const messageData = {
+    ...result.rows[0],
+    sender_name: sender.rows[0].full_name,
+    sender_avatar: sender.rows[0].avatar_url
+  };
 
-  socketService.broadcast('collab:new_message', {
-    teamId,
-    message: {
-      ...result.rows[0],
-      sender_name: sender.rows[0].full_name,
-      sender_avatar: sender.rows[0].avatar_url
-    }
-  });
+  if (recipientId) {
+    // Send to specific user via Socket
+    socketService.emitToUser(recipientId, 'collab:new_private_message', { teamId, message: messageData });
+    socketService.emitToUser(req.userId, 'collab:new_private_message', { teamId, message: messageData });
+  } else {
+    socketService.broadcast('collab:new_message', { teamId, message: messageData });
+  }
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });
@@ -229,7 +247,7 @@ const updateMessage = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Get team documents
+ * @desc    Get team documents (Public or Private)
  */
 const getDocuments = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
@@ -240,6 +258,7 @@ const getDocuments = asyncHandler(async (req, res) => {
     WHERE d.team_id = $1
       AND NOT ($2 = ANY(COALESCE(d.deleted_for_users, '{}')))
       AND (d.is_archived = FALSE OR d.archive_expires_at > NOW())
+      AND (d.recipient_id IS NULL OR d.recipient_id = $2 OR d.uploader_id = $2)
     ORDER BY d.created_at DESC
   `, [teamId, req.userId]);
   res.json({ success: true, data: result.rows });
@@ -306,17 +325,22 @@ const deleteDocument = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Upload a document record
+ * @desc    Upload a document record (Public or Private)
  */
 const uploadDocument = asyncHandler(async (req, res) => {
-  const { teamId, fileUrl, fileName, fileSize, mimeType } = req.body;
+  const { teamId, fileUrl, fileName, fileSize, mimeType, recipientId } = req.body;
   const result = await query(
-    `INSERT INTO public.collab_documents (team_id, uploader_id, file_url, file_name, file_size, mime_type)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [teamId, req.userId, fileUrl, fileName, fileSize, mimeType]
+    `INSERT INTO public.collab_documents (team_id, uploader_id, recipient_id, file_url, file_name, file_size, mime_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [teamId, req.userId, recipientId || null, fileUrl, fileName, fileSize, mimeType]
   );
 
-  socketService.broadcast('collab:document_uploaded', { teamId, document: result.rows[0] });
+  if (recipientId) {
+    socketService.emitToUser(recipientId, 'collab:new_private_document', { teamId, document: result.rows[0] });
+    socketService.emitToUser(req.userId, 'collab:new_private_document', { teamId, document: result.rows[0] });
+  } else {
+    socketService.broadcast('collab:document_uploaded', { teamId, document: result.rows[0] });
+  }
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });

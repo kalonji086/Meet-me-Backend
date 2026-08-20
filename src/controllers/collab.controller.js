@@ -10,7 +10,9 @@ const logger = require('../utils/logger');
  * @desc    Get all teams with unread counts
  */
 const getTeams = asyncHandler(async (req, res) => {
-  const result = await query(`
+  const isGlobalAdmin = req.user.is_global_admin;
+
+  let queryStr = `
     SELECT t.*,
     (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
     tm.role as my_role,
@@ -18,9 +20,11 @@ const getTeams = asyncHandler(async (req, res) => {
      WHERE m.team_id = t.id
      AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
     FROM public.collab_teams t
-    LEFT JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
+    ${isGlobalAdmin ? 'LEFT' : 'JOIN'} public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
     ORDER BY t.created_at DESC
-  `, [req.userId]);
+  `;
+
+  const result = await query(queryStr, [req.userId]);
   res.json({ success: true, data: result.rows });
 });
 
@@ -60,6 +64,13 @@ const createTeam = asyncHandler(async (req, res) => {
  */
 const getTeamMembers = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   const result = await query(`
     SELECT p.id, p.full_name, p.email, p.avatar_url, m.role, m.joined_at, p.status
     FROM public.collab_team_members m
@@ -75,6 +86,13 @@ const getTeamMembers = asyncHandler(async (req, res) => {
  */
 const getTasks = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   const result = await query(`
     SELECT t.*, p1.full_name as creator_name, p2.full_name as assignee_name
     FROM public.collab_tasks t
@@ -91,6 +109,13 @@ const getTasks = asyncHandler(async (req, res) => {
  */
 const createTask = asyncHandler(async (req, res) => {
   const { teamId, title, description, deadline, assigneeId, priority } = req.body;
+
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   const result = await query(
     `INSERT INTO public.collab_tasks (team_id, creator_id, assignee_id, title, description, deadline, priority)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -168,6 +193,12 @@ const getMessages = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
   const recipientId = req.query.recipientId; // If present, it's a private chat
 
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   let queryStr = `
     SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar
     FROM public.collab_messages m
@@ -196,6 +227,13 @@ const getMessages = asyncHandler(async (req, res) => {
  */
 const sendMessage = asyncHandler(async (req, res) => {
   const { teamId, content, recipientId } = req.body;
+
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   const result = await query(
     'INSERT INTO public.collab_messages (team_id, sender_id, recipient_id, content) VALUES ($1, $2, $3, $4) RETURNING *',
     [teamId, req.userId, recipientId || null, content]
@@ -251,6 +289,13 @@ const updateMessage = asyncHandler(async (req, res) => {
  */
 const getDocuments = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   const result = await query(`
     SELECT d.*, p.full_name as uploader_name
     FROM public.collab_documents d
@@ -329,6 +374,13 @@ const deleteDocument = asyncHandler(async (req, res) => {
  */
 const uploadDocument = asyncHandler(async (req, res) => {
   const { teamId, fileUrl, fileName, fileSize, mimeType, recipientId } = req.body;
+
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   const result = await query(
     `INSERT INTO public.collab_documents (team_id, uploader_id, recipient_id, file_url, file_name, file_size, mime_type)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -512,6 +564,17 @@ const moveTeamMember = asyncHandler(async (req, res) => {
 const getMemberDetails = asyncHandler(async (req, res) => {
   const { userId } = req.params;
 
+  // Security check: only global admin or member of the same team can see details
+  if (!req.user.is_global_admin) {
+    const sameTeam = await query(`
+      SELECT 1 FROM public.collab_team_members m1
+      JOIN public.collab_team_members m2 ON m1.team_id = m2.team_id
+      WHERE m1.user_id = $1 AND m2.user_id = $2
+    `, [req.userId, userId]);
+
+    if (sameTeam.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+  }
+
   // 1. Basic Profile
   const profile = await query('SELECT id, full_name, email, phone_number, avatar_url, status FROM public.profiles WHERE id = $1', [userId]);
   if (profile.rows.length === 0) return res.status(404).json({ success: false, error: 'Membre non trouvé' });
@@ -574,6 +637,12 @@ const savePermissions = asyncHandler(async (req, res) => {
 const getCalendarEvents = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
 
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
+
   // 1. Fetch meetings and availabilities
   const events = await query(
     'SELECT * FROM public.collab_calendar_events WHERE team_id = $1 ORDER BY start_at ASC',
@@ -596,6 +665,12 @@ const getCalendarEvents = asyncHandler(async (req, res) => {
  */
 const createCalendarEvent = asyncHandler(async (req, res) => {
   const { teamId, title, description, start_at, end_at, type } = req.body;
+
+  // Security: Check if member or global admin
+  if (!req.user.is_global_admin) {
+    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
+    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+  }
 
   const result = await query(
     `INSERT INTO public.collab_calendar_events (team_id, creator_id, title, description, start_at, end_at, type)

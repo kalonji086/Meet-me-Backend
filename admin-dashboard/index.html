@@ -1048,7 +1048,11 @@
                     loadCollaboration(); // Reload everything to show new team
                     addNotification('security', 'Équipe Modifiée', 'Votre affectation a été mise à jour par l\'Admin.', 'briefcase');
                 } else if (!document.getElementById('section-collaboration').classList.contains('hidden')) {
-                    loadCollaboration();
+                    // Someone else was moved. If they were in our current team or joined our current team, refresh members
+                    if (activeCollabTeamId === data.fromTeamId || activeCollabTeamId === data.toTeamId) {
+                        loadCollabMembers();
+                    }
+                    loadCollabTeams(); // Refresh unread counts and team list
                 }
             });
 

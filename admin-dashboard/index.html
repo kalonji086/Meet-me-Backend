@@ -175,6 +175,17 @@
                 </div>
 
                 <div class="flex items-center space-x-3 lg:space-x-6">
+                    <!-- Avatar update -->
+                    <div class="relative group">
+                        <button onclick="document.getElementById('admin-avatar-input').click()" class="relative">
+                            <img id="admin-header-avatar" src="https://placehold.co/100x100?text=..." class="w-10 h-10 rounded-xl border-2 border-purple-100 shadow-sm object-cover">
+                            <div class="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+                            </div>
+                        </button>
+                        <input type="file" id="admin-avatar-input" class="hidden" onchange="updateAdminAvatar(this)">
+                    </div>
+
                     <!-- Notification Bell -->
                     <div class="relative group">
                         <button onclick="toggleNotificationDropdown()" class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-purple-50 hover:text-purple-600 transition-all relative">
@@ -656,11 +667,33 @@
             } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; lucide.createIcons(); }
         }
 
+        async function updateAdminAvatar(input) {
+            if (!input.files[0]) return;
+            const file = input.files[0];
+            try {
+                const uploadRes = await apiService_upload(file);
+                if (uploadRes.success) {
+                    const avatar_url = uploadRes.data.fileUrl;
+                    await axios.put(`${API_URL}/users/profile`, { avatar_url }, { headers: { Authorization: `Bearer ${token}` } });
+
+                    // Update UI and LocalStorage
+                    const user = JSON.parse(localStorage.getItem('admin_user'));
+                    user.avatar_url = avatar_url;
+                    user.avatar = avatar_url;
+                    localStorage.setItem('admin_user', JSON.stringify(user));
+
+                    document.getElementById('admin-header-avatar').src = getFullUrl(avatar_url);
+                    alert("Photo de profil mise à jour !");
+                }
+            } catch (e) { alert("Erreur lors de la mise à jour de l'avatar."); }
+        }
+
         function showDashboard() {
             const user = JSON.parse(localStorage.getItem('admin_user'));
             if (!user) return logout();
 
             document.getElementById('admin-name').innerText = (user.full_name || user.name).toUpperCase();
+            document.getElementById('admin-header-avatar').src = getFullUrl(user.avatar_url || user.avatar);
 
             // SÉCURITÉ : Vérifier les mises à jour légales forcées SEULEMENT pour les délégués
             if (user && !user.isGlobalAdmin) {
@@ -1593,15 +1626,16 @@
             try {
                 const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
                 const tasks = res.data.data;
-                document.getElementById('collab-tasks-list').innerHTML = tasks.map(t => {
+                document.getElementById('collab-tasks-list').innerHTML = tasks.filter(t => t.status !== 'archived').map(t => {
                     let statusClass = "bg-orange-50 text-orange-600";
                     if (t.status === 'in_progress') statusClass = "bg-blue-50 text-blue-600";
                     if (t.status === 'completed') statusClass = "bg-green-50 text-green-600";
 
                     const progress = t.progress || 0;
+                    const isAdminOrManager = activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager';
 
                     return `
-                        <div class="p-5 bg-gray-50 rounded-3xl border border-gray-100 space-y-4">
+                        <div class="p-5 bg-gray-50 rounded-3xl border border-gray-100 space-y-4 relative group">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-sm font-black text-gray-800 uppercase tracking-tight">${t.title}</p>
@@ -1611,7 +1645,14 @@
                                     <button onclick="viewCollabTask('${t.id}')" class="p-2.5 bg-white text-cyan-600 rounded-xl shadow-sm hover:bg-cyan-500 hover:text-white transition-all" title="Voir détails"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
                                     ${t.status === 'pending' ? `<button onclick="updateTaskStatus('${t.id}', 'in_progress')" class="p-2.5 bg-white text-blue-500 rounded-xl shadow-sm hover:bg-blue-500 hover:text-white transition-all" title="Démarrer"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>` : ''}
                                     ${t.status !== 'completed' ? `<button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2.5 bg-white text-green-500 rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all" title="Terminer"><i data-lucide="check" class="w-3.5 h-3.5"></i></button>` : ''}
-                                    ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="deleteCollabTask('${t.id}')" class="p-2.5 bg-white text-red-400 rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
+
+                                    <!-- Management Actions -->
+                                    <div class="hidden group-hover:flex items-center space-x-1 ml-2 pl-2 border-l border-gray-200">
+                                        ${isAdminOrManager ? `
+                                            ${t.status === 'completed' ? `<button onclick="archiveCollabTask('${t.id}')" class="p-2.5 bg-white text-orange-500 rounded-xl shadow-sm hover:bg-orange-500 hover:text-white transition-all" title="Archiver"><i data-lucide="archive" class="w-3.5 h-3.5"></i></button>` : ''}
+                                            <button onclick="deleteCollabTask('${t.id}')" class="p-2.5 bg-white text-red-400 rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all" title="Supprimer"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                        ` : ''}
+                                    </div>
                                 </div>
                             </div>
 
@@ -1623,7 +1664,7 @@
                                 </div>
                                 <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden relative">
                                     <div class="h-full bg-cyan-500 transition-all duration-500" style="width: ${progress}%"></div>
-                                    ${t.status === 'in_progress' ? `<input type="range" min="0" max="100" value="${progress}" onchange="updateTaskProgress('${t.id}', this.value)" class="absolute inset-0 opacity-0 cursor-pointer">` : ''}
+                                    ${t.status === 'in_progress' ? `<input type="range" min="0" max="100" value="${progress}" oninput="this.previousElementSibling.style.width=this.value+'%'" onchange="updateTaskProgress('${t.id}', this.value)" class="absolute inset-0 opacity-0 cursor-pointer">` : ''}
                                 </div>
                                 ${t.status === 'in_progress' ? `<p class="text-[7px] text-gray-300 text-center uppercase font-bold">Glissez la barre pour mettre à jour</p>` : ''}
                             </div>
@@ -1632,6 +1673,22 @@
                 }).join('') || '<p class="p-10 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest">Aucune tâche</p>';
                 lucide.createIcons();
             } catch (e) {}
+        }
+
+        async function archiveCollabTask(id) {
+            if(!confirm("Archiver cette tâche terminée ?")) return;
+            try {
+                await axios.put(`${API_URL}/collab/tasks/${id}/status`, { status: 'archived' }, { headers: { Authorization: `Bearer ${token}` } });
+                loadCollabTasks();
+            } catch (e) { alert("Erreur archivage."); }
+        }
+
+        async function deleteCollabTask(id) {
+            if(!confirm("⚠️ Supprimer DÉFINITIVEMENT cette tâche ?")) return;
+            try {
+                await axios.delete(`${API_URL}/collab/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                loadCollabTasks();
+            } catch (e) { alert("Erreur suppression."); }
         }
 
         async function viewCollabTask(id) {

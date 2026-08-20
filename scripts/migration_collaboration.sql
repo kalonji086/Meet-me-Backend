@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS public.collab_tasks (
   title TEXT NOT NULL,
   description TEXT,
   deadline TIMESTAMP WITH TIME ZONE,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'archived')),
   priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
   progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

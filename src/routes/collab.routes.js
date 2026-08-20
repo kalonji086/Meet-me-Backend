@@ -18,6 +18,7 @@ router.post('/teams', collabController.createTeam);
 router.get('/teams/:teamId/members', collabController.getTeamMembers);
 router.post('/invite', collabController.inviteUser);
 router.post('/move-member', collabController.moveTeamMember);
+router.put('/teams/:teamId/read', collabController.markAsRead);
 
 // Tasks
 router.get('/teams/:teamId/tasks', collabController.getTasks);

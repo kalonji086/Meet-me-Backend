@@ -6,16 +6,34 @@ const logger = require('../utils/logger');
 /**
  * @desc    Get all teams
  */
+/**
+ * @desc    Get all teams with unread counts
+ */
 const getTeams = asyncHandler(async (req, res) => {
   const result = await query(`
     SELECT t.*,
     (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
-    tm.role as my_role
+    tm.role as my_role,
+    (SELECT COUNT(*) FROM public.collab_messages m
+     WHERE m.team_id = t.id
+     AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
     FROM public.collab_teams t
     LEFT JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
     ORDER BY t.created_at DESC
   `, [req.userId]);
   res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Mark team messages as read
+ */
+const markAsRead = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+  await query(
+    'UPDATE public.collab_team_members SET last_read_at = NOW() WHERE team_id = $1 AND user_id = $2',
+    [teamId, req.userId]
+  );
+  res.json({ success: true });
 });
 
 /**
@@ -541,7 +559,7 @@ const deleteCalendarEvent = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getTeams, createTeam, getTeamMembers,
+  getTeams, createTeam, getTeamMembers, markAsRead,
   getTasks, createTask, updateTaskStatus, deleteTask,
   getMessages, sendMessage, deleteMessage, updateMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,

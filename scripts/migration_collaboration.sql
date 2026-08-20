@@ -16,8 +16,17 @@ CREATE TABLE IF NOT EXISTS public.collab_team_members (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   role TEXT NOT NULL DEFAULT 'collaborator' CHECK (role IN ('collaborator', 'manager', 'admin')),
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_read_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   PRIMARY KEY (team_id, user_id)
 );
+
+-- Ensure column exists (Migration)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='collab_team_members' AND column_name='last_read_at') THEN
+    ALTER TABLE public.collab_team_members ADD COLUMN last_read_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+  END IF;
+END $$;
 
 -- 3. Tasks
 CREATE TABLE IF NOT EXISTS public.collab_tasks (

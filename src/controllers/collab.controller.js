@@ -166,7 +166,7 @@ const deleteTask = asyncHandler(async (req, res) => {
  */
 const getMessages = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
-  const { recipientId } = req.query; // If present, it's a private chat
+  const recipientId = req.query.recipientId; // If present, it's a private chat
 
   let queryStr = `
     SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar
@@ -176,7 +176,7 @@ const getMessages = asyncHandler(async (req, res) => {
   `;
   const params = [teamId];
 
-  if (recipientId) {
+  if (recipientId && recipientId !== 'undefined' && recipientId !== 'null' && recipientId !== '') {
     // Private chat between req.userId and recipientId
     queryStr += ` AND ((m.sender_id = $2 AND m.recipient_id = $3) OR (m.sender_id = $3 AND m.recipient_id = $2))`;
     params.push(req.userId, recipientId);

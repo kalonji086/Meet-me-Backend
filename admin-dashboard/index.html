@@ -885,8 +885,14 @@
 
         function initSocket() {
             if (socket) return;
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            if (!user) return;
+
             socket = io(BASE_URL, { query: { token } });
-            socket.on('connect', () => console.log("Socket connected"));
+            socket.on('connect', () => {
+                console.log("Socket connected");
+                socket.emit('authenticate', { userId: user.id, token });
+            });
 
             socket.on('admin:delegation_updated', (data) => {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
@@ -1639,8 +1645,8 @@
             document.getElementById('active-team-name').innerText = name.toUpperCase();
             document.getElementById('collab-team-dashboard').classList.remove('hidden');
 
-            // Synchronize Private selectors
-            if (chatMode === 'private') loadTeamMembersForPrivateChat();
+            // Synchronize Private selectors (Always load members)
+            loadTeamMembersForPrivateChat();
             if (!document.getElementById('collab-tab-documents').classList.contains('hidden')) loadTeamMembersForPrivateDoc();
 
             // Dynamic Task Button based on role

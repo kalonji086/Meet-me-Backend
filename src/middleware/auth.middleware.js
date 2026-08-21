@@ -76,7 +76,7 @@ const isAdmin = async (req, res, next) => {
 
   try {
     // Vérifier si l'utilisateur est délégué
-    const delegation = await query('SELECT modules, is_active FROM public.admin_delegations WHERE user_id = $1', [req.userId]);
+    const delegation = await query('SELECT modules, is_active, collab_admin_rights FROM public.admin_delegations WHERE user_id = $1', [req.userId]);
     if (delegation.rows.length > 0) {
       if (!delegation.rows[0].is_active) {
         return res.status(403).json({
@@ -87,6 +87,7 @@ const isAdmin = async (req, res, next) => {
       }
       req.user.is_delegated = true;
       req.user.allowed_modules = delegation.rows[0].modules;
+      req.user.collab_rights = delegation.rows[0].collab_admin_rights || {};
       return next();
     }
   } catch (err) {

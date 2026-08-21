@@ -146,8 +146,19 @@ const ensureAdminTables = async () => {
   await query('UPDATE public.profiles SET is_global_admin = TRUE WHERE email = $1', ['wecanconcept@gmail.com']);
 
   await query(`
-    CREATE TABLE IF NOT EXISTS public.reported_content (
+    CREATE TABLE IF NOT EXISTS public.admin_delegations (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
+      modules TEXT[] NOT NULL DEFAULT '{}',
+      is_active BOOLEAN DEFAULT TRUE,
+      collab_admin_rights JSONB DEFAULT '{}',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+
+  try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS collab_admin_rights JSONB DEFAULT \'{}\''); } catch (e) {}
+
       report_type TEXT NOT NULL CHECK (report_type IN ('message', 'user', 'group')),
       target_id UUID,
       target_name TEXT,
@@ -466,7 +477,7 @@ const getDelegations = asyncHandler(async (req, res) => {
  */
 const saveDelegation = asyncHandler(async (req, res) => {
   if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
-  const { userId, modules, isActive = true } = req.body;
+  const { userId, modules, isActive = true, collabAdminRights = {} } = req.body;
 
   const userRes = await query('SELECT id, full_name, email FROM public.profiles WHERE id = $1', [userId]);
   if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Meet Me non trouvé' });
@@ -474,11 +485,11 @@ const saveDelegation = asyncHandler(async (req, res) => {
   const user = userRes.rows[0];
 
   await query(
-    `INSERT INTO public.admin_delegations (user_id, modules, is_active, updated_at)
-     VALUES ($1, $2, $3, NOW())
+    `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, updated_at)
+     VALUES ($1, $2, $3, $4, NOW())
      ON CONFLICT (user_id) DO UPDATE
-     SET modules = EXCLUDED.modules, is_active = EXCLUDED.is_active, updated_at = NOW()`,
-    [userId, modules, isActive]
+     SET modules = EXCLUDED.modules, is_active = EXCLUDED.is_active, collab_admin_rights = EXCLUDED.collab_admin_rights, updated_at = NOW()`,
+    [userId, modules, isActive, JSON.stringify(collabAdminRights)]
   );
 
   // Si révoqué, on retire aussi des équipes de collaboration

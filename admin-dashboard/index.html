@@ -791,6 +791,7 @@
 
                         if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
                             user.allowedModules = myDelegation.modules;
+                            user.collabRights = myDelegation.collab_admin_rights || {};
                             localStorage.setItem('admin_user', JSON.stringify(user));
 
                             document.getElementById('main-container').classList.remove('hidden');
@@ -1175,9 +1176,10 @@
             activeCollabTeamId = null; // Force reload
             const user = JSON.parse(localStorage.getItem('admin_user'));
             const isGlobalAdmin = user.isGlobalAdmin;
+            const canManage = isGlobalAdmin || (user.collabRights && user.collabRights.manage_members);
 
-            // UI Access Control: ONLY Global Admin sees the management tools (Requests, Config)
-            if (isGlobalAdmin) {
+            // UI Access Control: Global Admin or Manager Delegate sees the management tools (Requests, Config)
+            if (canManage) {
                 document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
             }
 
@@ -1431,6 +1433,7 @@
         async function loadCollabTeams() {
             const user = JSON.parse(localStorage.getItem('admin_user'));
             const isGlobalAdmin = user.isGlobalAdmin;
+            const canCreate = isGlobalAdmin || (user.collabRights && user.collabRights.create_team);
 
             try {
                 const res = await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } });
@@ -1442,9 +1445,9 @@
                         <div class="w-3 h-3 rounded-full bg-cyan-500 mr-3"></div>
                         <span class="text-xs font-black text-gray-800 uppercase tracking-tight">${t.name}</span>
                     </button>
-                `).join('') + (isGlobalAdmin ? `<button onclick="createNewTeam()" class="px-6 py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:border-cyan-400 hover:text-cyan-500 transition-all text-xs font-bold uppercase tracking-widest">+ Créer Équipe</button>` : '');
+                `).join('') + (canCreate ? `<button onclick="createNewTeam()" class="px-6 py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:border-cyan-400 hover:text-cyan-500 transition-all text-xs font-bold uppercase tracking-widest">+ Créer Équipe</button>` : '');
 
-                if (collabTeamsData.length === 0 && !isGlobalAdmin) {
+                if (collabTeamsData.length === 0 && !canCreate) {
                     selector.innerHTML = `<button onclick="submitCollabJoinRequest()" class="px-8 py-4 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-cyan-600 transition-all">SOUMETTRE UNE DEMANDE DE COLLABORATION</button>`;
                 }
 
@@ -1466,6 +1469,8 @@
         }
 
         async function loadCollabDirectory() {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            const canManage = user.isGlobalAdmin || (user.collabRights && user.collabRights.manage_members);
             try {
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('collab-directory-list').innerHTML = res.data.data.map(u => `
@@ -1478,7 +1483,7 @@
                         <p class="text-[9px] text-gray-400 font-bold uppercase mb-4">${u.email}</p>
                         <div class="flex space-x-2">
                             <button onclick="viewCollabMemberDetails('${u.id}')" class="p-2 bg-gray-50 text-gray-600 rounded-xl hover:bg-cyan-500 hover:text-white transition-all" title="Voir détails"><i data-lucide="eye" class="w-4 h-4"></i></button>
-                            ${(activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager') ? `<button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-2 bg-cyan-50 text-cyan-600 rounded-xl hover:bg-cyan-600 hover:text-white transition-all"><i data-lucide="user-plus" class="w-4 h-4"></i></button>` : ''}
+                            ${canManage ? `<button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-2 bg-cyan-50 text-cyan-600 rounded-xl hover:bg-cyan-600 hover:text-white transition-all"><i data-lucide="user-plus" class="w-4 h-4"></i></button>` : ''}
                         </div>
                     </div>
                 `).join('');
@@ -1547,7 +1552,8 @@
             try {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
                 const isGlobalAdmin = user.isGlobalAdmin;
-                const endpoint = isGlobalAdmin ? `${API_URL}/collab/documents` : `${API_URL}/collab/teams/${activeCollabTeamId}/documents`;
+                const canSeeAll = isGlobalAdmin || (user.collabRights && user.collabRights.see_all_teams);
+                const endpoint = canSeeAll ? `${API_URL}/collab/documents` : `${API_URL}/collab/teams/${activeCollabTeamId}/documents`;
 
                 const res = await axios.get(endpoint, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('collab-global-docs-list').innerHTML = res.data.data.map(d => renderSingleDocCard(d, user, true)).join('') || '<div class="col-span-3 p-20 text-center text-gray-400 text-xs font-black uppercase tracking-widest opacity-50">Aucun document dans la centralisation</div>';
@@ -1566,7 +1572,7 @@
 
         function renderSingleDocCard(d, user, isGlobalView) {
             const isGlobalAdmin = user.isGlobalAdmin;
-            const canManage = isGlobalAdmin;
+            const canManage = isGlobalAdmin || (user.collabRights && user.collabRights.see_all_teams);
 
             return `
                 <div id="collab-doc-${d.id}" class="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm animate-pop-in group relative">
@@ -1682,16 +1688,13 @@
             const user = JSON.parse(localStorage.getItem('admin_user'));
             const team = collabTeamsData.find(t => t.id === id);
             const isGlobalAdmin = user.isGlobalAdmin;
-            const isCollabDelegate = user.allowedModules && user.allowedModules.includes('collaboration');
+            const canSeeAll = isGlobalAdmin || (user.collabRights && user.collabRights.see_all_teams);
 
-            // Force Admin role for Global Admin, otherwise use assigned role
-            // Separation: Global Admin has absolute power.
-            // Delegated Admin has power IF they have the module, but they might be limited to their assigned role in the team?
-            // Actually, the user wants separation. Let's make Global Admin special.
-            if (isGlobalAdmin) {
+            // Force Admin role for Global Admin or privileged delegate, otherwise use assigned role
+            if (canSeeAll) {
                 activeCollabUserRole = 'admin';
             } else {
-                // Delegated admins and others use their assigned role
+                // Others use their assigned role in the team
                 activeCollabUserRole = (team && team.my_role) ? team.my_role : 'collaborator';
             }
 
@@ -1847,6 +1850,7 @@
             try {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
                 const isGlobalAdmin = user.isGlobalAdmin;
+                const canSeeAll = isGlobalAdmin || (user.collabRights && user.collabRights.see_all_teams);
                 const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/documents`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('collab-docs-list').innerHTML = res.data.data.map(d => `
                     <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
@@ -1862,7 +1866,7 @@
 
                         <div class="flex space-x-2 mt-3">
                             <a href="${d.file_url}" target="_blank" class="flex-1 text-center py-2 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-cyan-600 hover:bg-cyan-600 hover:text-white transition-all uppercase">Ouvrir</a>
-                            ${isGlobalAdmin && d.status === 'pending' ? `
+                            ${canSeeAll && d.status === 'pending' ? `
                                 <button onclick="handleCollabDoc('${d.id}', 'approved')" class="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"><i data-lucide="check" class="w-3 h-3"></i></button>
                                 <button onclick="handleCollabDoc('${d.id}', 'rejected')" class="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"><i data-lucide="x" class="w-3 h-3"></i></button>
                             ` : ''}
@@ -1935,6 +1939,7 @@
             const user = JSON.parse(localStorage.getItem('admin_user'));
             const isMe = m.sender_id === user.id;
             const isGlobalAdmin = user.isGlobalAdmin;
+            const canRead = isGlobalAdmin || (user.collabRights && user.collabRights.read_messages);
 
             const msgHtml = `
                 <div id="collab-msg-${m.id}" class="flex items-start ${isMe ? 'flex-row-reverse' : ''} animate-pop-in group mb-4">

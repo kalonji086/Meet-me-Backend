@@ -2077,7 +2077,11 @@
             const description = prompt("Description :");
             if (!name) return;
             axios.post(`${API_URL}/collab/teams`, { name, description }, { headers: { Authorization: `Bearer ${token}` } })
-                .then(() => loadCollaboration());
+                .then(res => {
+                    if (res.data.pending) alert(res.data.message);
+                    loadCollaboration();
+                })
+                .catch(e => alert(e.response?.data?.error || "Erreur création équipe."));
         }
 
         async function loadMyRequests() {
@@ -2165,15 +2169,25 @@
         async function toggleUserBadge(id, verify) {
             if(!confirm(`${verify ? 'Accorder' : 'Retirer'} le badge de vérification à cet utilisateur ?`)) return;
             try {
-                await axios.put(`${API_URL}/admin/users/${id}/verify`, { isVerified: verify }, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.put(`${API_URL}/admin/users/${id}/verify`, { isVerified: verify }, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.pending) alert(res.data.message);
                 loadUsers();
-            } catch (e) { alert("Erreur lors de la modification du badge."); }
+            } catch (e) {
+                const msg = e.response?.data?.error || "Erreur lors de la modification du badge.";
+                alert(msg);
+            }
         }
 
         function confirmDeleteUser(id, name) {
             Alert.show("Suppression", `Désintégration de <b>${name}</b> ?`, async () => {
-                await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-                closeImpactModal(); loadUsers();
+                try {
+                    const res = await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                    if (res.data.pending) alert(res.data.message);
+                    closeImpactModal();
+                    loadUsers();
+                } catch (e) {
+                    alert(e.response?.data?.error || "Erreur lors de la suppression.");
+                }
             }, "Supprimer", "red");
         }
 
@@ -2478,8 +2492,13 @@
         }
 
         async function toggleUserLock(id, lock) {
-            await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
-            loadUsers();
+            try {
+                const res = await axios.put(`${API_URL}/admin/users/${id}/lock`, { isLocked: lock }, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.pending) alert(res.data.message);
+                loadUsers();
+            } catch (e) {
+                alert(e.response?.data?.error || "Erreur lors du changement de statut.");
+            }
         }
 
         async function loadLegal() {

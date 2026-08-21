@@ -10,6 +10,7 @@ const logger = require('../utils/logger');
  * @desc    Obtenir les statistiques globales
  */
 const getStats = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
   const usersCount = await query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE');
   const messagesCount = await query('SELECT COUNT(*) FROM public.messages');
   const chatsCount = await query('SELECT COUNT(*) FROM public.chats WHERE type = \'group\'');
@@ -298,6 +299,7 @@ const logAdminAction = async (req, action, entityType, entityId, details = {}) =
  * @desc    Lister tous les utilisateurs réels
  */
 const getUsers = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
   // Security check: only global admin or authorized delegate can see users
   if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.see_all_users)) {
     return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir la liste des utilisateurs.' });
@@ -343,13 +345,14 @@ const resolveReport = asyncHandler(async (req, res) => {
  * @desc    Helper to check and process sensitive actions
  */
 const processSensitiveAction = async (req, actionType, targetId, targetName, details = {}) => {
+  await ensureAdminTables();
   if (req.user.is_global_admin) return true; // L'admin principal peut tout faire directement
 
   // Créer une action en attente pour les délégués
   await query(
     `INSERT INTO public.admin_pending_actions (requested_by, action_type, target_id, target_name, details)
      VALUES ($1, $2, $3, $4, $5)`,
-    [req.userId, actionType, targetId?.toString(), targetName, JSON.stringify(details)]
+    [req.userId, actionType, targetId ? targetId.toString() : null, targetName, JSON.stringify(details)]
   );
 
   // Notifier l'admin principal en temps réel
@@ -515,6 +518,7 @@ const getDelegations = asyncHandler(async (req, res) => {
  * @desc    Créer ou mettre à jour une délégation
  */
 const saveDelegation = asyncHandler(async (req, res) => {
+  await ensureAdminTables();
   if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
   const { userId, modules, isActive = true, collabAdminRights = {}, userAdminRights = {} } = req.body;
 

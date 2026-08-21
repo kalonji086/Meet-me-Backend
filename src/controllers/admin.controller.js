@@ -159,6 +159,9 @@ const ensureAdminTables = async () => {
 
   try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS collab_admin_rights JSONB DEFAULT \'{}\''); } catch (e) {}
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.reported_content (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       report_type TEXT NOT NULL CHECK (report_type IN ('message', 'user', 'group')),
       target_id UUID,
       target_name TEXT,

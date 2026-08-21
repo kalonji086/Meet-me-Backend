@@ -899,7 +899,7 @@ const getAnalytics = asyncHandler(async (req, res) => {
 const getAuditLogs = asyncHandler(async (req, res) => {
   await ensureAdminTables();
   const result = await query(`
-    SELECT a.*, p.full_name AS admin_name
+    SELECT a.*, p.full_name AS actor_name, p.avatar_url AS actor_avatar
     FROM public.admin_audit_logs a
     LEFT JOIN public.profiles p ON p.id = a.admin_id
     ORDER BY a.created_at DESC

@@ -11,6 +11,7 @@ const logger = require('../utils/logger');
  */
 const getTeams = asyncHandler(async (req, res) => {
   const isGlobalAdmin = req.user.is_global_admin;
+  const isCollabAdmin = isGlobalAdmin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
 
   let queryStr = `
     SELECT t.*,
@@ -20,7 +21,7 @@ const getTeams = asyncHandler(async (req, res) => {
      WHERE m.team_id = t.id
      AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
     FROM public.collab_teams t
-    ${isGlobalAdmin ? 'LEFT' : 'JOIN'} public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
+    ${isCollabAdmin ? 'LEFT' : 'JOIN'} public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
     ORDER BY t.created_at DESC
   `;
 
@@ -65,8 +66,9 @@ const createTeam = asyncHandler(async (req, res) => {
 const getTeamMembers = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -87,8 +89,9 @@ const getTeamMembers = asyncHandler(async (req, res) => {
 const getTasks = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -110,8 +113,9 @@ const getTasks = asyncHandler(async (req, res) => {
 const createTask = asyncHandler(async (req, res) => {
   const { teamId, title, description, deadline, assigneeId, priority } = req.body;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -193,8 +197,9 @@ const getMessages = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
   const recipientId = req.query.recipientId; // If present, it's a private chat
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -228,8 +233,9 @@ const getMessages = asyncHandler(async (req, res) => {
 const sendMessage = asyncHandler(async (req, res) => {
   const { teamId, content, recipientId } = req.body;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -290,8 +296,9 @@ const updateMessage = asyncHandler(async (req, res) => {
 const getDocuments = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -313,7 +320,8 @@ const getDocuments = asyncHandler(async (req, res) => {
  * @desc    Get all documents across all teams (Admin only)
  */
 const getAllDocuments = asyncHandler(async (req, res) => {
-  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) return res.status(403).json({ success: false, error: 'Accès réservé' });
   const result = await query(`
     SELECT d.*, p.full_name as uploader_name, t.name as team_name
     FROM public.collab_documents d
@@ -375,8 +383,9 @@ const deleteDocument = asyncHandler(async (req, res) => {
 const uploadDocument = asyncHandler(async (req, res) => {
   const { teamId, fileUrl, fileName, fileSize, mimeType, recipientId } = req.body;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -435,7 +444,8 @@ const submitRequest = asyncHandler(async (req, res) => {
  * @desc    Invite a user to collaborate
  */
 const inviteUser = asyncHandler(async (req, res) => {
-  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) return res.status(403).json({ success: false, error: 'Accès réservé' });
   const { userId, teamId } = req.body;
 
   const userRes = await query('SELECT full_name, email FROM public.profiles WHERE id = $1', [userId]);
@@ -455,6 +465,9 @@ const inviteUser = asyncHandler(async (req, res) => {
  * @desc    Get all collaboration requests
  */
 const getRequests = asyncHandler(async (req, res) => {
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+
   const result = await query(`
     SELECT r.*, p.full_name, p.email, p.avatar_url, t.name as team_name
     FROM public.collab_requests r
@@ -534,7 +547,8 @@ const handleRequest = asyncHandler(async (req, res) => {
  * @desc    Move a member to another team
  */
 const moveTeamMember = asyncHandler(async (req, res) => {
-  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) return res.status(403).json({ success: false, error: 'Accès réservé' });
   const { userId, fromTeamId, toTeamId } = req.params.userId ? { ...req.body, userId: req.params.userId } : req.body;
 
   // 1. Remove from old team (if exists) or all teams to be sure
@@ -637,8 +651,9 @@ const savePermissions = asyncHandler(async (req, res) => {
 const getCalendarEvents = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
@@ -666,8 +681,9 @@ const getCalendarEvents = asyncHandler(async (req, res) => {
 const createCalendarEvent = asyncHandler(async (req, res) => {
   const { teamId, title, description, start_at, end_at, type } = req.body;
 
-  // Security: Check if member or global admin
-  if (!req.user.is_global_admin) {
+  // Security: Check if member or collab admin
+  const isCollabAdmin = req.user.is_global_admin || (req.user.allowed_modules && req.user.allowed_modules.includes('collaboration'));
+  if (!isCollabAdmin) {
     const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }

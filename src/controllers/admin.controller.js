@@ -160,6 +160,16 @@ const ensureAdminTables = async () => {
   try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS collab_admin_rights JSONB DEFAULT \'{}\''); } catch (e) {}
 
   await query(`
+    CREATE TABLE IF NOT EXISTS public.login_security (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      identifier TEXT UNIQUE NOT NULL,
+      fail_count INTEGER DEFAULT 0,
+      blocked_until TIMESTAMP WITH TIME ZONE,
+      last_attempt_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS public.reported_content (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       report_type TEXT NOT NULL CHECK (report_type IN ('message', 'user', 'group')),

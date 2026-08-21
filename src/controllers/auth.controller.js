@@ -159,6 +159,29 @@ const login = asyncHandler(async (req, res) => {
   }
 
   const emailLower = email?.toLowerCase().trim();
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const securityIdentifiers = [emailLower, ip].filter(Boolean);
+
+  // 0. Vérification de sécurité (Brute Force Protection)
+  const securityCheck = await query(
+    'SELECT identifier, blocked_until FROM public.login_security WHERE identifier = ANY($1) AND blocked_until > NOW() ORDER BY blocked_until DESC LIMIT 1',
+    [securityIdentifiers]
+  );
+
+  if (securityCheck.rows.length > 0) {
+    const block = securityCheck.rows[0];
+    const diffMs = new Date(block.blocked_until) - new Date();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.ceil((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    let timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+
+    return res.status(403).json({
+      success: false,
+      error: 'Accès temporairement bloqué',
+      message: `Trop de tentatives échouées. Veuillez réessayer dans ${timeStr}. Si vous avez oublié vos identifiants, contactez l'Admin principal ou le support : togethertechsupport@gmail.com`
+    });
+  }
 
   // 1. Trouver l'utilisateur (Case-insensitive search)
   const result = await query(
@@ -169,6 +192,7 @@ const login = asyncHandler(async (req, res) => {
   const user = result.rows[0];
   
   if (!user) {
+    await trackFailedLogin(securityIdentifiers);
     return res.status(401).json({ success: false, error: 'Email ou mot de passe incorrect' });
   }
 
@@ -186,6 +210,8 @@ const login = asyncHandler(async (req, res) => {
   const isPasswordValid = await bcrypt.compare(password, user.password);
   
   if (!isPasswordValid) {
+    await trackFailedLogin(securityIdentifiers);
+
     // Incrémenter les tentatives
     const attempts = (user.login_attempts || 0) + 1;
     const isLockedNow = attempts >= 3;
@@ -207,11 +233,14 @@ const login = asyncHandler(async (req, res) => {
     return res.status(401).json({
       success: false,
       error: 'Mot de passe incorrect',
-      attemptsLeft: 3 - attempts
+      attemptsLeft: 3 - attempts,
+      message: 'Identifiants invalides. Attention, trop d\'échecs bloqueront votre accès pendant plusieurs heures.'
     });
   }
 
   // 4. Succès: Réinitialiser les tentatives et mettre à jour last_login_at, app_version et device_info
+  await resetFailedLogin(securityIdentifiers);
+
   const appVersion = req.body.appVersion || null;
   await query(
     "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(), device_info = $1, app_version = COALESCE($2, app_version) WHERE id = $3",
@@ -252,13 +281,38 @@ const login = asyncHandler(async (req, res) => {
         email: user.email,
         username: user.username,
         avatar: user.avatar_url,
-        status: 'online',
+        status: user.status,
         isGlobalAdmin: user.is_global_admin,
         push_token: user.push_token
       },
     }
   });
 });
+
+/**
+ * Helpers Sécurité Login
+ */
+async function trackFailedLogin(identifiers) {
+  for (const id of identifiers) {
+    await query(
+      `INSERT INTO public.login_security (identifier, fail_count, blocked_until, last_attempt_at)
+       VALUES ($1, 1, NOW() + INTERVAL '1 hour', NOW())
+       ON CONFLICT (identifier) DO UPDATE
+       SET fail_count = login_security.fail_count + 1,
+           last_attempt_at = NOW(),
+           blocked_until = CASE
+             WHEN login_security.fail_count + 1 = 1 THEN NOW() + INTERVAL '1 hour'
+             WHEN login_security.fail_count + 1 = 2 THEN NOW() + INTERVAL '10 hours'
+             ELSE NOW() + (login_security.fail_count + 1) * INTERVAL '24 hours'
+           END`,
+      [id]
+    );
+  }
+}
+
+async function resetFailedLogin(identifiers) {
+  await query('DELETE FROM public.login_security WHERE identifier = ANY($1)', [identifiers]);
+}
 
 /**
  * @desc    Rafraîchir le token

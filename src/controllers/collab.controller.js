@@ -12,21 +12,36 @@ const logger = require('../utils/logger');
 const getTeams = asyncHandler(async (req, res) => {
   const isGlobalAdmin = req.user.is_global_admin;
 
-  // Separation: Global Admin sees ALL teams.
-  // Delegated Admin or Collaborator see only their teams.
-  let queryStr = `
-    SELECT t.*,
-    (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
-    tm.role as my_role,
-    (SELECT COUNT(*) FROM public.collab_messages m
-     WHERE m.team_id = t.id
-     AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
-    FROM public.collab_teams t
-    ${isGlobalAdmin ? 'LEFT' : 'JOIN'} public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
-    ORDER BY t.created_at DESC
-  `;
+  let queryStr;
+  let params;
 
-  const result = await query(queryStr, [req.userId]);
+  if (isGlobalAdmin) {
+    // Global Admin sees all teams, and their role is forced to 'admin' in the result
+    queryStr = `
+      SELECT t.*,
+      (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
+      'admin' as my_role,
+      0 as unread_count
+      FROM public.collab_teams t
+      ORDER BY t.created_at DESC
+    `;
+    params = [];
+  } else {
+    queryStr = `
+      SELECT t.*,
+      (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
+      tm.role as my_role,
+      (SELECT COUNT(*) FROM public.collab_messages m
+       WHERE m.team_id = t.id
+       AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
+      FROM public.collab_teams t
+      JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
+      ORDER BY t.created_at DESC
+    `;
+    params = [req.userId];
+  }
+
+  const result = await query(queryStr, params);
   res.json({ success: true, data: result.rows });
 });
 

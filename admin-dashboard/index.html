@@ -1172,6 +1172,7 @@
         let chatMode = 'team'; // 'team' or 'private'
 
         async function loadCollaboration() {
+            activeCollabTeamId = null; // Force reload
             const user = JSON.parse(localStorage.getItem('admin_user'));
             const isGlobalAdmin = user.isGlobalAdmin;
             const isCollabDelegate = user.allowedModules && user.allowedModules.includes('collaboration');
@@ -1449,8 +1450,17 @@
                     selector.innerHTML = `<button onclick="submitCollabJoinRequest()" class="px-8 py-4 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-cyan-600 transition-all">SOUMETTRE UNE DEMANDE DE COLLABORATION</button>`;
                 }
 
-                if (collabTeamsData.length > 0 && !activeCollabTeamId) {
-                    selectCollabTeam(collabTeamsData[0].id, collabTeamsData[0].name);
+                if (collabTeamsData.length > 0) {
+                    if (!activeCollabTeamId) {
+                        selectCollabTeam(collabTeamsData[0].id, collabTeamsData[0].name);
+                    } else {
+                        // Refresh current selection
+                        const current = collabTeamsData.find(t => t.id === activeCollabTeamId);
+                        if (current) selectCollabTeam(current.id, current.name);
+                        else selectCollabTeam(collabTeamsData[0].id, collabTeamsData[0].name);
+                    }
+                } else {
+                    document.getElementById('collab-team-dashboard').classList.add('hidden');
                 }
             } catch (e) {
                 console.error("Error loading collab teams:", e);
@@ -2521,7 +2531,10 @@
         async function loadDelegations() {
             try {
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
-                document.getElementById('delegations-list').innerHTML = res.data.data.map(d => `
+                // Filter out Global Admins from the delegation list
+                const delegations = res.data.data.filter(d => !d.is_global_admin);
+
+                document.getElementById('delegations-list').innerHTML = delegations.map(d => `
                     <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm animate-fade-in mb-2">
                         <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
                         <div class="flex items-center space-x-3">
@@ -2530,7 +2543,8 @@
                             <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}', ${d.is_active})" class="p-3 ${d.is_active ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'} rounded-xl hover:shadow-lg transition-all" title="${d.is_active ? 'Révoquer' : 'Rétablir'}"><i data-lucide="${d.is_active ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                         </div>
                     </div>
-                `).join(''); lucide.createIcons();
+                `).join('') || '<p class="p-20 text-center text-gray-400 text-xs font-black uppercase tracking-widest opacity-50">Aucun délégué actif</p>';
+                lucide.createIcons();
             } catch (e) {}
         }
 

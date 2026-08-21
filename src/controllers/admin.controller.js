@@ -452,7 +452,7 @@ const deletePendingAction = asyncHandler(async (req, res) => {
  */
 const getDelegations = asyncHandler(async (req, res) => {
   const result = await query(`
-    SELECT ad.*, p.full_name, p.email, p.avatar_url
+    SELECT ad.*, p.full_name, p.email, p.avatar_url, p.is_global_admin
     FROM public.admin_delegations ad
     JOIN public.profiles p ON ad.user_id = p.id
     ORDER BY ad.created_at DESC

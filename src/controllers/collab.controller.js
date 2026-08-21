@@ -92,7 +92,7 @@ const getTeamMembers = asyncHandler(async (req, res) => {
     SELECT p.id, p.full_name, p.email, p.avatar_url, m.role, m.joined_at, p.status
     FROM public.collab_team_members m
     JOIN public.profiles p ON m.user_id = p.id
-    WHERE m.team_id = $1
+    WHERE m.team_id = $1 AND p.is_global_admin = FALSE
     ORDER BY p.full_name ASC
   `, [teamId]);
   res.json({ success: true, data: result.rows });

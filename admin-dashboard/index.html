@@ -2531,10 +2531,7 @@
         async function loadDelegations() {
             try {
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
-                // Filter out Global Admins from the delegation list
-                const delegations = res.data.data.filter(d => !d.is_global_admin);
-
-                document.getElementById('delegations-list').innerHTML = delegations.map(d => `
+                document.getElementById('delegations-list').innerHTML = res.data.data.map(d => `
                     <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm animate-fade-in mb-2">
                         <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
                         <div class="flex items-center space-x-3">

@@ -690,7 +690,8 @@
                     showDashboard();
                 }
             } catch (e) {
-                const msg = e.response?.data?.error || "Identifiants incorrects.";
+                const data = e.response?.data;
+                const msg = data?.message || data?.error || "Identifiants incorrects.";
                 alert(msg);
             } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; lucide.createIcons(); }
         }

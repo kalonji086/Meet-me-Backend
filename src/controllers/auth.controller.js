@@ -287,14 +287,15 @@ async function trackFailedLogin(identifiers) {
   for (const id of identifiers) {
     await query(
       `INSERT INTO public.login_security (identifier, fail_count, blocked_until, last_attempt_at)
-       VALUES ($1, 1, NOW() + INTERVAL '1 hour', NOW())
+       VALUES ($1, 1, NULL, NOW())
        ON CONFLICT (identifier) DO UPDATE
        SET fail_count = login_security.fail_count + 1,
            last_attempt_at = NOW(),
            blocked_until = CASE
-             WHEN login_security.fail_count + 1 = 1 THEN NOW() + INTERVAL '1 hour'
-             WHEN login_security.fail_count + 1 = 2 THEN NOW() + INTERVAL '10 hours'
-             ELSE NOW() + (login_security.fail_count + 1) * INTERVAL '24 hours'
+             WHEN login_security.fail_count + 1 = 2 THEN NOW() + INTERVAL '1 hour'
+             WHEN login_security.fail_count + 1 = 3 THEN NOW() + INTERVAL '10 hours'
+             WHEN login_security.fail_count + 1 > 3 THEN NOW() + (login_security.fail_count + 1) * INTERVAL '24 hours'
+             ELSE NULL
            END`,
       [id]
     );

@@ -159,50 +159,51 @@ const login = asyncHandler(async (req, res) => {
   }
 
   const emailLower = email?.toLowerCase().trim();
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const securityIdentifiers = [emailLower, ip].filter(Boolean);
 
-  // 0. Vérification de sécurité (Brute Force Protection)
-  const securityCheck = await query(
-    'SELECT identifier, blocked_until FROM public.login_security WHERE identifier = ANY($1) AND blocked_until > NOW() ORDER BY blocked_until DESC LIMIT 1',
-    [securityIdentifiers]
-  );
-
-  if (securityCheck.rows.length > 0) {
-    const block = securityCheck.rows[0];
-    const diffMs = new Date(block.blocked_until) - new Date();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.ceil((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    let timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
-
-    return res.status(403).json({
-      success: false,
-      error: 'Accès temporairement bloqué',
-      message: `Trop de tentatives échouées. Veuillez réessayer dans ${timeStr}. Si vous avez oublié vos identifiants, contactez l'Admin principal ou le support : togethertechsupport@gmail.com`
-    });
-  }
-
-  // 1. Trouver l'utilisateur (Case-insensitive search)
+  // 1. Trouver l'utilisateur d'abord (pour vérifier si c'est l'Admin Principal)
   const result = await query(
     'SELECT * FROM public.profiles WHERE LOWER(email) = LOWER($1)',
     [emailLower]
   );
 
   const user = result.rows[0];
-  
+  const isGlobalAdmin = user?.is_global_admin || false;
+
+  // 0. Vérification de sécurité (Brute Force Protection) - EXEMPTION pour l'Admin Principal
+  if (!isGlobalAdmin) {
+    const securityCheck = await query(
+      'SELECT identifier, blocked_until FROM public.login_security WHERE identifier = $1 AND blocked_until > NOW() ORDER BY blocked_until DESC LIMIT 1',
+      [emailLower]
+    );
+
+    if (securityCheck.rows.length > 0) {
+      const block = securityCheck.rows[0];
+      const diffMs = new Date(block.blocked_until) - new Date();
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.ceil((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      let timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+
+      return res.status(403).json({
+        success: false,
+        error: 'Accès temporairement bloqué',
+        message: `Trop de tentatives échouées. Veuillez réessayer dans ${timeStr}. Si vous avez oublié vos identifiants, contactez l'Admin principal ou le support : togethertechsupport@gmail.com`
+      });
+    }
+  }
+
   if (!user) {
-    await trackFailedLogin(securityIdentifiers);
+    await trackFailedLogin([emailLower]);
     return res.status(401).json({ success: false, error: 'Email ou mot de passe incorrect' });
   }
 
-  // 2. Vérifier si le compte est bloqué
+  // 2. Vérifier si le compte est bloqué manuellement
   if (user.is_locked) {
     return res.status(403).json({
       success: false,
-      error: 'Compte bloqué',
+      error: 'Compte banni',
       isLocked: true,
-      message: 'Vous n\'êtes pas autorisé à vous connecter avec des identifiants incorrects. Veuillez créer un nouveau compte si vous le souhaitez.'
+      message: 'Votre accès a été révoqué par l\'administrateur.'
     });
   }
 
@@ -210,36 +211,26 @@ const login = asyncHandler(async (req, res) => {
   const isPasswordValid = await bcrypt.compare(password, user.password);
   
   if (!isPasswordValid) {
-    await trackFailedLogin(securityIdentifiers);
-
-    // Incrémenter les tentatives
-    const attempts = (user.login_attempts || 0) + 1;
-    const isLockedNow = attempts >= 3;
-
-    await query(
-      'UPDATE public.profiles SET login_attempts = $1, is_locked = $2 WHERE id = $3',
-      [attempts, isLockedNow, user.id]
-    );
-
-    if (isLockedNow) {
-      return res.status(403).json({
-        success: false,
-        error: 'Compte bloqué',
-        isLocked: true,
-        message: 'Tentatives épuisées. Compte bloqué par sécurité.'
-      });
+    // L'Admin Principal ne se fait pas auto-bloquer dans login_security
+    if (!isGlobalAdmin) {
+      await trackFailedLogin([emailLower]);
     }
+
+    // Logique legacy de blocage par utilisateur (login_attempts)
+    const attempts = (user.login_attempts || 0) + 1;
+    await query('UPDATE public.profiles SET login_attempts = $1 WHERE id = $2', [attempts, user.id]);
 
     return res.status(401).json({
       success: false,
       error: 'Mot de passe incorrect',
-      attemptsLeft: 3 - attempts,
-      message: 'Identifiants invalides. Attention, trop d\'échecs bloqueront votre accès pendant plusieurs heures.'
+      message: isGlobalAdmin ? 'Identifiants invalides.' : 'Identifiants invalides. Attention, trop d\'échecs bloqueront cet email pendant plusieurs heures.'
     });
   }
 
-  // 4. Succès: Réinitialiser les tentatives et mettre à jour last_login_at, app_version et device_info
-  await resetFailedLogin(securityIdentifiers);
+  // 4. Succès: Réinitialiser les tentatives
+  if (!isGlobalAdmin) {
+    await resetFailedLogin([emailLower]);
+  }
 
   const appVersion = req.body.appVersion || null;
   await query(
@@ -281,7 +272,7 @@ const login = asyncHandler(async (req, res) => {
         email: user.email,
         username: user.username,
         avatar: user.avatar_url,
-        status: user.status,
+        status: 'online',
         isGlobalAdmin: user.is_global_admin,
         push_token: user.push_token
       },

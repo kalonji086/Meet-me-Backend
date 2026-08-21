@@ -117,6 +117,10 @@
                 <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="users-2" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Groupes Chat</span>
                 </a>
+                <a href="#" onclick="showSection('collaboration')" id="nav-collaboration" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="briefcase" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Collaboration</span>
+                    <span id="collab-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                </a>
                 <a href="#" onclick="showSection('appeals')" id="nav-appeals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="life-buoy" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Support & Appeals</span>
                 </a>
@@ -137,10 +141,6 @@
                 </a>
                 <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="settings" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Config App</span>
-                </a>
-                <a href="#" onclick="showSection('collaboration')" id="nav-collaboration" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all text-cyan-400">
-                    <i data-lucide="briefcase" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm font-black">Collaboration</span>
-                    <span id="collab-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
                 </a>
                 <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
@@ -779,6 +779,7 @@
                 document.getElementById('pending-collab-container').classList.add('hidden');
                 initSocket();
                 initRichEditors();
+                filterSidebar(user.allowedModules);
                 showSection('stats');
             } else {
                 // Check if user has explicit delegation
@@ -844,34 +845,44 @@
         }
 
         function filterSidebar(allowed) {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            const isGlobalAdmin = user && user.isGlobalAdmin;
+
             const sidebarMapping = {
                 'stats': 'nav-stats', 'users': 'nav-users', 'groups': 'nav-groups',
                 'support': 'nav-appeals', 'reports': 'nav-appeals',
                 'market-requests': 'nav-market-requests', 'verifications': 'nav-verifications',
-                'audit': 'nav-audit',
-                'campaigns': 'nav-campaigns', 'legal': 'nav-legal', 'config': 'nav-config',
+                'audit': 'nav-audit', 'campaigns': 'nav-campaigns', 'legal': 'nav-legal',
+                'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
 
-            // Toujours afficher "Mes Requêtes" pour un délégué
-            const myReqNav = document.getElementById('nav-my-requests');
-            if (myReqNav) myReqNav.classList.remove('hidden');
+            if (isGlobalAdmin) {
+                Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.remove('hidden'); });
+                const adminTools = document.getElementById('admin-only-tools');
+                if (adminTools) adminTools.classList.remove('hidden');
+                const delegateTools = document.getElementById('delegate-tools');
+                if (delegateTools) delegateTools.classList.add('hidden');
+            } else {
+                const myReqNav = document.getElementById('nav-my-requests');
+                if (myReqNav) myReqNav.classList.remove('hidden');
 
-            allowed.forEach(m => { const navId = sidebarMapping[m]; if (navId) { const nav = document.getElementById(navId); if (nav) nav.classList.remove('hidden'); } });
+                allowed.forEach(m => { const navId = sidebarMapping[m]; if (navId) { const nav = document.getElementById(navId); if (nav) nav.classList.remove('hidden'); } });
 
-            const adminTools = document.getElementById('admin-only-tools');
-            if (adminTools) adminTools.classList.add('hidden');
+                const adminTools = document.getElementById('admin-only-tools');
+                if (adminTools) adminTools.classList.add('hidden');
 
-            const delegateTools = document.getElementById('delegate-tools');
-            if (delegateTools) {
-                delegateTools.classList.remove('hidden');
-                loadMyRequestsCount();
+                const delegateTools = document.getElementById('delegate-tools');
+                if (delegateTools) {
+                    delegateTools.classList.remove('hidden');
+                    loadMyRequestsCount();
+                }
+
+                const sectionMap = { 'market-requests': 'market-requests', 'support': 'appeals', 'reports': 'appeals' };
+                const first = sectionMap[allowed[0]] || allowed[0] || 'my-requests';
+                showSection(first);
             }
-
-            const sectionMap = { 'market-requests': 'market-requests', 'support': 'appeals', 'reports': 'appeals' };
-            const first = sectionMap[allowed[0]] || allowed[0] || 'my-requests';
-            showSection(first);
         }
 
         async function loadMyRequestsCount() {
@@ -2608,7 +2619,7 @@
         }
 
         function editDelegation(userId, userName, modules = "", active = true) {
-            const allModules = ['stats', 'users', 'groups', 'support', 'reports', 'verifications', 'audit', 'market-requests', 'campaigns', 'broadcast', 'legal', 'config'];
+            const allModules = ['stats', 'users', 'groups', 'support', 'verifications', 'audit', 'market-requests', 'campaigns', 'legal', 'config', 'collaboration'];
             const currentModules = modules ? modules.split(',') : [];
 
             let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `

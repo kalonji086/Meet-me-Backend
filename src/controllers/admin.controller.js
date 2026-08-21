@@ -152,10 +152,14 @@ const ensureAdminTables = async () => {
       modules TEXT[] NOT NULL DEFAULT '{}',
       is_active BOOLEAN DEFAULT TRUE,
       collab_admin_rights JSONB DEFAULT '{}',
+      user_admin_rights JSONB DEFAULT '{}',
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `);
+
+  try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS user_admin_rights JSONB DEFAULT \'{}\''); } catch (e) {}
+
 
   try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS collab_admin_rights JSONB DEFAULT \'{}\''); } catch (e) {}
 
@@ -294,6 +298,11 @@ const logAdminAction = async (req, action, entityType, entityId, details = {}) =
  * @desc    Lister tous les utilisateurs réels
  */
 const getUsers = asyncHandler(async (req, res) => {
+  // Security check: only global admin or authorized delegate can see users
+  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.see_all_users)) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir la liste des utilisateurs.' });
+  }
+
   // We hide Global Admins from the management lists (User List & Directory)
   const result = await query(`
     SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked,
@@ -409,10 +418,27 @@ const handlePendingAction = asyncHandler(async (req, res) => {
     try {
       switch (action.action_type) {
         case 'delete_user':
+          await query('DELETE FROM public.messages WHERE sender_id = $1', [action.target_id]);
+          await query('DELETE FROM public.chat_participants WHERE user_id = $1', [action.target_id]);
+          await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [action.target_id]);
           await query('DELETE FROM public.profiles WHERE id = $1', [action.target_id]);
           break;
         case 'toggle_user_lock':
-          await query('UPDATE public.profiles SET is_locked = $1 WHERE id = $2', [action.details.isLocked, action.target_id]);
+          await query('UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3', [action.details.isLocked, action.details.isLocked ? 3 : 0, action.target_id]);
+          break;
+        case 'toggle_user_badge':
+          await query('UPDATE public.profiles SET is_verified = $1 WHERE id = $2', [action.details.isVerified, action.target_id]);
+          socketService.broadcast('admin:user_verification_updated', { userId: action.target_id, isVerified: action.details.isVerified });
+          break;
+        case 'create_team':
+          const teamRes = await query(
+            'INSERT INTO public.collab_teams (name, description, created_by) VALUES ($1, $2, $3) RETURNING id',
+            [action.target_name, action.details.description, action.requested_by]
+          );
+          await query(
+            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, $3)',
+            [teamRes.rows[0].id, action.requested_by, 'admin']
+          );
           break;
         case 'delete_group':
           await query('DELETE FROM public.chats WHERE id = $1', [action.target_id]);
@@ -490,7 +516,7 @@ const getDelegations = asyncHandler(async (req, res) => {
  */
 const saveDelegation = asyncHandler(async (req, res) => {
   if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
-  const { userId, modules, isActive = true, collabAdminRights = {} } = req.body;
+  const { userId, modules, isActive = true, collabAdminRights = {}, userAdminRights = {} } = req.body;
 
   const userRes = await query('SELECT id, full_name, email FROM public.profiles WHERE id = $1', [userId]);
   if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Meet Me non trouvé' });
@@ -498,11 +524,14 @@ const saveDelegation = asyncHandler(async (req, res) => {
   const user = userRes.rows[0];
 
   await query(
-    `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, updated_at)
-     VALUES ($1, $2, $3, $4, NOW())
+    `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, user_admin_rights, updated_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())
      ON CONFLICT (user_id) DO UPDATE
-     SET modules = EXCLUDED.modules, is_active = EXCLUDED.is_active, collab_admin_rights = EXCLUDED.collab_admin_rights, updated_at = NOW()`,
-    [userId, modules, isActive, JSON.stringify(collabAdminRights)]
+     SET modules = EXCLUDED.modules, is_active = EXCLUDED.is_active,
+         collab_admin_rights = EXCLUDED.collab_admin_rights,
+         user_admin_rights = EXCLUDED.user_admin_rights,
+         updated_at = NOW()`,
+    [userId, modules, isActive, JSON.stringify(collabAdminRights), JSON.stringify(userAdminRights)]
   );
 
   // Si révoqué, on retire aussi des équipes de collaboration
@@ -529,6 +558,11 @@ const deleteUser = asyncHandler(async (req, res) => {
   if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
   if (user.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
 
+  // Security check for delegate
+  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.delete_user)) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de supprimer des utilisateurs.' });
+  }
+
   const canExecute = await processSensitiveAction(req, 'delete_user', userId, user.rows[0].full_name);
   if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression envoyée à l\'admin principal.' });
 
@@ -550,6 +584,11 @@ const toggleUserLock = asyncHandler(async (req, res) => {
   const user = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
   if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
 
+  // Security check for delegate
+  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.lock_user)) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de bloquer des utilisateurs.' });
+  }
+
   const canExecute = await processSensitiveAction(req, 'toggle_user_lock', userId, user.rows[0].full_name, { isLocked });
   if (!canExecute) return res.json({ success: true, pending: true, message: `Demande de ${isLocked ? 'blocage' : 'déblocage'} envoyée.` });
 
@@ -564,12 +603,21 @@ const toggleUserLock = asyncHandler(async (req, res) => {
 const toggleUserBadge = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { isVerified } = req.body;
+  const user = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
+  if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+
+  // Security check for delegate
+  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.verify_user)) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de gérer les badges.' });
+  }
+
+  const canExecute = await processSensitiveAction(req, 'toggle_user_badge', userId, user.rows[0].full_name, { isVerified });
+  if (!canExecute) return res.json({ success: true, pending: true, message: `Demande de ${isVerified ? 'certification' : 'retrait de badge'} envoyée.` });
 
   await query('UPDATE public.profiles SET is_verified = $1 WHERE id = $2', [isVerified, userId]);
   await logAdminAction(req, isVerified ? 'verify_user' : 'unverify_user', 'user', userId, { isVerified });
 
   // Real-time update via socket
-  const socketService = require('../services/socket.service');
   socketService.broadcast('admin:user_verification_updated', { userId, isVerified });
 
   res.json({ success: true });
@@ -1487,5 +1535,6 @@ module.exports = {
   deletePendingAction,
   getDelegations,
   saveDelegation,
-  ensureAdminTables
+  ensureAdminTables,
+  processSensitiveAction
 };

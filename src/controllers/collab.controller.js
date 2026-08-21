@@ -2,6 +2,7 @@ const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
 const logger = require('../utils/logger');
+const { processSensitiveAction } = require('./admin.controller');
 
 /**
  * @desc    Get all teams
@@ -72,6 +73,10 @@ const createTeam = asyncHandler(async (req, res) => {
   if (!canCreate) return res.status(403).json({ success: false, error: 'Accès refusé : Vous ne pouvez pas créer d\'équipe.' });
 
   const { name, description } = req.body;
+
+  const canExecute = await processSensitiveAction(req, 'create_team', null, name, { name, description });
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de création d\'équipe envoyée.' });
+
   const result = await query(
     'INSERT INTO public.collab_teams (name, description, created_by) VALUES ($1, $2, $3) RETURNING *',
     [name, description, req.userId]

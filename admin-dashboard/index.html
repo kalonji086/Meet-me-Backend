@@ -2539,12 +2539,13 @@
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('delegations-list').innerHTML = res.data.data.map(d => {
                     const collabRightsStr = encodeURIComponent(JSON.stringify(d.collab_admin_rights || {}));
+                    const userRightsStr = encodeURIComponent(JSON.stringify(d.user_admin_rights || {}));
                     return `
                         <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm animate-fade-in mb-2">
                             <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
                             <div class="flex items-center space-x-3">
                                 <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
-                                <button onclick="editDelegation('${d.user_id}', '${d.full_name}', '${d.modules.join(',')}', ${d.is_active}, '${collabRightsStr}')" class="p-3 bg-gray-50 text-gray-400 hover:text-purple-600 rounded-xl transition-all" title="Modifier les accès"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                                <button onclick="editDelegation('${d.user_id}', '${d.full_name}', '${d.modules.join(',')}', ${d.is_active}, '${collabRightsStr}', '${userRightsStr}')" class="p-3 bg-gray-50 text-gray-400 hover:text-purple-600 rounded-xl transition-all" title="Modifier les accès"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                                 <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}', ${d.is_active})" class="p-3 ${d.is_active ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'} rounded-xl hover:shadow-lg transition-all" title="${d.is_active ? 'Révoquer' : 'Rétablir'}"><i data-lucide="${d.is_active ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                             </div>
                         </div>
@@ -2638,14 +2639,15 @@
             } catch (e) { alert("Erreur."); }
         }
 
-        function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "") {
+        function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "", userRightsStr = "") {
             const allModules = ['stats', 'users', 'groups', 'support', 'verifications', 'audit', 'market-requests', 'campaigns', 'legal', 'config', 'collaboration'];
             const currentModules = modules ? modules.split(',') : [];
             const collabRights = collabRightsStr ? JSON.parse(decodeURIComponent(collabRightsStr)) : {};
+            const userRights = userRightsStr ? JSON.parse(decodeURIComponent(userRightsStr)) : {};
 
             let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
                 <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all">
-                    <input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3" onchange="toggleCollabExtraRights(this)">
+                    <input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3" onchange="toggleExtraRightsPanels(this)">
                     <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m}</span>
                 </label>
             `).join('') + `</div>`;
@@ -2675,6 +2677,31 @@
                 </div>
             `;
 
+            // Extra section for User Management Rights
+            html += `
+                <div id="users-extra-rights" class="${currentModules.includes('users') ? 'block' : 'hidden'} mt-6 pt-6 border-t border-gray-100 animate-fade-in">
+                    <p class="text-[10px] font-black text-blue-600 uppercase mb-4 tracking-widest">Droits Spécifiques Utilisateurs</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
+                            <input type="checkbox" id="user-right-see-all" ${userRights.see_all_users ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
+                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Voir Tous Utilisateurs</span>
+                        </label>
+                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
+                            <input type="checkbox" id="user-right-lock" ${userRights.lock_user ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
+                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Bloquer/Débloquer</span>
+                        </label>
+                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
+                            <input type="checkbox" id="user-right-verify" ${userRights.verify_user ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
+                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Gérer Badges</span>
+                        </label>
+                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
+                            <input type="checkbox" id="user-right-delete" ${userRights.delete_user ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
+                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Supprimer Utilisateur</span>
+                        </label>
+                    </div>
+                </div>
+            `;
+
             Alert.show("Droits Admin", html, async () => {
                 const selected = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
                 const collabAdminRights = {
@@ -2683,22 +2710,33 @@
                     manage_members: document.getElementById('collab-right-manage-members')?.checked || false,
                     read_messages: document.getElementById('collab-right-read-messages')?.checked || false
                 };
+                const userAdminRights = {
+                    see_all_users: document.getElementById('user-right-see-all')?.checked || false,
+                    lock_user: document.getElementById('user-right-lock')?.checked || false,
+                    verify_user: document.getElementById('user-right-verify')?.checked || false,
+                    delete_user: document.getElementById('user-right-delete')?.checked || false
+                };
 
                 try {
                     await axios.post(`${API_URL}/admin/delegations`, {
                         userId,
                         modules: selected,
                         isActive: active,
-                        collabAdminRights
+                        collabAdminRights,
+                        userAdminRights
                     }, { headers: { Authorization: `Bearer ${token}` } });
                     alert("Délégation validée !"); closeImpactModal(); loadDelegations();
                 } catch (e) { alert("Erreur."); }
             }, "Valider la Délégation", "purple");
         }
 
-        function toggleCollabExtraRights(cb) {
+        function toggleExtraRightsPanels(cb) {
             if (cb.value === 'collaboration') {
                 const extra = document.getElementById('collab-extra-rights');
+                if (cb.checked) extra.classList.remove('hidden'); else extra.classList.add('hidden');
+            }
+            if (cb.value === 'users') {
+                const extra = document.getElementById('users-extra-rights');
                 if (cb.checked) extra.classList.remove('hidden'); else extra.classList.add('hidden');
             }
         }

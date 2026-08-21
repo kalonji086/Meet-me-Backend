@@ -160,7 +160,7 @@ const login = asyncHandler(async (req, res) => {
 
   const emailLower = email?.toLowerCase().trim();
 
-  // 1. Trouver l'utilisateur d'abord (pour vérifier si c'est l'Admin Principal)
+  // 1. Trouver l'utilisateur d'abord
   const result = await query(
     'SELECT * FROM public.profiles WHERE LOWER(email) = LOWER($1)',
     [emailLower]
@@ -169,115 +169,93 @@ const login = asyncHandler(async (req, res) => {
   const user = result.rows[0];
   const isGlobalAdmin = user?.is_global_admin || false;
 
-  // 0. Vérification de sécurité (Brute Force Protection) - EXEMPTION pour l'Admin Principal
-  if (!isGlobalAdmin) {
-    const securityCheck = await query(
-      'SELECT identifier, blocked_until FROM public.login_security WHERE identifier = $1 AND blocked_until > NOW() ORDER BY blocked_until DESC LIMIT 1',
-      [emailLower]
-    );
+  // 2. Vérifier le mot de passe
+  const isPasswordValid = user ? await bcrypt.compare(password, user.password) : false;
 
-    if (securityCheck.rows.length > 0) {
-      const block = securityCheck.rows[0];
-      const diffMs = new Date(block.blocked_until) - new Date();
-      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-      const minutes = Math.ceil((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-      let timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
-
+  if (isPasswordValid) {
+    // SÉCURITÉ : Vérifier si banni manuellement
+    if (user.is_locked) {
       return res.status(403).json({
         success: false,
-        error: 'Accès temporairement bloqué',
-        message: `Trop de tentatives échouées. Veuillez réessayer dans ${timeStr}. Si vous avez oublié vos identifiants, contactez l'Admin principal ou le support : togethertechsupport@gmail.com`
+        error: 'Compte banni',
+        isLocked: true,
+        message: 'Votre accès a été révoqué par l\'administrateur.'
       });
     }
-  }
 
-  if (!user) {
-    await trackFailedLogin([emailLower]);
-    return res.status(401).json({ success: false, error: 'Email ou mot de passe incorrect' });
-  }
-
-  // 2. Vérifier si le compte est bloqué manuellement
-  if (user.is_locked) {
-    return res.status(403).json({
-      success: false,
-      error: 'Compte banni',
-      isLocked: true,
-      message: 'Votre accès a été révoqué par l\'administrateur.'
-    });
-  }
-
-  // 3. Vérifier le mot de passe
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  
-  if (!isPasswordValid) {
-    // L'Admin Principal ne se fait pas auto-bloquer dans login_security
+    // SUCCÈS : On débloque tout immédiatement pour cet email (si c'était bloqué temporairement)
     if (!isGlobalAdmin) {
-      await trackFailedLogin([emailLower]);
+      await resetFailedLogin([emailLower]);
     }
 
-    // Logique legacy de blocage par utilisateur (login_attempts)
-    const attempts = (user.login_attempts || 0) + 1;
-    await query('UPDATE public.profiles SET login_attempts = $1 WHERE id = $2', [attempts, user.id]);
+    const appVersion = req.body.appVersion || null;
+    await query(
+      "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(), device_info = $1, app_version = COALESCE($2, app_version) WHERE id = $3",
+      [JSON.stringify(device_info || user.device_info || {}), appVersion, user.id]
+    );
 
-    return res.status(401).json({
-      success: false,
-      error: 'Mot de passe incorrect',
-      message: isGlobalAdmin ? 'Identifiants invalides.' : 'Identifiants invalides. Attention, trop d\'échecs bloqueront cet email pendant plusieurs heures.'
-    });
-  }
-
-  // 4. Succès: Réinitialiser les tentatives
-  if (!isGlobalAdmin) {
-    await resetFailedLogin([emailLower]);
-  }
-
-  const appVersion = req.body.appVersion || null;
-  await query(
-    "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(), device_info = $1, app_version = COALESCE($2, app_version) WHERE id = $3",
-    [JSON.stringify(device_info || user.device_info || {}), appVersion, user.id]
-  );
-
-  const socketService = require('../services/socket.service');
-  socketService.broadcast('admin_user_login', {
-    userId: user.id,
-    name: user.full_name,
-    email: user.email,
-    time: new Date()
-  });
-
-  // Notification spécifique si un COLLABORATEUR se connecte
-  const delegationCheck = await query('SELECT is_active FROM public.admin_delegations WHERE user_id = $1', [user.id]);
-  if (delegationCheck.rows.length > 0 && delegationCheck.rows[0].is_active) {
-    socketService.broadcast('admin:collaborator_login', {
+    const socketService = require('../services/socket.service');
+    socketService.broadcast('admin_user_login', {
       userId: user.id,
       name: user.full_name,
       email: user.email,
-      avatar: user.avatar_url,
       time: new Date()
     });
-  }
 
-  const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
-  const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
+    const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
+    const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
 
-  res.json({
-    success: true,
-    data: {
-      token,
-      refreshToken,
-      user: {
-        id: user.id,
-        name: user.full_name,
-        email: user.email,
-        username: user.username,
-        avatar: user.avatar_url,
-        status: 'online',
-        isGlobalAdmin: user.is_global_admin,
-        push_token: user.push_token
-      },
+    return res.json({
+      success: true,
+      data: {
+        token,
+        refreshToken,
+        user: {
+          id: user.id,
+          name: user.full_name,
+          email: user.email,
+          username: user.username,
+          avatar: user.avatar_url,
+          status: 'online',
+          isGlobalAdmin: user.is_global_admin,
+          push_token: user.push_token
+        },
+      }
+    });
+  } else {
+    // ÉCHEC : On applique la sécurité (Sauf pour l'Admin Principal)
+    if (!isGlobalAdmin) {
+      // Vérifier si cet identifiant est déjà dans une période de pénalité
+      const securityCheck = await query(
+        'SELECT identifier, blocked_until FROM public.login_security WHERE identifier = $1 AND blocked_until > NOW() ORDER BY blocked_until DESC LIMIT 1',
+        [emailLower]
+      );
+
+      if (securityCheck.rows.length > 0) {
+        const block = securityCheck.rows[0];
+        const diffMs = new Date(block.blocked_until) - new Date();
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const minutes = Math.ceil((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        let timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+
+        return res.status(403).json({
+          success: false,
+          error: 'Accès temporairement bloqué',
+          message: `Trop de tentatives échouées. Veuillez réessayer dans ${timeStr}. Si vous avez oublié vos identifiants, contactez l'Admin principal ou le support : togethertechsupport@gmail.com`
+        });
+      }
+
+      // Pas encore bloqué (ou block expiré), on enregistre le nouvel échec
+      await trackFailedLogin([emailLower]);
     }
-  });
+
+    // Message d'erreur standard pour le 1er échec (ou si l'admin se trompe)
+    return res.status(401).json({
+      success: false,
+      error: 'Identifiants invalides',
+      message: isGlobalAdmin ? 'Mot de passe ou email incorrect.' : 'Email ou mot de passe incorrect. Attention : une deuxième erreur bloquera cet accès pendant 1 heure.'
+    });
+  }
 });
 
 /**

@@ -270,11 +270,12 @@ const logAdminAction = async (req, action, entityType, entityId, details = {}) =
  * @desc    Lister tous les utilisateurs réels
  */
 const getUsers = asyncHandler(async (req, res) => {
+  // Global Admin sees everyone.
+  // We can filter out current user to avoid self-deletion but show other admins.
   const result = await query(`
     SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked,
            login_attempts, created_at, is_global_admin, last_login_at, device_info, is_verified
     FROM public.profiles
-    WHERE is_global_admin = FALSE
     ORDER BY last_login_at DESC NULLS LAST
   `);
 

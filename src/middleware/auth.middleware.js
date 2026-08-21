@@ -68,7 +68,11 @@ const checkChatParticipation = async (req, res, next) => {
  * Middleware pour l'admin global ou délégué
  */
 const isAdmin = async (req, res, next) => {
-  if (req.user && req.user.is_global_admin) return next();
+  if (req.user && req.user.is_global_admin) {
+    req.user.is_delegated = false;
+    req.user.allowed_modules = ['stats', 'users', 'groups', 'support', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration'];
+    return next();
+  }
 
   try {
     // Vérifier si l'utilisateur est délégué

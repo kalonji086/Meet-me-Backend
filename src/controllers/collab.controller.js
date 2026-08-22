@@ -845,10 +845,46 @@ const createCalendarEvent = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Update a calendar event
+ */
+const updateCalendarEvent = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  const { title, description, start_at, end_at, type, status, meetingUrl, invitedMemberIds } = req.body;
+
+  // Security check: only creator or global admin
+  const eventCheck = await query('SELECT creator_id FROM public.collab_calendar_events WHERE id = $1', [eventId]);
+  if (eventCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Événement non trouvé' });
+
+  if (!req.user.is_global_admin && eventCheck.rows[0].creator_id !== req.userId) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Seul le créateur peut modifier cet événement.' });
+  }
+
+  const result = await query(
+    `UPDATE public.collab_calendar_events
+     SET title = $1, description = $2, start_at = $3, end_at = $4, type = $5, status = $6, meeting_url = $7, invited_member_ids = $8, updated_at = NOW()
+     WHERE id = $9 RETURNING *`,
+    [title, description, start_at, end_at, type, status || 'scheduled', meetingUrl, invitedMemberIds, eventId]
+  );
+
+  socketService.broadcast('collab:calendar_event_updated', { event: result.rows[0] });
+
+  res.json({ success: true, data: result.rows[0] });
+});
+
+/**
  * @desc    Delete a calendar event
  */
 const deleteCalendarEvent = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
+
+  // Security check
+  const eventCheck = await query('SELECT creator_id FROM public.collab_calendar_events WHERE id = $1', [eventId]);
+  if (eventCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Événement non trouvé' });
+
+  if (!req.user.is_global_admin && eventCheck.rows[0].creator_id !== req.userId) {
+    return res.status(403).json({ success: false, error: 'Accès refusé.' });
+  }
+
   await query('DELETE FROM public.collab_calendar_events WHERE id = $1', [eventId]);
   res.json({ success: true, message: 'Événement supprimé.' });
 });
@@ -859,7 +895,7 @@ module.exports = {
   getMessages, markMessageAsSeen, sendMessage, deleteMessage, updateMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,
   archiveDocument, deleteDocument,
-  getCalendarEvents, createCalendarEvent, deleteCalendarEvent,
+  getCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
   moveTeamMember, getMemberDetails,
   getPermissions, savePermissions

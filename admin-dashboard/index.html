@@ -1358,6 +1358,8 @@
             if (!activeCollabTeamId) return alert("Veuillez sélectionner une équipe.");
 
             const container = document.getElementById('collab-calendar-container');
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+
             if (!collabCalendar) {
                 collabCalendar = new FullCalendar.Calendar(container, {
                     initialView: 'dayGridMonth',
@@ -1366,21 +1368,35 @@
                     themeSystem: 'standard',
                     eventClick: function(info) {
                         const e = info.event.extendedProps;
+                        const isCreator = user.id === e.creator_id;
+                        const isAdmin = user.isGlobalAdmin;
+
                         let html = `
                             <div class="space-y-4">
-                                <div class="flex items-center space-x-2">
-                                    <div class="px-3 py-1 bg-cyan-50 text-cyan-600 rounded-lg text-[9px] font-black uppercase">${e.type}</div>
-                                    <div class="px-3 py-1 bg-gray-50 text-gray-400 rounded-lg text-[9px] font-black uppercase">PAR ${e.creator_name || 'Inconnu'}</div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="px-3 py-1 bg-cyan-50 text-cyan-600 rounded-lg text-[9px] font-black uppercase">${e.type}</div>
+                                        <div class="px-3 py-1 bg-gray-50 text-gray-400 rounded-lg text-[9px] font-black uppercase">PAR ${e.creator_name || 'Inconnu'}</div>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase ${e.status === 'cancelled' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}">${e.status || 'PROGRAMMÉ'}</span>
                                 </div>
                                 <div class="p-4 bg-white rounded-2xl border border-gray-100 shadow-inner">
                                     <p class="text-[10px] font-black text-gray-400 uppercase mb-2">Description</p>
                                     <p class="text-sm font-medium text-gray-600">${e.description || 'Aucune description'}</p>
                                 </div>
                                 ${e.meeting_url ? `
-                                    <div class="pt-4">
+                                    <div class="pt-2">
                                         <a href="${e.meeting_url}" target="_blank" class="w-full flex items-center justify-center py-4 bg-purple-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-purple-700 transition-all">
                                             <i data-lucide="video" class="w-4 h-4 mr-2"></i> Rejoindre la Réunion
                                         </a>
+                                    </div>
+                                ` : ''}
+
+                                ${(isCreator || isAdmin) ? `
+                                    <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50">
+                                        <button onclick="editCalendarEvent('${info.event.id}')" class="py-3 bg-gray-50 text-gray-600 rounded-xl font-black text-[9px] uppercase hover:bg-cyan-50 hover:text-cyan-600 transition-all">Modifier / Inviter</button>
+                                        <button onclick="confirmDeleteEvent('${info.event.id}')" class="py-3 bg-red-50 text-red-500 rounded-xl font-black text-[9px] uppercase hover:bg-red-500 hover:text-white transition-all">Supprimer</button>
+                                        ${e.status !== 'cancelled' ? `<button onclick="cancelCalendarEvent('${info.event.id}')" class="col-span-2 py-3 bg-orange-50 text-orange-600 rounded-xl font-black text-[9px] uppercase hover:bg-orange-500 hover:text-white transition-all">Annuler la Réunion</button>` : ''}
                                     </div>
                                 ` : ''}
                             </div>
@@ -1396,15 +1412,18 @@
                 const res = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/calendar`, { headers: { Authorization: `Bearer ${token}` } });
                 const events = res.data.data.map(e => ({
                     id: e.id,
-                    title: e.title,
+                    title: e.title + (e.status === 'cancelled' ? ' (ANNULÉ)' : ''),
                     start: e.start_at,
                     end: e.end_at,
-                    color: e.type === 'deadline' ? '#06b6d4' : (e.type === 'meeting' ? '#8b5cf6' : '#10b981'),
+                    color: e.status === 'cancelled' ? '#ef4444' : (e.type === 'deadline' ? '#06b6d4' : (e.type === 'meeting' ? '#8b5cf6' : '#10b981')),
                     extendedProps: {
                         description: e.description,
                         type: e.type,
                         meeting_url: e.meeting_url,
-                        creator_name: e.creator_name
+                        creator_name: e.creator_name,
+                        creator_id: e.creator_id,
+                        status: e.status,
+                        invited_member_ids: e.invited_member_ids || []
                     }
                 }));
                 collabCalendar.removeAllEvents();
@@ -1492,6 +1511,86 @@
                     } catch (e) { alert("Erreur lors de la création."); }
                 }, "Valider", "cyan");
             } catch (e) { alert("Erreur chargement membres."); }
+        }
+
+        async function cancelCalendarEvent(id) {
+            if (!confirm("Voulez-vous vraiment marquer cette réunion comme ANNULÉE ?")) return;
+            try {
+                const event = collabCalendar.getEventById(id);
+                const props = event.extendedProps;
+                await axios.put(`${API_URL}/collab/calendar/${id}`, {
+                    title: event.title,
+                    description: props.description,
+                    start_at: event.start,
+                    end_at: event.end,
+                    type: props.type,
+                    status: 'cancelled',
+                    meetingUrl: props.meeting_url,
+                    invitedMemberIds: props.invited_member_ids
+                }, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Événement annulé."); closeImpactModal(); loadCollabCalendar();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function confirmDeleteEvent(id) {
+            if (!confirm("Supprimer définitivement cet événement ?")) return;
+            try {
+                await axios.delete(`${API_URL}/collab/calendar/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Événement supprimé."); closeImpactModal(); loadCollabCalendar();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        async function editCalendarEvent(id) {
+            const event = collabCalendar.getEventById(id);
+            const e = event.extendedProps;
+
+            // Format dates for input (YYYY-MM-DDTHH:MM)
+            const startStr = new Date(event.start).toISOString().slice(0, 16);
+            const endStr = new Date(event.end).toISOString().slice(0, 16);
+
+            const membersRes = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+            const members = membersRes.data.data;
+
+            let html = `
+                <div class="space-y-4 text-left">
+                    <input type="text" id="edit-event-title" value="${event.title.replace(' (ANNULÉ)', '')}" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                    <textarea id="edit-event-desc" class="w-full h-24 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-medium">${e.description || ''}</textarea>
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="datetime-local" id="edit-event-start" value="${startStr}" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-xs">
+                        <input type="datetime-local" id="edit-event-end" value="${endStr}" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-xs">
+                    </div>
+                    ${e.type === 'meeting' ? `
+                        <input type="url" id="edit-event-url" value="${e.meeting_url || ''}" placeholder="Lien de la Réunion" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                        <div class="pt-2">
+                            <label class="text-[9px] font-black text-gray-400 uppercase ml-1 mb-2 block">Inviter des Membres (Gérer la liste)</label>
+                            <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-gray-100 rounded-2xl custom-scrollbar">
+                                ${members.map(m => `
+                                    <label class="flex items-center p-2 hover:bg-cyan-50 rounded-xl cursor-pointer transition-all">
+                                        <input type="checkbox" value="${m.id}" ${e.invited_member_ids.includes(m.id) ? 'checked' : ''} class="edit-invite-check w-4 h-4 accent-cyan-600 mr-2">
+                                        <span class="text-[10px] font-bold text-gray-600 truncate">${m.full_name}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            Alert.show("Modifier l'Événement", html, async () => {
+                const title = document.getElementById('edit-event-title').value;
+                const description = document.getElementById('edit-event-desc').value;
+                const start_at = document.getElementById('edit-event-start').value;
+                const end_at = document.getElementById('edit-event-end').value;
+                const meetingUrl = document.getElementById('edit-event-url')?.value || null;
+                const invitedMemberIds = Array.from(document.querySelectorAll('.edit-invite-check:checked')).map(cb => cb.value);
+
+                try {
+                    await axios.put(`${API_URL}/collab/calendar/${id}`, {
+                        title, description, start_at, end_at, type: e.type, status: e.status, meetingUrl, invitedMemberIds
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    alert("Mis à jour avec succès !"); closeImpactModal(); loadCollabCalendar();
+                } catch (err) { alert("Erreur lors de la modification."); }
+            }, "Enregistrer", "cyan");
         }
 
         async function loadCollabTeams() {

@@ -47,6 +47,7 @@ router.post('/documents/:docId/delete', collabController.deleteDocument);
 // Calendar
 router.get('/teams/:teamId/calendar', collabController.getCalendarEvents);
 router.post('/calendar', collabController.createCalendarEvent);
+router.put('/calendar/:eventId', collabController.updateCalendarEvent);
 router.delete('/calendar/:eventId', collabController.deleteCalendarEvent);
 
 // Requests / Applications Management

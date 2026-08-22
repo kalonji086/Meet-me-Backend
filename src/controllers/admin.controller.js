@@ -1243,12 +1243,17 @@ const updateLegalDoc = asyncHandler(async (req, res) => {
   await logAdminAction(req, 'update_legal_doc', 'legal', result.rows[0].id, { type, version });
 
   // Notifier tous les utilisateurs en ligne du changement légal
-  socketService.broadcast('legal_update', {
+  const broadcastData = {
     type,
     version,
-    force_acceptance: String(force_acceptance) === 'true',
-    content
-  });
+    force_acceptance: force_acceptance === true || String(force_acceptance) === 'true',
+    content,
+    isRealTime: true,
+    timestamp: new Date().toISOString()
+  };
+
+  logger.info(`📢 Broadcasting legal_update: ${type} v${version} (Forced: ${broadcastData.force_acceptance})`);
+  socketService.broadcast('legal_update', broadcastData);
 
   res.json({ success: true, data: result.rows[0] });
 });

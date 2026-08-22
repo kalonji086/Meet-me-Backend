@@ -759,11 +759,23 @@ const getCalendarEvents = asyncHandler(async (req, res) => {
     if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
   }
 
-  // 1. Fetch meetings and availabilities
-  const events = await query(
-    'SELECT * FROM public.collab_calendar_events WHERE team_id = $1 ORDER BY start_at ASC',
-    [teamId]
-  );
+  // 1. Fetch meetings and availabilities (with creator name)
+  // Filter: If it's a meeting and not Global Admin, only show if invited or creator
+  let eventsQuery = `
+    SELECT e.*, p.full_name as creator_name
+    FROM public.collab_calendar_events e
+    JOIN public.profiles p ON e.creator_id = p.id
+    WHERE e.team_id = $1
+  `;
+  const params = [teamId];
+
+  if (!req.user.is_global_admin) {
+    eventsQuery += ` AND (e.type != 'meeting' OR e.creator_id = $2 OR $2 = ANY(e.invited_member_ids))`;
+    params.push(req.userId);
+  }
+
+  eventsQuery += ` ORDER BY e.start_at ASC`;
+  const events = await query(eventsQuery, params);
 
   // 2. Fetch tasks as deadlines
   const tasks = await query(
@@ -780,7 +792,7 @@ const getCalendarEvents = asyncHandler(async (req, res) => {
  * @desc    Create a calendar event
  */
 const createCalendarEvent = asyncHandler(async (req, res) => {
-  const { teamId, title, description, start_at, end_at, type } = req.body;
+  const { teamId, title, description, start_at, end_at, type, meetingUrl, invitedMemberIds } = req.body;
 
   // Security: Check if member or global admin
   if (!req.user.is_global_admin) {
@@ -789,14 +801,47 @@ const createCalendarEvent = asyncHandler(async (req, res) => {
   }
 
   const result = await query(
-    `INSERT INTO public.collab_calendar_events (team_id, creator_id, title, description, start_at, end_at, type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [teamId, req.userId, title, description, start_at, end_at, type || 'meeting']
+    `INSERT INTO public.collab_calendar_events (team_id, creator_id, title, description, start_at, end_at, type, meeting_url, invited_member_ids)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [teamId, req.userId, title, description, start_at, end_at, type || 'meeting', meetingUrl || null, invitedMemberIds || '{}']
   );
 
-  socketService.broadcast('collab:calendar_event_created', { teamId, event: result.rows[0] });
+  const event = result.rows[0];
+  const creator = await query('SELECT full_name FROM public.profiles WHERE id = $1', [req.userId]);
+  const creatorName = creator.rows[0].full_name;
 
-  res.status(201).json({ success: true, data: result.rows[0] });
+  // Real-time notification
+  socketService.broadcast('collab:calendar_event_created', { teamId, event: { ...event, creator_name: creatorName } });
+
+  // Special Notification for absences (Availability type)
+  if (type === 'availability') {
+    const team = await query('SELECT name FROM public.collab_teams WHERE id = $1', [teamId]);
+    const teamName = team.rows[0]?.name || 'Equipe';
+
+    // Broadcast to all team members
+    const members = await query('SELECT user_id FROM public.collab_team_members WHERE team_id = $1', [teamId]);
+    members.rows.forEach(m => {
+      socketService.sendToUser(m.user_id, 'collab:absence_notification', {
+        userName: creatorName,
+        teamName,
+        start: start_at,
+        end: end_at
+      });
+    });
+
+    // Also notify Global Admin
+    const globalAdmins = await query('SELECT id FROM public.profiles WHERE is_global_admin = TRUE');
+    globalAdmins.rows.forEach(adm => {
+      socketService.sendToUser(adm.id, 'collab:absence_notification', {
+        userName: creatorName,
+        teamName,
+        start: start_at,
+        end: end_at
+      });
+    });
+  }
+
+  res.status(201).json({ success: true, data: event });
 });
 
 /**

@@ -256,6 +256,9 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.collab_teams ADD COLUMN IF NOT EXISTS color TEXT DEFAULT \'#06b6d4\'');
     // Track who saw the messages
     await query('ALTER TABLE public.collab_messages ADD COLUMN IF NOT EXISTS seen_by UUID[] DEFAULT \'{}\'');
+    // Calendar enhancements: Meeting URL and Invitations
+    await query('ALTER TABLE public.collab_calendar_events ADD COLUMN IF NOT EXISTS meeting_url TEXT');
+    await query('ALTER TABLE public.collab_calendar_events ADD COLUMN IF NOT EXISTS invited_member_ids UUID[] DEFAULT \'{}\'');
   } catch (e) {
     logger.error('Error migrating collab_teams:', e.message);
   }

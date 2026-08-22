@@ -1097,6 +1097,12 @@
                 }
             });
 
+            socket.on('collab:absence_notification', (data) => {
+                const start = new Date(data.start).toLocaleString();
+                const end = new Date(data.end).toLocaleString();
+                addNotification('calendar', 'Absence / Indisponibilité', `${data.userName} (${data.teamName}) sera indisponible du ${start} au ${end}.`, 'calendar');
+            });
+
             // Retrait de la mise à jour légale en temps réel
             socket.on('legal_removed', (data) => {
                 if (!document.getElementById('modal-legal-accept').classList.contains('hidden')) {
@@ -1362,17 +1368,25 @@
                         const e = info.event.extendedProps;
                         let html = `
                             <div class="space-y-4">
-                                <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                    <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Type</p>
-                                    <p class="font-bold text-cyan-600 uppercase text-xs">${info.event.display || info.event.title}</p>
+                                <div class="flex items-center space-x-2">
+                                    <div class="px-3 py-1 bg-cyan-50 text-cyan-600 rounded-lg text-[9px] font-black uppercase">${e.type}</div>
+                                    <div class="px-3 py-1 bg-gray-50 text-gray-400 rounded-lg text-[9px] font-black uppercase">PAR ${e.creator_name || 'Inconnu'}</div>
                                 </div>
-                                <div class="p-4 bg-white rounded-2xl border border-gray-100">
-                                    <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Description</p>
+                                <div class="p-4 bg-white rounded-2xl border border-gray-100 shadow-inner">
+                                    <p class="text-[10px] font-black text-gray-400 uppercase mb-2">Description</p>
                                     <p class="text-sm font-medium text-gray-600">${e.description || 'Aucune description'}</p>
                                 </div>
+                                ${e.meeting_url ? `
+                                    <div class="pt-4">
+                                        <a href="${e.meeting_url}" target="_blank" class="w-full flex items-center justify-center py-4 bg-purple-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-purple-700 transition-all">
+                                            <i data-lucide="video" class="w-4 h-4 mr-2"></i> Rejoindre la Réunion
+                                        </a>
+                                    </div>
+                                ` : ''}
                             </div>
                         `;
                         Alert.show(info.event.title, html, null, "Fermer", "cyan");
+                        lucide.createIcons();
                     }
                 });
                 collabCalendar.render();
@@ -1386,49 +1400,98 @@
                     start: e.start_at,
                     end: e.end_at,
                     color: e.type === 'deadline' ? '#06b6d4' : (e.type === 'meeting' ? '#8b5cf6' : '#10b981'),
-                    extendedProps: { description: e.description, type: e.type }
+                    extendedProps: {
+                        description: e.description,
+                        type: e.type,
+                        meeting_url: e.meeting_url,
+                        creator_name: e.creator_name
+                    }
                 }));
                 collabCalendar.removeAllEvents();
                 collabCalendar.addEventSource(events);
             } catch (e) {}
         }
 
-        function showAddEventModal(type) {
-            let html = `
-                <div class="space-y-4">
-                    <input type="text" id="event-title" placeholder="Titre" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
-                    <textarea id="event-desc" placeholder="Description..." class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-medium"></textarea>
-                    <div class="grid grid-cols-2 gap-4">
+        async function showAddEventModal(type) {
+            try {
+                // Fetch members for invitations
+                const membersRes = await axios.get(`${API_URL}/collab/teams/${activeCollabTeamId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+                const members = membersRes.data.data;
+
+                let html = `
+                    <div class="space-y-4 text-left">
                         <div>
-                            <label class="text-[8px] font-black text-gray-400 uppercase px-1">Début</label>
-                            <input type="datetime-local" id="event-start" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-xs">
+                            <label class="text-[9px] font-black text-gray-400 uppercase ml-1">Titre de l'événement</label>
+                            <input type="text" id="event-title" placeholder="Ex: Débriefing Technique" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm focus:border-cyan-500 transition-all">
                         </div>
+
+                        ${type === 'meeting' ? `
+                            <div>
+                                <label class="text-[9px] font-black text-gray-400 uppercase ml-1">Lien de la Réunion (Teams/Zoom)</label>
+                                <input type="url" id="event-url" placeholder="https://..." class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm focus:border-cyan-500 transition-all">
+                            </div>
+                        ` : ''}
+
                         <div>
-                            <label class="text-[8px] font-black text-gray-400 uppercase px-1">Fin</label>
-                            <input type="datetime-local" id="event-end" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-xs">
+                            <label class="text-[9px] font-black text-gray-400 uppercase ml-1">Description</label>
+                            <textarea id="event-desc" placeholder="Détails..." class="w-full h-24 p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-medium focus:border-cyan-500 transition-all"></textarea>
                         </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[8px] font-black text-gray-400 uppercase px-1">Début</label>
+                                <input type="datetime-local" id="event-start" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-xs focus:border-cyan-500 transition-all">
+                            </div>
+                            <div>
+                                <label class="text-[8px] font-black text-gray-400 uppercase px-1">Fin</label>
+                                <input type="datetime-local" id="event-end" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-xs focus:border-cyan-500 transition-all">
+                            </div>
+                        </div>
+
+                        ${type === 'meeting' ? `
+                            <div class="pt-2">
+                                <label class="text-[9px] font-black text-gray-400 uppercase ml-1 mb-2 block">Inviter des Membres</label>
+                                <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-gray-100 rounded-2xl custom-scrollbar">
+                                    ${members.map(m => `
+                                        <label class="flex items-center p-2 hover:bg-cyan-50 rounded-xl cursor-pointer transition-all">
+                                            <input type="checkbox" value="${m.id}" class="invite-check w-4 h-4 accent-cyan-600 mr-2">
+                                            <span class="text-[10px] font-bold text-gray-600 truncate">${m.full_name}</span>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
-                </div>
-            `;
+                `;
 
-            Alert.show(`Programmer un(e) ${type === 'meeting' ? 'Réunion' : 'Disponibilité'}`, html, async () => {
-                const title = document.getElementById('event-title').value;
-                const description = document.getElementById('event-desc').value;
-                const start_at = document.getElementById('event-start').value;
-                const end_at = document.getElementById('event-end').value;
+                Alert.show(`Programmer un(e) ${type === 'meeting' ? 'Réunion' : 'Disponibilité / Absence'}`, html, async () => {
+                    const title = document.getElementById('event-title').value;
+                    const description = document.getElementById('event-desc').value;
+                    const start_at = document.getElementById('event-start').value;
+                    const end_at = document.getElementById('event-end').value;
+                    const meetingUrl = document.getElementById('event-url')?.value;
+                    const invitedMemberIds = Array.from(document.querySelectorAll('.invite-check:checked')).map(cb => cb.value);
 
-                if (!title || !start_at || !end_at) return alert("Veuillez remplir tous les champs.");
+                    if (!title || !start_at || !end_at) return alert("Veuillez remplir les champs obligatoires.");
 
-                try {
-                    await axios.post(`${API_URL}/collab/calendar`, {
-                        teamId: activeCollabTeamId, title, description, start_at, end_at, type
-                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    try {
+                        await axios.post(`${API_URL}/collab/calendar`, {
+                            teamId: activeCollabTeamId,
+                            title,
+                            description,
+                            start_at,
+                            end_at,
+                            type,
+                            meetingUrl,
+                            invitedMemberIds
+                        }, { headers: { Authorization: `Bearer ${token}` } });
 
-                    alert("Événement ajouté au calendrier !");
-                    closeImpactModal();
-                    loadCollabCalendar();
-                } catch (e) { alert("Erreur lors de la création."); }
-            }, "Programmer", "cyan");
+                        alert("Événement ajouté avec succès !");
+                        closeImpactModal();
+                        loadCollabCalendar();
+                    } catch (e) { alert("Erreur lors de la création."); }
+                }, "Valider", "cyan");
+            } catch (e) { alert("Erreur chargement membres."); }
         }
 
         async function loadCollabTeams() {

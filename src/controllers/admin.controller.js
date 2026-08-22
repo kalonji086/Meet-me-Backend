@@ -257,8 +257,6 @@ const ensureAdminTables = async () => {
     logger.error('Error migrating collab_teams:', e.message);
   }
 
-    logger.error('Error updating market_businesses status constraint:', e);
-  }
 
   // S'assurer que les tables d'inventaire sont complètes
   try {

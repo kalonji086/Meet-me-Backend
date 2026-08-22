@@ -253,6 +253,7 @@ const ensureAdminTables = async () => {
   try {
     await query('ALTER TABLE public.collab_teams ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES public.collab_teams(id) ON DELETE CASCADE');
     await query('ALTER TABLE public.collab_teams ADD COLUMN IF NOT EXISTS is_confidential BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.collab_teams ADD COLUMN IF NOT EXISTS color TEXT DEFAULT \'#06b6d4\'');
   } catch (e) {
     logger.error('Error migrating collab_teams:', e.message);
   }
@@ -442,8 +443,8 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           break;
         case 'create_team':
           const teamRes = await query(
-            'INSERT INTO public.collab_teams (name, description, created_by, parent_id, is_confidential) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-            [action.target_name, action.details.description, action.requested_by, action.details.parentId || null, action.details.isConfidential || false]
+            'INSERT INTO public.collab_teams (name, description, created_by, parent_id, is_confidential, color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+            [action.target_name, action.details.description, action.requested_by, action.details.parentId || null, action.details.isConfidential || false, action.details.color || '#06b6d4']
           );
           await query(
             'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, $3)',
@@ -452,8 +453,8 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           break;
         case 'update_team':
           await query(
-            'UPDATE public.collab_teams SET name = $1, description = $2, is_confidential = $3, updated_at = NOW() WHERE id = $4',
-            [action.details.name, action.details.description, action.details.isConfidential, action.target_id]
+            'UPDATE public.collab_teams SET name = $1, description = $2, is_confidential = $3, color = $4, updated_at = NOW() WHERE id = $5',
+            [action.details.name, action.details.description, action.details.isConfidential, action.details.color, action.target_id]
           );
           break;
         case 'delete_team':

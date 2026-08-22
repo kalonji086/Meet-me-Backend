@@ -72,14 +72,14 @@ const createTeam = asyncHandler(async (req, res) => {
 
   if (!canCreate) return res.status(403).json({ success: false, error: 'Accès refusé : Vous ne pouvez pas créer d\'équipe.' });
 
-  const { name, description, parentId, isConfidential } = req.body;
+  const { name, description, parentId, isConfidential, color } = req.body;
 
-  const canExecute = await processSensitiveAction(req, 'create_team', null, name, { name, description, parentId, isConfidential });
+  const canExecute = await processSensitiveAction(req, 'create_team', null, name, { name, description, parentId, isConfidential, color });
   if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de création d\'équipe envoyée.' });
 
   const result = await query(
-    'INSERT INTO public.collab_teams (name, description, created_by, parent_id, is_confidential) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-    [name, description, req.userId, parentId || null, isConfidential || false]
+    'INSERT INTO public.collab_teams (name, description, created_by, parent_id, is_confidential, color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+    [name, description, req.userId, parentId || null, isConfidential || false, color || '#06b6d4']
   );
 
   // Add creator as admin member
@@ -96,18 +96,18 @@ const createTeam = asyncHandler(async (req, res) => {
  */
 const updateTeam = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
-  const { name, description, isConfidential } = req.body;
+  const { name, description, isConfidential, color } = req.body;
 
   // Security check: Global admin or authorized delegate
   const canManage = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.manage_teams);
   if (!canManage) return res.status(403).json({ success: false, error: 'Accès refusé : Vous ne pouvez pas modifier d\'équipe.' });
 
-  const canExecute = await processSensitiveAction(req, 'update_team', teamId, name, { name, description, isConfidential });
+  const canExecute = await processSensitiveAction(req, 'update_team', teamId, name, { name, description, isConfidential, color });
   if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de modification envoyée.' });
 
   const result = await query(
-    'UPDATE public.collab_teams SET name = $1, description = $2, is_confidential = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-    [name, description, isConfidential, teamId]
+    'UPDATE public.collab_teams SET name = $1, description = $2, is_confidential = $3, color = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
+    [name, description, isConfidential, color, teamId]
   );
 
   res.json({ success: true, data: result.rows[0] });

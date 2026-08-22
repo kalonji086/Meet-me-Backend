@@ -34,6 +34,7 @@ router.get('/teams/:teamId/messages', collabController.getMessages);
 router.post('/messages', collabController.sendMessage);
 router.put('/messages/:messageId', collabController.updateMessage);
 router.delete('/messages/:messageId', collabController.deleteMessage);
+router.put('/messages/:messageId/seen', collabController.markMessageAsSeen);
 
 // Documents
 router.get('/documents', collabController.getAllDocuments); // Centralized for Admin

@@ -1914,6 +1914,14 @@
                 chatContainer.innerHTML = "";
                 res.data.data.forEach(m => renderSingleCollabMessage(m));
                 chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                // Mark unseen messages as seen
+                res.data.data.forEach(m => {
+                    const seenBy = m.seen_by || [];
+                    if (m.sender_id !== user.id && !seenBy.includes(user.id)) {
+                        axios.put(`${API_URL}/collab/messages/${m.id}/seen`, {}, { headers: { Authorization: `Bearer ${token}` } });
+                    }
+                });
             } catch (e) {}
         }
 
@@ -1954,12 +1962,28 @@
             const isGlobalAdmin = user.isGlobalAdmin;
             const canRead = isGlobalAdmin || (user.collabRights && user.collabRights.read_messages);
 
+            const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const date = new Date(m.created_at).toLocaleDateString();
+
+            // Format seen by
+            let seenHtml = '';
+            if (isMe && m.seen_by_details && m.seen_by_details.length > 0) {
+                const names = m.seen_by_details.map(p => p.name).join(', ');
+                seenHtml = `<div class="flex items-center mt-1 text-[7px] text-cyan-200 font-bold uppercase"><i data-lucide="check-check" class="w-2.5 h-2.5 mr-1"></i> VU PAR ${names}</div>`;
+            } else if (isMe) {
+                seenHtml = `<div class="flex items-center mt-1 text-[7px] text-cyan-100/50 font-bold uppercase"><i data-lucide="check" class="w-2.5 h-2.5 mr-1"></i> ENVOYÉ</div>`;
+            }
+
             const msgHtml = `
                 <div id="collab-msg-${m.id}" class="flex items-start ${isMe ? 'flex-row-reverse' : ''} animate-pop-in group mb-4">
                     <img src="${getFullUrl(m.sender_avatar)}" class="w-8 h-8 rounded-lg mx-2 shadow-sm">
                     <div class="relative max-w-[80%] p-4 rounded-[1.5rem] text-sm shadow-sm ${isMe ? 'bg-cyan-500 text-white rounded-tr-none' : 'bg-gray-100 text-gray-700 rounded-tl-none border border-gray-200'}">
-                        <p class="font-black mb-1 opacity-50 text-[9px] uppercase tracking-widest">${m.sender_name}</p>
+                        <div class="flex justify-between items-center mb-1 space-x-4">
+                            <p class="font-black opacity-50 text-[9px] uppercase tracking-widest">${m.sender_name}</p>
+                            <p class="text-[7px] font-bold opacity-40 uppercase">${date} ${time}</p>
+                        </div>
                         <p class="msg-content leading-relaxed font-medium whitespace-pre-wrap">${m.content}</p>
+                        ${seenHtml}
 
                         <div class="absolute ${isMe ? 'right-full mr-2' : 'left-full ml-2'} top-2 hidden group-hover:flex space-x-1">
                             ${isMe || isGlobalAdmin ? `

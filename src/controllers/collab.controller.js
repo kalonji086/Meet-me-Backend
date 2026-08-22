@@ -278,7 +278,9 @@ const getMessages = asyncHandler(async (req, res) => {
   }
 
   let queryStr = `
-    SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar
+    SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar,
+    (SELECT json_agg(json_build_object('id', p2.id, 'name', p2.full_name))
+     FROM public.profiles p2 WHERE p2.id = ANY(m.seen_by)) as seen_by_details
     FROM public.collab_messages m
     JOIN public.profiles p ON m.sender_id = p.id
     WHERE m.team_id = $1
@@ -298,6 +300,32 @@ const getMessages = asyncHandler(async (req, res) => {
 
   const result = await query(queryStr, params);
   res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Mark a message as seen
+ */
+const markMessageAsSeen = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+
+  const result = await query(
+    `UPDATE public.collab_messages
+     SET seen_by = array_append(COALESCE(seen_by, '{}'), $1)
+     WHERE id = $2 AND NOT ($1 = ANY(COALESCE(seen_by, '{}')))
+     RETURNING *`,
+    [req.userId, messageId]
+  );
+
+  if (result.rows.length > 0) {
+    const user = await query('SELECT full_name FROM public.profiles WHERE id = $1', [req.userId]);
+    socketService.broadcast('collab:message_seen', {
+      messageId,
+      user: { id: req.userId, name: user.rows[0].full_name },
+      teamId: result.rows[0].team_id
+    });
+  }
+
+  res.json({ success: true });
 });
 
 /**
@@ -783,7 +811,7 @@ const deleteCalendarEvent = asyncHandler(async (req, res) => {
 module.exports = {
   getTeams, createTeam, updateTeam, deleteTeam, getTeamMembers, markAsRead,
   getTasks, createTask, updateTaskStatus, deleteTask,
-  getMessages, sendMessage, deleteMessage, updateMessage,
+  getMessages, markMessageAsSeen, sendMessage, deleteMessage, updateMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,
   archiveDocument, deleteDocument,
   getCalendarEvents, createCalendarEvent, deleteCalendarEvent,

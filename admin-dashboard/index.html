@@ -1117,6 +1117,32 @@
         function addNotification(type, title, message, icon = 'bell') {
             notifications_list.unshift({ id: Date.now(), type, title, message, icon, time: new Date() });
             unread_notif_count++; updateNotifBadge(); renderNotifications();
+            showToast(title, message, icon);
+        }
+
+        function showToast(title, message, icon = 'bell') {
+            const container = document.getElementById('toast-container');
+            const id = 'toast-' + Date.now();
+            const html = `
+                <div id="${id}" class="bg-white p-5 rounded-2xl shadow-2xl border border-gray-100 flex items-start w-80 animate-pop-in cursor-pointer hover:scale-105 transition-all" onclick="this.remove()">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center mr-4 bg-purple-50 text-purple-600 shrink-0">
+                        <i data-lucide="${icon}" class="w-5 h-5"></i>
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="text-[11px] font-black text-gray-900 uppercase truncate">${title}</p>
+                        <p class="text-[10px] text-gray-500 line-clamp-2">${message}</p>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+            if (window.lucide) lucide.createIcons();
+            setTimeout(() => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.add('opacity-0', 'translate-x-full');
+                    setTimeout(() => el.remove(), 500);
+                }
+            }, 6000);
         }
 
         function updateNotifBadge() {

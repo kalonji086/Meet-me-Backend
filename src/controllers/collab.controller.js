@@ -542,10 +542,6 @@ const submitRequest = asyncHandler(async (req, res) => {
  * @desc    Invite a user to collaborate
  */
 const inviteUser = asyncHandler(async (req, res) => {
-  const isGlobalAdmin = req.user.is_global_admin;
-  const canManage = isGlobalAdmin || (req.user.collab_rights && req.user.collab_rights.manage_members);
-
-  if (!canManage) return res.status(403).json({ success: false, error: 'Accès réservé : Vous ne pouvez pas inviter de collaborateurs.' });
   const { userId, teamId } = req.body;
 
   const userRes = await query('SELECT full_name, email FROM public.profiles WHERE id = $1', [userId]);
@@ -554,6 +550,9 @@ const inviteUser = asyncHandler(async (req, res) => {
 
   const teamRes = await query('SELECT name FROM public.collab_teams WHERE id = $1', [teamId]);
   const teamName = teamRes.rows[0]?.name || "l'équipe";
+
+  const canExecute = await processSensitiveAction(req, 'add_member', userId, user.full_name, { userId, teamId, teamName, email: user.email });
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande d\'ajout de membre envoyée à l\'admin principal.' });
 
   const mailService = require('../services/mail.service');
   await mailService.sendCollabInvitationEmail(user.email, user.full_name, teamName, teamId);
@@ -646,11 +645,16 @@ const handleRequest = asyncHandler(async (req, res) => {
  * @desc    Move a member to another team
  */
 const moveTeamMember = asyncHandler(async (req, res) => {
-  const isGlobalAdmin = req.user.is_global_admin;
-  const canManage = isGlobalAdmin || (req.user.collab_rights && req.user.collab_rights.manage_members);
-
-  if (!canManage) return res.status(403).json({ success: false, error: 'Accès réservé : Vous ne pouvez pas déplacer de collaborateurs.' });
   const { userId, fromTeamId, toTeamId } = req.params.userId ? { ...req.body, userId: req.params.userId } : req.body;
+
+  const userRes = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
+  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+
+  const teamRes = await query('SELECT name FROM public.collab_teams WHERE id = $1', [toTeamId]);
+  const teamName = teamRes.rows[0]?.name || "Nouvelle Équipe";
+
+  const canExecute = await processSensitiveAction(req, 'move_member', userId, userRes.rows[0].full_name, { userId, fromTeamId, toTeamId, teamName });
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de déplacement envoyée à l\'admin principal.' });
 
   // 1. Remove from old team (if exists) or all teams to be sure
   if (fromTeamId && fromTeamId !== 'null' && fromTeamId !== '') {

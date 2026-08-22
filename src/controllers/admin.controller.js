@@ -477,6 +477,27 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'toggle_market_block':
           await query('UPDATE public.market_businesses SET status = $1 WHERE id = $2', [action.details.status, action.target_id]);
           break;
+        case 'add_member':
+          await mailService.sendCollabInvitationEmail(action.details.email || '', action.target_name, action.details.teamName, action.details.teamId);
+          // Also add directly if it's an "add" rather than just "invite"
+          await query(
+            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
+            [action.details.teamId, action.target_id]
+          );
+          socketService.broadcast('collab:member_moved', { userId: action.target_id, toTeamId: action.details.teamId });
+          break;
+        case 'move_member':
+          if (action.details.fromTeamId) {
+            await query('DELETE FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [action.details.fromTeamId, action.target_id]);
+          } else {
+            await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [action.target_id]);
+          }
+          await query(
+            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
+            [action.details.toTeamId, action.target_id]
+          );
+          socketService.broadcast('collab:member_moved', { userId: action.target_id, fromTeamId: action.details.fromTeamId, toTeamId: action.details.toTeamId });
+          break;
       }
       await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1, admin_notes = $2 WHERE id = $3', [req.userId, comment || null, id]);
     } catch (err) {

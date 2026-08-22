@@ -6,7 +6,7 @@ class SocketService {
   constructor() {
     this.io = null;
     this.connectedUsers = new Map(); // socketId -> userId
-    this.userSockets = new Map(); // userId -> socketId
+    this.userSockets = new Map(); // userId -> Set of socketIds
     this.pendingCalls = new Map(); // callId -> { callerId, calleeId, timeout }
   }
 
@@ -264,7 +264,12 @@ class SocketService {
 
       // Stocker la connexion
       this.connectedUsers.set(socket.id, userId);
-      this.userSockets.set(userId.toString(), socket.id);
+
+      const userIdStr = userId.toString();
+      if (!this.userSockets.has(userIdStr)) {
+        this.userSockets.set(userIdStr, new Set());
+      }
+      this.userSockets.get(userIdStr).add(socket.id);
 
       // Mettre à jour le statut de l'utilisateur
       await query(
@@ -654,15 +659,23 @@ class SocketService {
       const userId = this.connectedUsers.get(socket.id);
       
       if (userId) {
-        await query(
-          "UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1",
-          [userId]
-        );
-        this.notifyUserStatusChange(userId, 'offline');
+        const userIdStr = userId.toString();
+        const userSockets = this.userSockets.get(userIdStr);
+
+        if (userSockets) {
+          userSockets.delete(socket.id);
+          if (userSockets.size === 0) {
+            this.userSockets.delete(userIdStr);
+
+            await query(
+              "UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1",
+              [userId]
+            );
+            this.notifyUserStatusChange(userId, 'offline');
+          }
+        }
 
         this.connectedUsers.delete(socket.id);
-        this.userSockets.delete(userId.toString());
-
         logger.socket('disconnect', socket.id, { userId });
       }
     } catch (error) {
@@ -756,10 +769,12 @@ class SocketService {
    * Émettre un événement à un utilisateur spécifique
    */
   emitToUser(userId, event, data) {
-    const socketId = this.userSockets.get(userId.toString());
+    const socketIds = this.userSockets.get(userId.toString());
     
-    if (socketId) {
-      this.io.to(socketId).emit(event, data);
+    if (socketIds && socketIds.size > 0) {
+      socketIds.forEach(socketId => {
+        this.io.to(socketId).emit(event, data);
+      });
       return true;
     }
     

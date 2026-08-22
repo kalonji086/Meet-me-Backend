@@ -19,7 +19,6 @@ const getTeams = asyncHandler(async (req, res) => {
 
   if (canSeeAll) {
     // Global Admin or authorized Delegated Admin sees all teams.
-    // For Delegated Admin, we still want to know their actual role in the team if they are part of it.
     queryStr = `
       SELECT t.*,
       (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
@@ -29,7 +28,7 @@ const getTeams = asyncHandler(async (req, res) => {
        AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')), 0) as unread_count
       FROM public.collab_teams t
       LEFT JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
-      ORDER BY t.created_at DESC
+      ORDER BY t.parent_id NULLS FIRST, t.created_at DESC
     `;
     params = [req.userId];
   } else {
@@ -42,7 +41,8 @@ const getTeams = asyncHandler(async (req, res) => {
        AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
       FROM public.collab_teams t
       JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
-      ORDER BY t.created_at DESC
+      WHERE t.is_confidential = FALSE OR tm.role = 'admin' OR tm.role = 'manager'
+      ORDER BY t.parent_id NULLS FIRST, t.created_at DESC
     `;
     params = [req.userId];
   }
@@ -72,14 +72,14 @@ const createTeam = asyncHandler(async (req, res) => {
 
   if (!canCreate) return res.status(403).json({ success: false, error: 'Accès refusé : Vous ne pouvez pas créer d\'équipe.' });
 
-  const { name, description } = req.body;
+  const { name, description, parentId, isConfidential } = req.body;
 
-  const canExecute = await processSensitiveAction(req, 'create_team', null, name, { name, description });
+  const canExecute = await processSensitiveAction(req, 'create_team', null, name, { name, description, parentId, isConfidential });
   if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de création d\'équipe envoyée.' });
 
   const result = await query(
-    'INSERT INTO public.collab_teams (name, description, created_by) VALUES ($1, $2, $3) RETURNING *',
-    [name, description, req.userId]
+    'INSERT INTO public.collab_teams (name, description, created_by, parent_id, is_confidential) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [name, description, req.userId, parentId || null, isConfidential || false]
   );
 
   // Add creator as admin member
@@ -89,6 +89,49 @@ const createTeam = asyncHandler(async (req, res) => {
   );
 
   res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Update a team
+ */
+const updateTeam = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+  const { name, description, isConfidential } = req.body;
+
+  // Security check: Global admin or authorized delegate
+  const canManage = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.manage_teams);
+  if (!canManage) return res.status(403).json({ success: false, error: 'Accès refusé : Vous ne pouvez pas modifier d\'équipe.' });
+
+  const canExecute = await processSensitiveAction(req, 'update_team', teamId, name, { name, description, isConfidential });
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de modification envoyée.' });
+
+  const result = await query(
+    'UPDATE public.collab_teams SET name = $1, description = $2, is_confidential = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
+    [name, description, isConfidential, teamId]
+  );
+
+  res.json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Delete a team
+ */
+const deleteTeam = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+
+  // Security check
+  const canManage = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.manage_teams);
+  if (!canManage) return res.status(403).json({ success: false, error: 'Accès refusé : Vous ne pouvez pas supprimer d\'équipe.' });
+
+  const team = await query('SELECT name FROM public.collab_teams WHERE id = $1', [teamId]);
+  if (team.rows.length === 0) return res.status(404).json({ success: false, error: 'Équipe non trouvée.' });
+
+  const canExecute = await processSensitiveAction(req, 'delete_team', teamId, team.rows[0].name);
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression envoyée.' });
+
+  await query('DELETE FROM public.collab_teams WHERE id = $1', [teamId]);
+
+  res.json({ success: true, message: 'Équipe supprimée.' });
 });
 
 /**
@@ -738,7 +781,7 @@ const deleteCalendarEvent = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getTeams, createTeam, getTeamMembers, markAsRead,
+  getTeams, createTeam, updateTeam, deleteTeam, getTeamMembers, markAsRead,
   getTasks, createTask, updateTaskStatus, deleteTask,
   getMessages, sendMessage, deleteMessage, updateMessage,
   getDocuments, getAllDocuments, uploadDocument, handleDocumentStatus,

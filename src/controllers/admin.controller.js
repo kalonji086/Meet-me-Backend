@@ -247,7 +247,16 @@ const ensureAdminTables = async () => {
       ADD CONSTRAINT market_businesses_status_check
       CHECK (status IN ('pending', 'approved', 'rejected', 'blocked'));
     `);
+  } catch (e) {}
+
+  // Migration Collaboration: Sub-teams and Confidentiality
+  try {
+    await query('ALTER TABLE public.collab_teams ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES public.collab_teams(id) ON DELETE CASCADE');
+    await query('ALTER TABLE public.collab_teams ADD COLUMN IF NOT EXISTS is_confidential BOOLEAN DEFAULT FALSE');
   } catch (e) {
+    logger.error('Error migrating collab_teams:', e.message);
+  }
+
     logger.error('Error updating market_businesses status constraint:', e);
   }
 
@@ -435,13 +444,22 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           break;
         case 'create_team':
           const teamRes = await query(
-            'INSERT INTO public.collab_teams (name, description, created_by) VALUES ($1, $2, $3) RETURNING id',
-            [action.target_name, action.details.description, action.requested_by]
+            'INSERT INTO public.collab_teams (name, description, created_by, parent_id, is_confidential) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+            [action.target_name, action.details.description, action.requested_by, action.details.parentId || null, action.details.isConfidential || false]
           );
           await query(
             'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, $3)',
             [teamRes.rows[0].id, action.requested_by, 'admin']
           );
+          break;
+        case 'update_team':
+          await query(
+            'UPDATE public.collab_teams SET name = $1, description = $2, is_confidential = $3, updated_at = NOW() WHERE id = $4',
+            [action.details.name, action.details.description, action.details.isConfidential, action.target_id]
+          );
+          break;
+        case 'delete_team':
+          await query('DELETE FROM public.collab_teams WHERE id = $1', [action.target_id]);
           break;
         case 'delete_group':
           await query('DELETE FROM public.chats WHERE id = $1', [action.target_id]);

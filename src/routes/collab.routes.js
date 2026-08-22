@@ -15,6 +15,8 @@ router.use(isAdmin);
 // Teams
 router.get('/teams', collabController.getTeams);
 router.post('/teams', collabController.createTeam);
+router.put('/teams/:teamId', collabController.updateTeam);
+router.delete('/teams/:teamId', collabController.deleteTeam);
 router.get('/teams/:teamId/members', collabController.getTeamMembers);
 router.get('/members/:userId', collabController.getMemberDetails);
 router.post('/invite', collabController.inviteUser);

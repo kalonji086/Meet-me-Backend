@@ -133,6 +133,8 @@ CREATE TABLE IF NOT EXISTS public.chat_participants (
   role TEXT DEFAULT 'member' CHECK (role IN ('member', 'admin')),
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   is_archived BOOLEAN DEFAULT FALSE,
+  is_favorite BOOLEAN DEFAULT FALSE,
+  is_priority BOOLEAN DEFAULT FALSE,
   PRIMARY KEY (chat_id, user_id)
 );
 
@@ -160,6 +162,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='deleted_for_users') THEN
     ALTER TABLE public.messages ADD COLUMN deleted_for_users UUID[] DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='likes') THEN
+    ALTER TABLE public.messages ADD COLUMN likes UUID[] DEFAULT '{}';
   END IF;
 END $$;
 
@@ -340,6 +345,14 @@ BEGIN
     ALTER TABLE public.chat_participants DROP CONSTRAINT chat_participants_user_id_fkey;
   END IF;
   ALTER TABLE public.chat_participants ADD CONSTRAINT chat_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+  -- Add is_favorite and is_priority to chat_participants
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_participants' AND column_name='is_favorite') THEN
+    ALTER TABLE public.chat_participants ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_participants' AND column_name='is_priority') THEN
+    ALTER TABLE public.chat_participants ADD COLUMN is_priority BOOLEAN DEFAULT FALSE;
+  END IF;
 END $$;
 
 -- 9. Activer le Realtime Supabase pour les messages et discussions

@@ -546,19 +546,39 @@ class SocketService {
    * Gérer les réactions aux messages
    */
   async handleReaction(socket, data) {
-    // Note: La table des réactions n'existe pas encore dans database_setup.sql
-    // On peut soit l'ignorer soit la stocker dans une colonne JSONB si on veut
-    // Pour l'instant, on émet juste l'événement
-    const userId = this.connectedUsers.get(socket.id);
-    const { messageId, emoji } = data;
+    try {
+      const userId = this.connectedUsers.get(socket.id);
+      if (!userId) return;
 
-    this.io.emit('message_reaction', {
-      messageId,
-      reaction: {
-        user: userId,
-        emoji,
+      const { messageId, emoji } = data;
+
+      // On supporte principalement le "like" (❤️) pour le moment dans les messages
+      // Mais on stocke les IDs des utilisateurs ayant liké
+      const result = await query(
+        `UPDATE public.messages
+         SET likes = CASE
+           WHEN $1 = ANY(COALESCE(likes, '{}')) THEN array_remove(likes, $1)
+           ELSE array_append(COALESCE(likes, '{}'), $1)
+         END
+         WHERE id = $2
+         RETURNING likes, chat_id`,
+        [userId, messageId]
+      );
+
+      if (result.rows.length > 0) {
+        const { likes, chat_id } = result.rows[0];
+        this.io.to(`chat:${chat_id}`).emit('message_reaction', {
+          messageId,
+          likes,
+          reaction: {
+            user: userId,
+            emoji: emoji || '❤️',
+          }
+        });
       }
-    });
+    } catch (error) {
+      logger.error('Error handling reaction:', error);
+    }
   }
 
   /**

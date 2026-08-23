@@ -24,6 +24,16 @@ router.post('/', chatController.createChat);
 router.put('/:chatId/archive', chatController.toggleArchive);
 
 /**
+ * @route   PUT /api/chats/:chatId/favorite
+ */
+router.put('/:chatId/favorite', chatController.toggleFavorite);
+
+/**
+ * @route   PUT /api/chats/:chatId/priority
+ */
+router.put('/:chatId/priority', chatController.togglePriority);
+
+/**
  * @route   DELETE /api/chats/:chatId
  */
 router.delete('/:chatId', chatController.deleteChat);

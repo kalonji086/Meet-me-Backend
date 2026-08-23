@@ -23,6 +23,8 @@ const getChats = asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT
         c.*,
+        cp.is_favorite,
+        cp.is_priority,
         CASE
           WHEN c.type = 'group' THEN NULL
           ELSE (
@@ -50,7 +52,7 @@ const getChats = asyncHandler(async (req, res) => {
      FROM public.chats c
      JOIN public.chat_participants cp ON c.id = cp.chat_id
      WHERE cp.user_id = $1 AND cp.is_archived = $4
-     ORDER BY c.last_message_at DESC
+     ORDER BY cp.is_priority DESC, c.last_message_at DESC
      LIMIT $2 OFFSET $3`,
     [userId, limit, offset, req.query.archived === 'true']
   );
@@ -680,12 +682,48 @@ const translateAudioMessage = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Mettre en favoris/Retirer des favoris
+ * @route   PUT /api/chats/:chatId/favorite
+ */
+const toggleFavorite = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.userId;
+  const { favorite = true } = req.body;
+
+  await query(
+    'UPDATE public.chat_participants SET is_favorite = $1 WHERE chat_id = $2 AND user_id = $3',
+    [favorite, chatId, userId]
+  );
+
+  res.json({ success: true, message: favorite ? 'Ajouté aux favoris' : 'Retiré des favoris' });
+});
+
+/**
+ * @desc    Mettre en priorité/Retirer priorité
+ * @route   PUT /api/chats/:chatId/priority
+ */
+const togglePriority = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.userId;
+  const { priority = true } = req.body;
+
+  await query(
+    'UPDATE public.chat_participants SET is_priority = $1 WHERE chat_id = $2 AND user_id = $3',
+    [priority, chatId, userId]
+  );
+
+  res.json({ success: true, message: priority ? 'Discussion épinglée' : 'Discussion détachée' });
+});
+
 module.exports = {
   getChats,
   createChat,
   getMessages,
   sendMessage,
   toggleArchive,
+  toggleFavorite,
+  togglePriority,
   deleteChat,
   markAsRead,
   deleteMessage,

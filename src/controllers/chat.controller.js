@@ -184,7 +184,7 @@ const getMessages = asyncHandler(async (req, res) => {
  */
 const sendMessage = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const { chat: chatId, content, type = 'text', file_url: fileUrl, fileSize, mimeType } = req.body;
+  const { chat: chatId, content, type = 'text', file_url: fileUrl, fileSize, mimeType, ...metadata } = req.body;
 
   if (!chatId || !content) {
     return res.status(400).json({
@@ -194,10 +194,10 @@ const sendMessage = asyncHandler(async (req, res) => {
   }
 
   const result = await query(
-    `INSERT INTO public.messages (chat_id, sender_id, content, type, file_url)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO public.messages (chat_id, sender_id, content, type, file_url, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [chatId, userId, content, type, fileUrl]
+    [chatId, userId, content, type, fileUrl, JSON.stringify(metadata)]
   );
 
   const message = result.rows[0];

@@ -92,11 +92,14 @@ const updateProfile = asyncHandler(async (req, res) => {
   const updatedUser = result.rows[0];
   socketService.notifyUserStatusChange(userId, updatedUser.status);
 
+  // Émettre un événement spécifique pour le changement de photo/nom en temps réel
   socketService.broadcast('admin_user_profile_updated', {
     userId: updatedUser.id,
     name: updatedUser.full_name,
     username: updatedUser.username,
-    avatar: updatedUser.avatar_url
+    avatar: updatedUser.avatar_url,
+    full_name: updatedUser.full_name,
+    avatar_url: updatedUser.avatar_url
   });
 
   res.json({

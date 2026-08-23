@@ -103,7 +103,7 @@ const config = {
   // Application Constants
   constants: {
     appName: 'Meet Me',
-    appVersion: '44.0.0',
+    appVersion: '45.0.0',
     defaultLanguage: 'fr',
     supportedLanguages: ['fr', 'en', 'es', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar'],
     messageTypes: {

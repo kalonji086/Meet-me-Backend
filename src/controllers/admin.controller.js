@@ -141,6 +141,10 @@ const ensureAdminTables = async () => {
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS accepted_privacy_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS app_version TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_update_at TIMESTAMP WITH TIME ZONE');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS collab_start_at TIMESTAMP WITH TIME ZONE');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS collab_end_at TIMESTAMP WITH TIME ZONE');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS collab_deleted_at TIMESTAMP WITH TIME ZONE');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_collaborator BOOLEAN DEFAULT FALSE');
 
   // Enforce single global admin: wecanconcept@gmail.com
   await query('UPDATE public.profiles SET is_global_admin = FALSE');
@@ -1551,6 +1555,69 @@ const handleVerification = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
+/**
+ * @desc    Créer un compte collaborateur complet
+ */
+const createCollaborator = asyncHandler(async (req, res) => {
+  const { full_name, email, password, username, avatar_url, modules, collab_start_at, collab_end_at, collabAdminRights = {}, userAdminRights = {} } = req.body;
+
+  if (!email || !password || !full_name) {
+    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants.' });
+  }
+
+  // Vérifier si l'utilisateur existe déjà
+  const existing = await query('SELECT id FROM public.profiles WHERE email = $1 OR username = $2', [email, username]);
+  if (existing.rows.length > 0) {
+    return res.status(400).json({ success: false, error: 'Cet email ou nom d\'utilisateur est déjà utilisé.' });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const userId = crypto.randomUUID();
+
+  // 1. Créer le profil
+  await query(
+    `INSERT INTO public.profiles (id, full_name, email, password, username, avatar_url, is_collaborator, collab_start_at, collab_end_at, is_verified)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [userId, full_name, email, hashedPassword, username || email.split('@')[0], avatar_url || null, true, collab_start_at || new Date(), collab_end_at || null, true]
+  );
+
+  // 2. Créer la délégation (Rôles et Accès)
+  await query(
+    `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, user_admin_rights)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, modules || [], true, JSON.stringify(collabAdminRights), JSON.stringify(userAdminRights)]
+  );
+
+  await logAdminAction(req, 'create_collaborator', 'user', userId, { email, full_name });
+
+  res.status(201).json({ success: true, message: 'Collaborateur créé avec succès.', data: { id: userId } });
+});
+
+/**
+ * @desc    Supprimer un collaborateur (Soft delete avec date)
+ */
+const deleteCollaborator = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await query('SELECT full_name, is_global_admin FROM public.profiles WHERE id = $1', [userId]);
+  if (user.rows.length === 0) return res.status(404).json({ success: false, error: 'Collaborateur non trouvé.' });
+  if (user.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Action interdite sur un admin global.' });
+
+  // On marque comme supprimé avec la date actuelle
+  const now = new Date();
+  await query(
+    'UPDATE public.profiles SET collab_deleted_at = $1, is_collaborator = FALSE WHERE id = $2',
+    [now, userId]
+  );
+
+  // Désactiver sa délégation
+  await query('UPDATE public.admin_delegations SET is_active = FALSE WHERE user_id = $1', [userId]);
+
+  await logAdminAction(req, 'delete_collaborator', 'user', userId, { deleted_at: now });
+
+  res.json({ success: true, message: 'Collaboration terminée et compte désactivé.', deleted_at: now });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -1600,6 +1667,8 @@ module.exports = {
   deletePendingAction,
   getDelegations,
   saveDelegation,
+  createCollaborator,
+  deleteCollaborator,
   ensureAdminTables,
   processSensitiveAction
 };

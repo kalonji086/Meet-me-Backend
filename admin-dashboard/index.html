@@ -617,11 +617,16 @@
                                             <h4 class="font-black text-gray-800 uppercase text-sm tracking-widest">Gestion des Collaborateurs en Direct</h4>
                                             <p class="text-[9px] text-gray-400 font-bold uppercase mt-1">Affectations d'équipes et droits d'accès temps réel</p>
                                         </div>
-                                        <div class="flex items-center space-x-4">
-                                            <button onclick="showAddCollabFromDirectory()" class="bg-cyan-500 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all">+ AJOUTER</button>
-                                            <div class="flex items-center space-x-2">
+                                        <div class="flex items-center space-x-2 lg:space-x-4">
+                                            <button onclick="showCreateCollaboratorModal()" class="bg-purple-600 text-white px-4 lg:px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all flex items-center shrink-0">
+                                                <i data-lucide="user-plus" class="w-3 h-3 mr-2"></i> CRÉER COMPTE
+                                            </button>
+                                            <button onclick="showAddCollabFromDirectory()" class="bg-cyan-500 text-white px-4 lg:px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all flex items-center shrink-0">
+                                                <i data-lucide="plus" class="w-3 h-3 mr-2"></i> AJOUTER
+                                            </button>
+                                            <div class="hidden sm:flex items-center space-x-2">
                                                 <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                                <span class="text-[10px] font-black text-gray-400 uppercase">Live Sync</span>
+                                                <span class="text-[8px] lg:text-[10px] font-black text-gray-400 uppercase">Live Sync</span>
                                             </div>
                                         </div>
                                     </div>
@@ -3098,12 +3103,121 @@
             } catch (e) {}
         }
 
+        async function showCreateCollaboratorModal() {
+            let html = `
+                <div class="space-y-6 text-left max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+                    <!-- Section Identité -->
+                    <div class="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-4">
+                        <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-4">Identité du Collaborateur</p>
+                        <div class="flex items-center mb-4">
+                            <div class="relative group">
+                                <img id="new-collab-avatar-preview" src="https://ui-avatars.com/api/?name=New+Collab" class="w-20 h-20 rounded-2xl border-4 border-white shadow-xl object-cover">
+                                <button onclick="document.getElementById('new-collab-avatar-input').click()" class="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <i data-lucide="camera" class="w-6 h-6 text-white"></i>
+                                </button>
+                                <input type="file" id="new-collab-avatar-input" class="hidden" onchange="previewNewCollabAvatar(this)">
+                            </div>
+                            <div class="ml-6 flex-1">
+                                <input type="text" id="new-collab-name" placeholder="Nom Complet" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500 mb-3">
+                                <input type="text" id="new-collab-username" placeholder="Nom d'utilisateur (Pseudo)" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                            </div>
+                        </div>
+                        <input type="email" id="new-collab-email" placeholder="Adresse Email Professionnelle" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                        <input type="password" id="new-collab-pass" placeholder="Clé d'Accès (Mot de passe)" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                    </div>
+
+                    <!-- Section Période -->
+                    <div class="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-4">
+                        <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">Période de Collaboration</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[8px] font-black text-gray-400 uppercase px-1">Date de Début</label>
+                                <input type="date" id="new-collab-start" value="${new Date().toISOString().split('T')[0]}" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-xs">
+                            </div>
+                            <div>
+                                <label class="text-[8px] font-black text-gray-400 uppercase px-1">Date de Fin (Optionnel)</label>
+                                <input type="date" id="new-collab-end" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-xs">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section Droits -->
+                    <div class="p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+                        <p class="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-4">Modules & Accès</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            ${['stats', 'users', 'groups', 'support', 'verifications', 'collaboration'].map(m => `
+                                <label class="flex items-center p-3 bg-white rounded-xl cursor-pointer border border-transparent hover:border-cyan-200 transition-all">
+                                    <input type="checkbox" value="${m}" class="new-collab-mod w-4 h-4 accent-cyan-600 mr-3">
+                                    <span class="text-[10px] font-black text-gray-700 uppercase">${m}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            Alert.show("Créer un Compte Collaborateur", html, async () => {
+                const full_name = document.getElementById('new-collab-name').value.trim();
+                const email = document.getElementById('new-collab-email').value.trim();
+                const password = document.getElementById('new-collab-pass').value.trim();
+                const username = document.getElementById('new-collab-username').value.trim();
+                const collab_start_at = document.getElementById('new-collab-start').value;
+                const collab_end_at = document.getElementById('new-collab-end').value;
+                const avatarFile = document.getElementById('new-collab-avatar-input').files[0];
+                const modules = Array.from(document.querySelectorAll('.new-collab-mod:checked')).map(cb => cb.value);
+
+                if (!full_name || !email || !password) return alert("Veuillez remplir les champs obligatoires.");
+
+                try {
+                    let avatar_url = null;
+                    if (avatarFile) {
+                        const uploadRes = await apiService_upload(avatarFile);
+                        if (uploadRes.success) avatar_url = uploadRes.data.fileUrl;
+                    }
+
+                    await axios.post(`${API_URL}/admin/collaborators`, {
+                        full_name, email, password, username, avatar_url, modules, collab_start_at, collab_end_at
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+
+                    alert("Compte Collaborateur créé avec succès !");
+                    closeImpactModal();
+                    loadCollabLiveManagement();
+                } catch (err) {
+                    alert(err.response?.data?.error || "Erreur lors de la création du compte.");
+                }
+            }, "Finaliser la Création", "purple");
+            lucide.createIcons();
+        }
+
+        function previewNewCollabAvatar(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => document.getElementById('new-collab-avatar-preview').src = e.target.result;
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
         async function revokeDelegation(userId, name, currentlyActive) {
             const action = currentlyActive ? "RÉVOQUER" : "RÉTABLIR";
             if (!confirm(`${action} les privilèges de ${name} ?`)) return;
             try {
                 const res = await axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } });
                 const d = res.data.data.find(x => x.user_id === userId);
+
+                // Si on révoque, on propose aussi de supprimer le compte (Collaboration terminée)
+                if (currentlyActive) {
+                    Alert.show("Collaboration terminée", `Voulez-vous également DÉSACTIVER DÉFINITIVEMENT le compte de <b>${name}</b> ? Sa date de départ sera enregistrée.`, async () => {
+                        try {
+                            await axios.delete(`${API_URL}/admin/collaborators/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+                            alert("Compte collaborateur désactivé et date de suppression fixée.");
+                            closeImpactModal();
+                            loadCollabLiveManagement();
+                            loadDelegations();
+                        } catch (e) { alert("Erreur suppression."); }
+                    }, "Désactiver le compte", "red");
+                    return;
+                }
+
                 if (!d) return alert("Utilisateur non trouvé.");
 
                 await axios.post(`${API_URL}/admin/delegations`, {
@@ -3113,10 +3227,8 @@
                 }, { headers: { Authorization: `Bearer ${token}` } });
 
                 alert(`Privilèges ${currentlyActive ? 'révoqués' : 'rétablis'} avec succès !`);
-
-                // Refresh local lists
-                if (typeof loadDelegations === 'function') loadDelegations();
-                if (!document.getElementById('collab-tab-config').classList.contains('hidden')) loadCollabLiveManagement();
+                loadCollabLiveManagement();
+                loadDelegations();
 
             } catch (e) {
                 console.error(e);

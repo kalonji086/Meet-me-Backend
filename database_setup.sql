@@ -98,6 +98,20 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN device_info JSONB DEFAULT '{}'::jsonb;
   END IF;
 
+  -- Collaboration Period Columns
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='collab_start_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN collab_start_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='collab_end_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN collab_end_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='collab_deleted_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN collab_deleted_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_collaborator') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_collaborator BOOLEAN DEFAULT FALSE;
+  END IF;
+
   -- legal versions
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='accepted_tos_version') THEN
     ALTER TABLE public.profiles ADD COLUMN accepted_tos_version TEXT;

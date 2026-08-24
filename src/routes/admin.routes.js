@@ -70,4 +70,8 @@ router.delete('/pending-actions/:id', adminController.deletePendingAction);
 router.get('/delegations', adminController.getDelegations);
 router.post('/delegations', adminController.saveDelegation);
 
+// Collaborators Management
+router.post('/collaborators', adminController.createCollaborator);
+router.delete('/collaborators/:userId', adminController.deleteCollaborator);
+
 module.exports = router;

@@ -1166,6 +1166,26 @@
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
 
+            socket.on('admin_user_profile_updated', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (user && user.id === data.userId) {
+                    user.avatar_url = data.avatar_url;
+                    user.avatar = data.avatar_url;
+                    user.full_name = data.full_name;
+                    localStorage.setItem('admin_user', JSON.stringify(user));
+
+                    document.getElementById('admin-header-avatar').src = getFullUrl(data.avatar_url);
+                    document.getElementById('admin-name').innerText = data.full_name.toUpperCase();
+                }
+
+                // Refresh visible management lists
+                if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
+                if (!document.getElementById('section-collaboration').classList.contains('hidden')) {
+                    if (!document.getElementById('collab-tab-config').classList.contains('hidden')) loadCollabLiveManagement();
+                    if (!document.getElementById('collab-tab-directory').classList.contains('hidden')) loadCollabDirectory();
+                }
+            });
+
             // Collaboration Events
             socket.on('collab:new_message', (data) => {
                 if (activeCollabTeamId === data.teamId && chatMode === 'team') {

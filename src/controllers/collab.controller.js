@@ -583,13 +583,16 @@ const inviteUser = asyncHandler(async (req, res) => {
  * @desc    Get all collaboration requests
  */
 const getRequests = asyncHandler(async (req, res) => {
-  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  const isGlobalAdmin = req.user.is_global_admin;
+  const canManage = isGlobalAdmin || (req.user.collab_rights && req.user.collab_rights.manage_members);
+
+  if (!canManage) return res.status(403).json({ success: false, error: 'Accès réservé : Vous n\'avez pas les droits pour gérer les candidatures.' });
 
   const result = await query(`
     SELECT r.*, p.full_name, p.email, p.avatar_url, t.name as team_name
     FROM public.collab_requests r
     JOIN public.profiles p ON r.user_id = p.id
-    JOIN public.collab_teams t ON r.team_id = t.id
+    LEFT JOIN public.collab_teams t ON r.team_id = t.id
     WHERE r.status = 'pending'
     ORDER BY r.created_at DESC
   `);
@@ -613,6 +616,10 @@ const getMyRequestStatus = asyncHandler(async (req, res) => {
 const handleRequest = asyncHandler(async (req, res) => {
   const { requestId } = req.params;
   const { status, comment } = req.body;
+
+  const isGlobalAdmin = req.user.is_global_admin;
+  const canManage = isGlobalAdmin || (req.user.collab_rights && req.user.collab_rights.manage_members);
+  if (!canManage) return res.status(403).json({ success: false, error: 'Accès réservé' });
 
   const reqRes = await query('SELECT * FROM public.collab_requests WHERE id = $1', [requestId]);
   if (reqRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande non trouvée' });

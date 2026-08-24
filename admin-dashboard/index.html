@@ -1246,7 +1246,9 @@
 
             socket.on('collab:new_request', (data) => {
                 const user = JSON.parse(localStorage.getItem('admin_user'));
-                if (user.isGlobalAdmin) {
+                const canManage = user.isGlobalAdmin || (user.collabRights && user.collabRights.manage_members);
+
+                if (canManage) {
                     loadCollabRequests();
                     addNotification('groups', 'Nouvelle Candidature', `${data.userName} veut collaborer.`, 'briefcase');
                 }

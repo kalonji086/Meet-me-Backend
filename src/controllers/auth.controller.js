@@ -218,7 +218,8 @@ const login = asyncHandler(async (req, res) => {
           avatar: user.avatar_url,
           status: 'online',
           isGlobalAdmin: user.is_global_admin,
-          push_token: user.push_token
+          push_token: user.push_token,
+          mustChangePassword: user.must_change_password
         },
       }
     });
@@ -345,7 +346,7 @@ const changePassword = asyncHandler(async (req, res) => {
   if (!(await bcrypt.compare(currentPassword, user.password))) return res.status(401).json({ success: false, error: 'Ancien mot de passe incorrect' });
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
-  await query('UPDATE public.profiles SET password = $1 WHERE id = $2', [hashedPassword, req.userId]);
+  await query('UPDATE public.profiles SET password = $1, must_change_password = FALSE WHERE id = $2', [hashedPassword, req.userId]);
   res.json({ success: true, message: 'Mot de passe mis à jour' });
 });
 

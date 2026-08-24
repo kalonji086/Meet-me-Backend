@@ -288,6 +288,27 @@ const ensureAdminTables = async () => {
   } catch (e) {
     logger.error('Error updating inventory tables:', e);
   }
+
+  // TÂCHE AUTOMATIQUE : Désactiver les collaborateurs dont la date de fin est dépassée
+  try {
+    const expiredRes = await query(
+      `UPDATE public.admin_delegations
+       SET is_active = FALSE
+       WHERE user_id IN (
+         SELECT id FROM public.profiles
+         WHERE collab_end_at < NOW() AND is_collaborator = TRUE
+       ) AND is_active = TRUE
+       RETURNING user_id`
+    );
+    if (expiredRes.rows.length > 0) {
+      logger.info(`🚨 ${expiredRes.rows.length} collaborations expirées désactivées.`);
+      for (const row of expiredRes.rows) {
+        socketService.emitToUser(row.user_id, 'admin:delegation_updated', { isActive: false });
+      }
+    }
+  } catch (err) {
+    logger.error('Error auto-expiring collaborations:', err.message);
+  }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
@@ -1559,9 +1580,9 @@ const handleVerification = asyncHandler(async (req, res) => {
  * @desc    Créer un compte collaborateur complet
  */
 const createCollaborator = asyncHandler(async (req, res) => {
-  const { full_name, email, password, username, avatar_url, modules, collab_start_at, collab_end_at, collabAdminRights = {}, userAdminRights = {} } = req.body;
+  const { full_name, email, username, avatar_url, modules, collab_start_at, collab_end_at, collabAdminRights = {}, userAdminRights = {} } = req.body;
 
-  if (!email || !password || !full_name) {
+  if (!email || !full_name) {
     return res.status(400).json({ success: false, error: 'Champs obligatoires manquants.' });
   }
 
@@ -1571,14 +1592,16 @@ const createCollaborator = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Cet email ou nom d\'utilisateur est déjà utilisé.' });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  // Générer un mot de passe temporaire
+  const tempPassword = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8 caractères
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
   const userId = crypto.randomUUID();
 
-  // 1. Créer le profil
+  // 1. Créer le profil avec l'obligation de changer de mot de passe
   await query(
-    `INSERT INTO public.profiles (id, full_name, email, password, username, avatar_url, is_collaborator, collab_start_at, collab_end_at, is_verified)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [userId, full_name, email, hashedPassword, username || email.split('@')[0], avatar_url || null, true, collab_start_at || new Date(), collab_end_at || null, true]
+    `INSERT INTO public.profiles (id, full_name, email, password, username, avatar_url, is_collaborator, collab_start_at, collab_end_at, is_verified, must_change_password)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [userId, full_name, email, hashedPassword, username || email.split('@')[0], avatar_url || null, true, collab_start_at || new Date(), collab_end_at || null, true, true]
   );
 
   // 2. Créer la délégation (Rôles et Accès)
@@ -1588,9 +1611,12 @@ const createCollaborator = asyncHandler(async (req, res) => {
     [userId, modules || [], true, JSON.stringify(collabAdminRights), JSON.stringify(userAdminRights)]
   );
 
-  await logAdminAction(req, 'create_collaborator', 'user', userId, { email, full_name });
+  // 3. Envoyer l'email avec le mot de passe temporaire
+  await mailService.sendCollaboratorAccountEmail(email, full_name, tempPassword);
 
-  res.status(201).json({ success: true, message: 'Collaborateur créé avec succès.', data: { id: userId } });
+  await logAdminAction(req, 'create_collaborator', 'user', userId, { email, full_name, tempPassword_sent: true });
+
+  res.status(201).json({ success: true, message: 'Compte collaborateur créé et email envoyé.', data: { id: userId } });
 });
 
 /**

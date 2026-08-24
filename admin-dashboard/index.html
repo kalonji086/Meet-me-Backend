@@ -689,6 +689,39 @@
         </div>
     </div>
 
+    <!-- MODAL FORCED PASSWORD CHANGE -->
+    <div id="modal-force-password" class="hidden fixed inset-0 bg-gray-900/95 flex items-center justify-center z-[700] p-6 backdrop-blur-md">
+        <div class="max-w-md w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
+            <div class="p-10 border-b bg-purple-50 flex flex-col items-center text-center">
+                <div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
+                    <i data-lucide="key-round" class="w-8 h-8 text-purple-600"></i>
+                </div>
+                <h3 class="text-xl font-black text-gray-900 tracking-tighter uppercase">Sécurisation du Compte</h3>
+                <p class="text-[10px] text-purple-400 font-bold uppercase mt-1">Première connexion détectée</p>
+            </div>
+            <div class="p-10 space-y-6">
+                <p class="text-xs text-gray-500 font-medium leading-relaxed">Par mesure de sécurité, vous devez remplacer votre mot de passe temporaire par un mot de passe personnel définitif avant d'accéder au dashboard.</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-1">Mot de passe actuel (Temporaire)</label>
+                        <input type="password" id="force-current-pass" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-1">Nouveau mot de passe</label>
+                        <input type="password" id="force-new-pass" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-1">Confirmer le nouveau mot de passe</label>
+                        <input type="password" id="force-confirm-pass" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                    </div>
+                </div>
+
+                <button onclick="submitForcedPasswordChange()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">ACTIVER MON COMPTE</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL LEGAL ACCEPTANCE -->
     <div id="modal-legal-accept" class="hidden fixed inset-0 bg-gray-900/95 flex items-center justify-center z-[600] p-6 backdrop-blur-md">
         <div class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
@@ -749,9 +782,19 @@
                 btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>'; lucide.createIcons();
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
                 if (res.data.success) {
-                    token = res.data.data.token;
+                    const data = res.data.data;
+                    token = data.token;
                     localStorage.setItem('admin_token', token);
-                    localStorage.setItem('admin_user', JSON.stringify(res.data.data.user));
+                    localStorage.setItem('admin_user', JSON.stringify(data.user));
+
+                    // Vérifier si changement de mot de passe requis
+                    if (data.user.mustChangePassword) {
+                        document.getElementById('login-container').classList.add('hidden');
+                        document.getElementById('modal-force-password').classList.remove('hidden');
+                        document.getElementById('force-current-pass').value = password;
+                        return;
+                    }
+
                     showDashboard();
                 }
             } catch (e) {
@@ -759,6 +802,36 @@
                 const msg = data?.message || data?.error || "Identifiants incorrects.";
                 alert(msg);
             } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; lucide.createIcons(); }
+        }
+
+        async function submitForcedPasswordChange() {
+            const currentPassword = document.getElementById('force-current-pass').value;
+            const newPassword = document.getElementById('force-new-pass').value;
+            const confirmPassword = document.getElementById('force-confirm-pass').value;
+
+            if (!newPassword || newPassword.length < 6) return alert("Le nouveau mot de passe doit faire au moins 6 caractères.");
+            if (newPassword !== confirmPassword) return alert("Les mots de passe ne correspondent pas.");
+
+            try {
+                const res = await axios.put(`${API_URL}/auth/change-password`, {
+                    currentPassword,
+                    newPassword
+                }, { headers: { Authorization: `Bearer ${token}` } });
+
+                if (res.data.success) {
+                    alert("✅ Mot de passe mis à jour ! Votre compte est activé.");
+                    document.getElementById('modal-force-password').classList.add('hidden');
+
+                    // Mettre à jour l'utilisateur local
+                    const user = JSON.parse(localStorage.getItem('admin_user'));
+                    user.mustChangePassword = false;
+                    localStorage.setItem('admin_user', JSON.stringify(user));
+
+                    showDashboard();
+                }
+            } catch (e) {
+                alert(e.response?.data?.error || "Erreur lors du changement de mot de passe.");
+            }
         }
 
         async function updateAdminAvatar(input) {
@@ -3124,7 +3197,10 @@
                             </div>
                         </div>
                         <input type="email" id="new-collab-email" placeholder="Adresse Email Professionnelle" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
-                        <input type="password" id="new-collab-pass" placeholder="Clé d'Accès (Mot de passe)" class="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                        <div class="p-4 bg-purple-50 border border-purple-100 rounded-2xl">
+                            <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">Mot de passe</p>
+                            <p class="text-xs font-bold text-purple-900">Un mot de passe temporaire sera généré et envoyé par email.</p>
+                        </div>
                     </div>
 
                     <!-- Section Période -->
@@ -3160,14 +3236,13 @@
             Alert.show("Créer un Compte Collaborateur", html, async () => {
                 const full_name = document.getElementById('new-collab-name').value.trim();
                 const email = document.getElementById('new-collab-email').value.trim();
-                const password = document.getElementById('new-collab-pass').value.trim();
                 const username = document.getElementById('new-collab-username').value.trim();
                 const collab_start_at = document.getElementById('new-collab-start').value;
                 const collab_end_at = document.getElementById('new-collab-end').value;
                 const avatarFile = document.getElementById('new-collab-avatar-input').files[0];
                 const modules = Array.from(document.querySelectorAll('.new-collab-mod:checked')).map(cb => cb.value);
 
-                if (!full_name || !email || !password) return alert("Veuillez remplir les champs obligatoires.");
+                if (!full_name || !email) return alert("Veuillez remplir les champs obligatoires.");
 
                 try {
                     let avatar_url = null;
@@ -3177,7 +3252,7 @@
                     }
 
                     await axios.post(`${API_URL}/admin/collaborators`, {
-                        full_name, email, password, username, avatar_url, modules, collab_start_at, collab_end_at
+                        full_name, email, username, avatar_url, modules, collab_start_at, collab_end_at
                     }, { headers: { Authorization: `Bearer ${token}` } });
 
                     alert("Compte Collaborateur créé avec succès !");

@@ -26,24 +26,24 @@ const createStatus = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Obtenir les status récents des contacts
+ * @desc    Obtenir les status récents des contacts uniquement (Style WhatsApp)
  * @route   GET /api/statuses
  * @access  Private
  */
 const getStatuses = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
-  // On récupère les status non expirés des autres utilisateurs
-  // Pour l'instant, on prend tous les utilisateurs (mode découverte)
-  // Dans une version finale, on filtrerait par contacts
+  // On récupère les status non expirés des contacts que l'utilisateur a enregistré
   const result = await query(
     `SELECT s.*, p.full_name, p.avatar_url
      FROM public.statuses s
      JOIN public.profiles p ON s.user_id = p.id
+     JOIN public.contacts c ON s.user_id = c.contact_id
      WHERE s.expires_at > NOW()
+       AND c.user_id = $1
        AND p.is_global_admin = FALSE
      ORDER BY s.created_at DESC`,
-    []
+    [userId]
   );
 
   // Grouper les status par utilisateur (comme WhatsApp)

@@ -31,9 +31,15 @@ router.post('/posts', marketController.createPost);
 
 /**
  * @route   GET /api/market/feed
- * @desc    Get market discovery feed
+ * @desc    Get market discovery feed (posts)
  */
 router.get('/feed', marketController.getDiscoveryFeed);
+
+/**
+ * @route   GET /api/market/discovery
+ * @desc    Get list of businesses for discovery
+ */
+router.get('/discovery', marketController.getDiscoveryBusinesses);
 
 /**
  * @route   POST /api/market/posts/:postId/like

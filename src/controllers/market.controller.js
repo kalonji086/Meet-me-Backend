@@ -579,12 +579,29 @@ const getPostComments = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Get active businesses for discovery (everyone can see)
+ */
+const getDiscoveryBusinesses = asyncHandler(async (req, res) => {
+  const result = await query(
+    `SELECT id, business_name, logo_url, category, short_description,
+     (SELECT COUNT(*) FROM public.market_subscriptions WHERE business_id = b.id) as followers_count
+     FROM public.market_businesses b
+     WHERE b.status = 'approved'
+     ORDER BY created_at DESC LIMIT 50`,
+    []
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
 module.exports = {
   registerBusiness,
   getMyBusiness,
   getDashboardStats,
   createPost,
   getDiscoveryFeed,
+  getDiscoveryBusinesses,
   toggleLike,
   addComment,
   toggleSubscription,

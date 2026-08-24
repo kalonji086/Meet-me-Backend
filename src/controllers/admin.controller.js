@@ -263,6 +263,19 @@ const ensureAdminTables = async () => {
     // Calendar enhancements: Meeting URL and Invitations
     await query('ALTER TABLE public.collab_calendar_events ADD COLUMN IF NOT EXISTS meeting_url TEXT');
     await query('ALTER TABLE public.collab_calendar_events ADD COLUMN IF NOT EXISTS invited_member_ids UUID[] DEFAULT \'{}\'');
+
+    // NOUVEAU: Créer l'équipe par défaut si elle n'existe pas
+    const defaultTeamRes = await query("SELECT id FROM public.collab_teams WHERE name = 'Together Tech Community' LIMIT 1");
+    if (defaultTeamRes.rows.length === 0) {
+      const adminRes = await query("SELECT id FROM public.profiles WHERE email = 'wecanconcept@gmail.com' LIMIT 1");
+      if (adminRes.rows.length > 0) {
+        await query(
+          "INSERT INTO public.collab_teams (name, description, created_by, is_confidential, color) VALUES ($1, $2, $3, $4, $5)",
+          ['Together Tech Community', 'Équipe de collaboration par défaut pour tous les nouveaux membres.', adminRes.rows[0].id, false, '#06b6d4']
+        );
+        logger.info('✅ Équipe par défaut créée.');
+      }
+    }
   } catch (e) {
     logger.error('Error migrating collab_teams:', e.message);
   }

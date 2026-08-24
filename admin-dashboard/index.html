@@ -48,7 +48,8 @@
             </div>
             <h3 class="text-3xl font-black text-gray-900 tracking-tighter mb-4 uppercase">ACCÈS RÉVOQUÉ</h3>
             <p id="blocked-message" class="text-gray-500 font-medium leading-relaxed mb-10">Vos privilèges d'administration ont été suspendus par l'administrateur principal. Veuillez contacter le support pour toute réclamation.</p>
-            <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Retour à l'accueil</button>
+            <button onclick="openCollabApplyModal()" class="w-full bg-cyan-500 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all mb-4">Demander une Collaboration</button>
+            <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Déconnexion</button>
         </div>
     </div>
 
@@ -732,6 +733,35 @@
                 <p class="text-sm text-gray-500 mb-6 font-medium">Nos conditions d'utilisation ont été mises à jour. Vous devez les accepter pour continuer à utiliser le panel d'administration.</p>
                 <div id="legal-accept-content" class="h-64 overflow-y-auto custom-scrollbar p-6 bg-gray-50 rounded-2xl border border-gray-100 text-xs leading-relaxed text-gray-600 mb-8"></div>
                 <button onclick="acceptLatestLegal()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">J'ACCEPTE LES NOUVELLES CONDITIONS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL COLLAB APPLY -->
+    <div id="modal-collab-apply" class="hidden fixed inset-0 bg-gray-900/95 flex items-center justify-center z-[800] p-6 backdrop-blur-md">
+        <div class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in">
+            <div class="p-10 border-b bg-cyan-900 text-center relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full -mr-16 -mt-16"></div>
+                <h3 class="text-2xl font-black text-white tracking-tighter uppercase relative z-10">Demande de Collaboration</h3>
+                <p class="text-cyan-400 text-[10px] font-black tracking-widest mt-2 uppercase relative z-10">Together Tech Community</p>
+                <button onclick="closeCollabApplyModal()" class="absolute top-6 right-6 text-white/50 hover:text-white transition-all z-20"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="p-10 space-y-6">
+                <div>
+                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Motivations</label>
+                    <textarea id="apply-motivation" rows="3" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-medium text-sm focus:border-cyan-500 transition-all" placeholder="Pourquoi voulez-vous nous rejoindre ?"></textarea>
+                </div>
+                <div>
+                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Objectifs</label>
+                    <textarea id="apply-objectives" rows="3" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-medium text-sm focus:border-cyan-500 transition-all" placeholder="Quels sont vos buts ?"></textarea>
+                </div>
+                <div>
+                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Compétences</label>
+                    <input type="text" id="apply-skills" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-medium text-sm focus:border-cyan-500 transition-all" placeholder="Ex: Design, Modération, Support...">
+                </div>
+                <button onclick="submitCollabApply()" id="apply-submit-btn" class="w-full bg-cyan-500 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all flex items-center justify-center">
+                    ENVOYER MA CANDIDATURE
+                </button>
             </div>
         </div>
     </div>
@@ -2006,18 +2036,7 @@
         }
 
         async function submitCollabJoinRequest() {
-            const teamRes = await axios.get(`${API_URL}/collab/teams`, { headers: { Authorization: `Bearer ${token}` } });
-            const teams = teamRes.data.data;
-            if (teams.length === 0) return alert("Aucune équipe disponible.");
-
-            const teamId = teams[0].id;
-            const message = prompt("Pourquoi voulez-vous rejoindre l'équipe de collaboration ?", "Je souhaite aider à la modération.");
-            if (!message) return;
-
-            try {
-                await axios.post(`${API_URL}/collab/requests`, { teamId, motivation: message, objectives: "Aider le projet", skills: "Modération" }, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Votre demande a été envoyée à l'administrateur !");
-            } catch (e) { alert("Demande déjà en cours ou erreur."); }
+            openCollabApplyModal();
         }
 
         async function selectCollabTeam(id, name) {
@@ -3575,6 +3594,49 @@
                     if (context === 'global') loadCollabGlobalDocs(); else loadCollabDocs();
                 }
             } catch (e) { alert("Erreur upload document."); }
+        }
+
+        // --- NEW COLLAB APPLY FUNCTIONS ---
+        function openCollabApplyModal() {
+            document.getElementById('modal-collab-apply').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeCollabApplyModal() {
+            document.getElementById('modal-collab-apply').classList.add('hidden');
+        }
+
+        async function submitCollabApply() {
+            const motivation = document.getElementById('apply-motivation').value;
+            const objectives = document.getElementById('apply-objectives').value;
+            const skills = document.getElementById('apply-skills').value;
+            const btn = document.getElementById('apply-submit-btn');
+
+            if (!motivation || !objectives) return alert("Veuillez remplir vos motivations et objectifs.");
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
+                lucide.createIcons();
+
+                await axios.post(`${API_URL}/collab/requests`, {
+                    motivation, objectives, skills
+                }, { headers: { Authorization: `Bearer ${token}` } });
+
+                alert("Candidature envoyée ! L'Administrateur Principal va l'examiner.");
+                closeCollabApplyModal();
+
+                // Refresh state to show pending screen
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                continueDashboardLoad(user);
+
+            } catch (e) {
+                alert(e.response?.data?.error || "Erreur lors de l'envoi.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'ENVOYER MA CANDIDATURE';
+                lucide.createIcons();
+            }
         }
 
         async function apiService_upload(file) {

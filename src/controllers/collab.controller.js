@@ -523,7 +523,26 @@ const handleDocumentStatus = asyncHandler(async (req, res) => {
  * @desc    Submit a collaboration request
  */
 const submitRequest = asyncHandler(async (req, res) => {
-  const { teamId, motivation, objectives, skills } = req.body;
+  let { teamId, motivation, objectives, skills } = req.body;
+
+  // Si aucun teamId n'est fourni, on cherche l'équipe par défaut
+  if (!teamId || teamId === 'null' || teamId === '') {
+    const defaultTeamRes = await query("SELECT id FROM public.collab_teams WHERE name = 'Together Tech Community' LIMIT 1");
+    if (defaultTeamRes.rows.length > 0) {
+      teamId = defaultTeamRes.rows[0].id;
+    } else {
+      // Fallback sur la toute première équipe créée si l'équipe par défaut n'est pas encore créée
+      const firstTeamRes = await query("SELECT id FROM public.collab_teams ORDER BY created_at ASC LIMIT 1");
+      if (firstTeamRes.rows.length > 0) {
+        teamId = firstTeamRes.rows[0].id;
+      }
+    }
+  }
+
+  if (!teamId) {
+    return res.status(400).json({ success: false, error: "Aucune équipe disponible pour la demande. Veuillez contacter l'admin." });
+  }
+
   const result = await query(
     'INSERT INTO public.collab_requests (user_id, team_id, motivation, objectives, skills) VALUES ($1, $2, $3, $4, $5) RETURNING *',
     [req.userId, teamId, motivation, objectives, skills]

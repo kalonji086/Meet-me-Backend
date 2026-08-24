@@ -397,14 +397,66 @@
                     </div>
                 </div>
 
-                <div id="section-config" class="hidden animate-fade-in max-w-xl mx-auto pb-20">
-                    <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 text-center">
-                        <h3 class="text-2xl font-black text-gray-800 mb-8 tracking-tighter uppercase">Mise à jour App</h3>
-                        <div class="space-y-6 text-left">
-                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Version Cible</label><input type="text" id="up-version" placeholder="40.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
-                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Lien Fichier (AAB/APK)</label><input type="text" id="up-url" placeholder="https://..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold"></div>
-                            <div><label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Release Notes</label><textarea id="up-notes" class="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl font-medium"></textarea></div>
-                            <button onclick="saveAppUpdate()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest">PUBLIER LA MISE À JOUR</button>
+                <div id="section-config" class="hidden animate-fade-in max-w-6xl mx-auto pb-20 space-y-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <!-- Formulaire de Mise à Jour -->
+                        <div class="lg:col-span-1 space-y-6">
+                            <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
+                                <h3 class="text-xl font-black text-gray-800 mb-6 tracking-tighter uppercase">Nouvelle Version</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-1 block">Version Cible</label>
+                                        <input type="text" id="up-version" placeholder="50.0.0" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-1 block">Lien de Téléchargement</label>
+                                        <input type="text" id="up-url" placeholder="https://expo.dev/..." class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-1 block">Notes de version</label>
+                                        <textarea id="up-notes" class="w-full h-24 p-4 bg-gray-50 border border-gray-100 rounded-2xl font-medium text-sm outline-none focus:border-purple-500"></textarea>
+                                    </div>
+                                    <div class="flex items-center p-2 bg-purple-50 rounded-xl mb-4">
+                                        <input type="checkbox" id="up-force" checked class="w-5 h-5 accent-purple-600 mr-3">
+                                        <label for="up-force" class="text-[10px] font-black text-purple-700 uppercase tracking-widest cursor-pointer">Forcer la mise à jour</label>
+                                    </div>
+                                    <button onclick="saveAppUpdate()" class="w-full bg-purple-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-purple-100 uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">DIFFUSER EN TEMPS RÉEL</button>
+                                    <button onclick="deleteLatestUpdate()" class="w-full bg-red-50 text-red-600 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all mt-2">Supprimer la MAJ en cours</button>
+                                </div>
+                            </div>
+
+                            <!-- Résumé des versions -->
+                            <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
+                                <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Répartition des versions</h4>
+                                <div id="update-stats-container" class="space-y-3"></div>
+                            </div>
+                        </div>
+
+                        <!-- Liste de Tracking des Utilisateurs -->
+                        <div class="lg:col-span-2 bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+                            <div class="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                                <div>
+                                    <h4 class="font-black text-gray-800 uppercase text-sm tracking-widest">Suivi du déploiement</h4>
+                                    <p class="text-[9px] text-gray-400 font-bold uppercase mt-1">État des téléphones en temps réel</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
+                                    <span class="text-[10px] font-black text-purple-600 uppercase">Live Tracking</span>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto custom-scrollbar">
+                                <table class="w-full text-left min-w-[600px]">
+                                    <thead class="bg-gray-50 border-b border-gray-100">
+                                        <tr class="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                            <th class="px-8 py-4">Utilisateur</th>
+                                            <th class="px-8 py-4">Version</th>
+                                            <th class="px-8 py-4">Appareil</th>
+                                            <th class="px-8 py-4 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="update-tracking-table"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2900,15 +2952,129 @@
         }
 
         async function loadConfig() {
-            const res = await axios.get(`${API_URL}/admin/app-config`, { headers: { Authorization: `Bearer ${token}` } });
-            const d = res.data.data;
-            if(d) { document.getElementById('up-version').value = d.current_version; document.getElementById('up-url').value = d.update_url || ''; document.getElementById('up-notes').value = d.release_notes || ''; }
+            try {
+                const res = await axios.get(`${API_URL}/admin/app-config`, { headers: { Authorization: `Bearer ${token}` } });
+                const { config, stats, users, currentAppVersion } = res.data;
+
+                // Pré-remplir le formulaire avec la config actuelle
+                if (config) {
+                    document.getElementById('up-version').value = config.current_version;
+                    document.getElementById('up-url').value = config.update_url || '';
+                    document.getElementById('up-notes').value = config.release_notes || '';
+                    document.getElementById('up-force').checked = config.force_update;
+                } else {
+                    document.getElementById('up-version').value = currentAppVersion;
+                }
+
+                // Afficher les stats de version
+                const statsContainer = document.getElementById('update-stats-container');
+                statsContainer.innerHTML = stats.map(s => {
+                    const isLatest = s.app_version === currentAppVersion;
+                    const percent = Math.round((s.count / users.length) * 100);
+                    return `
+                        <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[10px] font-black uppercase ${isLatest ? 'text-green-600' : 'text-orange-600'}">${s.app_version || 'Inconnue'}</span>
+                                <span class="text-xs font-bold text-gray-800">${s.count} users</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div class="h-full ${isLatest ? 'bg-green-500' : 'bg-orange-500'}" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('') || '<p class="text-center text-gray-400 text-[10px] font-bold uppercase py-4">Aucune donnée</p>';
+
+                // Afficher le tracking par utilisateur
+                const trackingTable = document.getElementById('update-tracking-table');
+                trackingTable.innerHTML = users.map(u => {
+                    const isLatest = u.app_version === currentAppVersion;
+                    const info = u.device_info || {};
+                    const isTargeted = config?.target_user_ids?.includes(u.id);
+
+                    return `
+                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                            <td class="px-8 py-4">
+                                <div class="flex items-center">
+                                    <p class="font-bold text-xs text-gray-800">${u.full_name}</p>
+                                </div>
+                            </td>
+                            <td class="px-8 py-4">
+                                <span class="px-3 py-1 rounded-lg text-[9px] font-black ${isLatest ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}">
+                                    ${u.app_version || 'À JOUR'}
+                                </span>
+                            </td>
+                            <td class="px-8 py-4">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase">${info.brand || 'Inconnu'} ${info.model || ''}</p>
+                            </td>
+                            <td class="px-8 py-4 text-right">
+                                ${!isLatest ? `
+                                    <button onclick="forceUpdateForUser('${u.id}', '${u.full_name}')" class="px-4 py-1.5 ${isTargeted ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-600'} rounded-lg text-[9px] font-black uppercase hover:shadow-md transition-all">
+                                        ${isTargeted ? 'DÉJÀ FORCÉ' : 'FORCER MAJ'}
+                                    </button>
+                                ` : '<i data-lucide="check-circle-2" class="w-4 h-4 text-green-500 inline-block"></i>'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                lucide.createIcons();
+            } catch (e) { alert("Erreur chargement config."); }
         }
 
         async function saveAppUpdate() {
-            const data = { current_version: document.getElementById('up-version').value, update_url: document.getElementById('up-url').value, release_notes: document.getElementById('up-notes').value, force_update: true };
-            await axios.post(`${API_URL}/admin/app-config`, data, { headers: { Authorization: `Bearer ${token}` } });
-            alert("Mise à jour publiée !");
+            const data = {
+                current_version: document.getElementById('up-version').value.trim(),
+                update_url: document.getElementById('up-url').value.trim(),
+                release_notes: document.getElementById('up-notes').value.trim(),
+                force_update: document.getElementById('up-force').checked,
+                active: true
+            };
+
+            if (!data.current_version || !data.update_url) return alert("Version et Lien requis.");
+
+            if (!confirm(`DIFFUSER cette mise à jour (${data.current_version}) en temps réel à TOUS les utilisateurs ?`)) return;
+
+            try {
+                const res = await axios.post(`${API_URL}/admin/app-config`, data, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.success) {
+                    alert("✅ Mise à jour diffusée en direct !");
+                    loadConfig();
+                }
+            } catch (e) { alert("Erreur de publication."); }
+        }
+
+        async function deleteLatestUpdate() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/app-config`, { headers: { Authorization: `Bearer ${token}` } });
+                const config = res.data.config;
+                if (!config) return alert("Aucune mise à jour à supprimer.");
+
+                if (!confirm(`Voulez-vous DÉSACTIVER la mise à jour v${config.current_version} ? Cela retirera l'écran de blocage chez les utilisateurs.`)) return;
+
+                await axios.delete(`${API_URL}/admin/app-config/${config.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert("Mise à jour supprimée !");
+                loadConfig();
+            } catch (e) { alert("Erreur suppression."); }
+        }
+
+        async function forceUpdateForUser(userId, name) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/app-config`, { headers: { Authorization: `Bearer ${token}` } });
+                const config = res.data.config;
+                if (!config) return alert("Publiez d'abord une mise à jour globale.");
+
+                const targetIds = config.target_user_ids || [];
+                if (targetIds.includes(userId)) return alert("Déjà forcé pour cet utilisateur.");
+
+                targetIds.push(userId);
+
+                await axios.post(`${API_URL}/admin/app-config`, {
+                    ...config,
+                    target_user_ids: targetIds
+                }, { headers: { Authorization: `Bearer ${token}` } });
+
+                alert(`Mise à jour forcée pour ${name} !`);
+                loadConfig();
+            } catch (e) { alert("Erreur."); }
         }
 
         async function loadDelegations() {

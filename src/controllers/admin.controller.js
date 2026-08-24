@@ -1074,46 +1074,59 @@ const broadcastMessage = asyncHandler(async (req, res) => {
  */
 const getAppConfig = asyncHandler(async (req, res) => {
   await ensureAdminTables();
-  const result = await query('SELECT * FROM public.app_configs ORDER BY id DESC LIMIT 1');
+  const configRes = await query('SELECT * FROM public.app_configs ORDER BY id DESC LIMIT 1');
 
-  // Récupérer la version la plus haute détectée chez les utilisateurs
-  const maxDetected = await query('SELECT app_version FROM public.profiles WHERE app_version IS NOT NULL ORDER BY app_version DESC LIMIT 1');
-  const latestDetected = maxDetected.rows[0]?.app_version || 'N/A';
+  // Stats des versions utilisateurs
+  const statsRes = await query(`
+    SELECT app_version, COUNT(*) as count
+    FROM public.profiles
+    WHERE is_global_admin = FALSE
+    GROUP BY app_version
+    ORDER BY app_version DESC
+  `);
 
-  // Version actuelle de l'application (définie dans app.json)
+  // Liste des utilisateurs avec leurs versions pour le tracking individuel
+  const usersRes = await query(`
+    SELECT id, full_name, email, app_version, last_update_at, device_info
+    FROM public.profiles
+    WHERE is_global_admin = FALSE
+    ORDER BY last_update_at DESC NULLS LAST
+  `);
+
   const currentAppVersion = '50.0.0';
 
-  if (result.rows.length === 0) {
-    // Si aucune config n'existe, utiliser la version actuelle de l'app
-    const init = await query(`INSERT INTO public.app_configs (current_version, force_update) VALUES ('${currentAppVersion}', false) RETURNING *`);
-    return res.json({ success: true, data: init.rows[0], latestDetected });
-  }
-
-  res.json({ success: true, data: result.rows[0], latestDetected, currentAppVersion });
+  res.json({
+    success: true,
+    config: configRes.rows[0] || null,
+    stats: statsRes.rows,
+    users: usersRes.rows,
+    currentAppVersion
+  });
 });
 
 const updateAppConfig = asyncHandler(async (req, res) => {
-  const { current_version, force_update, update_url, release_notes, target_user_emails, active = true } = req.body;
-
-  let targetIds = [];
-  if (target_user_emails && target_user_emails.length > 0) {
-    const users = await query('SELECT id FROM public.profiles WHERE email = ANY($1)', [target_user_emails]);
-    targetIds = users.rows.map(u => u.id);
-  }
+  const { current_version, force_update, update_url, release_notes, target_user_ids = [], active = true } = req.body;
 
   await ensureAdminTables();
+
+  // Désactiver les anciennes configs si celle-ci est active
+  if (active) {
+    await query('UPDATE public.app_configs SET active = FALSE');
+  }
+
   const result = await query(
     `INSERT INTO public.app_configs (current_version, force_update, update_url, release_notes, target_user_ids, active)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [current_version, force_update, update_url, release_notes, targetIds, active]
+    [current_version, force_update, update_url, release_notes, target_user_ids, active]
   );
 
-  // Notifier les utilisateurs de la nouvelle version
+  // Diffusion temps réel immédiate
   socketService.broadcast('app_config_update', {
     current_version,
     force_update,
     update_url,
-    release_notes
+    release_notes,
+    target_user_ids
   });
 
   await logAdminAction(req, 'update_app_config', 'config', result.rows[0].id, req.body);

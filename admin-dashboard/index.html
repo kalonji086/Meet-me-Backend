@@ -2564,6 +2564,7 @@
                                         <span class="text-[10px] font-black uppercase ${u.status === 'online' ? 'text-green-600' : 'text-gray-400'}">${u.status === 'online' ? 'Connecté' : 'Hors ligne'}</span>
                                     </div>
                                     <p class="text-[9px] font-bold text-gray-400 mt-1 uppercase">Depuis : ${timeAgo(u.status_updated_at || u.last_seen)}</p>
+                                    ${u.collab_start_at ? `<p class="text-[7px] text-cyan-600 font-black uppercase mt-1">Collab : ${new Date(u.collab_start_at).toLocaleDateString()}</p>` : ''}
                                 </div>
                             </td>
                             <td class="px-8 py-5">

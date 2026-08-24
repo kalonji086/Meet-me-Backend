@@ -359,7 +359,7 @@
                             </div>
                             <div>
                                 <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Version</label>
-                                <input type="text" id="legal-version" value="48.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                                <input type="text" id="legal-version" value="50.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
                             </div>
                         </div>
 
@@ -726,8 +726,8 @@
 
             // SÉCURITÉ : Vérifier les mises à jour légales forcées SEULEMENT pour les délégués
             if (user && !user.isGlobalAdmin) {
-                // EXCEPTION VERSION 48 : Si l'utilisateur a déjà la version 48, on ne le bloque pas
-                if (user.accepted_tos_version === '48.0.0' || user.accepted_tos_version === '48') {
+                // EXCEPTION VERSION 50 : Si l'utilisateur a déjà la version 50, on ne le bloque pas
+                if (user.accepted_tos_version === '50.0.0' || user.accepted_tos_version === '50') {
                     return continueDashboardLoad(user);
                 }
 
@@ -757,10 +757,10 @@
             try {
                 // Simuler l'acceptation (Mettre à jour le profil utilisateur côté backend)
                 // Normalement, vous auriez une route /api/users/accept-legal
-                await axios.put(`${API_URL}/users/profile`, { accepted_tos_version: '48.0.0' }, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.put(`${API_URL}/users/profile`, { accepted_tos_version: '50.0.0' }, { headers: { Authorization: `Bearer ${token}` } });
 
                 // Mettre à jour l'utilisateur local
-                user.accepted_tos_version = '48.0.0';
+                user.accepted_tos_version = '50.0.0';
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('modal-legal-accept').classList.add('hidden');

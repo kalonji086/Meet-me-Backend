@@ -91,6 +91,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='last_update_at') THEN
     ALTER TABLE public.profiles ADD COLUMN last_update_at TIMESTAMP WITH TIME ZONE;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='status_updated_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN status_updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='device_info') THEN
+    ALTER TABLE public.profiles ADD COLUMN device_info JSONB DEFAULT '{}'::jsonb;
+  END IF;
 
   -- legal versions
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='accepted_tos_version') THEN

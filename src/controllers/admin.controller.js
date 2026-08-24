@@ -320,11 +320,11 @@ const getUsers = asyncHandler(async (req, res) => {
 
   // We hide Global Admins from the management lists (User List & Directory)
   const result = await query(`
-    SELECT id, email, full_name, username, avatar_url, status, phone_number, is_locked,
+    SELECT id, email, full_name, username, avatar_url, status, status_updated_at, phone_number, is_locked,
            login_attempts, created_at, is_global_admin, last_login_at, device_info, is_verified
     FROM public.profiles
     WHERE is_global_admin = FALSE
-    ORDER BY last_login_at DESC NULLS LAST
+    ORDER BY status = 'online' DESC, status_updated_at DESC NULLS LAST
   `);
 
   res.json({ success: true, data: result.rows });

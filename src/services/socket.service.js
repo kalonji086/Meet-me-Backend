@@ -273,7 +273,7 @@ class SocketService {
 
       // Mettre à jour le statut de l'utilisateur
       await query(
-        "UPDATE public.profiles SET status = 'online', last_seen = NOW() WHERE id = $1",
+        "UPDATE public.profiles SET status = 'online', last_seen = NOW(), status_updated_at = NOW() WHERE id = $1",
         [userId]
       );
 
@@ -688,7 +688,7 @@ class SocketService {
             this.userSockets.delete(userIdStr);
 
             await query(
-              "UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1",
+              "UPDATE public.profiles SET status = 'offline', last_seen = NOW(), status_updated_at = NOW() WHERE id = $1",
               [userId]
             );
             this.notifyUserStatusChange(userId, 'offline');

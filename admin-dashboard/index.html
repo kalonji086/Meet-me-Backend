@@ -236,8 +236,16 @@
 
                 <div id="section-users" class="hidden animate-fade-in">
                     <div class="bg-white rounded-[2rem] lg:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-x-auto custom-scrollbar">
-                        <table class="w-full text-left min-w-[600px]">
-                            <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5 text-gray-500">Profil</th><th class="px-8 py-5">Email & Identifiant</th><th class="px-8 py-5">Sécurité</th><th class="px-8 py-5 text-right">Contrôle</th></tr></thead>
+                        <table class="w-full text-left min-w-[1000px]">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th class="px-8 py-5 text-gray-500">Utilisateur</th>
+                                    <th class="px-8 py-5">Appareil & Utilisation</th>
+                                    <th class="px-8 py-5">Statut Live</th>
+                                    <th class="px-8 py-5">Sécurité</th>
+                                    <th class="px-8 py-5 text-right">Contrôle</th>
+                                </tr>
+                            </thead>
                             <tbody id="users-table-body"></tbody>
                         </table>
                     </div>
@@ -2447,28 +2455,72 @@
             } catch (e) {}
         }
 
+        function timeAgo(date) {
+            if (!date) return 'Jamais';
+            const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + " ans";
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + " mois";
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + " j";
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + " h";
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + " min";
+            return "À l'instant";
+        }
+
         async function loadUsers() {
             try {
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
-                document.getElementById('users-table-body').innerHTML = res.data.data.map(u => `
-                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
-                        <td class="px-8 py-5 flex items-center">
-                            <img src="${getFullUrl(u.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md">
-                            <div>
-                                <p class="font-bold text-sm text-gray-800">${u.full_name}</p>
-                                ${u.is_verified ? '<span class="flex items-center text-[8px] font-black text-blue-500 uppercase tracking-tighter"><i data-lucide="badge-check" class="w-2.5 h-2.5 mr-1 fill-blue-500 text-white"></i> Vérifié</span>' : ''}
-                            </div>
-                        </td>
-                        <td class="px-8 py-5 text-sm">${u.email}</td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>
-                        <td class="px-8 py-5 text-right space-x-2">
-                            <button onclick="toggleUserBadge('${u.id}', ${!u.is_verified})" class="p-3 ${u.is_verified ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'} rounded-xl hover:shadow-lg transition-all" title="${u.is_verified ? 'Retirer Badge' : 'Accorder Badge'}"><i data-lucide="${u.is_verified ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
-                            <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
-                            <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
-                            <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                        </td>
-                    </tr>
-                `).join(''); lucide.createIcons();
+                document.getElementById('users-table-body').innerHTML = res.data.data.map(u => {
+                    const info = u.device_info || {};
+                    const deviceLabel = info.brand ? `${info.brand} ${info.model || ''}` : 'Appareil Inconnu';
+                    const osLabel = info.os ? `${info.os} ${info.version || ''}` : 'OS Inconnu';
+
+                    return `
+                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                            <td class="px-8 py-5">
+                                <div class="flex items-center">
+                                    <img src="${getFullUrl(u.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md">
+                                    <div>
+                                        <p class="font-bold text-sm text-gray-800">${u.full_name}</p>
+                                        <p class="text-[10px] text-gray-400 font-bold">${u.email}</p>
+                                        ${u.is_verified ? '<span class="flex items-center text-[8px] font-black text-blue-500 uppercase tracking-tighter mt-1"><i data-lucide="badge-check" class="w-2.5 h-2.5 mr-1 fill-blue-500 text-white"></i> Vérifié</span>' : ''}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-5">
+                                <div class="flex items-center text-gray-600">
+                                    <div class="p-2 bg-gray-50 rounded-lg mr-3"><i data-lucide="smartphone" class="w-4 h-4 text-gray-400"></i></div>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-tight">${deviceLabel}</p>
+                                        <p class="text-[9px] font-bold text-gray-400 uppercase">${osLabel}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-5">
+                                <div class="flex flex-col">
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 rounded-full ${u.status === 'online' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'} mr-2"></div>
+                                        <span class="text-[10px] font-black uppercase ${u.status === 'online' ? 'text-green-600' : 'text-gray-400'}">${u.status === 'online' ? 'Connecté' : 'Hors ligne'}</span>
+                                    </div>
+                                    <p class="text-[9px] font-bold text-gray-400 mt-1 uppercase">Depuis : ${timeAgo(u.status_updated_at || u.last_seen)}</p>
+                                </div>
+                            </td>
+                            <td class="px-8 py-5">
+                                <span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span>
+                            </td>
+                            <td class="px-8 py-5 text-right space-x-2">
+                                <button onclick="toggleUserBadge('${u.id}', ${!u.is_verified})" class="p-3 ${u.is_verified ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'} rounded-xl hover:shadow-lg transition-all" title="${u.is_verified ? 'Retirer Badge' : 'Accorder Badge'}"><i data-lucide="${u.is_verified ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
+                                <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
+                                <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
+                                <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                }).join(''); lucide.createIcons();
             } catch (e) {}
         }
 

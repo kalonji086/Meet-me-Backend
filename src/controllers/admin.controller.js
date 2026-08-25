@@ -525,15 +525,15 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           socketService.broadcast('collab:member_moved', { userId: action.target_id, toTeamId: action.details.teamId });
           break;
         case 'move_member':
-          if (action.details.fromTeamId) {
-            await query('DELETE FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [action.details.fromTeamId, action.target_id]);
-          } else {
-            await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [action.target_id]);
+          // Retirer de toutes les équipes d'abord pour un déplacement propre
+          await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [action.target_id]);
+
+          if (action.details.toTeamId && action.details.toTeamId !== 'null' && action.details.toTeamId !== '') {
+            await query(
+              'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
+              [action.details.toTeamId, action.target_id]
+            );
           }
-          await query(
-            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
-            [action.details.toTeamId, action.target_id]
-          );
           socketService.broadcast('collab:member_moved', { userId: action.target_id, fromTeamId: action.details.fromTeamId, toTeamId: action.details.toTeamId });
           break;
       }
@@ -1626,6 +1626,22 @@ const createCollaborator = asyncHandler(async (req, res) => {
 
   // 3. Envoyer l'email avec le mot de passe temporaire
   await mailService.sendCollaboratorAccountEmail(email, full_name, tempPassword);
+
+  // 4. Ajouter à l'équipe par défaut si le module collaboration est présent
+  if (modules && modules.includes('collaboration')) {
+    try {
+      const defaultTeamRes = await query("SELECT id FROM public.collab_teams WHERE name = 'Together Tech Community' LIMIT 1");
+      if (defaultTeamRes.rows.length > 0) {
+        await query(
+          'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
+          [defaultTeamRes.rows[0].id, userId]
+        );
+        logger.info(`✅ Collaborateur ${full_name} ajouté à l'équipe par défaut.`);
+      }
+    } catch (err) {
+      logger.error('Erreur lors de l\'ajout à l\'équipe par défaut:', err.message);
+    }
+  }
 
   await logAdminAction(req, 'create_collaborator', 'user', userId, { email, full_name, tempPassword_sent: true });
 

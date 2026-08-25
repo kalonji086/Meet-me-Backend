@@ -682,15 +682,12 @@ const moveTeamMember = asyncHandler(async (req, res) => {
   const canExecute = await processSensitiveAction(req, 'move_member', userId, userRes.rows[0].full_name, { userId, fromTeamId, toTeamId, teamName });
   if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de déplacement envoyée à l\'admin principal.' });
 
-  // 1. Remove from old team (if exists) or all teams to be sure
-  if (fromTeamId && fromTeamId !== 'null' && fromTeamId !== '') {
-    await query('DELETE FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [fromTeamId, userId]);
-  } else {
-    await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [userId]);
-  }
+  // 1. Toujours retirer de TOUTES les équipes pour éviter les accès résiduels
+  // (Cela règle le problème où le collaborateur garde des accès sur d'anciennes équipes)
+  await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [userId]);
 
-  // 2. Add to new team
-  if (toTeamId) {
+  // 2. Ajouter à la nouvelle équipe
+  if (toTeamId && toTeamId !== 'null' && toTeamId !== '') {
     await query(
       'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
       [toTeamId, userId]

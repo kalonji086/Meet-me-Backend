@@ -48,8 +48,10 @@
             </div>
             <h3 class="text-3xl font-black text-gray-900 tracking-tighter mb-4 uppercase">ACCÈS RÉVOQUÉ</h3>
             <p id="blocked-message" class="text-gray-500 font-medium leading-relaxed mb-10">Vos privilèges d'administration ont été suspendus par l'administrateur principal. Veuillez contacter le support pour toute réclamation.</p>
-            <button onclick="openCollabApplyModal()" class="w-full bg-cyan-500 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all mb-4">Demander une Collaboration</button>
-            <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Déconnexion</button>
+            <div id="blocked-actions" class="space-y-4">
+                <button id="apply-collab-btn" onclick="openCollabApplyModal()" class="w-full bg-cyan-500 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all">Demander une Collaboration</button>
+                <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Déconnexion</button>
+            </div>
         </div>
     </div>
 
@@ -974,12 +976,28 @@
                             axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
                                 .then(reqRes => {
                                     const myRequest = reqRes.data.data;
+                                    const applyBtn = document.getElementById('apply-collab-btn');
+
                                     if (myRequest && myRequest.status === 'pending') {
+                                        // Update button text if on blocked screen
+                                        if (applyBtn) {
+                                            applyBtn.innerText = "DEMANDE EN COURS D'EXAMEN";
+                                            applyBtn.disabled = true;
+                                            applyBtn.className = "w-full bg-gray-100 text-gray-400 py-5 rounded-2xl font-black uppercase text-xs tracking-widest cursor-not-allowed";
+                                        }
+
                                         document.getElementById('main-container').classList.add('hidden');
                                         document.getElementById('blocked-container').classList.add('hidden');
                                         document.getElementById('pending-collab-container').classList.remove('hidden');
                                         initSocket();
                                     } else {
+                                        // Reset button if rejected or none
+                                        if (applyBtn) {
+                                            applyBtn.innerText = "Demander une Collaboration";
+                                            applyBtn.disabled = false;
+                                            applyBtn.className = "w-full bg-cyan-500 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all";
+                                        }
+
                                         document.getElementById('main-container').classList.add('hidden');
                                         document.getElementById('blocked-container').classList.remove('hidden');
                                         document.getElementById('pending-collab-container').classList.add('hidden');
@@ -3387,7 +3405,10 @@
             try {
                 await axios.put(`${API_URL}/admin/pending-actions/${id}`, { decision, comment }, { headers: { Authorization: `Bearer ${token}` } });
                 loadApprovals(); loadStats();
-            } catch (e) { alert("Erreur."); }
+            } catch (e) {
+                const msg = e.response?.data?.error || "Erreur lors de l'approbation.";
+                alert(msg);
+            }
         }
 
         async function deleteApproval(id) {
@@ -3647,6 +3668,14 @@
 
                 alert("Candidature envoyée ! L'Administrateur Principal va l'examiner.");
                 closeCollabApplyModal();
+
+                // Update the main button text immediately
+                const mainApplyBtn = document.getElementById('apply-collab-btn');
+                if (mainApplyBtn) {
+                    mainApplyBtn.innerText = "DEMANDE EN COURS D'EXAMEN";
+                    mainApplyBtn.disabled = true;
+                    mainApplyBtn.className = "w-full bg-gray-100 text-gray-400 py-5 rounded-2xl font-black uppercase text-xs tracking-widest cursor-not-allowed";
+                }
 
                 // Refresh state to show pending screen
                 const user = JSON.parse(localStorage.getItem('admin_user'));

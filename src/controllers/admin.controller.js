@@ -516,25 +516,51 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           await query('UPDATE public.market_businesses SET status = $1 WHERE id = $2', [action.details.status, action.target_id]);
           break;
         case 'collab_application':
+          let applyTeamId = action.details.teamId;
+
+          // Sécurité: Si teamId manquant, on cherche l'équipe par défaut
+          if (!applyTeamId || applyTeamId === 'null') {
+            const defTeam = await query("SELECT id FROM public.collab_teams WHERE name = 'Together Tech Community' LIMIT 1");
+            applyTeamId = defTeam.rows[0]?.id;
+
+            if (!applyTeamId) {
+              const firstTeam = await query("SELECT id FROM public.collab_teams ORDER BY created_at ASC LIMIT 1");
+              applyTeamId = firstTeam.rows[0]?.id;
+            }
+          }
+
+          if (!applyTeamId) throw new Error("Aucune équipe disponible pour l'assignation.");
+
           // 1. Enregistrer dans collab_requests pour l'historique
           await query(
             'INSERT INTO public.collab_requests (user_id, team_id, motivation, objectives, skills, status, processed_at, processed_by) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)',
-            [action.requested_by, action.details.teamId, action.details.motivation, action.details.objectives, action.details.skills, 'approved', req.userId]
+            [action.requested_by, applyTeamId, action.details.motivation, action.details.objectives, action.details.skills, 'approved', req.userId]
           );
 
           // 2. Ajouter aux membres de l'équipe
           await query(
             'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
-            [action.details.teamId, action.requested_by]
+            [applyTeamId, action.requested_by]
           );
 
           // 3. Activer le module Collaboration dans sa délégation
           const existingCollabDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [action.requested_by]);
           if (existingCollabDel.rows.length === 0) {
             await query('INSERT INTO public.admin_delegations (user_id, modules, is_active) VALUES ($1, $2, TRUE)', [action.requested_by, ['collaboration']]);
-          } else if (!existingCollabDel.rows[0].modules.includes('collaboration')) {
-            await query('UPDATE public.admin_delegations SET modules = array_append(modules, \'collaboration\'), is_active = TRUE WHERE user_id = $1', [action.requested_by]);
+          } else {
+            await query(
+              `UPDATE public.admin_delegations
+               SET modules = CASE WHEN NOT ('collaboration' = ANY(modules)) THEN array_append(modules, 'collaboration') ELSE modules END,
+                   is_active = TRUE,
+                   updated_at = NOW()
+               WHERE user_id = $1`,
+              [action.requested_by]
+            );
           }
+
+          // 4. S'assurer que le profil est marqué comme collaborateur
+          await query('UPDATE public.profiles SET is_collaborator = TRUE WHERE id = $1', [action.requested_by]);
+
           socketService.emitToUser(action.requested_by, 'collab:request_processed', { status: 'approved', comment: comment || 'Bienvenue dans l\'équipe !' });
           break;
         case 'add_member':

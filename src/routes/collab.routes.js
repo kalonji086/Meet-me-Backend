@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const collabController = require('../controllers/collab.controller');
-const { authenticate, isAdmin } = require('../middleware/auth.middleware');
+const { authenticate, authenticateAllowLocked, isAdmin } = require('../middleware/auth.middleware');
+
+// Public status check (logged in but not yet admin, allows even if locked/revoked)
+router.get('/my-status', authenticateAllowLocked, collabController.getMyRequestStatus);
+router.post('/requests', authenticateAllowLocked, collabController.submitRequest);
 
 router.use(authenticate);
-
-// Public status check (logged in but not yet admin)
-router.get('/my-status', collabController.getMyRequestStatus);
-router.post('/requests', collabController.submitRequest);
 
 // Restrict these to Admins/Delegates
 router.use(isAdmin);

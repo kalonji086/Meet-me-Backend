@@ -4,10 +4,18 @@ const socketService = require('../services/socket.service');
 const logger = require('../utils/logger');
 const { processSensitiveAction } = require('./admin.controller');
 
+const isValidUUID = (id) => {
+  if (!id || id === 'null' || id === 'undefined') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
 /**
  * Helper to check permissions dynamically based on the user's role in a team
  */
 const checkCollabPermission = async (userId, teamId, action) => {
+  if (!isValidUUID(teamId)) return false;
+
   // 1. Get user role in this team
   const memberRes = await query(
     'SELECT role FROM public.collab_team_members WHERE user_id = $1 AND team_id = $2',
@@ -82,6 +90,8 @@ const getTeams = asyncHandler(async (req, res) => {
  */
 const markAsRead = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.json({ success: true });
+
   await query(
     'UPDATE public.collab_team_members SET last_read_at = NOW() WHERE team_id = $1 AND user_id = $2',
     [teamId, req.userId]
@@ -122,6 +132,8 @@ const createTeam = asyncHandler(async (req, res) => {
  */
 const updateTeam = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.status(400).json({ success: false, error: 'ID d\'équipe invalide' });
+
   const { name, description, isConfidential, color } = req.body;
 
   // Security check: Global admin or authorized delegate
@@ -144,6 +156,7 @@ const updateTeam = asyncHandler(async (req, res) => {
  */
 const deleteTeam = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.status(400).json({ success: false, error: 'ID d\'équipe invalide' });
 
   // Security check
   const canManage = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.manage_teams);
@@ -165,6 +178,7 @@ const deleteTeam = asyncHandler(async (req, res) => {
  */
 const getTeamMembers = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.json({ success: true, data: [] });
 
   // Security: Check if member or global admin or has right to see all teams
   const canAccess = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.see_all_teams);
@@ -188,6 +202,7 @@ const getTeamMembers = asyncHandler(async (req, res) => {
  */
 const getTasks = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.json({ success: true, data: [] });
 
   // Security: Check if member or global admin or has right to see all teams
   const canAccess = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.see_all_teams);
@@ -212,6 +227,7 @@ const getTasks = asyncHandler(async (req, res) => {
  */
 const createTask = asyncHandler(async (req, res) => {
   const { teamId, title, description, deadline, assigneeId, priority } = req.body;
+  if (!isValidUUID(teamId)) return res.status(400).json({ success: false, error: 'ID d\'équipe invalide' });
 
   // Security: Check if member has 'write' permission for 'tasks'
   if (!req.user.is_global_admin) {
@@ -312,6 +328,8 @@ const deleteTask = asyncHandler(async (req, res) => {
  */
 const getMessages = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.json({ success: true, data: [] });
+
   const recipientId = req.query.recipientId; // If present, it's a private chat
 
   // Security: Check if member or global admin or has right to read all messages
@@ -377,6 +395,7 @@ const markMessageAsSeen = asyncHandler(async (req, res) => {
  */
 const sendMessage = asyncHandler(async (req, res) => {
   const { teamId, content, recipientId } = req.body;
+  if (!isValidUUID(teamId)) return res.status(400).json({ success: false, error: 'ID d\'équipe invalide' });
 
   // Security: Check if member has 'write' permission for 'chat'
   if (!req.user.is_global_admin) {
@@ -440,6 +459,7 @@ const updateMessage = asyncHandler(async (req, res) => {
  */
 const getDocuments = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.json({ success: true, data: [] });
 
   // Security: Check if member or global admin or see all teams
   const canAccess = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.see_all_teams);
@@ -527,6 +547,7 @@ const deleteDocument = asyncHandler(async (req, res) => {
  */
 const uploadDocument = asyncHandler(async (req, res) => {
   const { teamId, fileUrl, fileName, fileSize, mimeType, recipientId } = req.body;
+  if (!isValidUUID(teamId)) return res.status(400).json({ success: false, error: 'ID d\'équipe invalide' });
 
   // Security: Check if member has 'write' permission for 'documents'
   if (!req.user.is_global_admin) {
@@ -841,6 +862,7 @@ const savePermissions = asyncHandler(async (req, res) => {
  */
 const getCalendarEvents = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
+  if (!isValidUUID(teamId)) return res.json({ success: true, data: [] });
 
   // Security: Check if member or global admin or see all
   const canAccess = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.see_all_teams);
@@ -883,6 +905,7 @@ const getCalendarEvents = asyncHandler(async (req, res) => {
  */
 const createCalendarEvent = asyncHandler(async (req, res) => {
   const { teamId, title, description, start_at, end_at, type, meetingUrl, invitedMemberIds } = req.body;
+  if (!isValidUUID(teamId)) return res.status(400).json({ success: false, error: 'ID d\'équipe invalide' });
 
   // Security: Check if member or global admin
   if (!req.user.is_global_admin) {
@@ -984,6 +1007,7 @@ const deleteCalendarEvent = asyncHandler(async (req, res) => {
  */
 const updateMemberRole = asyncHandler(async (req, res) => {
   const { teamId, userId, role } = req.body;
+  if (!isValidUUID(teamId)) return res.status(400).json({ success: false, error: 'ID d\'équipe invalide' });
 
   // Security: Only global admin or team admin can change roles
   const isGlobalAdmin = req.user.is_global_admin;

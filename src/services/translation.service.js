@@ -20,6 +20,7 @@ class TranslationService {
     this.deeplApiKey = config.translation.deeplApiKey;
     this.openaiApiKey = config.translation.openaiApiKey;
     
+    this.openaiDisabledUntil = null;
     this.validateConfig();
   }
 
@@ -43,17 +44,48 @@ class TranslationService {
         return cachedTranslation;
       }
 
-      let translatedText;
+      let translatedText = null;
+      let errorOpenAI = null;
 
-      // Utiliser l'IA (OpenAI) en priorité si configuré, sinon Google/DeepL
-      if (this.openaiApiKey) {
-        translatedText = await this.translateWithOpenAI(text, targetLanguage, sourceLanguage);
-      } else if (this.provider === 'google' && this.googleApiKey) {
-        translatedText = await this.translateWithGoogle(text, targetLanguage, sourceLanguage);
-      } else if (this.provider === 'deepl' && this.deeplApiKey) {
-        translatedText = await this.translateWithDeepL(text, targetLanguage, sourceLanguage);
-      } else {
-        logger.debug('Mode traduction simulé (pas de clé API configurée)');
+      // 1. Essayer OpenAI si configuré et non désactivé temporairement
+      if (this.openaiApiKey && (!this.openaiDisabledUntil || Date.now() > this.openaiDisabledUntil)) {
+        try {
+          translatedText = await this.translateWithOpenAI(text, targetLanguage, sourceLanguage);
+        } catch (error) {
+          errorOpenAI = error;
+          // Si c'est une erreur de quota (429), désactiver OpenAI pour 1 heure
+          if (error.response?.status === 429 || error.message?.includes('insufficient_quota')) {
+            logger.warn('OpenAI quota épuisé, désactivation temporaire du service IA (1h)');
+            this.openaiDisabledUntil = Date.now() + 3600000;
+          }
+        }
+      }
+
+      // 2. Fallback vers Google Translate
+      if (!translatedText && this.googleApiKey) {
+        try {
+          translatedText = await this.translateWithGoogle(text, targetLanguage, sourceLanguage);
+        } catch (error) {
+          logger.error('Erreur Google Translate fallback:', error.message);
+        }
+      }
+
+      // 3. Fallback vers DeepL
+      if (!translatedText && this.deeplApiKey) {
+        try {
+          translatedText = await this.translateWithDeepL(text, targetLanguage, sourceLanguage);
+        } catch (error) {
+          logger.error('Erreur DeepL fallback:', error.message);
+        }
+      }
+
+      // 4. Mode simulé en dernier recours
+      if (!translatedText) {
+        if (errorOpenAI) {
+          logger.debug('Mode traduction simulé suite à erreur OpenAI');
+        } else {
+          logger.debug('Mode traduction simulé (pas de clé API configurée)');
+        }
         translatedText = this.getMockTranslation(text, targetLanguage);
       }
 
@@ -64,7 +96,7 @@ class TranslationService {
       
       return translatedText;
     } catch (error) {
-      logger.error('Erreur lors de la traduction:', error);
+      logger.error('Erreur fatale lors de la traduction:', error);
       return this.getMockTranslation(text, targetLanguage);
     }
   }
@@ -311,7 +343,7 @@ class TranslationService {
    */
   async detectLanguage(text) {
     try {
-      if (!this.apiKey || this.provider !== 'google') {
+      if (!this.googleApiKey || this.provider !== 'google') {
         // Retourner une détection simulée
         return this.detectLanguageMock(text);
       }
@@ -321,7 +353,7 @@ class TranslationService {
       const response = await axios.post(url, null, {
         params: {
           q: text,
-          key: this.apiKey,
+          key: this.googleApiKey,
         },
         timeout: 5000,
       });

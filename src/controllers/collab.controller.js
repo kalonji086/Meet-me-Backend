@@ -5,8 +5,32 @@ const logger = require('../utils/logger');
 const { processSensitiveAction } = require('./admin.controller');
 
 /**
- * @desc    Get all teams
+ * Helper to check permissions dynamically based on the user's role in a team
  */
+const checkCollabPermission = async (userId, teamId, action) => {
+  // 1. Get user role in this team
+  const memberRes = await query(
+    'SELECT role FROM public.collab_team_members WHERE user_id = $1 AND team_id = $2',
+    [userId, teamId]
+  );
+  if (memberRes.rows.length === 0) return false;
+  const role = memberRes.rows[0].role;
+
+  // 2. Get permissions for this role from config table
+  const permRes = await query('SELECT * FROM public.collab_permissions_config WHERE role = $1', [role]);
+  if (permRes.rows.length === 0) return false;
+  const perms = permRes.rows[0];
+
+  if (action === 'read') return perms.can_read;
+  if (action === 'write') return perms.can_write;
+  if (action === 'delete') return perms.can_delete;
+
+  // Check module access
+  const moduleMap = { 'tasks': 'tasks', 'chat': 'chat', 'documents': 'documents', 'members': 'members', 'requests': 'requests' };
+  const targetModule = moduleMap[action];
+  return targetModule ? perms.modules.includes(targetModule) : false;
+};
+
 /**
  * @desc    Get all teams with unread counts
  */
@@ -32,6 +56,7 @@ const getTeams = asyncHandler(async (req, res) => {
     `;
     params = [req.userId];
   } else {
+    // Users see teams they belong to IF their role has LECTURE (can_read) enabled
     queryStr = `
       SELECT t.*,
       (SELECT COUNT(*) FROM public.collab_team_members WHERE team_id = t.id) as members_count,
@@ -41,6 +66,8 @@ const getTeams = asyncHandler(async (req, res) => {
        AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
       FROM public.collab_teams t
       JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
+      JOIN public.collab_permissions_config pc ON tm.role = pc.role
+      WHERE pc.can_read = TRUE
       ORDER BY t.parent_id NULLS FIRST, t.created_at DESC
     `;
     params = [req.userId];
@@ -186,10 +213,11 @@ const getTasks = asyncHandler(async (req, res) => {
 const createTask = asyncHandler(async (req, res) => {
   const { teamId, title, description, deadline, assigneeId, priority } = req.body;
 
-  // Security: Check if member or global admin
+  // Security: Check if member has 'write' permission for 'tasks'
   if (!req.user.is_global_admin) {
-    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
-    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
+    const hasModule = await checkCollabPermission(req.userId, teamId, 'tasks');
+    if (!hasWrite || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé : Droits d\'écriture requis.' });
   }
 
   const result = await query(
@@ -217,6 +245,16 @@ const createTask = asyncHandler(async (req, res) => {
 const updateTaskStatus = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
   const { status, progress } = req.body;
+
+  const taskRes = await query('SELECT team_id FROM public.collab_tasks WHERE id = $1', [taskId]);
+  if (taskRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Tâche non trouvée' });
+  const teamId = taskRes.rows[0].team_id;
+
+  // Security
+  if (!req.user.is_global_admin) {
+    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
+    if (!hasWrite) return res.status(403).json({ success: false, error: 'Accès refusé' });
+  }
 
   let queryStr = 'UPDATE public.collab_tasks SET updated_at = NOW()';
   const params = [taskId];
@@ -255,6 +293,13 @@ const deleteTask = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
   const task = await query('SELECT team_id FROM public.collab_tasks WHERE id = $1', [taskId]);
   if (!task.rows[0]) return res.status(404).json({ success: false, error: 'Tâche non trouvée' });
+  const teamId = task.rows[0].team_id;
+
+  // Security
+  if (!req.user.is_global_admin) {
+    const hasDelete = await checkCollabPermission(req.userId, teamId, 'delete');
+    if (!hasDelete) return res.status(403).json({ success: false, error: 'Accès refusé' });
+  }
 
   await query('DELETE FROM public.collab_tasks WHERE id = $1', [taskId]);
   socketService.broadcast('collab:task_deleted', { taskId, teamId: task.rows[0].team_id });
@@ -333,10 +378,11 @@ const markMessageAsSeen = asyncHandler(async (req, res) => {
 const sendMessage = asyncHandler(async (req, res) => {
   const { teamId, content, recipientId } = req.body;
 
-  // Security: Check if member or global admin
+  // Security: Check if member has 'write' permission for 'chat'
   if (!req.user.is_global_admin) {
-    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
-    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
+    const hasModule = await checkCollabPermission(req.userId, teamId, 'chat');
+    if (!hasWrite || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 
   const result = await query(
@@ -398,8 +444,9 @@ const getDocuments = asyncHandler(async (req, res) => {
   // Security: Check if member or global admin or see all teams
   const canAccess = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.see_all_teams);
   if (!canAccess) {
-    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
-    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+    const hasRead = await checkCollabPermission(req.userId, teamId, 'read');
+    const hasModule = await checkCollabPermission(req.userId, teamId, 'documents');
+    if (!hasRead || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 
   const result = await query(`
@@ -481,10 +528,11 @@ const deleteDocument = asyncHandler(async (req, res) => {
 const uploadDocument = asyncHandler(async (req, res) => {
   const { teamId, fileUrl, fileName, fileSize, mimeType, recipientId } = req.body;
 
-  // Security: Check if member or global admin
+  // Security: Check if member has 'write' permission for 'documents'
   if (!req.user.is_global_admin) {
-    const check = await query('SELECT 1 FROM public.collab_team_members WHERE team_id = $1 AND user_id = $2', [teamId, req.userId]);
-    if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès à cette équipe refusé' });
+    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
+    const hasModule = await checkCollabPermission(req.userId, teamId, 'documents');
+    if (!hasWrite || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 
   const result = await query(
@@ -782,6 +830,9 @@ const savePermissions = asyncHandler(async (req, res) => {
     );
   }
 
+  // Notify all online collaborators in real-time
+  socketService.broadcast('collab:permissions_config_updated', { permissions });
+
   res.json({ success: true, message: 'Permissions mises à jour.' });
 });
 
@@ -928,6 +979,30 @@ const deleteCalendarEvent = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Événement supprimé.' });
 });
 
+/**
+ * @desc    Update a member's role in a team
+ */
+const updateMemberRole = asyncHandler(async (req, res) => {
+  const { teamId, userId, role } = req.body;
+
+  // Security: Only global admin or team admin can change roles
+  const isGlobalAdmin = req.user.is_global_admin;
+  const canManage = isGlobalAdmin || (req.user.collab_rights && req.user.collab_rights.manage_members);
+
+  if (!canManage) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  await query(
+    'UPDATE public.collab_team_members SET role = $1 WHERE team_id = $2 AND user_id = $3',
+    [role, teamId, userId]
+  );
+
+  // Notify user in real-time
+  socketService.emitToUser(userId, 'collab:role_updated', { teamId, role });
+  socketService.broadcast('collab:member_moved', { userId, toTeamId: teamId }); // Refresh lists
+
+  res.json({ success: true, message: 'Rôle mis à jour.' });
+});
+
 module.exports = {
   getTeams, createTeam, updateTeam, deleteTeam, getTeamMembers, markAsRead,
   getTasks, createTask, updateTaskStatus, deleteTask,
@@ -937,5 +1012,5 @@ module.exports = {
   getCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
   submitRequest, inviteUser, getRequests, getMyRequestStatus, handleRequest,
   moveTeamMember, getMemberDetails,
-  getPermissions, savePermissions
+  getPermissions, savePermissions, updateMemberRole
 };

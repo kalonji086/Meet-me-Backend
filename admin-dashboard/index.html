@@ -1305,6 +1305,26 @@
                 }
             });
 
+            socket.on('collab:role_updated', (data) => {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                showToast("Évolution de poste", `Votre rôle a été mis à jour vers : ${data.role}.`, "award");
+                // Reload collaboration to refresh permissions and UI tabs
+                if (!document.getElementById('section-collaboration').classList.contains('hidden')) {
+                    loadCollaboration();
+                }
+            });
+
+            socket.on('collab:permissions_config_updated', (data) => {
+                // If I am a collaborator, my rights might have changed
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                if (user && !user.isGlobalAdmin) {
+                    showToast("Mise à jour Système", "Vos habilitations ont été mises à jour par l'Administrateur.", "shield-check");
+                    if (!document.getElementById('section-collaboration').classList.contains('hidden')) {
+                        loadCollaboration();
+                    }
+                }
+            });
+
             socket.on('collab:absence_notification', (data) => {
                 const start = new Date(data.start).toLocaleString();
                 const end = new Date(data.end).toLocaleString();
@@ -1409,6 +1429,7 @@
 
         let activeCollabTeamId = null;
         let activeCollabUserRole = 'collaborator';
+        let activeCollabPermissions = { can_read: true, can_write: false, can_delete: false, modules: [] };
         let collabTeamsData = [];
         let collabCalendar = null;
         let chatMode = 'team'; // 'team' or 'private'
@@ -1417,11 +1438,11 @@
             activeCollabTeamId = null; // Force reload
             const user = JSON.parse(localStorage.getItem('admin_user'));
             const isGlobalAdmin = user.isGlobalAdmin;
-            const canManage = isGlobalAdmin || (user.collabRights && user.collabRights.manage_members);
 
-            // UI Access Control: Global Admin or Manager Delegate sees the management tools (Requests, Config)
-            if (canManage) {
+            // Global Admin sees everything
+            if (isGlobalAdmin) {
                 document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+                activeCollabPermissions = { can_read: true, can_write: true, can_delete: true, modules: ['teams', 'calendar', 'directory', 'documents', 'requests', 'config'] };
             }
 
             // Load initial tab
@@ -1429,12 +1450,23 @@
         }
 
         async function showCollabTab(tab) {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+
+            // SECURITY CHECK: If not Global Admin, check if this module is allowed for my current role
+            if (!user.isGlobalAdmin && activeCollabPermissions.modules.length > 0) {
+                if (!activeCollabPermissions.modules.includes(tab) && tab !== 'teams') {
+                   // Fallback to teams if trying to access restricted tab
+                   tab = 'teams';
+                }
+            }
+
             document.querySelectorAll('.collab-tab').forEach(el => el.classList.remove('active', 'bg-cyan-500', 'text-white'));
             document.querySelectorAll('.collab-content').forEach(el => el.classList.add('hidden'));
 
             const btn = document.getElementById('tab-collab-' + tab);
-            btn.classList.add('active', 'bg-cyan-500', 'text-white');
-            document.getElementById('collab-tab-' + tab).classList.remove('hidden');
+            if (btn) btn.classList.add('active', 'bg-cyan-500', 'text-white');
+            const content = document.getElementById('collab-tab-' + tab);
+            if (content) content.classList.remove('hidden');
 
             if (tab === 'teams') loadCollabTeams();
             if (tab === 'calendar') loadCollabCalendar();
@@ -1444,6 +1476,22 @@
             if (tab === 'config') { loadCollabPermissions(); loadCollabLiveManagement(); }
 
             lucide.createIcons();
+        }
+            if (tab === 'directory') loadCollabDirectory();
+            if (tab === 'documents') { loadCollabGlobalDocs(); loadTeamMembersForPrivateDoc(); }
+            if (tab === 'requests') loadCollabRequests();
+            if (tab === 'config') { loadCollabPermissions(); loadCollabLiveManagement(); }
+
+            lucide.createIcons();
+        }
+
+        async function updateCollabUserRole(teamId, userId, role) {
+            if (!teamId || teamId === 'undefined') return alert("L'utilisateur doit d'abord être dans une équipe.");
+            try {
+                await axios.post(`${API_URL}/collab/update-role`, { teamId, userId, role }, { headers: { Authorization: `Bearer ${token}` } });
+                showToast("Rôle mis à jour", `Le collaborateur est désormais ${role}.`, "shield-check");
+                loadCollabLiveManagement();
+            } catch (e) { alert("Erreur lors de la mise à jour du rôle."); }
         }
 
         async function loadCollabLiveManagement() {
@@ -1457,10 +1505,12 @@
                 const membersPromises = teams.map(t => axios.get(`${API_URL}/collab/teams/${t.id}/members`, { headers: { Authorization: `Bearer ${token}` } }));
                 const membersRes = await Promise.all(membersPromises);
 
-                // Map user to their team
+                // Map user to their team and role
                 const userTeams = {};
                 membersRes.forEach((res, i) => {
-                    res.data.data.forEach(m => { userTeams[m.id] = { id: teams[i].id, name: teams[i].name }; });
+                    res.data.data.forEach(m => {
+                        userTeams[m.id] = { id: teams[i].id, name: teams[i].name, role: m.role };
+                    });
                 });
 
                 document.getElementById('collab-live-management').innerHTML = delRes.data.data.filter(d => d.modules.includes('collaboration')).map(d => `
@@ -1469,7 +1519,16 @@
                             <img src="${getFullUrl(d.avatar_url)}" class="w-10 lg:w-12 h-10 lg:h-12 rounded-2xl mr-4 lg:mr-5 shadow-sm">
                             <div class="flex-1 min-w-0">
                                 <p class="text-xs lg:text-sm font-black text-gray-800 uppercase tracking-tight truncate">${d.full_name}</p>
-                                <p class="text-[8px] lg:text-[9px] text-cyan-600 font-bold uppercase mb-1 truncate">Équipe : ${userTeams[d.user_id]?.name || 'SANS ÉQUIPE'}</p>
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <p class="text-[8px] lg:text-[9px] text-cyan-600 font-bold uppercase truncate">Équipe : ${userTeams[d.user_id]?.name || 'SANS ÉQUIPE'}</p>
+                                    ${userTeams[d.user_id] ? `
+                                        <select onchange="updateCollabUserRole('${userTeams[d.user_id].id}', '${d.user_id}', this.value)" class="bg-purple-50 text-[8px] font-black uppercase text-purple-600 outline-none border-none px-2 py-0.5 rounded-md cursor-pointer">
+                                            <option value="collaborator" ${userTeams[d.user_id].role === 'collaborator' ? 'selected' : ''}>Collaborateur</option>
+                                            <option value="manager" ${userTeams[d.user_id].role === 'manager' ? 'selected' : ''}>Manager</option>
+                                            <option value="admin" ${userTeams[d.user_id].role === 'admin' ? 'selected' : ''}>Admin</option>
+                                        </select>
+                                    ` : ''}
+                                </div>
                                 <div class="flex flex-wrap gap-1.5 mt-2">
                                     ${['stats', 'users', 'groups', 'support', 'verifications', 'collaboration'].map(m => `
                                         <button onclick="toggleUserModule('${d.user_id}', '${m}', ${d.modules.includes(m)})" class="px-2 py-0.5 rounded-md text-[7px] lg:text-[8px] font-black uppercase transition-all ${d.modules.includes(m) ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-cyan-50 hover:text-cyan-600'}">${m}</button>
@@ -1979,7 +2038,8 @@
 
         function renderSingleDocCard(d, user, isGlobalView) {
             const isGlobalAdmin = user.isGlobalAdmin;
-            const canManage = isGlobalAdmin || (user.collabRights && user.collabRights.see_all_teams);
+            const canManage = isGlobalAdmin || (user.collabRights && user.collabRights.see_all_teams) || activeCollabPermissions.can_delete;
+            const canWrite = isGlobalAdmin || activeCollabPermissions.can_write;
 
             return `
                 <div id="collab-doc-${d.id}" class="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm animate-pop-in group relative">
@@ -2084,15 +2144,24 @@
             const user = JSON.parse(localStorage.getItem('admin_user'));
             const team = collabTeamsData.find(t => t.id === id);
             const isGlobalAdmin = user.isGlobalAdmin;
-            const canSeeAll = isGlobalAdmin || (user.collabRights && user.collabRights.see_all_teams);
 
-            // Force Admin role for Global Admin or privileged delegate, otherwise use assigned role
-            if (canSeeAll) {
+            if (isGlobalAdmin) {
                 activeCollabUserRole = 'admin';
+                activeCollabPermissions = { can_read: true, can_write: true, can_delete: true, modules: ['teams', 'calendar', 'directory', 'documents', 'requests', 'config'] };
             } else {
-                // Others use their assigned role in the team
                 activeCollabUserRole = (team && team.my_role) ? team.my_role : 'collaborator';
+                // Fetch permissions for this role
+                try {
+                    const permRes = await axios.get(`${API_URL}/collab/permissions`, { headers: { Authorization: `Bearer ${token}` } });
+                    const myPerms = permRes.data.data.find(p => p.role === activeCollabUserRole);
+                    if (myPerms) {
+                        activeCollabPermissions = myPerms;
+                    }
+                } catch (e) {}
             }
+
+            // UI UPDATES based on permissions
+            updateCollabUIByPermissions();
 
             document.getElementById('active-team-name').innerText = name.toUpperCase();
             document.getElementById('active-team-name').style.backgroundColor = (team?.color || '#06b6d4') + '22'; // 20% opacity
@@ -2103,21 +2172,64 @@
             loadTeamMembersForPrivateChat();
             if (!document.getElementById('collab-tab-documents').classList.contains('hidden')) loadTeamMembersForPrivateDoc();
 
-            // Dynamic Task Button based on role
-            const taskBtnContainer = document.getElementById('collab-add-task-container');
-            if (taskBtnContainer) {
-                taskBtnContainer.innerHTML = (activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager')
-                    ? `<button onclick="showAddTaskModal()" class="text-[10px] font-black text-cyan-600 hover:underline">NOUVELLE TÂCHE</button>`
-                    : '';
-            }
-
             // UI Visual update
             document.querySelectorAll('.team-btn').forEach(btn => btn.classList.remove('border-cyan-500', 'bg-cyan-50'));
+            const activeBtn = document.querySelector(`button[onclick*="selectCollabTeam('${id}'"]`);
+            if (activeBtn) activeBtn.classList.add('border-cyan-500', 'bg-cyan-50');
 
             loadCollabMembers();
             loadCollabTasks();
             loadCollabDocs();
             loadCollabChat();
+        }
+
+        function updateCollabUIByPermissions() {
+            const perms = activeCollabPermissions;
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+
+            // Special: requests and config are only for high level or explicit rights
+            const canManage = user.isGlobalAdmin || (user.collabRights && user.collabRights.manage_members);
+
+            document.querySelectorAll('.collab-tab').forEach(tabBtn => {
+                const tabId = tabBtn.id.replace('tab-collab-', '');
+                if (user.isGlobalAdmin) {
+                    tabBtn.classList.remove('hidden');
+                    return;
+                }
+
+                // If it's the config or requests tab, use the high-level canManage
+                if (tabId === 'requests' || tabId === 'config') {
+                    tabBtn.classList.toggle('hidden', !canManage);
+                    return;
+                }
+
+                // For others, check role modules
+                const isAllowed = perms.modules.includes(tabId) || tabId === 'teams';
+                tabBtn.classList.toggle('hidden', !isAllowed);
+            });
+
+            // 2. Hide/Show Write buttons (Add Task, etc.)
+            const taskBtnContainer = document.getElementById('collab-add-task-container');
+            if (taskBtnContainer) {
+                taskBtnContainer.innerHTML = (perms.can_write && perms.modules.includes('tasks'))
+                    ? `<button onclick="showAddTaskModal()" class="text-[10px] font-black text-cyan-600 hover:underline">NOUVELLE TÂCHE</button>`
+                    : '';
+            }
+
+            const chatInputContainer = document.getElementById('collab-chat-input')?.parentElement;
+            if (chatInputContainer) {
+                chatInputContainer.classList.toggle('hidden', !perms.can_write || !perms.modules.includes('chat'));
+            }
+
+            const docUploadBtn = document.querySelector('button[onclick*="uploadCollabDocument"]');
+            if (docUploadBtn) {
+                docUploadBtn.classList.toggle('hidden', !perms.can_write || !perms.modules.includes('documents'));
+            }
+
+            const calendarBtns = document.querySelector('#collab-tab-calendar button')?.parentElement;
+            if (calendarBtns) {
+                calendarBtns.classList.toggle('hidden', !perms.can_write);
+            }
         }
 
         async function loadCollabMembers() {
@@ -2146,7 +2258,7 @@
                     if (t.status === 'completed') statusClass = "bg-green-50 text-green-600";
 
                     const progress = t.progress || 0;
-                    const isAdminOrManager = activeCollabUserRole === 'admin' || activeCollabUserRole === 'manager';
+                    const canDelete = activeCollabPermissions.can_delete;
 
                     return `
                         <div class="p-5 bg-gray-50 rounded-3xl border border-gray-100 space-y-4 relative group">
@@ -2157,12 +2269,12 @@
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <button onclick="viewCollabTask('${t.id}')" class="p-2.5 bg-white text-cyan-600 rounded-xl shadow-sm hover:bg-cyan-500 hover:text-white transition-all" title="Voir détails"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
-                                    ${t.status === 'pending' ? `<button onclick="updateTaskStatus('${t.id}', 'in_progress')" class="p-2.5 bg-white text-blue-500 rounded-xl shadow-sm hover:bg-blue-500 hover:text-white transition-all" title="Démarrer"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>` : ''}
-                                    ${t.status !== 'completed' ? `<button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2.5 bg-white text-green-500 rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all" title="Terminer"><i data-lucide="check" class="w-3.5 h-3.5"></i></button>` : ''}
+                                    ${t.status === 'pending' && activeCollabPermissions.can_write ? `<button onclick="updateTaskStatus('${t.id}', 'in_progress')" class="p-2.5 bg-white text-blue-500 rounded-xl shadow-sm hover:bg-blue-500 hover:text-white transition-all" title="Démarrer"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>` : ''}
+                                    ${t.status !== 'completed' && activeCollabPermissions.can_write ? `<button onclick="updateTaskStatus('${t.id}', 'completed')" class="p-2.5 bg-white text-green-500 rounded-xl shadow-sm hover:bg-green-500 hover:text-white transition-all" title="Terminer"><i data-lucide="check" class="w-3.5 h-3.5"></i></button>` : ''}
 
                                     <!-- Management Actions -->
                                     <div class="hidden group-hover:flex items-center space-x-1 ml-2 pl-2 border-l border-gray-200">
-                                        ${isAdminOrManager ? `
+                                        ${canDelete ? `
                                             ${t.status === 'completed' ? `<button onclick="archiveCollabTask('${t.id}')" class="p-2.5 bg-white text-orange-500 rounded-xl shadow-sm hover:bg-orange-500 hover:text-white transition-all" title="Archiver"><i data-lucide="archive" class="w-3.5 h-3.5"></i></button>` : ''}
                                             <button onclick="deleteCollabTask('${t.id}')" class="p-2.5 bg-white text-red-400 rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all" title="Supprimer"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                                         ` : ''}

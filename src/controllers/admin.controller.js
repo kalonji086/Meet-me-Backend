@@ -515,6 +515,28 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'toggle_market_block':
           await query('UPDATE public.market_businesses SET status = $1 WHERE id = $2', [action.details.status, action.target_id]);
           break;
+        case 'collab_application':
+          // 1. Enregistrer dans collab_requests pour l'historique
+          await query(
+            'INSERT INTO public.collab_requests (user_id, team_id, motivation, objectives, skills, status, processed_at, processed_by) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)',
+            [action.requested_by, action.details.teamId, action.details.motivation, action.details.objectives, action.details.skills, 'approved', req.userId]
+          );
+
+          // 2. Ajouter aux membres de l'équipe
+          await query(
+            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
+            [action.details.teamId, action.requested_by]
+          );
+
+          // 3. Activer le module Collaboration dans sa délégation
+          const existingCollabDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [action.requested_by]);
+          if (existingCollabDel.rows.length === 0) {
+            await query('INSERT INTO public.admin_delegations (user_id, modules, is_active) VALUES ($1, $2, TRUE)', [action.requested_by, ['collaboration']]);
+          } else if (!existingCollabDel.rows[0].modules.includes('collaboration')) {
+            await query('UPDATE public.admin_delegations SET modules = array_append(modules, \'collaboration\'), is_active = TRUE WHERE user_id = $1', [action.requested_by]);
+          }
+          socketService.emitToUser(action.requested_by, 'collab:request_processed', { status: 'approved', comment: comment || 'Bienvenue dans l\'équipe !' });
+          break;
         case 'add_member':
           await mailService.sendCollabInvitationEmail(action.details.email || '', action.target_name, action.details.teamName, action.details.teamId);
           // Also add directly if it's an "add" rather than just "invite"
@@ -522,6 +544,15 @@ const handlePendingAction = asyncHandler(async (req, res) => {
             'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
             [action.details.teamId, action.target_id]
           );
+
+          // Activer automatiquement le module collaboration si pas déjà fait
+          const addDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [action.target_id]);
+          if (addDel.rows.length === 0) {
+            await query('INSERT INTO public.admin_delegations (user_id, modules, is_active) VALUES ($1, $2, TRUE)', [action.target_id, ['collaboration']]);
+          } else if (!addDel.rows[0].modules.includes('collaboration')) {
+            await query('UPDATE public.admin_delegations SET modules = array_append(modules, \'collaboration\'), is_active = TRUE WHERE user_id = $1', [action.target_id]);
+          }
+
           socketService.broadcast('collab:member_moved', { userId: action.target_id, toTeamId: action.details.teamId });
           break;
         case 'move_member':
@@ -533,6 +564,14 @@ const handlePendingAction = asyncHandler(async (req, res) => {
               'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
               [action.details.toTeamId, action.target_id]
             );
+
+            // Activer automatiquement le module collaboration si pas déjà fait
+            const moveDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [action.target_id]);
+            if (moveDel.rows.length === 0) {
+              await query('INSERT INTO public.admin_delegations (user_id, modules, is_active) VALUES ($1, $2, TRUE)', [action.target_id, ['collaboration']]);
+            } else if (!moveDel.rows[0].modules.includes('collaboration')) {
+              await query('UPDATE public.admin_delegations SET modules = array_append(modules, \'collaboration\'), is_active = TRUE WHERE user_id = $1', [action.target_id]);
+            }
           }
           socketService.broadcast('collab:member_moved', { userId: action.target_id, fromTeamId: action.details.fromTeamId, toTeamId: action.details.toTeamId });
           break;

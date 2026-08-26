@@ -41,7 +41,6 @@ const getTeams = asyncHandler(async (req, res) => {
        AND m.created_at > COALESCE(tm.last_read_at, '1970-01-01')) as unread_count
       FROM public.collab_teams t
       JOIN public.collab_team_members tm ON t.id = tm.team_id AND tm.user_id = $1
-      WHERE t.is_confidential = FALSE OR tm.role = 'admin' OR tm.role = 'manager'
       ORDER BY t.parent_id NULLS FIRST, t.created_at DESC
     `;
     params = [req.userId];
@@ -543,6 +542,19 @@ const submitRequest = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: "Aucune équipe disponible pour la demande. Veuillez contacter l'admin." });
   }
 
+  // NOUVEAU: On utilise processSensitiveAction pour que ça arrive dans le module "Approbations"
+  const canExecute = await processSensitiveAction(req, 'collab_application', req.userId, req.user.full_name, {
+    teamId,
+    motivation,
+    objectives,
+    skills
+  });
+
+  if (!canExecute) {
+    return res.json({ success: true, pending: true, message: 'Votre candidature a été envoyée à l\'administrateur pour approbation.' });
+  }
+
+  // Si l'admin se l'auto-approuve (cas rare) ou pour la logique résiduelle
   const result = await query(
     'INSERT INTO public.collab_requests (user_id, team_id, motivation, objectives, skills) VALUES ($1, $2, $3, $4, $5) RETURNING *',
     [req.userId, teamId, motivation, objectives, skills]

@@ -1477,13 +1477,6 @@
 
             lucide.createIcons();
         }
-            if (tab === 'directory') loadCollabDirectory();
-            if (tab === 'documents') { loadCollabGlobalDocs(); loadTeamMembersForPrivateDoc(); }
-            if (tab === 'requests') loadCollabRequests();
-            if (tab === 'config') { loadCollabPermissions(); loadCollabLiveManagement(); }
-
-            lucide.createIcons();
-        }
 
         async function updateCollabUserRole(teamId, userId, role) {
             if (!teamId || teamId === 'undefined') return alert("L'utilisateur doit d'abord être dans une équipe.");

@@ -7,7 +7,8 @@ class SocketService {
     this.io = null;
     this.connectedUsers = new Map(); // socketId -> userId
     this.userSockets = new Map(); // userId -> Set of socketIds
-    this.pendingCalls = new Map(); // callId -> { callerId, calleeId, timeout }
+    this.pendingCalls = new Map(); // callId -> { callerId, calleeId, timeout, startedAt }
+    this.activeCalls = new Map(); // channelName -> { callerId, calleeId, startedAt, callType }
   }
 
   initialize(io) {
@@ -164,7 +165,10 @@ class SocketService {
           }
 
           // persist connected start
-          this.persistCallRecord({ callerId: pending.callerId, calleeId: pending.calleeId, status: 'connected', callType: pending.callType || 'audio', channelName: pending.channelName, startedAt: new Date() });
+          const startedAt = new Date();
+          this.activeCalls.set(pending.channelName, { callerId: pending.callerId, calleeId: pending.calleeId, startedAt, callType: pending.callType });
+
+          this.persistCallRecord({ callerId: pending.callerId, calleeId: pending.calleeId, status: 'connected', callType: pending.callType || 'audio', channelName: pending.channelName, startedAt });
 
           // Notify callee also (confirmation)
           socket.emit('call:accepted', { callId, by: accepterId });
@@ -198,7 +202,7 @@ class SocketService {
       socket.on('call:hangup', (data) => {
         try {
           const hangerId = this.connectedUsers.get(socket.id);
-          const { callId, toUserId } = data;
+          const { callId, toUserId, channelName } = data;
 
           // Forward hangup to other side if online
           if (toUserId) {
@@ -206,12 +210,23 @@ class SocketService {
             if (targetSocket) this.io.to(targetSocket).emit('call:hangup', { callId, by: hangerId });
           }
 
+          // Calculate duration if active
+          let durationSeconds = null;
+          const active = this.activeCalls.get(channelName);
+          if (active) {
+            durationSeconds = Math.floor((Date.now() - new Date(active.startedAt).getTime()) / 1000);
+            this.activeCalls.delete(channelName);
+          }
+
           // Cleanup pending if exists
           const pending = this.pendingCalls.get(callId);
           if (pending) {
             clearTimeout(pending.timeout);
             this.pendingCalls.delete(callId);
-            this.persistCallRecord({ callerId: pending.callerId, calleeId: pending.calleeId, status: 'hung_up', callType: pending.callType || 'audio', channelName: pending.channelName });
+            this.persistCallRecord({ callerId: pending.callerId, calleeId: pending.calleeId, status: 'hung_up', callType: pending.callType || 'audio', channelName: pending.channelName, durationSeconds });
+          } else if (active) {
+            // Already connected, just update the end
+            this.persistCallRecord({ callerId: active.callerId, calleeId: active.calleeId, status: 'hung_up', callType: active.callType || 'audio', channelName, durationSeconds });
           }
 
           socket.emit('call:hangup', { callId, by: hangerId });
@@ -308,13 +323,59 @@ class SocketService {
 
   async persistCallRecord({ callerId, calleeId, status = 'missed', callType = 'audio', channelName = null, startedAt = null, endedAt = null, durationSeconds = null }) {
     try {
-      await query(
+      const callResult = await query(
         `INSERT INTO public.calls (caller_id, callee_id, status, call_type, channel_name, started_at, ended_at, duration_seconds)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         [callerId, calleeId, status, callType, channelName, startedAt, endedAt, durationSeconds]
       );
+
+      // Notifier les deux utilisateurs pour la mise à jour de l'historique en temps réel
+      this.emitToUser(callerId, 'call:history_update', callResult.rows[0]);
+      this.emitToUser(calleeId, 'call:history_update', callResult.rows[0]);
+
+      // --- AJOUT : Insérer un message de log dans la discussion ---
+      // 1. Trouver ou créer le chat entre les deux (private)
+      const chatRes = await query(
+        `SELECT id FROM public.chats
+         WHERE type = 'private'
+           AND id IN (SELECT chat_id FROM public.chat_participants WHERE user_id = $1)
+           AND id IN (SELECT chat_id FROM public.chat_participants WHERE user_id = $2)`,
+        [callerId, calleeId]
+      );
+
+      let chatId;
+      if (chatRes.rows.length > 0) {
+        chatId = chatRes.rows[0].id;
+      } else {
+        // Créer un nouveau chat si inexistant
+        const newChat = await query(
+          "INSERT INTO public.chats (type) VALUES ('private') RETURNING id"
+        );
+        chatId = newChat.rows[0].id;
+        await query("INSERT INTO public.chat_participants (chat_id, user_id) VALUES ($1, $2), ($1, $3)", [chatId, callerId, calleeId]);
+      }
+
+      // 2. Insérer le message spécial "call"
+      let content = status === 'connected' ? `Appel ${callType} terminé` : (status === 'missed' ? `Appel ${callType} manqué` : `Appel ${callType} sans réponse`);
+      if (durationSeconds) content += ` (${durationSeconds}s)`;
+
+      const msgResult = await query(
+        `INSERT INTO public.messages (chat_id, sender_id, content, type, metadata)
+         VALUES ($1, $2, $3, 'call', $4) RETURNING *`,
+        [chatId, callerId, content, JSON.stringify({ duration: durationSeconds, callStatus: status, callType })]
+      );
+
+      // 3. Diffuser le message via Socket
+      const sender = await query('SELECT id, full_name, avatar_url FROM public.profiles WHERE id = $1', [callerId]);
+      const messageData = {
+        ...msgResult.rows[0],
+        sender: { id: sender.rows[0].id, name: sender.rows[0].full_name, avatar: sender.rows[0].avatar_url }
+      };
+
+      this.io.to(`chat:${chatId}`).emit('new_message', { chatId, message: messageData });
+
     } catch (err) {
-      logger.error('Error persisting call record:', err);
+      logger.error('Error persisting call record and log message:', err);
     }
   }
 

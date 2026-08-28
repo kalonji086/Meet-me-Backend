@@ -11,7 +11,7 @@ const getMe = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   const result = await query(
-    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin, is_locked, push_token, accepted_tos_version, accepted_privacy_version, accepted_legal_version FROM public.profiles WHERE id = $1',
+    'SELECT id, email, username, full_name, avatar_url, status, phone_number, last_seen, privacy_settings, last_login_at, is_global_admin, is_locked, push_token, accepted_tos_version, accepted_privacy_version, accepted_legal_version, gender, country, province, city, commune, birth_date, preferred_language, auto_translate FROM public.profiles WHERE id = $1',
     [userId]
   );
 
@@ -254,7 +254,7 @@ const submitVerification = asyncHandler(async (req, res) => {
 
 const getUserById = asyncHandler(async (req, res) => {
   const result = await query(
-    'SELECT id, full_name, avatar_url, status, username, phone_number, is_verified, last_seen FROM public.profiles WHERE id = $1',
+    'SELECT id, full_name, avatar_url, status, username, phone_number, is_verified, last_seen, gender, country, province, city, commune, birth_date FROM public.profiles WHERE id = $1',
     [req.params.id]
   );
   if (result.rows[0]) res.json({ success: true, data: result.rows[0] });

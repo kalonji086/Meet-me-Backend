@@ -243,10 +243,14 @@
                             <thead class="bg-gray-50 border-b border-gray-100">
                                 <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                     <th class="px-8 py-5 text-gray-500">Utilisateur</th>
-                                    <th class="px-8 py-5">Infos (Sexe/Age)</th>
-                                    <th class="px-8 py-5">Localisation</th>
+                                    <th class="px-8 py-5">Sexe</th>
+                                    <th class="px-8 py-5">Âge</th>
+                                    <th class="px-8 py-5">Pays</th>
+                                    <th class="px-8 py-5">Province</th>
+                                    <th class="px-8 py-5">Ville</th>
+                                    <th class="px-8 py-5">Commune</th>
                                     <th class="px-8 py-5">Appareil</th>
-                                    <th class="px-8 py-5">Statut Live</th>
+                                    <th class="px-8 py-5">Statut</th>
                                     <th class="px-8 py-5">Sécurité</th>
                                     <th class="px-8 py-5 text-right">Contrôle</th>
                                 </tr>
@@ -2800,16 +2804,22 @@
                                 </div>
                             </td>
                             <td class="px-8 py-5">
-                                <div class="flex flex-col">
-                                    <span class="text-[10px] font-black uppercase ${u.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}">${u.gender === 'M' ? 'Homme' : (u.gender === 'F' ? 'Femme' : 'Inconnu')}</span>
-                                    <span class="text-xs font-bold text-gray-700">${age}</span>
-                                </div>
+                                <span class="text-[10px] font-black uppercase ${u.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}">${u.gender === 'M' ? 'Homme' : (u.gender === 'F' ? 'Femme' : 'Inconnu')}</span>
                             </td>
                             <td class="px-8 py-5">
-                                <div class="flex flex-col">
-                                    <p class="text-[10px] font-black uppercase text-gray-800">${u.city || 'Ville'} / ${u.province || 'Prov'}</p>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase">${u.commune || ''} • ${u.country || 'Congo'}</p>
-                                </div>
+                                <span class="text-xs font-bold text-gray-700">${age}</span>
+                            </td>
+                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
+                                ${u.country || 'N/A'}
+                            </td>
+                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
+                                ${u.province || 'N/A'}
+                            </td>
+                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
+                                ${u.city || 'N/A'}
+                            </td>
+                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
+                                ${u.commune || 'N/A'}
                             </td>
                             <td class="px-8 py-5">
                                 <div class="flex items-center text-gray-600">

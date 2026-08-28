@@ -762,4 +762,5 @@ module.exports = {
   changeMemberRole,
   translateMessage,
   translateAudioMessage,
+  reactToMessage,
 };

@@ -93,7 +93,8 @@ class SocketService {
           }
 
           if (!calleeSocketId) {
-            // Callee offline
+            // Callee offline - PERSIST AS MISSED CALL
+            this.persistCallRecord({ callerId, calleeId: toUserId, status: 'missed', callType: callType || 'audio', channelName });
             socket.emit('call:callee_unavailable', { toUserId, callId: callIdentifier });
             return;
           }

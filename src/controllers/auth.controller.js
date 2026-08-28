@@ -48,7 +48,13 @@ const checkAvailability = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const register = asyncHandler(async (req, res) => {
-  const { name, email, password, phone_number, username, device_info, appVersion } = req.body;
+  const {
+    name, email, password, phone_number, username,
+    device_info, appVersion, gender, country, province,
+    city, commune, birth_date
+  } = req.body;
+
+  logger.info(`Nouvelle tentative d'inscription: ${email} (${name})`);
 
   if (!name || !email || !password) {
     return res.status(400).json({
@@ -103,12 +109,12 @@ const register = asyncHandler(async (req, res) => {
       phone_number || null,
       JSON.stringify(device_info || {}),
       appVersion || null,
-      req.body.gender,
-      req.body.country,
-      req.body.province,
-      req.body.city,
-      req.body.commune,
-      req.body.birth_date
+      gender || null,
+      country || null,
+      province || null,
+      city || null,
+      commune || null,
+      birth_date || null
     ]
   );
 

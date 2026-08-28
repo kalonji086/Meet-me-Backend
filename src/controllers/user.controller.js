@@ -45,7 +45,10 @@ const getMe = asyncHandler(async (req, res) => {
  * @desc    Mettre à jour le profil
  */
 const updateProfile = asyncHandler(async (req, res) => {
-  const { name, status, avatar_url, username } = req.body;
+  const {
+    name, status, avatar_url, username,
+    gender, country, province, city, commune, birth_date
+  } = req.body;
   const userId = req.userId;
 
   const avatarIsPresent = Object.prototype.hasOwnProperty.call(req.body, 'avatar_url');
@@ -92,12 +95,12 @@ const updateProfile = asyncHandler(async (req, res) => {
       req.body.accepted_privacy_version,
       avatarIsPresent,
       userId,
-      req.body.gender,
-      req.body.country,
-      req.body.province,
-      req.body.city,
-      req.body.commune,
-      req.body.birth_date
+      gender,
+      country,
+      province,
+      city,
+      commune,
+      birth_date
     ]
   );
 

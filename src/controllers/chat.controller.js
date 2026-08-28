@@ -197,7 +197,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     `INSERT INTO public.messages (chat_id, sender_id, content, type, file_url, metadata)
      VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [chatId, userId, content, type, fileUrl, JSON.stringify(metadata)]
+    [chatId, userId, content, type, fileUrl, JSON.stringify(req.body.metadata || metadata)]
   );
 
   const message = result.rows[0];
@@ -714,6 +714,34 @@ const togglePriority = asyncHandler(async (req, res) => {
   );
 
   res.json({ success: true, message: priority ? 'Discussion épinglée' : 'Discussion détachée' });
+});
+
+/**
+ * @desc    Liker/Réagir à un message
+ * @route   PUT /api/messages/:messageId/react
+ */
+const reactToMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const userId = req.userId;
+
+  const result = await query(
+    `UPDATE public.messages
+     SET likes = CASE
+       WHEN $1 = ANY(COALESCE(likes, '{}')) THEN array_remove(likes, $1)
+       ELSE array_append(COALESCE(likes, '{}'), $1)
+     END
+     WHERE id = $2
+     RETURNING likes, chat_id`,
+    [userId, messageId]
+  );
+
+  if (result.rows.length > 0) {
+    const { likes, chat_id } = result.rows[0];
+    socketService.sendToChat(chat_id, 'message_reaction', { messageId, likes });
+    res.json({ success: true, data: { likes } });
+  } else {
+    res.status(404).json({ success: false, error: 'Message non trouvé' });
+  }
 });
 
 module.exports = {

@@ -39,4 +39,9 @@ router.post('/:messageId/translate', chatController.translateMessage);
  */
 router.post('/:messageId/translate-voice', chatController.translateAudioMessage);
 
+/**
+ * @route   PUT /api/messages/:messageId/react
+ */
+router.put('/:messageId/react', chatController.reactToMessage);
+
 module.exports = router;

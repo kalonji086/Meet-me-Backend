@@ -239,11 +239,13 @@
 
                 <div id="section-users" class="hidden animate-fade-in">
                     <div class="bg-white rounded-[2rem] lg:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-x-auto custom-scrollbar">
-                        <table class="w-full text-left min-w-[1000px]">
+                        <table class="w-full text-left min-w-[1200px]">
                             <thead class="bg-gray-50 border-b border-gray-100">
                                 <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                     <th class="px-8 py-5 text-gray-500">Utilisateur</th>
-                                    <th class="px-8 py-5">Appareil & Utilisation</th>
+                                    <th class="px-8 py-5">Infos (Sexe/Age)</th>
+                                    <th class="px-8 py-5">Localisation</th>
+                                    <th class="px-8 py-5">Appareil</th>
                                     <th class="px-8 py-5">Statut Live</th>
                                     <th class="px-8 py-5">Sécurité</th>
                                     <th class="px-8 py-5 text-right">Contrôle</th>
@@ -1150,9 +1152,13 @@
                     addNotification('user', 'Utilisateur Connecté', `${data.name} est maintenant en ligne.`, 'zap');
                 }
                 loadStats();
+                if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
 
-            socket.on('admin_user_logout', () => loadStats());
+            socket.on('admin_user_logout', () => {
+                loadStats();
+                if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
+            });
             socket.on('admin_user_deleted', () => loadStats());
             socket.on('admin:new_message', () => loadStats());
 
@@ -2773,6 +2779,14 @@
                     const deviceLabel = info.brand ? `${info.brand} ${info.model || ''}` : 'Appareil Inconnu';
                     const osLabel = info.os ? `${info.os} ${info.version || ''}` : 'OS Inconnu';
 
+                    // Calcul de l'âge
+                    let age = 'N/A';
+                    if (u.birth_date) {
+                        const birth = new Date(u.birth_date);
+                        const diff = Date.now() - birth.getTime();
+                        age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)) + ' ans';
+                    }
+
                     return `
                         <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
                             <td class="px-8 py-5">
@@ -2783,6 +2797,18 @@
                                         <p class="text-[10px] text-gray-400 font-bold">${u.email}</p>
                                         ${u.is_verified ? '<span class="flex items-center text-[8px] font-black text-blue-500 uppercase tracking-tighter mt-1"><i data-lucide="badge-check" class="w-2.5 h-2.5 mr-1 fill-blue-500 text-white"></i> Vérifié</span>' : ''}
                                     </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-5">
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] font-black uppercase ${u.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}">${u.gender === 'M' ? 'Homme' : (u.gender === 'F' ? 'Femme' : 'Inconnu')}</span>
+                                    <span class="text-xs font-bold text-gray-700">${age}</span>
+                                </div>
+                            </td>
+                            <td class="px-8 py-5">
+                                <div class="flex flex-col">
+                                    <p class="text-[10px] font-black uppercase text-gray-800">${u.city || 'Ville'} / ${u.province || 'Prov'}</p>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase">${u.commune || ''} • ${u.country || 'Congo'}</p>
                                 </div>
                             </td>
                             <td class="px-8 py-5">
@@ -2801,7 +2827,6 @@
                                         <span class="text-[10px] font-black uppercase ${u.status === 'online' ? 'text-green-600' : 'text-gray-400'}">${u.status === 'online' ? 'Connecté' : 'Hors ligne'}</span>
                                     </div>
                                     <p class="text-[9px] font-bold text-gray-400 mt-1 uppercase">Depuis : ${timeAgo(u.status_updated_at || u.last_seen)}</p>
-                                    ${u.collab_start_at ? `<p class="text-[7px] text-cyan-600 font-black uppercase mt-1">Collab : ${new Date(u.collab_start_at).toLocaleDateString()}</p>` : ''}
                                 </div>
                             </td>
                             <td class="px-8 py-5">

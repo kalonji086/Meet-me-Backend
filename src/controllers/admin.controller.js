@@ -145,6 +145,12 @@ const ensureAdminTables = async () => {
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS collab_end_at TIMESTAMP WITH TIME ZONE');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS collab_deleted_at TIMESTAMP WITH TIME ZONE');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_collaborator BOOLEAN DEFAULT FALSE');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS gender TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS country TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS province TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS city TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS commune TEXT');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS birth_date DATE');
 
   // Enforce single global admin: wecanconcept@gmail.com
   await query('UPDATE public.profiles SET is_global_admin = FALSE');
@@ -359,7 +365,8 @@ const getUsers = asyncHandler(async (req, res) => {
   // We hide Global Admins from the management lists (User List & Directory)
   const result = await query(`
     SELECT id, email, full_name, username, avatar_url, status, status_updated_at, phone_number, is_locked,
-           login_attempts, created_at, is_global_admin, last_login_at, device_info, is_verified
+           login_attempts, created_at, is_global_admin, last_login_at, device_info, is_verified,
+           gender, country, province, city, commune, birth_date
     FROM public.profiles
     WHERE is_global_admin = FALSE
     ORDER BY status = 'online' DESC, status_updated_at DESC NULLS LAST

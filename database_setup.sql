@@ -144,6 +144,15 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='province') THEN
     ALTER TABLE public.profiles ADD COLUMN province TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='city') THEN
+    ALTER TABLE public.profiles ADD COLUMN city TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='commune') THEN
+    ALTER TABLE public.profiles ADD COLUMN commune TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='birth_date') THEN
+    ALTER TABLE public.profiles ADD COLUMN birth_date DATE;
+  END IF;
 END $$;
 
 -- 4. Droits Administrateurs

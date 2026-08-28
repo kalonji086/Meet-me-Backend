@@ -76,9 +76,12 @@ const updateProfile = asyncHandler(async (req, res) => {
          gender = COALESCE($10, gender),
          country = COALESCE($11, country),
          province = COALESCE($12, province),
+         city = COALESCE($13, city),
+         commune = COALESCE($14, commune),
+         birth_date = COALESCE($15, birth_date),
          updated_at = NOW()
      WHERE id = $9
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, is_verified, accepted_tos_version, accepted_privacy_version, accepted_legal_version, gender, country, province`,
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, is_verified, accepted_tos_version, accepted_privacy_version, accepted_legal_version, gender, country, province, city, commune, birth_date`,
     [
       name,
       status,
@@ -91,7 +94,10 @@ const updateProfile = asyncHandler(async (req, res) => {
       userId,
       req.body.gender,
       req.body.country,
-      req.body.province
+      req.body.province,
+      req.body.city,
+      req.body.commune,
+      req.body.birth_date
     ]
   );
 

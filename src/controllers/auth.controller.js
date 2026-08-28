@@ -91,9 +91,9 @@ const register = asyncHandler(async (req, res) => {
   const finalUsername = usernameLower || (emailLower.split('@')[0] + Math.floor(1000 + Math.random() * 9000));
 
   const result = await query(
-    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at, device_info, app_version, gender, country, province)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11)
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, app_version, gender, country, province`,
+    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at, device_info, app_version, gender, country, province, city, commune, birth_date)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, $13, $14)
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, app_version, gender, country, province, city, commune, birth_date`,
     [
       userId,
       name,
@@ -105,7 +105,10 @@ const register = asyncHandler(async (req, res) => {
       appVersion || null,
       req.body.gender,
       req.body.country,
-      req.body.province
+      req.body.province,
+      req.body.city,
+      req.body.commune,
+      req.body.birth_date
     ]
   );
 

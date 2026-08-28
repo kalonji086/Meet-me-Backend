@@ -133,6 +133,17 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='auto_translate') THEN
     ALTER TABLE public.profiles ADD COLUMN auto_translate BOOLEAN DEFAULT FALSE;
   END IF;
+
+  -- New Profile Fields: Gender, Country, Province
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='gender') THEN
+    ALTER TABLE public.profiles ADD COLUMN gender TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='country') THEN
+    ALTER TABLE public.profiles ADD COLUMN country TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='province') THEN
+    ALTER TABLE public.profiles ADD COLUMN province TEXT;
+  END IF;
 END $$;
 
 -- 4. Droits Administrateurs

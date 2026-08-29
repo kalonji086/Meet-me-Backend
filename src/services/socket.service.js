@@ -357,7 +357,7 @@ class SocketService {
       }
 
       // 2. Insérer le message spécial "call"
-      let content = status === 'connected' ? `Appel ${callType} terminé` : (status === 'missed' ? `Appel ${callType} manqué` : `Appel ${callType} sans réponse`);
+      let content = status === 'connected' ? `Appel ${callType} terminé` : (status === 'missed' ? `Appel ${callType} manqué` : (status === 'busy' ? `Appel ${callType} (Occupé)` : `Appel ${callType} sans réponse`));
       if (durationSeconds) content += ` (${durationSeconds}s)`;
 
       const msgResult = await query(
@@ -369,7 +369,12 @@ class SocketService {
       // 3. Diffuser le message via Socket
       const sender = await query('SELECT id, full_name, avatar_url FROM public.profiles WHERE id = $1', [callerId]);
       const messageData = {
-        ...msgResult.rows[0],
+        id: msgResult.rows[0].id,
+        chatId: msgResult.rows[0].chat_id,
+        content: msgResult.rows[0].content,
+        type: msgResult.rows[0].type,
+        metadata: msgResult.rows[0].metadata,
+        createdAt: msgResult.rows[0].created_at,
         sender: { id: sender.rows[0].id, name: sender.rows[0].full_name, avatar: sender.rows[0].avatar_url }
       };
 

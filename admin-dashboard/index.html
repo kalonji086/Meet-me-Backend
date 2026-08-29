@@ -1453,7 +1453,7 @@
             // Global Admin sees everything
             if (isGlobalAdmin) {
                 document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
-                activeCollabPermissions = { can_read: true, can_write: true, can_delete: true, modules: ['teams', 'calendar', 'directory', 'documents', 'requests', 'config'] };
+                activeCollabPermissions = { can_read: true, can_write: true, can_delete: true, modules: ['teams', 'calendar', 'directory', 'documents', 'requests', 'config', 'tasks', 'chat'] };
             }
 
             // Load initial tab
@@ -2151,7 +2151,7 @@
 
             if (isGlobalAdmin) {
                 activeCollabUserRole = 'admin';
-                activeCollabPermissions = { can_read: true, can_write: true, can_delete: true, modules: ['teams', 'calendar', 'directory', 'documents', 'requests', 'config'] };
+                activeCollabPermissions = { can_read: true, can_write: true, can_delete: true, modules: ['teams', 'calendar', 'directory', 'documents', 'requests', 'config', 'tasks', 'chat'] };
             } else {
                 activeCollabUserRole = (team && team.my_role) ? team.my_role : 'collaborator';
                 // Fetch permissions for this role

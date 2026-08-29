@@ -13,9 +13,11 @@ const isValidUUID = (id) => {
 /**
  * Helper to check permissions dynamically based on the user's role in a team
  */
-const checkCollabPermission = async (userId, teamId, action) => {
+const checkCollabPermission = async (req, teamId, action) => {
   if (!isValidUUID(teamId)) return false;
+  if (req.user.is_global_admin) return true;
 
+  const userId = req.userId;
   // 1. Get user role in this team
   const memberRes = await query(
     'SELECT role FROM public.collab_team_members WHERE user_id = $1 AND team_id = $2',
@@ -231,8 +233,8 @@ const createTask = asyncHandler(async (req, res) => {
 
   // Security: Check if member has 'write' permission for 'tasks'
   if (!req.user.is_global_admin) {
-    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
-    const hasModule = await checkCollabPermission(req.userId, teamId, 'tasks');
+    const hasWrite = await checkCollabPermission(req, teamId, 'write');
+    const hasModule = await checkCollabPermission(req, teamId, 'tasks');
     if (!hasWrite || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé : Droits d\'écriture requis.' });
   }
 
@@ -268,7 +270,7 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
 
   // Security
   if (!req.user.is_global_admin) {
-    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
+    const hasWrite = await checkCollabPermission(req, teamId, 'write');
     if (!hasWrite) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 
@@ -313,7 +315,7 @@ const deleteTask = asyncHandler(async (req, res) => {
 
   // Security
   if (!req.user.is_global_admin) {
-    const hasDelete = await checkCollabPermission(req.userId, teamId, 'delete');
+    const hasDelete = await checkCollabPermission(req, teamId, 'delete');
     if (!hasDelete) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 
@@ -399,8 +401,8 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   // Security: Check if member has 'write' permission for 'chat'
   if (!req.user.is_global_admin) {
-    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
-    const hasModule = await checkCollabPermission(req.userId, teamId, 'chat');
+    const hasWrite = await checkCollabPermission(req, teamId, 'write');
+    const hasModule = await checkCollabPermission(req, teamId, 'chat');
     if (!hasWrite || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 
@@ -464,8 +466,8 @@ const getDocuments = asyncHandler(async (req, res) => {
   // Security: Check if member or global admin or see all teams
   const canAccess = req.user.is_global_admin || (req.user.collab_rights && req.user.collab_rights.see_all_teams);
   if (!canAccess) {
-    const hasRead = await checkCollabPermission(req.userId, teamId, 'read');
-    const hasModule = await checkCollabPermission(req.userId, teamId, 'documents');
+    const hasRead = await checkCollabPermission(req, teamId, 'read');
+    const hasModule = await checkCollabPermission(req, teamId, 'documents');
     if (!hasRead || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 
@@ -551,8 +553,8 @@ const uploadDocument = asyncHandler(async (req, res) => {
 
   // Security: Check if member has 'write' permission for 'documents'
   if (!req.user.is_global_admin) {
-    const hasWrite = await checkCollabPermission(req.userId, teamId, 'write');
-    const hasModule = await checkCollabPermission(req.userId, teamId, 'documents');
+    const hasWrite = await checkCollabPermission(req, teamId, 'write');
+    const hasModule = await checkCollabPermission(req, teamId, 'documents');
     if (!hasWrite || !hasModule) return res.status(403).json({ success: false, error: 'Accès refusé' });
   }
 

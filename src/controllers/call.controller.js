@@ -1,6 +1,7 @@
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 const config = require('../../config/config');
 const { asyncHandler } = require('../middleware/error.middleware');
+const { query } = require('../config/db');
 
 /**
  * @desc    Générer un jeton RTC pour Agora

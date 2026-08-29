@@ -120,16 +120,14 @@ const register = asyncHandler(async (req, res) => {
 
   const user = result.rows[0];
 
-  // Informer l'admin qu'un nouvel utilisateur s'est inscrit
+  // Informer l'admin qu'un nouvel utilisateur s'est inscrit avec les détails complets
   const socketService = require('../services/socket.service');
   socketService.broadcast('admin_new_user', {
     user: {
+      ...user,
       id: user.id,
       name: user.full_name,
-      email: user.email,
-      username: user.username,
       avatar: user.avatar_url,
-      phone_number: user.phone_number,
       created_at: new Date()
     }
   });

@@ -243,6 +243,7 @@
                             <thead class="bg-gray-50 border-b border-gray-100">
                                 <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                     <th class="px-8 py-5 text-gray-500">Utilisateur</th>
+                                    <th class="px-8 py-5">Téléphone</th>
                                     <th class="px-8 py-5">Sexe</th>
                                     <th class="px-8 py-5">Âge</th>
                                     <th class="px-8 py-5">Pays</th>
@@ -2804,6 +2805,9 @@
                                 </div>
                             </td>
                             <td class="px-8 py-5">
+                                <p class="text-xs font-bold text-gray-700">${u.phone_number || 'N/A'}</p>
+                            </td>
+                            <td class="px-8 py-5">
                                 <span class="text-[10px] font-black uppercase ${u.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}">${u.gender === 'M' ? 'Homme' : (u.gender === 'F' ? 'Femme' : 'Inconnu')}</span>
                             </td>
                             <td class="px-8 py-5">
@@ -2829,6 +2833,9 @@
                                         <p class="text-[9px] font-bold text-gray-400 uppercase">${osLabel}</p>
                                     </div>
                                 </div>
+                            </td>
+                            <td class="px-8 py-5">
+                                <p class="text-xs font-bold text-gray-700">${u.phone_number || 'N/A'}</p>
                             </td>
                             <td class="px-8 py-5">
                                 <div class="flex flex-col">

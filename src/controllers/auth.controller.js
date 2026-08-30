@@ -63,6 +63,28 @@ const register = asyncHandler(async (req, res) => {
     });
   }
 
+  // 1. Validation du format du nom
+  if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(name)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Format du nom invalide. Seuls les lettres et espaces sont autorisés.',
+    });
+  }
+
+  // 2. Validation de la force du mot de passe
+  if (password.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: 'Le mot de passe doit contenir au moins 8 caractères.',
+    });
+  }
+  if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Le mot de passe doit inclure au moins une majuscule, une minuscule et un chiffre.',
+    });
+  }
+
   const emailLower = email.toLowerCase();
   const usernameLower = username ? username.toLowerCase().trim() : null;
 

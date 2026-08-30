@@ -27,6 +27,11 @@
         /* Draggable Header */
         .drag-handle { cursor: move; }
         .draggable-modal { position: absolute !important; margin: 0 !important; transform: none !important; }
+        .minimized-card { width: 300px !important; height: auto !important; bottom: 20px !important; right: 20px !important; top: auto !important; left: auto !important; position: fixed !important; }
+        .minimized-card .card-body, .minimized-card .card-footer { display: none !important; }
+        .minimized-card .drag-handle { height: 60px !important; border-radius: 1.5rem !important; }
+        .no-backdrop { background-color: transparent !important; backdrop-filter: none !important; pointer-events: none !important; }
+        .no-backdrop #impact-card { pointer-events: auto !important; }
 
         /* Mobile Overlay */
         #sidebar-overlay { display: none; }
@@ -674,16 +679,24 @@
     </div>
 
     <!-- GLOBAL IMPACT MODAL -->
-    <div id="impact-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[500] p-6 backdrop-blur-xl">
-        <div id="impact-card" class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in relative">
-            <div id="impact-header" class="h-40 flex flex-col items-center justify-center bg-purple-600 drag-handle">
+    <div id="impact-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[500] p-6 backdrop-blur-xl transition-all">
+        <div id="impact-card" class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in relative border border-gray-100">
+            <div id="impact-header" class="h-40 flex flex-col items-center justify-center bg-purple-600 drag-handle relative">
+                <!-- Control Buttons -->
+                <div class="absolute top-6 right-8 flex space-x-3 pointer-events-auto">
+                    <button onclick="toggleMinimizeModal()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/30 transition-all" title="Réduire"><i data-lucide="minus" class="w-4 h-4"></i></button>
+                    <button onclick="toggleBackdropMode()" id="backdrop-toggle-btn" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/30 transition-all" title="Mode Flottant (Travailler à côté)"><i data-lucide="layers" class="w-4 h-4"></i></button>
+                    <button onclick="closeImpactModal()" class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-red-500 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+
                 <i id="impact-icon" data-lucide="alert-circle" class="w-16 h-16 text-white mb-2"></i>
-                <p class="text-[8px] font-bold text-white/50 uppercase tracking-[0.3em]">Déplacez cette fenêtre en glissant ici</p>
+                <p id="drag-hint" class="text-[8px] font-black text-white/50 uppercase tracking-[0.3em]">Maintenir pour déplacer</p>
             </div>
-            <div class="p-12 text-center">
+
+            <div class="card-body p-12 text-center">
                 <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-6 uppercase tracking-tighter">EXAMEN DÉTAILLÉ</h3>
                 <div id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-12 max-h-[40vh] overflow-y-auto custom-scrollbar px-4 text-left"></div>
-                <div class="flex space-x-4" id="impact-footer">
+                <div class="card-footer flex space-x-4">
                     <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all">RETOUR</button>
                     <button id="impact-confirm-btn" class="flex-[2] py-4 bg-purple-600 text-white font-black rounded-2xl shadow-lg uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">Confirmer l'Action</button>
                 </div>
@@ -847,16 +860,51 @@
             };
         }
 
+        function toggleMinimizeModal() {
+            const card = document.getElementById('impact-card');
+            const hint = document.getElementById('drag-hint');
+            card.classList.toggle('minimized-card');
+
+            if (card.classList.contains('minimized-card')) {
+                hint.innerText = "FENÊTRE RÉDUITE";
+                // En mode réduit, on active souvent le mode sans backdrop
+                if (!document.getElementById('impact-modal').classList.contains('no-backdrop')) {
+                    toggleBackdropMode();
+                }
+            } else {
+                hint.innerText = "Maintenir pour déplacer";
+            }
+        }
+
+        function toggleBackdropMode() {
+            const modal = document.getElementById('impact-modal');
+            const btn = document.getElementById('backdrop-toggle-btn');
+            modal.classList.toggle('no-backdrop');
+
+            if (modal.classList.contains('no-backdrop')) {
+                btn.classList.add('bg-white/50', 'text-purple-700');
+                showToast("Mode Flottant", "Vous pouvez maintenant interagir avec les listes en arrière-plan.", "layers");
+            } else {
+                btn.classList.remove('bg-white/50', 'text-purple-700');
+            }
+        }
+
         const Alert = {
             show: function(title, html, onConfirm, confirmText = "Confirmer", color = "purple") {
                 const modal = document.getElementById('impact-modal');
                 const card = document.getElementById('impact-card');
+                const header = document.getElementById('impact-header');
 
-                // Reset draggable state for new show
-                card.classList.remove('draggable-modal');
+                // Reset states
+                card.classList.remove('draggable-modal', 'minimized-card');
+                modal.classList.remove('no-backdrop');
+                document.getElementById('drag-hint').innerText = "Maintenir pour déplacer";
+                document.getElementById('backdrop-toggle-btn').classList.remove('bg-white/50', 'text-purple-700');
+
                 card.style.top = '';
                 card.style.left = '';
                 modal.classList.add('items-center', 'justify-center');
+                header.className = `h-40 flex flex-col items-center justify-center bg-${color}-600 drag-handle relative`;
 
                 document.getElementById('impact-title').innerText = title;
                 document.getElementById('impact-message').innerHTML = html;

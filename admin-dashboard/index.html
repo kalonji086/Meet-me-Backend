@@ -238,22 +238,25 @@
                 </div>
 
                 <div id="section-users" class="hidden animate-fade-in">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-black text-gray-800 tracking-tighter uppercase">Gestion des Utilisateurs</h3>
+                        <button onclick="toggleColumnSelector()" class="flex items-center px-5 py-2.5 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase text-gray-600 hover:bg-gray-50 transition-all shadow-sm">
+                            <i data-lucide="columns" class="w-4 h-4 mr-2"></i> Colonnes
+                        </button>
+                    </div>
+
+                    <div id="column-selector" class="hidden bg-white p-6 rounded-2xl shadow-xl border border-gray-100 mb-6 animate-pop-in">
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Afficher / Masquer les informations</p>
+                        <div id="column-checkboxes" class="flex flex-wrap gap-4">
+                            <!-- Checkboxes will be injected here -->
+                        </div>
+                    </div>
+
                     <div class="bg-white rounded-[2rem] lg:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-x-auto custom-scrollbar">
                         <table class="w-full text-left min-w-[1200px]">
                             <thead class="bg-gray-50 border-b border-gray-100">
-                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                    <th class="px-8 py-5 text-gray-500">Utilisateur</th>
-                                    <th class="px-8 py-5">Téléphone</th>
-                                    <th class="px-8 py-5">Sexe</th>
-                                    <th class="px-8 py-5">Âge</th>
-                                    <th class="px-8 py-5">Pays</th>
-                                    <th class="px-8 py-5">Province</th>
-                                    <th class="px-8 py-5">Ville</th>
-                                    <th class="px-8 py-5">Commune</th>
-                                    <th class="px-8 py-5">Appareil</th>
-                                    <th class="px-8 py-5">Statut</th>
-                                    <th class="px-8 py-5">Sécurité</th>
-                                    <th class="px-8 py-5 text-right">Contrôle</th>
+                                <tr id="users-table-header" class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <!-- Header cells will be injected here -->
                                 </tr>
                             </thead>
                             <tbody id="users-table-body"></tbody>
@@ -2776,7 +2779,62 @@
             return "À l'instant";
         }
 
+        // --- GESTION DYNAMIQUE DES COLONNES UTILISATEURS ---
+        const USER_COLUMNS = [
+            { id: 'user', label: 'Utilisateur', alwaysVisible: true },
+            { id: 'phone', label: 'Téléphone' },
+            { id: 'gender', label: 'Sexe' },
+            { id: 'age', label: 'Âge' },
+            { id: 'country', label: 'Pays' },
+            { id: 'province', label: 'Province' },
+            { id: 'city', label: 'Ville' },
+            { id: 'commune', label: 'Commune' },
+            { id: 'device', label: 'Appareil' },
+            { id: 'status', label: 'Statut' },
+            { id: 'security', label: 'Sécurité' },
+            { id: 'actions', label: 'Contrôle', alwaysVisible: true, align: 'right' }
+        ];
+
+        let visibleColumns = JSON.parse(localStorage.getItem('admin_user_columns')) || USER_COLUMNS.map(c => c.id);
+
+        function toggleColumnSelector() {
+            const selector = document.getElementById('column-selector');
+            selector.classList.toggle('hidden');
+            if (!selector.classList.contains('hidden')) {
+                renderColumnCheckboxes();
+            }
+        }
+
+        function renderColumnCheckboxes() {
+            const container = document.getElementById('column-checkboxes');
+            container.innerHTML = USER_COLUMNS.filter(c => !c.alwaysVisible).map(c => `
+                <label class="flex items-center p-3 bg-gray-50 rounded-xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all select-none">
+                    <input type="checkbox" onchange="toggleColumnVisibility('${c.id}')" ${visibleColumns.includes(c.id) ? 'checked' : ''} class="w-5 h-5 accent-purple-600 mr-3">
+                    <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${c.label}</span>
+                </label>
+            `).join('');
+        }
+
+        function toggleColumnVisibility(columnId) {
+            if (visibleColumns.includes(columnId)) {
+                visibleColumns = visibleColumns.filter(id => id !== columnId);
+            } else {
+                visibleColumns.push(columnId);
+            }
+            localStorage.setItem('admin_user_columns', JSON.stringify(visibleColumns));
+            renderUsersTableHeader();
+            loadUsers(); // Refresh table content
+        }
+
+        function renderUsersTableHeader() {
+            const headerRow = document.getElementById('users-table-header');
+            headerRow.innerHTML = USER_COLUMNS.filter(c => visibleColumns.includes(c.id)).map(c => `
+                <th class="px-8 py-5 ${c.align === 'right' ? 'text-right' : ''} ${c.id === 'user' ? 'text-gray-500' : ''}">${c.label}</th>
+            `).join('');
+        }
+
         async function loadUsers() {
+            renderUsersTableHeader(); // Ensure header is correct
             try {
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('users-table-body').innerHTML = res.data.data.map(u => {
@@ -2792,8 +2850,10 @@
                         age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)) + ' ans';
                     }
 
-                    return `
-                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                    const cols = [];
+
+                    if (visibleColumns.includes('user')) {
+                        cols.push(`
                             <td class="px-8 py-5">
                                 <div class="flex items-center">
                                     <img src="${getFullUrl(u.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md">
@@ -2804,27 +2864,39 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-8 py-5">
-                                <p class="text-xs font-bold text-gray-700">${u.phone_number || 'N/A'}</p>
-                            </td>
-                            <td class="px-8 py-5">
-                                <span class="text-[10px] font-black uppercase ${u.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}">${u.gender === 'M' ? 'Homme' : (u.gender === 'F' ? 'Femme' : 'Inconnu')}</span>
-                            </td>
-                            <td class="px-8 py-5">
-                                <span class="text-xs font-bold text-gray-700">${age}</span>
-                            </td>
-                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
-                                ${u.country || 'N/A'}
-                            </td>
-                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
-                                ${u.province || 'N/A'}
-                            </td>
-                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
-                                ${u.city || 'N/A'}
-                            </td>
-                            <td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">
-                                ${u.commune || 'N/A'}
-                            </td>
+                        `);
+                    }
+
+                    if (visibleColumns.includes('phone')) {
+                        cols.push(`<td class="px-8 py-5"><p class="text-xs font-bold text-gray-700">${u.phone_number || 'N/A'}</p></td>`);
+                    }
+
+                    if (visibleColumns.includes('gender')) {
+                        cols.push(`<td class="px-8 py-5"><span class="text-[10px] font-black uppercase ${u.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}">${u.gender === 'M' ? 'Homme' : (u.gender === 'F' ? 'Femme' : 'Inconnu')}</span></td>`);
+                    }
+
+                    if (visibleColumns.includes('age')) {
+                        cols.push(`<td class="px-8 py-5"><span class="text-xs font-bold text-gray-700">${age}</span></td>`);
+                    }
+
+                    if (visibleColumns.includes('country')) {
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.country || 'N/A'}</td>`);
+                    }
+
+                    if (visibleColumns.includes('province')) {
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.province || 'N/A'}</td>`);
+                    }
+
+                    if (visibleColumns.includes('city')) {
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.city || 'N/A'}</td>`);
+                    }
+
+                    if (visibleColumns.includes('commune')) {
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.commune || 'N/A'}</td>`);
+                    }
+
+                    if (visibleColumns.includes('device')) {
+                        cols.push(`
                             <td class="px-8 py-5">
                                 <div class="flex items-center text-gray-600">
                                     <div class="p-2 bg-gray-50 rounded-lg mr-3"><i data-lucide="smartphone" class="w-4 h-4 text-gray-400"></i></div>
@@ -2834,9 +2906,11 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-8 py-5">
-                                <p class="text-xs font-bold text-gray-700">${u.phone_number || 'N/A'}</p>
-                            </td>
+                        `);
+                    }
+
+                    if (visibleColumns.includes('status')) {
+                        cols.push(`
                             <td class="px-8 py-5">
                                 <div class="flex flex-col">
                                     <div class="flex items-center">
@@ -2846,17 +2920,25 @@
                                     <p class="text-[9px] font-bold text-gray-400 mt-1 uppercase">Depuis : ${timeAgo(u.status_updated_at || u.last_seen)}</p>
                                 </div>
                             </td>
-                            <td class="px-8 py-5">
-                                <span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span>
-                            </td>
+                        `);
+                    }
+
+                    if (visibleColumns.includes('security')) {
+                        cols.push(`<td class="px-8 py-5"><span class="px-3 py-1 rounded-lg text-[10px] font-black ${u.is_locked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}">${u.is_locked ? 'BLOQUÉ' : 'ACTIF'}</span></td>`);
+                    }
+
+                    if (visibleColumns.includes('actions')) {
+                        cols.push(`
                             <td class="px-8 py-5 text-right space-x-2">
                                 <button onclick="toggleUserBadge('${u.id}', ${!u.is_verified})" class="p-3 ${u.is_verified ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'} rounded-xl hover:shadow-lg transition-all" title="${u.is_verified ? 'Retirer Badge' : 'Accorder Badge'}"><i data-lucide="${u.is_verified ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                                 <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
                                 <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
                                 <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </td>
-                        </tr>
-                    `;
+                        `);
+                    }
+
+                    return `<tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">${cols.join('')}</tr>`;
                 }).join(''); lucide.createIcons();
             } catch (e) {}
         }

@@ -27,9 +27,14 @@
         /* Draggable Header */
         .drag-handle { cursor: move; }
         .draggable-modal { position: absolute !important; margin: 0 !important; transform: none !important; }
-        .minimized-card { width: 300px !important; height: auto !important; bottom: 20px !important; right: 20px !important; top: auto !important; left: auto !important; position: fixed !important; }
+        .minimized-card { width: 300px !important; height: auto !important; bottom: 20px !important; right: 20px !important; top: auto !important; left: auto !important; position: fixed !important; box-shadow: 0 10px 50px rgba(0,0,0,0.3) !important; }
         .minimized-card .card-body, .minimized-card .card-footer { display: none !important; }
-        .minimized-card .drag-handle { height: 60px !important; border-radius: 1.5rem !important; }
+        .minimized-card .drag-handle { height: 60px !important; border-radius: 1.5rem !important; padding: 0 1rem !important; flex-direction: row !important; justify-content: space-between !important; }
+        .minimized-card #impact-icon { width: 24px !important; height: 24px !important; margin: 0 !important; }
+        .minimized-card #drag-hint { display: none !important; }
+        .minimized-card #impact-title-min { display: block !important; }
+        .minimized-card .control-btns { top: 0 !important; right: 10px !important; position: relative !important; height: 100% !important; align-items: center !important; }
+        #impact-title-min { display: none; font-size: 10px; font-weight: 900; color: white; text-transform: uppercase; letter-spacing: 0.1em; }
         .no-backdrop { background-color: transparent !important; backdrop-filter: none !important; pointer-events: none !important; }
         .no-backdrop #impact-card { pointer-events: auto !important; }
 
@@ -681,22 +686,23 @@
     <!-- GLOBAL IMPACT MODAL -->
     <div id="impact-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[500] p-6 backdrop-blur-xl transition-all">
         <div id="impact-card" class="max-w-2xl w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-pop-in relative border border-gray-100">
-            <div id="impact-header" class="h-40 flex flex-col items-center justify-center bg-purple-600 drag-handle relative">
+            <div id="impact-header" class="h-40 flex flex-col items-center justify-center bg-purple-600 drag-handle relative transition-all duration-300">
                 <!-- Control Buttons -->
-                <div class="absolute top-6 right-8 flex space-x-3 pointer-events-auto">
-                    <button onclick="toggleMinimizeModal()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/30 transition-all" title="Réduire"><i data-lucide="minus" class="w-4 h-4"></i></button>
+                <div class="control-btns absolute top-6 right-8 flex space-x-3 pointer-events-auto">
+                    <button onclick="toggleMinimizeModal()" id="minimize-btn" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/30 transition-all" title="Réduire/Agrandir"><i id="minimize-icon" data-lucide="minus" class="w-4 h-4"></i></button>
                     <button onclick="toggleBackdropMode()" id="backdrop-toggle-btn" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/30 transition-all" title="Mode Flottant (Travailler à côté)"><i data-lucide="layers" class="w-4 h-4"></i></button>
                     <button onclick="closeImpactModal()" class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-red-500 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
                 </div>
 
-                <i id="impact-icon" data-lucide="alert-circle" class="w-16 h-16 text-white mb-2"></i>
+                <i id="impact-icon" data-lucide="alert-circle" class="w-16 h-16 text-white mb-2 transition-all"></i>
+                <p id="impact-title-min" class="hidden truncate pr-4">Examen en cours</p>
                 <p id="drag-hint" class="text-[8px] font-black text-white/50 uppercase tracking-[0.3em]">Maintenir pour déplacer</p>
             </div>
 
             <div class="card-body p-12 text-center">
                 <h3 id="impact-title" class="text-3xl font-black text-gray-900 mb-6 uppercase tracking-tighter">EXAMEN DÉTAILLÉ</h3>
                 <div id="impact-message" class="text-gray-600 text-lg font-medium leading-relaxed mb-12 max-h-[40vh] overflow-y-auto custom-scrollbar px-4 text-left"></div>
-                <div class="card-footer flex space-x-4">
+                <div id="impact-footer" class="card-footer flex space-x-4">
                     <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all">RETOUR</button>
                     <button id="impact-confirm-btn" class="flex-[2] py-4 bg-purple-600 text-white font-black rounded-2xl shadow-lg uppercase text-xs tracking-widest hover:bg-purple-700 transition-all">Confirmer l'Action</button>
                 </div>
@@ -862,18 +868,23 @@
 
         function toggleMinimizeModal() {
             const card = document.getElementById('impact-card');
-            const hint = document.getElementById('drag-hint');
+            const icon = document.getElementById('minimize-icon');
+            const titleMin = document.getElementById('impact-title-min');
+            const mainTitle = document.getElementById('impact-title').innerText;
+
             card.classList.toggle('minimized-card');
 
             if (card.classList.contains('minimized-card')) {
-                hint.innerText = "FENÊTRE RÉDUITE";
-                // En mode réduit, on active souvent le mode sans backdrop
+                icon.setAttribute('data-lucide', 'maximize-2');
+                titleMin.innerText = mainTitle;
+                // En mode réduit, on active le mode sans backdrop pour permettre le travail
                 if (!document.getElementById('impact-modal').classList.contains('no-backdrop')) {
                     toggleBackdropMode();
                 }
             } else {
-                hint.innerText = "Maintenir pour déplacer";
+                icon.setAttribute('data-lucide', 'minus');
             }
+            lucide.createIcons();
         }
 
         function toggleBackdropMode() {
@@ -882,10 +893,12 @@
             modal.classList.toggle('no-backdrop');
 
             if (modal.classList.contains('no-backdrop')) {
-                btn.classList.add('bg-white/50', 'text-purple-700');
-                showToast("Mode Flottant", "Vous pouvez maintenant interagir avec les listes en arrière-plan.", "layers");
+                btn.classList.add('bg-white', 'text-purple-700');
+                btn.classList.remove('bg-white/10', 'text-white');
+                showToast("Mode Flottant", "Fenêtre détachée. Vous pouvez interagir avec l'arrière-plan.", "layers");
             } else {
-                btn.classList.remove('bg-white/50', 'text-purple-700');
+                btn.classList.remove('bg-white', 'text-purple-700');
+                btn.classList.add('bg-white/10', 'text-white');
             }
         }
 
@@ -894,17 +907,24 @@
                 const modal = document.getElementById('impact-modal');
                 const card = document.getElementById('impact-card');
                 const header = document.getElementById('impact-header');
+                const minTitle = document.getElementById('impact-title-min');
+                const minimizeIcon = document.getElementById('minimize-icon');
 
                 // Reset states
                 card.classList.remove('draggable-modal', 'minimized-card');
                 modal.classList.remove('no-backdrop');
+                minTitle.classList.add('hidden');
+                minimizeIcon.setAttribute('data-lucide', 'minus');
                 document.getElementById('drag-hint').innerText = "Maintenir pour déplacer";
-                document.getElementById('backdrop-toggle-btn').classList.remove('bg-white/50', 'text-purple-700');
+
+                const backdropBtn = document.getElementById('backdrop-toggle-btn');
+                backdropBtn.classList.remove('bg-white', 'text-purple-700');
+                backdropBtn.classList.add('bg-white/10', 'text-white');
 
                 card.style.top = '';
                 card.style.left = '';
                 modal.classList.add('items-center', 'justify-center');
-                header.className = `h-40 flex flex-col items-center justify-center bg-${color}-600 drag-handle relative`;
+                header.className = `h-40 flex flex-col items-center justify-center bg-${color}-600 drag-handle relative transition-all duration-300`;
 
                 document.getElementById('impact-title').innerText = title;
                 document.getElementById('impact-message').innerHTML = html;
@@ -3096,9 +3116,23 @@
                 const m = res.data.data.find(x => x.id === id);
                 if (!m) return;
 
+                const modal = document.getElementById('impact-modal');
+                const card = document.getElementById('impact-card');
+                const header = document.getElementById('impact-header');
                 const messageEl = document.getElementById('impact-message');
                 const footer = document.getElementById('impact-footer');
                 const titleEl = document.getElementById('impact-title');
+
+                // Reset states
+                card.classList.remove('draggable-modal', 'minimized-card');
+                modal.classList.remove('no-backdrop');
+                document.getElementById('drag-hint').innerText = "Maintenir pour déplacer";
+                document.getElementById('backdrop-toggle-btn').classList.remove('bg-white/50', 'text-purple-700');
+
+                card.style.top = '';
+                card.style.left = '';
+                modal.classList.add('items-center', 'justify-center', 'flex'); // Ensure it's flex for centering
+                header.className = `h-40 flex flex-col items-center justify-center bg-purple-600 drag-handle relative`;
 
                 titleEl.innerText = "EXAMEN BUSINESS : " + m.business_name;
                 messageEl.innerHTML = `
@@ -3133,7 +3167,9 @@
                     `}
                 `;
 
-                document.getElementById('impact-modal').classList.remove('hidden');
+                modal.classList.remove('hidden');
+                lucide.createIcons();
+                makeDraggable('impact-modal', 'impact-card', 'impact-header');
                 lucide.createIcons();
             } catch (e) {}
         }

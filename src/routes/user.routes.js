@@ -17,6 +17,11 @@ router.get('/profile/current', userController.getMe);
 router.get('/search', userController.searchUsers);
 
 /**
+ * @route   GET /api/users/check-phone/:phone
+ */
+router.get('/check-phone/:phone', userController.checkUserByPhone);
+
+/**
  * @route   PUT /api/users/profile
  */
 router.put('/profile', userController.updateProfile);

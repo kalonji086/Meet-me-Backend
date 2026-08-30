@@ -186,37 +186,81 @@ const deleteAccount = asyncHandler(async (req, res) => {
 
 // Les autres méthodes (searchUsers, syncContacts, etc.) restent identiques
 const searchUsers = asyncHandler(async (req, res) => {
-  const { query: searchQuery } = req.query;
+  const { query: searchQuery, onlyContacts } = req.query;
   const userId = req.userId;
+  const isOnlyContacts = onlyContacts === 'true' || !searchQuery || searchQuery.trim() === '';
 
-  // Si pas de recherche, on retourne tous les contacts de l'utilisateur (Style WhatsApp)
-  if (!searchQuery || searchQuery.trim() === '') {
-    const contactsRes = await query(
-      `SELECT p.id, p.full_name, p.avatar_url, p.status, p.username
-       FROM public.profiles p
-       JOIN public.contacts c ON (c.contact_id = p.id AND c.user_id = $1)
-       WHERE p.is_locked = FALSE
-       ORDER BY p.full_name ASC`,
-      [userId]
-    );
+  const contactIdsQuery = `
+    SELECT contact_id FROM public.contacts WHERE user_id = $1
+    UNION
+    SELECT user_id FROM public.chat_participants
+    WHERE chat_id IN (SELECT chat_id FROM public.chat_participants WHERE user_id = $1)
+    AND user_id != $1
+  `;
 
+  if (isOnlyContacts) {
+    const searchTerm = searchQuery ? `%${searchQuery.toLowerCase()}%` : null;
+    let sql = `
+      SELECT p.id, p.full_name, p.avatar_url, p.status, p.username, p.is_verified
+      FROM public.profiles p
+      WHERE p.id IN (${contactIdsQuery})
+      AND p.is_locked = FALSE
+      AND p.is_global_admin = FALSE
+    `;
+    const params = [userId];
+
+    if (searchTerm) {
+      sql += ` AND (LOWER(p.full_name) LIKE $2 OR LOWER(p.username) LIKE $2 OR p.phone_number LIKE $2)`;
+      params.push(searchTerm);
+    }
+
+    sql += ` ORDER BY p.full_name ASC LIMIT 50`;
+    const contactsRes = await query(sql, params);
     return res.json({ success: true, data: contactsRes.rows });
   }
 
   const searchTerm = `%${searchQuery.toLowerCase()}%`;
   const result = await query(
-    `SELECT id, full_name, avatar_url, status, username, last_seen FROM public.profiles
+    `SELECT id, full_name, avatar_url, status, username, last_seen, is_verified FROM public.profiles
      WHERE (LOWER(full_name) LIKE $1 OR LOWER(username) LIKE $1 OR phone_number LIKE $1 OR LOWER(email) LIKE $1)
-     AND id != $2 AND is_locked = FALSE LIMIT 50`,
+     AND id != $2 AND is_locked = FALSE AND is_global_admin = FALSE LIMIT 50`,
     [searchTerm, userId]
   );
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Vérifier un numéro de téléphone en temps réel
+ * @route   GET /api/users/check-phone/:phone
+ */
+const checkUserByPhone = asyncHandler(async (req, res) => {
+  const { phone } = req.params;
+  const userId = req.userId;
+
+  if (!phone) return res.status(400).json({ success: false, error: 'Numéro requis' });
+
+  // On cherche l'utilisateur, en ignorant l'admin
+  const result = await query(
+    'SELECT id, full_name, avatar_url, username, is_verified FROM public.profiles WHERE phone_number = $1 AND is_global_admin = FALSE',
+    [phone]
+  );
+
+  if (result.rows.length > 0) {
+    const foundUser = result.rows[0];
+    // Ne pas se trouver soi-même
+    if (foundUser.id === userId) {
+        return res.json({ success: true, found: false, isSelf: true });
+    }
+    return res.json({ success: true, found: true, user: foundUser });
+  }
+
+  res.json({ success: true, found: false });
+});
+
 const syncContacts = asyncHandler(async (req, res) => {
   const { phoneNumbers } = req.body;
   const result = await query(
-    'SELECT id, full_name, avatar_url, status, phone_number, username FROM public.profiles WHERE phone_number = ANY($1) AND is_locked = FALSE',
+    'SELECT id, full_name, avatar_url, status, phone_number, username, is_verified FROM public.profiles WHERE phone_number = ANY($1) AND is_locked = FALSE AND is_global_admin = FALSE',
     [phoneNumbers]
   );
   res.json({ success: true, data: result.rows });

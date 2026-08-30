@@ -203,7 +203,7 @@ const getDiscoveryFeed = asyncHandler(async (req, res) => {
      EXISTS(SELECT 1 FROM public.market_post_likes WHERE post_id = p.id AND user_id = $1) as is_liked
      FROM public.market_posts p
      JOIN public.market_businesses b ON p.business_id = b.id
-     WHERE b.status = 'approved'
+     WHERE b.status = 'approved' AND (SELECT is_global_admin FROM public.profiles WHERE id = b.user_id) = FALSE
      ORDER BY p.created_at DESC LIMIT 50`,
     [userId]
   );
@@ -618,7 +618,7 @@ const getDiscoveryBusinesses = asyncHandler(async (req, res) => {
     `SELECT id, business_name, logo_url, category, short_description,
      (SELECT COUNT(*) FROM public.market_subscriptions WHERE business_id = b.id) as followers_count
      FROM public.market_businesses b
-     WHERE b.status = 'approved'
+     WHERE b.status = 'approved' AND (SELECT is_global_admin FROM public.profiles WHERE id = b.user_id) = FALSE
      ORDER BY created_at DESC LIMIT 50`,
     []
   );

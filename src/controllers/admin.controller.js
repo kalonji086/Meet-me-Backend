@@ -250,6 +250,7 @@ const ensureAdminTables = async () => {
 
   // S'assurer que le statut 'blocked' est autorisé dans market_businesses
   try {
+    await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS rejection_reason TEXT');
     await query(`
       ALTER TABLE public.market_businesses
       DROP CONSTRAINT IF EXISTS market_businesses_status_check;
@@ -1485,8 +1486,8 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
 
   } else {
     await query(
-      'UPDATE public.market_businesses SET status = $1, updated_at = NOW() WHERE id = $2',
-      ['rejected', id]
+      'UPDATE public.market_businesses SET status = $1, rejection_reason = $2, updated_at = NOW() WHERE id = $3',
+      ['rejected', admin_notes, id]
     );
 
     // Notifier le rejet par EMAIL

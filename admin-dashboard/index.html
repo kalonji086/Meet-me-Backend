@@ -3156,7 +3156,7 @@
                 footer.innerHTML = `
                     <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
                     ${m.status === 'pending' ? `
-                        <button onclick="handleMarketAction('${m.id}', 'rejected')" class="flex-1 bg-red-50 text-red-600 py-4 rounded-2xl font-black text-[10px] hover:bg-red-600 hover:text-white transition-all uppercase">Rejeter</button>
+                        <button onclick="showMarketRejectionModal('${m.id}', '${m.business_name.replace(/'/g, "\\'")}')" class="flex-1 bg-red-50 text-red-600 py-4 rounded-2xl font-black text-[10px] hover:bg-red-600 hover:text-white transition-all uppercase">Rejeter</button>
                         <button onclick="handleMarketAction('${m.id}', 'approved')" class="flex-[2] bg-green-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-100 text-[10px] uppercase">Approuver</button>
                     ` : `
                         <button onclick="manageMarketGroup('${m.id}', '${m.category}')" class="flex-1 bg-blue-500 text-white py-4 rounded-2xl font-black text-[9px] shadow-lg shadow-blue-100 uppercase">Groupe</button>
@@ -3174,12 +3174,41 @@
             } catch (e) {}
         }
 
-        async function handleMarketAction(id, status) {
-            if (!confirm(`Confirmer la décision : ${status.toUpperCase()} ?`)) return;
+        async function handleMarketAction(id, status, admin_notes = null) {
+            if (!admin_notes && !confirm(`Confirmer la décision : ${status.toUpperCase()} ?`)) return;
             try {
-                await axios.put(`${API_URL}/admin/market-requests/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
-                alert("Action réussie !"); closeImpactModal(); loadMarket();
+                await axios.put(`${API_URL}/admin/market-requests/${id}`, { status, admin_notes }, { headers: { Authorization: `Bearer ${token}` } });
+                showToast("Succès", `Demande ${status === 'approved' ? 'approuvée' : 'rejetée'}.`, "check-circle");
+                closeImpactModal();
+                loadMarket();
             } catch (e) { alert("Erreur."); }
+        }
+
+        function showMarketRejectionModal(id, businessName) {
+            let html = `
+                <div class="space-y-6 text-left">
+                    <div class="p-6 bg-red-50 rounded-[2rem] border border-red-100">
+                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-2">Refus de la demande : ${businessName}</p>
+                        <p class="text-xs text-red-800 font-medium leading-relaxed">Veuillez expliquer à l'utilisateur pourquoi son business a été refusé et ce qu'il doit corriger pour être accepté (ex: logo flou, informations incomplètes, etc.).</p>
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Message de justification (sera envoyé par email)</label>
+                        <textarea id="rejection-reason-text" class="w-full h-48 p-5 bg-gray-50 border border-gray-200 rounded-[2rem] outline-none text-sm font-medium focus:border-red-500 transition-all" placeholder="Écrivez ici les raisons du refus et les conseils de correction..."></textarea>
+                    </div>
+
+                    <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Note</p>
+                        <p class="text-[10px] text-gray-500 italic">L'utilisateur recevra un mail officiel contenant ce texte et un lien pour soumettre une nouvelle demande.</p>
+                    </div>
+                </div>
+            `;
+
+            Alert.show("Rédiger le motif du refus", html, async () => {
+                const reason = document.getElementById('rejection-reason-text').value.trim();
+                if(!reason) return alert("Veuillez saisir un motif de refus pour informer l'utilisateur.");
+                handleMarketAction(id, 'rejected', reason);
+            }, "Confirmer le Refus et envoyer l'Email", "red");
         }
 
         async function toggleMarketBlock(id, block) {

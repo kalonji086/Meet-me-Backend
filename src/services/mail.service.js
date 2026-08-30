@@ -199,14 +199,34 @@ class MailService {
   async sendMarketRejectionEmail(email, name, businessName, reason) {
     const title = `Mise à jour concernant votre demande pour "${businessName}"`;
     const content = `
-      <p>Bonjour ${name},</p>
-      <p>Nous avons examiné votre demande pour rejoindre le Market Meet Me avec le business "${businessName}".</p>
-      <p>Malheureusement, nous ne pouvons pas approuver votre demande pour la raison suivante :</p>
-      <div style="background-color: #fff5f5; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #f56565; color: #c53030;">
-        <p style="margin: 0;"><strong>Motif du refus :</strong><br>${reason}</p>
+      <div style="text-align: center; margin-bottom: 30px;">
+        <img src="https://cdn-icons-png.flaticon.com/512/1161/1161388.png" style="width: 70px; height: 70px;" alt="Avertissement">
       </div>
-      <p>Vous pouvez corriger ces informations et soumettre une nouvelle demande directement depuis l'application.</p>
-      <p>L'équipe de modération Meet Me</p>
+      <p>Bonjour <strong>${name}</strong>,</p>
+      <p>Nous avons examiné avec attention votre demande pour rejoindre le <strong>Market Meet Me</strong> avec le business "${businessName}".</p>
+      <p>Malheureusement, nous ne pouvons pas approuver votre demande dans son état actuel pour la raison suivante :</p>
+
+      <div style="background-color: #fff5f5; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #feb2b2; color: #c53030;">
+        <p style="margin: 0; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">Motif de l'administrateur :</p>
+        <p style="margin: 15px 0 0 0; font-size: 15px; line-height: 1.6; font-style: italic;">"${reason}"</p>
+      </div>
+
+      <div style="background-color: #f7fafc; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #edf2f7;">
+        <p style="margin: 0; color: #2d3748; font-weight: bold; font-size: 14px;">🛠️ CE QUE VOUS POUVEZ FAIRE :</p>
+        <p style="margin: 10px 0 0 0; font-size: 14px; color: #4a5568; line-height: 1.6;">
+          Ne vous découragez pas ! Vous pouvez modifier vos informations (logo plus net, description plus détaillée, documents officiels valides) et soumettre une <strong>nouvelle demande</strong> directement depuis l'onglet Market de votre application.
+        </p>
+      </div>
+
+      <p style="margin-top: 30px;">Une fois les corrections effectuées, notre équipe réexaminera votre dossier en priorité.</p>
+
+      <div style="text-align: center; margin-top: 35px;">
+        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn" style="background-color: #111111; color: #ffffff !important;">OUVRIR L'APPLICATION</a>
+      </div>
+
+      <p style="margin-top: 40px; font-size: 11px; color: #999; text-align: center;">
+        L'équipe de modération Meet Me
+      </p>
     `;
 
     return this.sendSystemEmail(email, `Votre demande Market : ${businessName}`, content, 'amazon', name);

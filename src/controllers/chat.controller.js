@@ -86,12 +86,11 @@ const createChat = asyncHandler(async (req, res) => {
     const existingChat = await query(
       `SELECT c.id
        FROM public.chats c
-       JOIN public.chat_participants cp1 ON c.id = cp1.chat_id
-       JOIN public.chat_participants cp2 ON c.id = cp2.chat_id
        WHERE c.type = 'private'
-         AND cp1.user_id = $1
-         AND cp2.user_id = $2`,
-      [userId, otherUserId]
+         AND (SELECT COUNT(*) FROM public.chat_participants WHERE chat_id = c.id) = $3
+         AND EXISTS (SELECT 1 FROM public.chat_participants WHERE chat_id = c.id AND user_id = $1)
+         AND EXISTS (SELECT 1 FROM public.chat_participants WHERE chat_id = c.id AND user_id = $2)`,
+      [userId, otherUserId, userId === otherUserId ? 1 : 2]
     );
 
     if (existingChat.rows.length > 0) {

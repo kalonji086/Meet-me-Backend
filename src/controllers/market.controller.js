@@ -104,25 +104,51 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   const business = businessRes.rows[0];
   const bId = business.id;
 
-  // Stats de base
-  const postsCount = await query('SELECT COUNT(*) FROM public.market_posts WHERE business_id = $1', [bId]);
-  const reviewsCount = await query('SELECT COUNT(*) FROM public.market_reviews WHERE business_id = $1', [bId]);
-  const avgRating = await query('SELECT AVG(rating) FROM public.market_reviews WHERE business_id = $1', [bId]);
-  const followersCount = await query('SELECT COUNT(*) FROM public.market_subscriptions WHERE business_id = $1', [bId]);
+  // 1. Stats de base
+  const postsCountPromise = query('SELECT COUNT(*) FROM public.market_posts WHERE business_id = $1', [bId]);
+  const reviewsCountPromise = query('SELECT COUNT(*) FROM public.market_reviews WHERE business_id = $1', [bId]);
+  const avgRatingPromise = query('SELECT AVG(rating) FROM public.market_reviews WHERE business_id = $1', [bId]);
+  const followersCountPromise = query('SELECT COUNT(*) FROM public.market_subscriptions WHERE business_id = $1', [bId]);
+
+  // 2. Données temps réel pour l'affichage instantané
+  const latestOrdersPromise = business.category === 'Boutique'
+    ? query(`SELECT o.*, p.full_name as customer_name, p.avatar_url as customer_avatar
+             FROM public.market_orders o LEFT JOIN public.profiles p ON o.user_id = p.id
+             WHERE o.business_id = $1 ORDER BY o.created_at DESC LIMIT 10`, [bId])
+    : Promise.resolve({ rows: [] });
+
+  const latestRequestsPromise = business.category !== 'Boutique'
+    ? query(`SELECT r.*, p.full_name as customer_name, p.avatar_url as customer_avatar
+             FROM public.market_requests r JOIN public.profiles p ON r.user_id = p.id
+             WHERE r.business_id = $1 ORDER BY r.created_at DESC LIMIT 10`, [bId])
+    : Promise.resolve({ rows: [] });
+
+  const inventoryPromise = business.category === 'Boutique'
+    ? query('SELECT * FROM public.market_inventory WHERE business_id = $1 ORDER BY item_name ASC LIMIT 20', [bId])
+    : Promise.resolve({ rows: [] });
+
+  // Exécuter tout en parallèle pour la performance maximale
+  const [
+    postsRes, reviewsRes, avgRes, followersRes,
+    ordersRes, requestsRes, invRes
+  ] = await Promise.all([
+    postsCountPromise, reviewsCountPromise, avgRatingPromise, followersCountPromise,
+    latestOrdersPromise, latestRequestsPromise, inventoryPromise
+  ]);
 
   let specificStats = {};
 
   if (business.category === 'Boutique') {
-    const pendingOrders = await query('SELECT COUNT(*) FROM public.market_orders WHERE business_id = $1 AND status = \'pending\'', [bId]);
+    const pendingCount = ordersRes.rows.filter(o => o.status === 'pending').length;
     const totalSales = await query('SELECT SUM(total_amount) FROM public.market_orders WHERE business_id = $1 AND status = \'delivered\'', [bId]);
     specificStats = {
-      pendingOrders: parseInt(pendingOrders.rows[0].count),
+      pendingOrders: pendingCount,
       totalSales: parseFloat(totalSales.rows[0].sum || 0)
     };
   } else {
-    const pendingRequests = await query('SELECT COUNT(*) FROM public.market_requests WHERE business_id = $1 AND status = \'pending\'', [bId]);
+    const pendingCount = requestsRes.rows.filter(r => r.status === 'pending').length;
     specificStats = {
-      pendingRequests: parseInt(pendingRequests.rows[0].count)
+      pendingRequests: pendingCount
     };
   }
 
@@ -130,11 +156,16 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     success: true,
     data: {
       business,
+      initialData: {
+        orders: ordersRes.rows,
+        requests: requestsRes.rows,
+        inventory: invRes.rows
+      },
       stats: {
-        posts: parseInt(postsCount.rows[0].count),
-        reviews: parseInt(reviewsCount.rows[0].count),
-        rating: parseFloat(avgRating.rows[0].avg || 0),
-        followers: parseInt(followersCount.rows[0].count),
+        posts: parseInt(postsRes.rows[0].count),
+        reviews: parseInt(reviewsRes.rows[0].count),
+        rating: parseFloat(avgRes.rows[0].avg || 0),
+        followers: parseInt(followersRes.rows[0].count),
         ...specificStats
       }
     }

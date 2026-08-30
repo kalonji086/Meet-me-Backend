@@ -351,4 +351,4 @@ const checkContact = asyncHandler(async (req, res) => {
   res.json({ success: true, isContact: result.rows.length > 0 });
 });
 
-module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact, deleteAccount };
+module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact, deleteAccount, checkUserByPhone };

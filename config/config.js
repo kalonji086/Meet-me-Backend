@@ -94,12 +94,6 @@ const config = {
     maxHttpBufferSize: parseInt(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE) || 1e6,
   },
 
-  // Agora Configuration (Voice & Video)
-  agora: {
-    appId: process.env.AGORA_APP_ID,
-    appCertificate: process.env.AGORA_APP_CERTIFICATE,
-  },
-
   // Application Constants
   constants: {
     appName: 'Meet Me',

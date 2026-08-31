@@ -21,7 +21,6 @@ const chatRoutes = require('./routes/chat.routes');
 const messageRoutes = require('./routes/message.routes');
 const statusRoutes = require('./routes/status.routes');
 const adminRoutes = require('./routes/admin.routes');
-const callRoutes = require('./routes/call.routes');
 const marketRoutes = require('./routes/market.routes');
 const collabRoutes = require('./routes/collab.routes');
 
@@ -167,7 +166,6 @@ class Server {
     this.app.use('/api/messages', messageRoutes);
     this.app.use('/api/statuses', statusRoutes);
     this.app.use('/api/admin', adminRoutes);
-    this.app.use('/api/calls', callRoutes);
     this.app.use('/api/market', marketRoutes);
     this.app.use('/api/collab', collabRoutes);
 

@@ -22,6 +22,7 @@ const messageRoutes = require('./routes/message.routes');
 const statusRoutes = require('./routes/status.routes');
 const adminRoutes = require('./routes/admin.routes');
 const marketRoutes = require('./routes/market.routes');
+const schoolRoutes = require('./routes/school.routes');
 const collabRoutes = require('./routes/collab.routes');
 const employerRoutes = require('./routes/employer.routes');
 
@@ -168,6 +169,7 @@ class Server {
     this.app.use('/api/statuses', statusRoutes);
     this.app.use('/api/admin', adminRoutes);
     this.app.use('/api/market', marketRoutes);
+    this.app.use('/api/school', schoolRoutes);
     this.app.use('/api/collab', collabRoutes);
     this.app.use('/api/employer', employerRoutes);
 

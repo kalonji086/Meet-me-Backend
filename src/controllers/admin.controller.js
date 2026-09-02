@@ -329,6 +329,15 @@ const ensureAdminTables = async () => {
   } catch (err) {
     logger.error('Error auto-expiring collaborations:', err.message);
   }
+
+  // Modération : S'assurer que les colonnes de boost existent
+  try {
+    await query('ALTER TABLE public.statuses ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.market_posts ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.job_postings ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
+  } catch (e) {
+    logger.error('Error adding is_boosted columns:', e.message);
+  }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
@@ -1746,6 +1755,103 @@ const deleteCollaborator = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Collaboration terminée et compte désactivé.', deleted_at: now });
 });
 
+/**
+ * @desc    Get all recent content for moderation
+ * @route   GET /api/admin/moderation/feed
+ */
+const getModerationFeed = asyncHandler(async (req, res) => {
+  // 1. Fetch recent social statuses
+  const statuses = await query(`
+    SELECT s.*, p.full_name as author_name, p.email as author_email, p.avatar_url as author_avatar, 'social' as content_type
+    FROM public.statuses s
+    JOIN public.profiles p ON s.user_id = p.id
+    WHERE p.is_global_admin = FALSE
+    ORDER BY s.created_at DESC LIMIT 30
+  `);
+
+  // 2. Fetch recent market posts
+  const market = await query(`
+    SELECT mp.*, b.business_name as author_name, p.email as author_email, b.logo_url as author_avatar, 'market' as content_type
+    FROM public.market_posts mp
+    JOIN public.market_businesses b ON mp.business_id = b.id
+    JOIN public.profiles p ON b.user_id = p.id
+    WHERE p.is_global_admin = FALSE
+    ORDER BY mp.created_at DESC LIMIT 30
+  `);
+
+  // 3. Fetch recent job postings
+  const jobs = await query(`
+    SELECT jp.*, b.company_name as author_name, p.email as author_email, b.logo_url as author_avatar, 'job' as content_type
+    FROM public.job_postings jp
+    JOIN public.employer_profiles b ON jp.employer_id = b.id
+    JOIN public.profiles p ON b.user_id = p.id
+    WHERE p.is_global_admin = FALSE
+    ORDER BY jp.created_at DESC LIMIT 30
+  `);
+
+  res.json({
+    success: true,
+    data: {
+      social: statuses.rows,
+      market: market.rows,
+      jobs: jobs.rows
+    }
+  });
+});
+
+/**
+ * @desc    Moderate content (Delete, Correction, Boost)
+ * @route   POST /api/admin/moderation/action
+ */
+const moderateContent = asyncHandler(async (req, res) => {
+  const { contentId, contentType, action, reason, contentTitle, authorEmail, authorName } = req.body;
+
+  if (!contentId || !contentType || !action) {
+    return res.status(400).json({ success: false, error: 'Informations manquantes' });
+  }
+
+  let tableName = "";
+  if (contentType === 'social') tableName = "public.statuses";
+  else if (contentType === 'market') tableName = "public.market_posts";
+  else if (contentType === 'job') tableName = "public.job_postings";
+
+  if (!tableName) return res.status(400).json({ success: false, error: 'Type de contenu invalide' });
+
+  try {
+    if (action === 'delete') {
+      await query(`DELETE FROM ${tableName} WHERE id = $1`, [contentId]);
+
+      // Notifier par email
+      if (authorEmail) {
+        await mailService.sendModerationAlertEmail(authorEmail, authorName || 'Utilisateur', contentType, contentTitle || 'votre publication', 'deleted', reason);
+      }
+
+      await logAdminAction(req, `moderate_delete_${contentType}`, contentType, contentId, { reason });
+    }
+    else if (action === 'correction') {
+      // Pour correction, on pourrait par exemple passer le contenu en 'draft' ou 'pending'
+      // Ici on va juste envoyer le mail et laisser le contenu (ou on pourrait ajouter une colonne 'moderation_status')
+      if (authorEmail) {
+        await mailService.sendModerationAlertEmail(authorEmail, authorName || 'Utilisateur', contentType, contentTitle || 'votre publication', 'correction_required', reason);
+      }
+      await logAdminAction(req, `moderate_correction_${contentType}`, contentType, contentId, { reason });
+    }
+    else if (action === 'boost') {
+      await query(`UPDATE ${tableName} SET is_boosted = NOT is_boosted, updated_at = NOW() WHERE id = $1`, [contentId]);
+      await logAdminAction(req, `moderate_boost_${contentType}`, contentType, contentId);
+    }
+
+    // Informer via socket pour mise à jour temps réel
+    socketService.broadcast('admin:content_moderated', { contentId, contentType, action });
+
+    res.json({ success: true, message: 'Action de modération effectuée avec succès.' });
+
+  } catch (error) {
+    logger.error('Moderation Error:', error.message);
+    res.status(500).json({ success: false, error: 'Erreur lors de la modération' });
+  }
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -1797,6 +1903,8 @@ module.exports = {
   saveDelegation,
   createCollaborator,
   deleteCollaborator,
+  getModerationFeed,
+  moderateContent,
   ensureAdminTables,
   processSensitiveAction
 };

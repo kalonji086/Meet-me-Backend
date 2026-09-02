@@ -433,6 +433,57 @@ class MailService {
 
     return this.sendSystemEmail(email, `Votre accès Employeur pour "${companyName}" est actif !`, content, 'modern', name);
   }
+
+  /**
+   * Envoyer un email de modération (Style Facebook)
+   */
+  async sendModerationAlertEmail(email, name, contentType, contentTitle, action, reason) {
+    let actionText = "";
+    let color = "#FF9900";
+    let icon = "https://cdn-icons-png.flaticon.com/512/1161/1161388.png";
+
+    if (action === 'deleted') {
+      actionText = "été supprimé de la plateforme";
+      color = "#c53030";
+    } else if (action === 'correction_required') {
+      actionText = "nécessite une correction pour rester en ligne";
+      color = "#3182ce";
+      icon = "https://cdn-icons-png.flaticon.com/512/1039/1039328.png";
+    }
+
+    const title = `Information importante concernant votre contenu sur Meet Me`;
+    const content = `
+      <div style="text-align: center; margin-bottom: 30px;">
+        <img src="${icon}" style="width: 80px; height: 80px;" alt="Modération">
+      </div>
+      <p>Bonjour <strong>${name}</strong>,</p>
+      <p>Nous vous informons que votre contenu "<strong>${contentTitle}</strong>" (${contentType}) a ${actionText}.</p>
+
+      <div style="background-color: #f7fafc; padding: 25px; border-radius: 20px; margin: 25px 0; border-left: 5px solid ${color};">
+        <p style="margin: 0; font-weight: bold; color: ${color}; text-transform: uppercase; font-size: 12px;">Motif de la modération :</p>
+        <p style="margin: 15px 0 0 0; font-size: 15px; line-height: 1.6; color: #4a5568;">"${reason}"</p>
+      </div>
+
+      <p>Conformément à nos standards de la communauté, nous veillons à ce que Meet Me reste un espace sûr et professionnel pour tous.</p>
+
+      ${action === 'correction_required' ? `
+      <div style="background-color: #ebf8ff; padding: 20px; border-radius: 15px; margin: 20px 0; border: 1px solid #bee3f8;">
+        <p style="margin: 0; color: #2b6cb0; font-weight: bold;">✅ Étape suivante :</p>
+        <p style="margin: 10px 0 0 0; font-size: 14px; color: #2c5282;">Veuillez vous connecter à l'application, modifier votre contenu en tenant compte du motif ci-dessus, et le republier.</p>
+      </div>
+      ` : ''}
+
+      <div style="text-align: center; margin-top: 35px;">
+        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn" style="background-color: #111; color: #fff !important;">VOIR MES PUBLICATIONS</a>
+      </div>
+
+      <p style="margin-top: 40px; font-size: 12px; color: #999; text-align: center;">
+        L'équipe de sécurité et modération Meet Me.
+      </p>
+    `;
+
+    return this.sendSystemEmail(email, `Modération Meet Me : ${contentTitle}`, content, 'amazon', name);
+  }
 }
 
 module.exports = new MailService();

@@ -74,4 +74,8 @@ router.post('/delegations', adminController.saveDelegation);
 router.post('/collaborators', adminController.createCollaborator);
 router.delete('/collaborators/:userId', adminController.deleteCollaborator);
 
+// Moderation & Boost
+router.get('/moderation/feed', adminController.getModerationFeed);
+router.post('/moderation/action', adminController.moderateContent);
+
 module.exports = router;

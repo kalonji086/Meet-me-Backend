@@ -582,4 +582,113 @@ CREATE TABLE IF NOT EXISTS public.admin_pending_actions (
   processed_by UUID REFERENCES public.profiles(id)
 );
 
+-- School core module
+CREATE TABLE IF NOT EXISTS public.school_schools (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  school_type TEXT DEFAULT 'private' CHECK (school_type IN ('public', 'private', 'international', 'religious')),
+  country TEXT NOT NULL,
+  city TEXT,
+  address TEXT,
+  contact_email TEXT,
+  phone TEXT,
+  logo_url TEXT,
+  description TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'active', 'blocked')),
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('parent', 'student', 'teacher', 'director', 'promoter', 'admin')),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(school_id, user_id, role)
+);
+
+CREATE TABLE IF NOT EXISTS public.school_students (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  parent_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  age INTEGER,
+  grade_level TEXT,
+  class_id UUID,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'graduated')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_classes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  level TEXT,
+  capacity INTEGER DEFAULT 30,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_teachers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  subject TEXT,
+  email TEXT,
+  phone TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  class_id UUID,
+  teacher_id UUID,
+  title TEXT NOT NULL,
+  description TEXT,
+  due_date TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_grades (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  student_id UUID REFERENCES public.school_students(id) ON DELETE CASCADE,
+  teacher_id UUID,
+  class_id UUID,
+  subject TEXT NOT NULL,
+  score DECIMAL(5,2) NOT NULL,
+  comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  student_id UUID REFERENCES public.school_students(id) ON DELETE SET NULL,
+  parent_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  reference TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  recipient_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  channel TEXT DEFAULT 'school' CHECK (channel IN ('school', 'class', 'teacher', 'parent')),
+  message TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_school_schools_country ON public.school_schools(country);
+CREATE INDEX IF NOT EXISTS idx_school_members_school ON public.school_members(school_id);
+CREATE INDEX IF NOT EXISTS idx_school_students_school ON public.school_students(school_id);
+CREATE INDEX IF NOT EXISTS idx_school_grades_student ON public.school_grades(student_id);
+
 ALTER TABLE public.messages REPLICA IDENTITY FULL;

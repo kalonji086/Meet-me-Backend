@@ -325,10 +325,29 @@ const sendMessage = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: result.rows[0] });
 });
 
+/**
+ * @desc    Get user's current school membership
+ */
+const getMySchool = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const result = await query(
+    `SELECT s.*, sm.role
+     FROM public.school_members sm
+     JOIN public.school_schools s ON s.id = sm.school_id
+     WHERE sm.user_id = $1 AND sm.is_active = TRUE
+     ORDER BY s.created_at DESC
+     LIMIT 1`,
+    [userId]
+  );
+
+  res.json({ success: true, data: result.rows[0] || null });
+});
+
 module.exports = {
   getSchoolOverview,
   createSchool,
   getDashboard,
+  getMySchool,
   submitAssignment,
   addGrade,
   getSchools,

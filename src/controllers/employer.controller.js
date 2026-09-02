@@ -115,7 +115,8 @@ const postJob = asyncHandler(async (req, res) => {
     jobType,
     salaryRange,
     requirements,
-    benefits
+    benefits,
+    category
   } = req.body;
 
   if (!title || !description) {
@@ -124,10 +125,10 @@ const postJob = asyncHandler(async (req, res) => {
 
   const result = await query(
     `INSERT INTO public.job_postings (
-      employer_id, title, description, location, job_type, salary_range, requirements, benefits
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      employer_id, title, description, location, job_type, salary_range, requirements, benefits, category
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *`,
-    [employerId, title, description, location, jobType, salaryRange, requirements || [], benefits || []]
+    [employerId, title, description, location, jobType, salaryRange, requirements || [], benefits || [], category || 'all']
   );
 
   res.status(201).json({
@@ -143,13 +144,112 @@ const postJob = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const getAllJobs = asyncHandler(async (req, res) => {
+  const { category, search } = req.query;
+
+  let sql = `
+    SELECT j.*, e.company_name, e.company_email, e.industry, e.logo_url as company_logo
+    FROM public.job_postings j
+    JOIN public.employer_profiles e ON j.employer_id = e.id
+    WHERE j.status = 'active'
+  `;
+
+  const params = [];
+
+  if (category && category !== 'all') {
+    sql += ` AND j.category = $${params.length + 1}`;
+    params.push(category);
+  }
+
+  if (search) {
+    sql += ` AND (j.title ILIKE $${params.length + 1} OR e.company_name ILIKE $${params.length + 1})`;
+    params.push(`%${search}%`);
+  }
+
+  sql += ` ORDER BY j.created_at DESC`;
+
+  const result = await query(sql, params);
+
+  res.json({
+    success: true,
+    data: result.rows
+  });
+});
+
+/**
+ * @desc    Get job by ID with details
+ * @route   GET /api/employer/jobs/:id
+ */
+const getJobById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
   const result = await query(
-    `SELECT j.*, e.company_name, e.company_email, e.industry
+    `SELECT j.*, e.company_name, e.company_email, e.industry, e.logo_url as company_logo, e.user_id as employer_user_id
      FROM public.job_postings j
      JOIN public.employer_profiles e ON j.employer_id = e.id
-     WHERE j.status = 'active'
-     ORDER BY j.created_at DESC`,
-    []
+     WHERE j.id = $1`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Offre d\'emploi non trouvée' });
+  }
+
+  res.json({
+    success: true,
+    data: result.rows[0]
+  });
+});
+
+/**
+ * @desc    Add a comment to a job posting
+ */
+const addJobComment = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { jobId } = req.params;
+  const { content } = req.body;
+
+  if (!content) return res.status(400).json({ success: false, error: 'Contenu requis' });
+
+  const result = await query(
+    `INSERT INTO public.job_comments (job_id, user_id, content)
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [jobId, userId, content]
+  );
+
+  const comment = result.rows[0];
+
+  // Get user info for real-time update
+  const user = await query('SELECT full_name, avatar_url FROM public.profiles WHERE id = $1', [userId]);
+
+  const commentWithUser = {
+    ...comment,
+    user: user.rows[0].full_name,
+    avatar: user.rows[0].avatar_url
+  };
+
+  // Broadcast to anyone viewing this job (if we had specific job rooms, but for now broadcast)
+  socketService.broadcast(`job:new_comment:${jobId}`, commentWithUser);
+
+  res.status(201).json({
+    success: true,
+    data: commentWithUser
+  });
+});
+
+/**
+ * @desc    Get comments for a job
+ */
+const getJobComments = asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+
+  const result = await query(
+    `SELECT c.*, p.full_name as user, p.avatar_url as avatar
+     FROM public.job_comments c
+     JOIN public.profiles p ON c.user_id = p.id
+     WHERE c.job_id = $1
+     ORDER BY c.created_at DESC`,
+    [jobId]
   );
 
   res.json({
@@ -208,5 +308,8 @@ module.exports = {
   getEmployerStatus,
   postJob,
   getAllJobs,
+  getJobById,
+  addJobComment,
+  getJobComments,
   approveRequest
 };

@@ -80,6 +80,7 @@ router.post('/moderation/action', adminController.moderateContent);
 
 // School Management
 router.get('/schools/pending', adminController.getPendingSchools);
+router.get('/schools/stats', adminController.getSchoolsStats);
 router.put('/schools/:id/approve', adminController.approveSchool);
 router.put('/schools/:id/block', adminController.blockSchool);
 

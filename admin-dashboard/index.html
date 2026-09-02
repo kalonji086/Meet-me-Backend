@@ -267,6 +267,28 @@
                     <div id="school-pending-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Pending schools injected by JS -->
                     </div>
+
+                    <div class="mt-12">
+                        <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6">Monitoring des Écoles Actives</h3>
+                        <div class="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 border-b border-gray-100">
+                                    <tr>
+                                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Établissement</th>
+                                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Type / Lieu</th>
+                                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Élèves</th>
+                                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Employés</th>
+                                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Classes</th>
+                                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Revenus ($)</th>
+                                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="school-monitoring-table" class="divide-y divide-gray-50 font-medium">
+                                    <!-- Data injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8 mb-10" id="stats-summary">
                         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
@@ -1657,9 +1679,65 @@
             if (name === 'config') loadConfig();
             if (name === 'collaboration') loadCollaboration();
             if (name === 'moderation') loadModerationFeed();
-            if (name === 'school-admin') loadPendingSchools();
+            if (name === 'school-admin') {
+                loadPendingSchools();
+                loadSchoolsMonitoring();
+            }
 
             lucide.createIcons();
+        }
+
+        async function loadSchoolsMonitoring() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/schools/stats`, { headers: { Authorization: `Bearer ${token}` } });
+                const container = document.getElementById('school-monitoring-table');
+                container.innerHTML = "";
+
+                if (res.data.data.length === 0) {
+                    container.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">Aucun établissement actif monitoré.</td></tr>`;
+                    return;
+                }
+
+                res.data.data.forEach(s => {
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-gray-50/50 transition-all";
+                    row.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <img src="${getFullUrl(s.logo_url)}" class="w-8 h-8 rounded-lg object-cover">
+                                <div class="overflow-hidden">
+                                    <p class="text-xs font-black text-gray-900 truncate">${s.name}</p>
+                                    <p class="text-[10px] text-gray-400 truncate">${s.promoter_name}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="text-[10px] font-bold text-indigo-500 uppercase">${s.school_type}</p>
+                            <p class="text-[10px] text-gray-400">${s.city}, ${s.country}</p>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-md text-[10px] font-black">${s.students_count}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-2 py-1 bg-gray-50 text-gray-600 rounded-md text-[10px] font-black">${s.teachers_count}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-2 py-1 bg-purple-50 text-purple-600 rounded-md text-[10px] font-black">${s.classes_count}</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <p class="text-xs font-black text-emerald-600">${parseFloat(s.total_revenue).toFixed(2)}$</p>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex justify-end gap-2">
+                                <button onclick="handleSchoolAction('${s.id}', 'block')" class="p-2 text-gray-400 hover:text-red-600 transition-all"><i data-lucide="lock" class="w-4 h-4"></i></button>
+                                <button onclick="toast('Détails complets à venir', 'info')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                            </div>
+                        </td>
+                    `;
+                    container.appendChild(row);
+                });
+                lucide.createIcons();
+            } catch (e) { toast("Erreur monitoring schools", "error"); }
         }
 
         async function loadPendingSchools() {

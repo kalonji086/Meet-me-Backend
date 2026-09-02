@@ -1992,6 +1992,30 @@ const blockSchool = asyncHandler(async (req, res) => {
   res.json({ success: true, message: `L'école ${school.name} a été bloquée.` });
 });
 
+/**
+ * @desc    Get global statistics for all schools
+ * @route   GET /api/admin/schools/stats
+ */
+const getSchoolsStats = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT s.id, s.name, s.school_type, s.city, s.country, s.status, s.logo_url,
+           p.full_name as promoter_name,
+           (SELECT COUNT(*) FROM public.school_students WHERE school_id = s.id) as students_count,
+           (SELECT COUNT(*) FROM public.school_classes WHERE school_id = s.id) as classes_count,
+           (SELECT COUNT(*) FROM public.school_teachers WHERE school_id = s.id) as teachers_count,
+           (SELECT COALESCE(SUM(amount), 0) FROM public.school_payments WHERE school_id = s.id AND status = 'completed') as total_revenue
+    FROM public.school_schools s
+    JOIN public.profiles p ON s.created_by = p.id
+    WHERE s.status != 'pending'
+    ORDER BY total_revenue DESC, students_count DESC
+  `);
+
+  res.json({
+    success: true,
+    data: result.rows
+  });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -2048,6 +2072,7 @@ module.exports = {
   getPendingSchools,
   approveSchool,
   blockSchool,
+  getSchoolsStats,
   ensureAdminTables,
   processSensitiveAction
 };

@@ -15,7 +15,8 @@ router.post('/students', schoolController.createParentStudent);
 router.post('/classes', schoolController.createClass);
 router.post('/teachers', schoolController.createTeacher);
 router.post('/assignments', schoolController.createAssignment);
-router.post('/grades', schoolController.createGrade);
+router.post('/submissions', schoolController.submitAssignment);
+router.post('/grades', schoolController.addGrade);
 router.post('/payments', schoolController.createPayment);
 router.post('/messages', schoolController.sendMessage);
 

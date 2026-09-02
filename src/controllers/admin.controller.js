@@ -338,6 +338,82 @@ const ensureAdminTables = async () => {
   } catch (e) {
     logger.error('Error adding is_boosted columns:', e.message);
   }
+
+  // School tables initialization
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.school_schools (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          school_type TEXT DEFAULT 'private',
+          country TEXT NOT NULL,
+          city TEXT,
+          address TEXT,
+          contact_email TEXT,
+          phone TEXT,
+          logo_url TEXT,
+          description TEXT,
+          status TEXT DEFAULT 'pending',
+          created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.school_members (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+          user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+          role TEXT NOT NULL CHECK (role IN ('student', 'parent', 'teacher', 'director', 'promoter')),
+          is_active BOOLEAN DEFAULT TRUE,
+          joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(school_id, user_id)
+      );
+      CREATE TABLE IF NOT EXISTS public.school_classes (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          level TEXT,
+          capacity INTEGER DEFAULT 30,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.school_students (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+          user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+          parent_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          age INTEGER,
+          grade_level TEXT,
+          class_id UUID REFERENCES public.school_classes(id) ON DELETE SET NULL,
+          status TEXT DEFAULT 'active',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.school_grades (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+          student_id UUID REFERENCES public.school_students(id) ON DELETE CASCADE,
+          teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+          class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
+          subject TEXT NOT NULL,
+          score DECIMAL NOT NULL,
+          max_score DECIMAL DEFAULT 20,
+          comment TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.school_assignments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+          class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
+          teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          due_date TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+  } catch (e) {
+    logger.error('Error ensuring school tables:', e.message);
+  }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
@@ -1852,6 +1928,70 @@ const moderateContent = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Get all pending school creation requests
+ * @route   GET /api/admin/schools/pending
+ */
+const getPendingSchools = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT s.*, p.full_name as creator_name, p.email as creator_email
+    FROM public.school_schools s
+    JOIN public.profiles p ON s.created_by = p.id
+    WHERE s.status = 'pending'
+    ORDER BY s.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Approve a school
+ * @route   PUT /api/admin/schools/:id/approve
+ */
+const approveSchool = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const result = await query(
+    "UPDATE public.school_schools SET status = 'approved', updated_at = NOW() WHERE id = $1 RETURNING *",
+    [id]
+  );
+
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
+
+  const school = result.rows[0];
+
+  // Notify creator via socket and email
+  socketService.sendToUser(school.created_by, 'school:approved', { schoolName: school.name });
+
+  // Optionally send email via mailService if defined
+  // await mailService.sendSchoolApprovalEmail(creator_email, creator_name, school.name);
+
+  await logAdminAction(req, 'approve_school', 'school', id, { schoolName: school.name });
+  res.json({ success: true, message: `L'école ${school.name} a été approuvée.` });
+});
+
+/**
+ * @desc    Block/Reject a school
+ * @route   PUT /api/admin/schools/:id/block
+ */
+const blockSchool = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const result = await query(
+    "UPDATE public.school_schools SET status = 'blocked', updated_at = NOW() WHERE id = $1 RETURNING *",
+    [id]
+  );
+
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
+
+  const school = result.rows[0];
+
+  socketService.sendToUser(school.created_by, 'school:blocked', { schoolName: school.name, reason });
+
+  await logAdminAction(req, 'block_school', 'school', id, { schoolName: school.name, reason });
+  res.json({ success: true, message: `L'école ${school.name} a été bloquée.` });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -1905,6 +2045,9 @@ module.exports = {
   deleteCollaborator,
   getModerationFeed,
   moderateContent,
+  getPendingSchools,
+  approveSchool,
+  blockSchool,
   ensureAdminTables,
   processSensitiveAction
 };

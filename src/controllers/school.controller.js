@@ -1,6 +1,11 @@
 const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
+const socketService = require('../services/socket.service');
+const logger = require('../utils/logger');
 
+/**
+ * @desc    Get global overview and world schools
+ */
 const getSchoolOverview = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
@@ -20,48 +25,41 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
        FROM public.school_schools s
        WHERE s.status IN ('approved', 'active')
        ORDER BY s.created_at DESC
-       LIMIT 20`,
-      [userId]
+       LIMIT 50`,
+      []
     ),
     query(
       `SELECT COUNT(*) AS total_students
        FROM public.school_students st
-       JOIN public.school_members sm ON sm.school_id = st.school_id
-       WHERE sm.user_id = $1 AND sm.is_active = TRUE`,
+       WHERE st.parent_id = $1 OR st.user_id = $1`,
       [userId]
     ),
     query(
       `SELECT COUNT(*) AS total_assignments
        FROM public.school_assignments sa
        JOIN public.school_members sm ON sm.school_id = sa.school_id
-       WHERE sm.user_id = $1 AND sm.is_active = TRUE`,
+       WHERE sm.user_id = $1 AND sm.is_active = TRUE AND sa.due_date > NOW()`,
       [userId]
     )
   ]);
 
-  const dashboard = {
-    role: schoolMembership.rows[0]?.role || 'parent',
-    school: schoolMembership.rows[0] || null,
-    stats: {
-      totalSchools: worldSchools.rows.length,
-      totalStudents: parseInt(myStudents.rows[0]?.total_students || 0, 10),
-      totalAssignments: parseInt(pendingAssignments.rows[0]?.total_assignments || 0, 10),
-      totalMembers: schoolMembership.rows[0]
-        ? await query('SELECT COUNT(*) AS total_members FROM public.school_members WHERE school_id = $1 AND is_active = TRUE', [schoolMembership.rows[0].id]).then(r => parseInt(r.rows[0].total_members || 0, 10))
-        : 0
-    }
-  };
-
   res.json({
     success: true,
     data: {
-      dashboard,
+      role: schoolMembership.rows[0]?.role || 'none',
+      mySchool: schoolMembership.rows[0] || null,
       worldSchools: worldSchools.rows,
-      mySchool: schoolMembership.rows[0] || null
+      stats: {
+        totalStudents: parseInt(myStudents.rows[0]?.total_students || 0),
+        activeAssignments: parseInt(pendingAssignments.rows[0]?.total_assignments || 0)
+      }
     }
   });
 });
 
+/**
+ * @desc    Submit a request to create a new school (Promoter Dashboard)
+ */
 const createSchool = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const { name, schoolType, country, city, address, contactEmail, phone, logoUrl, description } = req.body;
@@ -80,17 +78,142 @@ const createSchool = asyncHandler(async (req, res) => {
 
   const school = schoolResult.rows[0];
 
+  // Auto-assign as promoter
   await query(
     `INSERT INTO public.school_members (school_id, user_id, role, is_active)
      VALUES ($1, $2, 'promoter', TRUE)`,
     [school.id, userId]
   );
 
+  // Notify Principal Admin
+  socketService.broadcast('admin:new_school_request', { schoolName: school.name, promoterId: userId });
+
   res.status(201).json({
     success: true,
-    message: 'École créée avec succès. Elle est en attente de validation.',
+    message: 'Votre école a été créée et est en attente de validation par l’administrateur principal.',
     data: school
   });
+});
+
+/**
+ * @desc    Dashboard logic for each role (Real-time updates)
+ */
+const getDashboard = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { schoolId } = req.query;
+
+  if (!schoolId) return res.status(400).json({ success: false, error: 'ID de l’école requis' });
+
+  // Verify membership
+  const memberRes = await query(
+    'SELECT role, is_active FROM public.school_members WHERE school_id = $1 AND user_id = $2',
+    [schoolId, userId]
+  );
+
+  if (memberRes.rows.length === 0 || !memberRes.rows[0].is_active) {
+    return res.status(403).json({ success: false, error: 'Accès refusé à cet établissement' });
+  }
+
+  const role = memberRes.rows[0].role;
+  let dashboardData = { role };
+
+  // Fetch role-specific data
+  if (role === 'student') {
+    const [grades, assignments, profile] = await Promise.all([
+      query('SELECT * FROM public.school_grades WHERE school_id = $1 AND student_id = (SELECT id FROM public.school_students WHERE user_id = $2 AND school_id = $1) ORDER BY created_at DESC', [schoolId, userId]),
+      query('SELECT * FROM public.school_assignments WHERE school_id = $1 ORDER BY due_date ASC', [schoolId]),
+      query('SELECT * FROM public.school_students WHERE school_id = $1 AND user_id = $2', [schoolId, userId])
+    ]);
+    dashboardData.grades = grades.rows;
+    dashboardData.assignments = assignments.rows;
+    dashboardData.profile = profile.rows[0];
+  }
+  else if (role === 'parent') {
+    const [children, payments] = await Promise.all([
+      query('SELECT * FROM public.school_students WHERE school_id = $1 AND parent_id = $2', [schoolId, userId]),
+      query('SELECT * FROM public.school_payments WHERE school_id = $1 AND parent_id = $2 ORDER BY created_at DESC', [schoolId, userId])
+    ]);
+    dashboardData.children = children.rows;
+    dashboardData.payments = payments.rows;
+  }
+  else if (role === 'teacher') {
+    const [myClasses, myAssignments] = await Promise.all([
+      query(`SELECT c.* FROM public.school_classes c
+             JOIN public.school_teacher_classes tc ON c.id = tc.class_id
+             JOIN public.school_teachers t ON tc.teacher_id = t.id
+             WHERE t.user_id = $1 AND t.school_id = $2`, [userId, schoolId]),
+      query('SELECT * FROM public.school_assignments WHERE school_id = $1 AND teacher_id = $2', [schoolId, userId])
+    ]);
+    dashboardData.classes = myClasses.rows;
+    dashboardData.assignments = myAssignments.rows;
+  }
+  else if (role === 'director' || role === 'promoter') {
+    const [allStudents, allTeachers, allPayments] = await Promise.all([
+      query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1', [schoolId]),
+      query('SELECT COUNT(*) FROM public.school_teachers WHERE school_id = $1', [schoolId]),
+      query('SELECT SUM(amount) FROM public.school_payments WHERE school_id = $1 AND status = \'completed\'', [schoolId])
+    ]);
+    dashboardData.stats = {
+      totalStudents: parseInt(allStudents.rows[0].count),
+      totalTeachers: parseInt(allTeachers.rows[0].count),
+      revenue: parseFloat(allPayments.rows[0].sum || 0)
+    };
+  }
+
+  res.json({ success: true, data: dashboardData });
+});
+
+/**
+ * @desc    Submit an assignment (Student)
+ */
+const submitAssignment = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { assignmentId, content, fileUrl } = req.body;
+
+  // Find student ID linked to this user
+  const studentRes = await query('SELECT id FROM public.school_students WHERE user_id = $1', [userId]);
+  if (studentRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Profil élève non trouvé' });
+
+  const result = await query(
+    `INSERT INTO public.school_submissions (assignment_id, student_id, content, file_url)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [assignmentId, studentRes.rows[0].id, content, fileUrl]
+  );
+
+  // Notify teacher
+  const assignRes = await query('SELECT teacher_id FROM public.school_assignments WHERE id = $1', [assignmentId]);
+  if (assignRes.rows.length > 0 && assignRes.rows[0].teacher_id) {
+    socketService.sendToUser(assignRes.rows[0].teacher_id, 'school:new_submission', { assignmentId });
+  }
+
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Grade a student (Teacher)
+ */
+const addGrade = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { schoolId, studentId, classId, subject, score, maxScore, comment } = req.body;
+
+  const result = await query(
+    `INSERT INTO public.school_grades (school_id, student_id, teacher_id, class_id, subject, score, max_score, comment)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [schoolId, studentId, userId, classId, subject, score, maxScore || 20, comment]
+  );
+
+  // Notify student and parent in real-time
+  const studentInfo = await query('SELECT user_id, parent_id FROM public.school_students WHERE id = $1', [studentId]);
+  if (studentInfo.rows.length > 0) {
+    if (studentInfo.rows[0].user_id) {
+      socketService.sendToUser(studentInfo.rows[0].user_id, 'school:new_grade', { subject, score });
+    }
+    if (studentInfo.rows[0].parent_id) {
+      socketService.sendToUser(studentInfo.rows[0].parent_id, 'school:child_new_grade', { subject, score });
+    }
+  }
+
+  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 const getSchools = asyncHandler(async (req, res) => {
@@ -124,77 +247,6 @@ const getSchools = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
-const getMySchool = asyncHandler(async (req, res) => {
-  const userId = req.userId;
-  const result = await query(
-    `SELECT s.*, sm.role
-     FROM public.school_members sm
-     JOIN public.school_schools s ON s.id = sm.school_id
-     WHERE sm.user_id = $1 AND sm.is_active = TRUE
-     ORDER BY s.created_at DESC
-     LIMIT 1`,
-    [userId]
-  );
-
-  res.json({ success: true, data: result.rows[0] || null });
-});
-
-const getDashboard = asyncHandler(async (req, res) => {
-  const userId = req.userId;
-  const membership = await query(
-    `SELECT sm.role, sm.school_id
-     FROM public.school_members sm
-     WHERE sm.user_id = $1 AND sm.is_active = TRUE
-     ORDER BY sm.created_at DESC
-     LIMIT 1`,
-    [userId]
-  );
-
-  if (membership.rows.length === 0) {
-    return res.json({ success: true, data: { role: 'parent', school: null, stats: {}, students: [], teachers: [], classes: [], assignments: [], grades: [], payments: [], messages: [] } });
-  }
-
-  const schoolId = membership.rows[0].school_id;
-  const role = membership.rows[0].role;
-
-  const [school, students, teachers, classes, assignments, grades, payments, messages] = await Promise.all([
-    query('SELECT * FROM public.school_schools WHERE id = $1', [schoolId]),
-    query('SELECT * FROM public.school_students WHERE school_id = $1 ORDER BY created_at DESC LIMIT 20', [schoolId]),
-    query('SELECT * FROM public.school_teachers WHERE school_id = $1 ORDER BY created_at DESC LIMIT 20', [schoolId]),
-    query('SELECT * FROM public.school_classes WHERE school_id = $1 ORDER BY created_at DESC LIMIT 20', [schoolId]),
-    query('SELECT * FROM public.school_assignments WHERE school_id = $1 ORDER BY due_date ASC LIMIT 20', [schoolId]),
-    query('SELECT * FROM public.school_grades WHERE school_id = $1 ORDER BY created_at DESC LIMIT 20', [schoolId]),
-    query('SELECT * FROM public.school_payments WHERE school_id = $1 ORDER BY created_at DESC LIMIT 20', [schoolId]),
-    query('SELECT * FROM public.school_messages WHERE school_id = $1 ORDER BY created_at DESC LIMIT 20', [schoolId])
-  ]);
-
-  const stats = {
-    students: students.rows.length,
-    teachers: teachers.rows.length,
-    classes: classes.rows.length,
-    assignments: assignments.rows.length,
-    payments: payments.rows.length,
-    messages: messages.rows.length,
-    grades: grades.rows.length
-  };
-
-  res.json({
-    success: true,
-    data: {
-      role,
-      school: school.rows[0] || null,
-      stats,
-      students: students.rows,
-      teachers: teachers.rows,
-      classes: classes.rows,
-      assignments: assignments.rows,
-      grades: grades.rows,
-      payments: payments.rows,
-      messages: messages.rows
-    }
-  });
-});
-
 const createParentStudent = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const { schoolId, firstName, lastName, age, gradeLevel, classId } = req.body;
@@ -203,16 +255,11 @@ const createParentStudent = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Les informations de l’élève sont incomplètes.' });
   }
 
-  const schoolCheck = await query('SELECT id FROM public.school_schools WHERE id = $1', [schoolId]);
-  if (schoolCheck.rows.length === 0) {
-    return res.status(404).json({ success: false, error: 'École introuvable.' });
-  }
-
   const result = await query(
     `INSERT INTO public.school_students (school_id, parent_id, first_name, last_name, age, grade_level, class_id, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
      RETURNING *`,
-    [schoolId, userId, firstName, lastName, age || 0, gradeLevel || '', classId || null,]
+    [schoolId, userId, firstName, lastName, age || 0, gradeLevel || '', classId || null]
   );
 
   res.status(201).json({ success: true, data: result.rows[0], message: 'Élève ajouté avec succès.' });
@@ -220,117 +267,75 @@ const createParentStudent = asyncHandler(async (req, res) => {
 
 const createClass = asyncHandler(async (req, res) => {
   const { schoolId, name, level, capacity } = req.body;
-
-  if (!schoolId || !name) {
-    return res.status(400).json({ success: false, error: 'Le nom de la classe et l’école sont requis.' });
-  }
+  if (!schoolId || !name) return res.status(400).json({ success: false, error: 'Nom de classe et école requis' });
 
   const result = await query(
     `INSERT INTO public.school_classes (school_id, name, level, capacity)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
+     VALUES ($1, $2, $3, $4) RETURNING *`,
     [schoolId, name, level || '', capacity || 30]
   );
-
-  res.status(201).json({ success: true, data: result.rows[0], message: 'Classe créée.' });
+  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 const createTeacher = asyncHandler(async (req, res) => {
-  const { schoolId, fullName, subject, email, phone } = req.body;
-
-  if (!schoolId || !fullName) {
-    return res.status(400).json({ success: false, error: 'Le professeur et l’école sont requis.' });
-  }
+  const { schoolId, userId, fullName, subject, email, phone } = req.body;
+  if (!schoolId || !fullName) return res.status(400).json({ success: false, error: 'Nom et école requis' });
 
   const result = await query(
-    `INSERT INTO public.school_teachers (school_id, full_name, subject, email, phone)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING *`,
-    [schoolId, fullName, subject || '', email || '', phone || '']
+    `INSERT INTO public.school_teachers (school_id, user_id, full_name, subject, email, phone)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [schoolId, userId, fullName, subject || '', email || '', phone || '']
   );
-
-  res.status(201).json({ success: true, data: result.rows[0], message: 'Enseignant ajouté.' });
+  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 const createAssignment = asyncHandler(async (req, res) => {
-  const { schoolId, classId, teacherId, title, description, dueDate } = req.body;
-
-  if (!schoolId || !title) {
-    return res.status(400).json({ success: false, error: 'Le devoir nécessite un titre et une école.' });
-  }
+  const { schoolId, classId, title, description, dueDate } = req.body;
+  const teacherId = req.userId;
 
   const result = await query(
     `INSERT INTO public.school_assignments (school_id, class_id, teacher_id, title, description, due_date)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING *`,
-    [schoolId, classId || null, teacherId || null, title, description || '', dueDate || null]
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [schoolId, classId, teacherId, title, description || '', dueDate]
   );
-
-  res.status(201).json({ success: true, data: result.rows[0], message: 'Devoir créé.' });
-});
-
-const createGrade = asyncHandler(async (req, res) => {
-  const { schoolId, studentId, teacherId, classId, subject, score, comment } = req.body;
-
-  if (!schoolId || !studentId || !subject || score === undefined) {
-    return res.status(400).json({ success: false, error: 'Les notes sont incomplètes.' });
-  }
-
-  const result = await query(
-    `INSERT INTO public.school_grades (school_id, student_id, teacher_id, class_id, subject, score, comment)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING *`,
-    [schoolId, studentId, teacherId || null, classId || null, subject, score, comment || '']
-  );
-
-  res.status(201).json({ success: true, data: result.rows[0], message: 'Note ajoutée.' });
+  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 const createPayment = asyncHandler(async (req, res) => {
   const { schoolId, studentId, parentId, amount, reference, status } = req.body;
-
-  if (!schoolId || !amount) {
-    return res.status(400).json({ success: false, error: 'Le montant et l’école sont requis.' });
-  }
-
   const result = await query(
     `INSERT INTO public.school_payments (school_id, student_id, parent_id, amount, reference, status)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING *`,
-    [schoolId, studentId || null, parentId || req.userId, amount, reference || '', status || 'pending']
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [schoolId, studentId, parentId || req.userId, amount, reference, status || 'pending']
   );
-
-  res.status(201).json({ success: true, data: result.rows[0], message: 'Paiement enregistré.' });
+  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 const sendMessage = asyncHandler(async (req, res) => {
-  const { schoolId, recipientId, channel, message } = req.body;
-
-  if (!schoolId || !message) {
-    return res.status(400).json({ success: false, error: 'Le message est vide.' });
-  }
+  const { schoolId, recipientId, message } = req.body;
+  const senderId = req.userId;
 
   const result = await query(
-    `INSERT INTO public.school_messages (school_id, sender_id, recipient_id, channel, message)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING *`,
-    [schoolId, req.userId, recipientId || null, channel || 'school', message]
+    `INSERT INTO public.school_messages (school_id, sender_id, recipient_id, message)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [schoolId, senderId, recipientId, message]
   );
 
-  res.status(201).json({ success: true, data: result.rows[0], message: 'Message envoyé.' });
+  socketService.sendToUser(recipientId, 'school:new_message', { from: senderId, message });
+  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 module.exports = {
   getSchoolOverview,
   createSchool,
-  getSchools,
-  getMySchool,
   getDashboard,
+  submitAssignment,
+  addGrade,
+  getSchools,
   createParentStudent,
   createClass,
   createTeacher,
   createAssignment,
-  createGrade,
   createPayment,
   sendMessage
 };

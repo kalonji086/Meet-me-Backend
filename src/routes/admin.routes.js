@@ -78,4 +78,9 @@ router.delete('/collaborators/:userId', adminController.deleteCollaborator);
 router.get('/moderation/feed', adminController.getModerationFeed);
 router.post('/moderation/action', adminController.moderateContent);
 
+// School Management
+router.get('/schools/pending', adminController.getPendingSchools);
+router.put('/schools/:id/approve', adminController.approveSchool);
+router.put('/schools/:id/block', adminController.blockSchool);
+
 module.exports = router;

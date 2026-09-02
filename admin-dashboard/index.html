@@ -164,6 +164,9 @@
                 <a href="#" onclick="showSection('moderation')" id="nav-moderation" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="zap" class="w-5 h-5 mr-4 text-yellow-400"></i><span class="font-medium text-sm">Boost & Modération</span>
                 </a>
+                <a href="#" onclick="showSection('school-admin')" id="nav-school-admin" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="graduation-cap" class="w-5 h-5 mr-4 text-indigo-400"></i><span class="font-medium text-sm">Gestion School</span>
+                </a>
                 <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
                         <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span>
@@ -252,6 +255,19 @@
             </div>
 
             <div id="section-stats" class="animate-fade-in">
+                <!-- SCHOOL ADMIN SECTION -->
+                <div id="section-school-admin" class="hidden animate-fade-in">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-black text-gray-900 tracking-tighter uppercase">Validation des Écoles</h2>
+                            <p class="text-gray-500 font-medium mt-1">Approuvez ou bloquez les établissements scolaires créés par les utilisateurs.</p>
+                        </div>
+                    </div>
+
+                    <div id="school-pending-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Pending schools injected by JS -->
+                    </div>
+                </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8 mb-10" id="stats-summary">
                         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users" class="w-7 h-7 text-purple-600"></i></div>
@@ -1148,7 +1164,7 @@
         function continueDashboardLoad(user) {
             if (user.isGlobalAdmin) {
                 // Ensure allowedModules is full for Global Admin
-                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation'];
+                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin'];
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('login-container').classList.add('hidden');
@@ -1250,7 +1266,7 @@
                 'audit': 'nav-audit', 'campaigns': 'nav-campaigns', 'legal': 'nav-legal',
                 'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration',
-                'moderation': 'nav-moderation'
+                'moderation': 'nav-moderation', 'school-admin': 'nav-school-admin'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
 
@@ -1332,6 +1348,11 @@
             socket.on('admin:new_verification', (data) => {
                 if(!document.getElementById('section-verifications').classList.contains('hidden')) loadVerifications();
                 addNotification('security', 'Demande Badge', `${data.name} a soumis ses documents.`, 'check-circle');
+            });
+
+            socket.on('admin:new_school_request', (data) => {
+                if(!document.getElementById('section-school-admin').classList.contains('hidden')) loadPendingSchools();
+                addNotification('security', 'Nouvelle École', `L'établissement ${data.schoolName} attend validation.`, 'graduation-cap');
             });
 
             socket.on('admin:new_pending_action', (data) => {
@@ -1611,14 +1632,14 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'school-admin'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
-                const navId = s === 'market-requests' ? 'nav-market-requests' : 'nav-' + s;
+                const navId = s === 'market-requests' ? 'nav-market-requests' : (s === 'school-admin' ? 'nav-school-admin' : 'nav-' + s);
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
             });
             const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            const navId = name === 'market-requests' ? 'nav-market-requests' : 'nav-' + name;
+            const navId = name === 'market-requests' ? 'nav-market-requests' : (name === 'school-admin' ? 'nav-school-admin' : 'nav-' + name);
             const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
             document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 
@@ -1636,8 +1657,59 @@
             if (name === 'config') loadConfig();
             if (name === 'collaboration') loadCollaboration();
             if (name === 'moderation') loadModerationFeed();
+            if (name === 'school-admin') loadPendingSchools();
 
             lucide.createIcons();
+        }
+
+        async function loadPendingSchools() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/schools/pending`, { headers: { Authorization: `Bearer ${token}` } });
+                const container = document.getElementById('school-pending-list');
+                container.innerHTML = "";
+
+                if (res.data.data.length === 0) {
+                    container.innerHTML = `<div class="col-span-full py-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune école en attente</div>`;
+                    return;
+                }
+
+                res.data.data.forEach(school => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 flex flex-col gap-6";
+                    card.innerHTML = `
+                        <div class="flex items-center gap-6">
+                            <img src="${getFullUrl(school.logo_url)}" class="w-20 h-20 rounded-[1.5rem] object-cover bg-gray-50 border border-gray-100">
+                            <div>
+                                <h4 class="text-xl font-black text-gray-900 leading-none mb-2">${school.name}</h4>
+                                <p class="text-indigo-500 font-bold text-xs uppercase tracking-widest">${school.school_type} • ${school.city}, ${school.country}</p>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="p-4 bg-gray-50 rounded-2xl">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Promoteur</p>
+                                <p class="text-sm font-bold text-gray-800">${school.creator_name} (${school.creator_email})</p>
+                            </div>
+                            <p class="text-gray-500 text-sm font-medium line-clamp-2">${school.description || 'Pas de description.'}</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-auto pt-4">
+                            <button onclick="handleSchoolAction('${school.id}', 'approve')" class="px-6 py-4 bg-green-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-600 transition-all active:scale-95">Approuver</button>
+                            <button onclick="handleSchoolAction('${school.id}', 'block')" class="px-6 py-4 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95">Bloquer</button>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+                lucide.createIcons();
+            } catch (e) { toast("Erreur lors du chargement des écoles.", "error"); }
+        }
+
+        async function handleSchoolAction(id, action) {
+            try {
+                const res = await axios.put(`${API_URL}/admin/schools/${id}/${action}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.success) {
+                    toast(res.data.message, "success");
+                    loadPendingSchools();
+                }
+            } catch (e) { toast(e.response?.data?.error || "Erreur action school", "error"); }
         }
 
         // --- MODERATION & BOOST SYSTEM ---

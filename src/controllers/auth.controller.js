@@ -350,14 +350,50 @@ const logout = asyncHandler(async (req, res) => {
 
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  const result = await query('SELECT id, email FROM public.profiles WHERE email = $1', [email?.toLowerCase()]);
+
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email requis' });
+  }
+
+  const result = await query('SELECT id, email FROM public.profiles WHERE email = $1', [email?.toLowerCase().trim()]);
   const user = result.rows[0];
-  if (!user) return res.json({ success: true, message: 'OTP envoyé si compte existant' });
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Compte introuvable',
+      message: 'Cette adresse email n\'est associée à aucun compte. Veuillez vérifier votre saisie.'
+    });
+  }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   await query('UPDATE public.profiles SET otp_code = $1, otp_expires_at = NOW() + INTERVAL \'15 minutes\' WHERE id = $2', [otp, user.id]);
   await mailService.sendOTPEmail(user.email, otp);
+
   res.json({ success: true, message: 'OTP envoyé' });
+});
+
+const verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ success: false, error: 'Email et code OTP requis' });
+  }
+
+  const result = await query(
+    'SELECT id FROM public.profiles WHERE email = $1 AND otp_code = $2 AND otp_expires_at > NOW()',
+    [email.toLowerCase().trim(), otp]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'Code OTP invalide',
+      message: 'Le code saisi est incorrect ou a expiré. Veuillez réessayer.'
+    });
+  }
+
+  res.json({ success: true, message: 'Code OTP vérifié avec succès' });
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
@@ -386,4 +422,4 @@ const verifyToken = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: req.user } });
 });
 
-module.exports = { register, login, refreshToken, logout, forgotPassword, resetPassword, changePassword, verifyToken, checkAvailability };
+module.exports = { register, login, refreshToken, logout, forgotPassword, verifyOTP, resetPassword, changePassword, verifyToken, checkAvailability };

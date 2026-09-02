@@ -23,6 +23,7 @@ const statusRoutes = require('./routes/status.routes');
 const adminRoutes = require('./routes/admin.routes');
 const marketRoutes = require('./routes/market.routes');
 const collabRoutes = require('./routes/collab.routes');
+const employerRoutes = require('./routes/employer.routes');
 
 // Controllers pour routes directes
 const userController = require('./controllers/user.controller');
@@ -168,6 +169,7 @@ class Server {
     this.app.use('/api/admin', adminRoutes);
     this.app.use('/api/market', marketRoutes);
     this.app.use('/api/collab', collabRoutes);
+    this.app.use('/api/employer', employerRoutes);
 
     // Servir le Dashboard Admin
     const adminPath = path.join(__dirname, '..', 'admin-dashboard');

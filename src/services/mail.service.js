@@ -398,6 +398,41 @@ class MailService {
 
     return this.sendSystemEmail(email, "Compte Collaborateur TOGETHE TECH", content, 'minimal', name);
   }
+
+  /**
+   * Envoyer un email d'approbation Employeur
+   */
+  async sendEmployerApprovalEmail(email, name, companyName) {
+    const title = `Félicitations ${name}, votre profil employeur "${companyName}" est approuvé.`;
+    const content = `
+      <div style="text-align: center; margin-bottom: 30px;">
+        <img src="https://cdn-icons-png.flaticon.com/512/1063/1063376.png" style="width: 80px; height: 80px;" alt="Employeur Approuvé">
+      </div>
+      <p>Nous avons le plaisir de vous informer que votre demande d'accès au <strong>Dashboard Employeur Meet Me</strong> a été validée par notre équipe !</p>
+
+      <div style="background-color: #f0fdf4; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #bbf7d0;">
+        <p style="margin: 0; color: #166534; font-weight: bold; font-size: 16px;">BIENVENUE PARMI NOS PARTENAIRES</p>
+        <p style="margin: 10px 0 0 0; font-size: 15px; color: #15803d;">Vous pouvez désormais publier vos offres d'emploi et gérer les candidatures directement depuis votre nouveau tableau de bord professionnel.</p>
+      </div>
+
+      <p><strong>Vos nouveaux avantages :</strong></p>
+      <ul>
+        <li>Publication illimitée d'offres style "Amazon Job"</li>
+        <li>Visibilité accrue auprès de toute la communauté Meet Me</li>
+        <li>Interface simplifiée pour le suivi des postulants</li>
+      </ul>
+
+      <div style="text-align: center; margin-top: 35px;">
+        <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn" style="background-color: #673AB7; color: #ffffff !important;">ACCÉDER AU DASHBOARD EMPLOYEUR</a>
+      </div>
+
+      <p style="margin-top: 40px; font-size: 12px; color: #888; text-align: center;">
+        <em>L'équipe Partenariats Meet Me.</em>
+      </p>
+    `;
+
+    return this.sendSystemEmail(email, `Votre accès Employeur pour "${companyName}" est actif !`, content, 'modern', name);
+  }
 }
 
 module.exports = new MailService();

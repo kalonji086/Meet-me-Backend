@@ -1999,6 +1999,28 @@ const blockSchool = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Delete a school
+ * @route   DELETE /api/admin/schools/:id
+ */
+const deleteSchool = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const schoolRes = await query('SELECT name, created_by FROM public.school_schools WHERE id = $1', [id]);
+  if (schoolRes.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
+
+  const school = schoolRes.rows[0];
+
+  await query('DELETE FROM public.school_schools WHERE id = $1', [id]);
+
+  // Real-time notification to the promoter and global broadcast
+  socketService.emitToUser(school.created_by, 'school:deleted', { schoolName: school.name });
+  socketService.broadcast('admin:school_deleted', { schoolId: id });
+
+  await logAdminAction(req, 'delete_school', 'school', id, { schoolName: school.name });
+  res.json({ success: true, message: `L'école ${school.name} a été supprimée définitivement.` });
+});
+
+/**
  * @desc    Get all pending employer requests
  * @route   GET /api/admin/employer-requests
  */
@@ -2234,6 +2256,7 @@ module.exports = {
   getPendingSchools,
   approveSchool,
   blockSchool,
+  deleteSchool,
   getSchoolsStats,
   getSchoolDetailsAdmin,
   getEmployerRequests,

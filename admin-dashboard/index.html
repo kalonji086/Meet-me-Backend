@@ -1804,10 +1804,13 @@
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-2">
-                                <button onclick="handleSchoolAction('${s.id}', '${s.status === 'blocked' ? 'approve' : 'block'}')" class="p-2 ${s.status === 'blocked' ? 'text-green-500' : 'text-gray-400'} hover:text-red-600 transition-all">
+                                <button onclick="handleSchoolAction('${s.id}', '${s.status === 'blocked' ? 'approve' : 'block'}')" class="p-2 ${s.status === 'blocked' ? 'text-green-500' : 'text-gray-400'} hover:text-red-600 transition-all" title="${s.status === 'blocked' ? 'Débloquer' : 'Bloquer'}">
                                     <i data-lucide="${s.status === 'blocked' ? 'unlock' : 'lock'}" class="w-4 h-4"></i>
                                 </button>
-                                <button onclick="examineSchoolDetail('${s.id}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all">
+                                <button onclick="deleteSchoolAction('${s.id}', '${s.name.replace(/'/g, "\\'")}')" class="p-2 text-gray-400 hover:text-red-600 transition-all" title="Supprimer">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="examineSchoolDetail('${s.id}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all" title="Voir détails">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -1869,8 +1872,21 @@
                     toast(res.data.message, "success");
                     loadPendingSchools();
                     loadSchoolsMonitoring();
+                    if(!document.getElementById('impact-modal').classList.contains('hidden')) closeImpactModal();
                 }
             } catch (e) { toast(e.response?.data?.error || "Erreur action school", "error"); }
+        }
+
+        async function deleteSchoolAction(id, name) {
+            if (!confirm(`Voulez-vous vraiment supprimer l'école "${name}" ? Cette action est irréversible et supprimera toutes les données liées (élèves, notes, etc.).`)) return;
+            try {
+                const res = await axios.delete(`${API_URL}/admin/schools/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.success) {
+                    toast(res.data.message, "success");
+                    loadSchoolsMonitoring();
+                    loadPendingSchools();
+                }
+            } catch (e) { toast("Erreur lors de la suppression de l'école.", "error"); }
         }
 
         async function examineSchoolDetail(id) {

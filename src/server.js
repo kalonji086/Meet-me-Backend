@@ -114,8 +114,8 @@ class Server {
   }
 
   initializeRoutes() {
-    this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me', version: '83.0.0' }));
-    this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '83.0.0' }));
+    this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me', version: '84.0.0' }));
+    this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '84.0.0' }));
     
     // Route de ping pour garder le serveur actif sur Render
     this.app.get('/api/ping', (req, res) => {

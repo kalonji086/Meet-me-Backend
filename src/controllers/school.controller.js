@@ -119,42 +119,45 @@ const getDashboard = asyncHandler(async (req, res) => {
 
   // Fetch role-specific data
   if (role === 'student') {
-    const [grades, assignments, profile] = await Promise.all([
+    const [grades, assignments, profile, schoolInfo, fees] = await Promise.all([
       query('SELECT * FROM public.school_grades WHERE school_id = $1 AND student_id = (SELECT id FROM public.school_students WHERE user_id = $2 AND school_id = $1) ORDER BY created_at DESC', [schoolId, userId]),
-      query('SELECT * FROM public.school_assignments WHERE school_id = $1 ORDER BY due_date ASC', [schoolId]),
-      query('SELECT * FROM public.school_students WHERE school_id = $1 AND user_id = $2', [schoolId, userId])
+      query('SELECT a.*, p.full_name as teacher_name FROM public.school_assignments a LEFT JOIN public.profiles p ON a.teacher_id = p.id WHERE a.school_id = $1 AND a.class_id = (SELECT class_id FROM public.school_students WHERE user_id = $2 AND school_id = $1) ORDER BY a.due_date ASC', [schoolId, userId]),
+      query('SELECT s.*, (SELECT COUNT(*) FROM public.school_students WHERE class_id = s.class_id) as classmates_count FROM public.school_students s WHERE s.school_id = $1 AND s.user_id = $2', [schoolId, userId]),
+      query('SELECT s.name, p.full_name as director_name FROM public.school_schools s LEFT JOIN public.profiles p ON s.director_id = p.id WHERE s.id = $1', [schoolId]),
+      query('SELECT * FROM public.school_fees_config WHERE school_id = $1 ORDER BY created_at ASC', [schoolId])
     ]);
     dashboardData.grades = grades.rows;
     dashboardData.assignments = assignments.rows;
     dashboardData.profile = profile.rows[0];
-  }
-  else if (role === 'parent') {
-    const [children, payments] = await Promise.all([
-      query('SELECT * FROM public.school_students WHERE school_id = $1 AND parent_id = $2', [schoolId, userId]),
-      query('SELECT * FROM public.school_payments WHERE school_id = $1 AND parent_id = $2 ORDER BY created_at DESC', [schoolId, userId])
-    ]);
-    dashboardData.children = children.rows;
-    dashboardData.payments = payments.rows;
+    dashboardData.schoolInfo = schoolInfo.rows[0];
+    dashboardData.fees = fees.rows;
   }
   else if (role === 'teacher') {
-    const [myClasses, myAssignments] = await Promise.all([
+    const [myClasses, myAssignments, myStudents] = await Promise.all([
       query(`SELECT c.* FROM public.school_classes c
              JOIN public.school_teacher_classes tc ON c.id = tc.class_id
              JOIN public.school_teachers t ON tc.teacher_id = t.id
              WHERE t.user_id = $1 AND t.school_id = $2`, [userId, schoolId]),
-      query('SELECT * FROM public.school_assignments WHERE school_id = $1 AND teacher_id = $2', [schoolId, userId])
+      query('SELECT * FROM public.school_assignments WHERE school_id = $1 AND teacher_id = $2', [schoolId, userId]),
+      query(`SELECT s.*, (s.created_at > NOW() - INTERVAL '3 days') as is_new
+             FROM public.school_students s
+             JOIN public.school_teacher_classes tc ON s.class_id = tc.class_id
+             JOIN public.school_teachers t ON tc.teacher_id = t.id
+             WHERE t.user_id = $1 AND t.school_id = $2`, [userId, schoolId])
     ]);
     dashboardData.classes = myClasses.rows;
     dashboardData.assignments = myAssignments.rows;
+    dashboardData.students = myStudents.rows;
   }
   else if (role === 'director' || role === 'promoter') {
     const [allStudents, allTeachers, allPayments] = await Promise.all([
-      query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1', [schoolId]),
+      query("SELECT s.*, (s.created_at > NOW() - INTERVAL '3 days') as is_new FROM public.school_students s WHERE s.school_id = $1", [schoolId]),
       query('SELECT COUNT(*) FROM public.school_teachers WHERE school_id = $1', [schoolId]),
       query('SELECT SUM(amount) FROM public.school_payments WHERE school_id = $1 AND status = \'completed\'', [schoolId])
     ]);
+    dashboardData.students = allStudents.rows;
     dashboardData.stats = {
-      totalStudents: parseInt(allStudents.rows[0].count),
+      totalStudents: allStudents.rows.length,
       totalTeachers: parseInt(allTeachers.rows[0].count),
       revenue: parseFloat(allPayments.rows[0].sum || 0)
     };
@@ -453,6 +456,38 @@ const getSchoolProfile = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Get all pending enrollment requests for a school (Promoter/Director)
+ */
+const getEnrollmentRequests = asyncHandler(async (req, res) => {
+  const { schoolId } = req.query;
+  const userId = req.userId;
+
+  // Verify access
+  const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND role IN (\'promoter\', \'director\')', [schoolId, userId]);
+  if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    `SELECT er.*, p.full_name as parent_name, p.avatar_url as parent_avatar
+     FROM public.school_enrollment_requests er
+     JOIN public.profiles p ON er.parent_id = p.id
+     WHERE er.school_id = $1 AND er.status = 'pending'
+     ORDER BY er.created_at DESC`,
+    [schoolId]
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Get all classes for a school
+ */
+const getSchoolClasses = asyncHandler(async (req, res) => {
+  const { schoolId } = req.query;
+  const result = await query('SELECT * FROM public.school_classes WHERE school_id = $1 ORDER BY level ASC, name ASC', [schoolId]);
+  res.json({ success: true, data: result.rows });
+});
+
 module.exports = {
   getSchoolOverview,
   createSchool,
@@ -470,5 +505,7 @@ module.exports = {
   requestStaffAccount,
   submitEnrollmentRequest,
   handleEnrollment,
-  getSchoolProfile
+  getSchoolProfile,
+  getEnrollmentRequests,
+  getSchoolClasses
 };

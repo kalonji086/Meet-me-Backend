@@ -10,6 +10,8 @@ router.get('/world', schoolController.getSchools);
 router.get('/my-school', schoolController.getMySchool);
 router.get('/dashboard', schoolController.getDashboard);
 router.get('/profile/:id', schoolController.getSchoolProfile);
+router.get('/enroll/requests', schoolController.getEnrollmentRequests);
+router.get('/classes', schoolController.getSchoolClasses);
 
 router.post('/create', schoolController.createSchool);
 router.post('/enroll', schoolController.submitEnrollmentRequest);

@@ -303,6 +303,43 @@ const approveRequest = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Search for talents (users with completed profiles)
+ * @route   GET /api/employer/talents
+ * @access  Private (Employer only)
+ */
+const searchTalents = asyncHandler(async (req, res) => {
+  const { search } = req.query;
+  const userId = req.userId;
+
+  // Verify user is an employer
+  const employerRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (employerRes.rows.length === 0) {
+    return res.status(403).json({ success: false, error: 'Accès réservé aux employeurs' });
+  }
+
+  let sql = `
+    SELECT id, full_name, username, avatar_url, country, city, bio, is_verified
+    FROM public.profiles
+    WHERE is_global_admin = FALSE AND id != $1
+  `;
+  const params = [userId];
+
+  if (search) {
+    sql += ` AND (full_name ILIKE $2 OR username ILIKE $2 OR bio ILIKE $2 OR city ILIKE $2)`;
+    params.push(`%${search}%`);
+  }
+
+  sql += ` LIMIT 50`;
+
+  const result = await query(sql, params);
+
+  res.json({
+    success: true,
+    data: result.rows
+  });
+});
+
 module.exports = {
   submitEmployerRequest,
   getEmployerStatus,
@@ -311,5 +348,6 @@ module.exports = {
   getJobById,
   addJobComment,
   getJobComments,
-  approveRequest
+  approveRequest,
+  searchTalents
 };

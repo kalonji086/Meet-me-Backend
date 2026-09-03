@@ -15,6 +15,7 @@ router.post('/jobs/:jobId/comments', authenticate, employerController.addJobComm
 
 // Employer specific routes
 router.post('/jobs', authenticate, employerController.postJob);
+router.get('/talents', authenticate, employerController.searchTalents);
 
 // Admin routes (Should be restricted by admin middleware in a real app)
 router.put('/approve/:requestId', authenticate, employerController.approveRequest);

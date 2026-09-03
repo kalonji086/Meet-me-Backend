@@ -945,6 +945,12 @@
 
         const getFullUrl = (url) => { if(!url || url === 'null') return 'https://placehold.co/100x100?text=None'; if(url.startsWith('http')) return url; return BASE_URL + (url.startsWith('/') ? '' : '/') + url; };
 
+        function toast(message, type = "info") {
+            const title = type === "success" ? "Succès" : (type === "error" ? "Erreur" : "Information");
+            const icon = type === "success" ? "check-circle" : (type === "error" ? "alert-circle" : "info");
+            showToast(title, message, icon);
+        }
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -1804,7 +1810,7 @@
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-2">
-                                <button onclick="handleSchoolAction('${s.id}', '${s.status === 'blocked' ? 'approve' : 'block'}')" class="p-2 ${s.status === 'blocked' ? 'text-green-500' : 'text-gray-400'} hover:text-red-600 transition-all" title="${s.status === 'blocked' ? 'Débloquer' : 'Bloquer'}">
+                                <button onclick="handleSchoolAction('${s.id}', '${s.status === 'blocked' ? 'approve' : 'block'}', this)" class="p-2 ${s.status === 'blocked' ? 'text-green-500' : 'text-gray-400'} hover:text-red-600 transition-all" title="${s.status === 'blocked' ? 'Débloquer' : 'Bloquer'}">
                                     <i data-lucide="${s.status === 'blocked' ? 'unlock' : 'lock'}" class="w-4 h-4"></i>
                                 </button>
                                 <button onclick="deleteSchoolAction('${s.id}', '${s.name.replace(/'/g, "\\'")}')" class="p-2 text-gray-400 hover:text-red-600 transition-all" title="Supprimer">
@@ -1854,8 +1860,8 @@
                         </div>
                         <div class="grid grid-cols-2 gap-4 mt-auto pt-4">
                             ${school.status === 'pending' ? `
-                                <button onclick="handleSchoolAction('${school.id}', 'approve')" class="px-6 py-4 bg-green-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-600 transition-all active:scale-95">Approuver</button>
-                                <button onclick="handleSchoolAction('${school.id}', 'block')" class="px-6 py-4 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95">Bloquer</button>
+                                <button onclick="handleSchoolAction('${school.id}', 'approve', this)" class="px-6 py-4 bg-green-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-600 transition-all active:scale-95">Approuver</button>
+                                <button onclick="handleSchoolAction('${school.id}', 'block', this)" class="px-6 py-4 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95">Bloquer</button>
                             ` : `<p class="col-span-2 text-center font-black text-[10px] uppercase text-green-500">Déjà traitée</p>`}
                         </div>
                     `;
@@ -1865,7 +1871,13 @@
             } catch (e) { toast("Erreur lors du chargement des écoles.", "error"); }
         }
 
-        async function handleSchoolAction(id, action) {
+        async function handleSchoolAction(id, action, btn = null) {
+            let originalText = "";
+            if (btn) {
+                originalText = btn.innerText;
+                btn.innerText = "Traitement...";
+                btn.disabled = true;
+            }
             try {
                 const res = await axios.put(`${API_URL}/admin/schools/${id}/${action}`, {}, { headers: { Authorization: `Bearer ${token}` } });
                 if (res.data.success) {
@@ -1874,7 +1886,10 @@
                     loadSchoolsMonitoring();
                     if(!document.getElementById('impact-modal').classList.contains('hidden')) closeImpactModal();
                 }
-            } catch (e) { toast(e.response?.data?.error || "Erreur action school", "error"); }
+            } catch (e) {
+                toast(e.response?.data?.error || "Erreur action school", "error");
+                if (btn) { btn.innerText = originalText; btn.disabled = false; }
+            }
         }
 
         async function deleteSchoolAction(id, name) {
@@ -1967,7 +1982,7 @@
 
                 footer.innerHTML = `
                     <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
-                    <button onclick="handleSchoolAction('${school.id}', '${school.status === 'blocked' ? 'approve' : 'block'}')" class="flex-[2] ${school.status === 'blocked' ? 'bg-green-500 text-white' : 'bg-red-50 text-red-600'} py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">
+                    <button onclick="handleSchoolAction('${school.id}', '${school.status === 'blocked' ? 'approve' : 'block'}', this)" class="flex-[2] ${school.status === 'blocked' ? 'bg-green-500 text-white' : 'bg-red-50 text-red-600'} py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">
                         ${school.status === 'blocked' ? 'DÉBLOQUER ÉTABLISSEMENT' : 'BLOQUER ÉTABLISSEMENT'}
                     </button>
                 `;
@@ -3727,8 +3742,8 @@
                 footer.innerHTML = `
                     <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
                     ${r.status === 'pending' ? `
-                        <button onclick="handleEmployerAction('${r.id}', 'rejected')" class="flex-1 bg-red-50 text-red-600 py-4 rounded-2xl font-black text-[10px] uppercase">Rejeter</button>
-                        <button onclick="handleEmployerAction('${r.id}', 'approved')" class="flex-[2] bg-blue-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-blue-100 text-[10px] uppercase">Approuver</button>
+                        <button onclick="handleEmployerAction('${r.id}', 'rejected', this)" class="flex-1 bg-red-50 text-red-600 py-4 rounded-2xl font-black text-[10px] uppercase">Rejeter</button>
+                        <button onclick="handleEmployerAction('${r.id}', 'approved', this)" class="flex-[2] bg-blue-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-blue-100 text-[10px] uppercase">Approuver</button>
                     ` : `<p class="flex-1 text-center font-bold uppercase text-[10px] ${r.status === 'approved' ? 'text-green-500' : 'text-red-500'}">${r.status}</p>`}
                 `;
 
@@ -3737,7 +3752,13 @@
             } catch (e) {}
         }
 
-        async function handleEmployerAction(id, status) {
+        async function handleEmployerAction(id, status, btn = null) {
+            let originalText = "";
+            if (btn) {
+                originalText = btn.innerText;
+                btn.innerText = "Traitement...";
+                btn.disabled = true;
+            }
             try {
                 const res = await axios.put(`${API_URL}/admin/employer-requests/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
                 if (res.data.success) {
@@ -3745,7 +3766,10 @@
                     closeImpactModal();
                     loadEmployerRequests();
                 }
-            } catch (e) { toast("Erreur lors de l'action", "error"); }
+            } catch (e) {
+                toast("Erreur lors de l'action", "error");
+                if (btn) { btn.innerText = originalText; btn.disabled = false; }
+            }
         }
 
         async function examineMarket(id) {

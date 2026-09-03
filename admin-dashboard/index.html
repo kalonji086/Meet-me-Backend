@@ -271,6 +271,15 @@
                 </div>
 
                 <div class="mt-12">
+                    <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6 flex items-center gap-3">
+                        Demandes de Comptes Staff <span class="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-[10px]">Promoteurs</span>
+                    </h3>
+                    <div id="school-staff-requests-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+
+                <div class="mt-12">
                     <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6">Monitoring des Écoles Actives</h3>
                     <div class="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
                         <table class="w-full text-left">
@@ -1697,9 +1706,60 @@
             if (name === 'school-admin') {
                 loadPendingSchools();
                 loadSchoolsMonitoring();
+                loadStaffRequests();
             }
 
             lucide.createIcons();
+        }
+
+        async function loadStaffRequests() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/schools/staff-requests`, { headers: { Authorization: `Bearer ${token}` } });
+                const container = document.getElementById('school-staff-requests-list');
+                if (!container) return;
+
+                container.innerHTML = "";
+
+                if (res.data.data.length === 0) {
+                    container.innerHTML = `<div class="col-span-full py-10 text-center text-gray-400 font-bold uppercase text-[10px]">Aucune demande staff</div>`;
+                    return;
+                }
+
+                res.data.data.forEach(sr => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-6 rounded-[2rem] border border-gray-100 flex flex-col gap-4";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">${sr.role_requested}</p>
+                                <h4 class="text-lg font-black text-gray-900">${sr.full_name}</h4>
+                            </div>
+                            <span class="px-2 py-1 bg-gray-50 text-gray-400 text-[8px] font-black rounded uppercase">${sr.school_name}</span>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded-xl">
+                            <p class="text-[10px] text-gray-400 font-medium">Email du compte à activer :</p>
+                            <p class="text-xs font-bold text-gray-800">${sr.email}</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 pt-2">
+                            <button onclick="handleStaffAction('${sr.id}', 'approve')" class="px-4 py-3 bg-indigo-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest">Activer</button>
+                            <button onclick="handleStaffAction('${sr.id}', 'rejected')" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-black text-[9px] uppercase tracking-widest">Rejeter</button>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function handleStaffAction(id, status) {
+            try {
+                const res = await axios.put(`${API_URL}/admin/schools/staff-requests/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.success) {
+                    toast(res.data.message, "success");
+                    loadStaffRequests();
+                    loadSchoolsMonitoring();
+                }
+            } catch (e) { toast(e.response?.data?.error || "Erreur activation staff", "error"); }
         }
 
         async function loadSchoolsMonitoring() {

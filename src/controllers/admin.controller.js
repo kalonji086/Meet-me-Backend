@@ -2122,6 +2122,62 @@ const getSchoolDetailsAdmin = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Get all pending staff account requests (Promoters asking for staff accounts)
+ * @route   GET /api/admin/schools/staff-requests
+ */
+const getStaffRequests = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT sr.*, s.name as school_name, p.full_name as promoter_name
+    FROM public.school_staff_requests sr
+    JOIN public.school_schools s ON sr.school_id = s.id
+    JOIN public.profiles p ON sr.promoter_id = p.id
+    WHERE sr.status = 'pending'
+    ORDER BY sr.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Handle staff account request (Promote existing user or send invite)
+ * @route   PUT /api/admin/schools/staff-requests/:id
+ */
+const handleStaffRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body;
+
+  const requestRes = await query('SELECT * FROM public.school_staff_requests WHERE id = $1', [id]);
+  if (requestRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande non trouvée' });
+  const request = requestRes.rows[0];
+
+  if (status === 'approved') {
+    // 1. Check if user exists by email
+    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [request.email]);
+
+    if (userRes.rows.length > 0) {
+      const userId = userRes.rows[0].id;
+      // 2. Add to school members
+      await query(
+        `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+         VALUES ($1, $2, $3, TRUE)
+         ON CONFLICT (school_id, user_id) DO UPDATE SET role = $3, is_active = TRUE`,
+        [request.school_id, userId, request.role_requested]
+      );
+
+      // 3. Mark request as approved
+      await query("UPDATE public.school_staff_requests SET status = 'approved', updated_at = NOW() WHERE id = $1", [id]);
+
+      socketService.emitToUser(userId, 'school:staff_activated', { schoolId: request.school_id, role: request.role_requested });
+    } else {
+      return res.status(400).json({ success: false, error: 'Cet utilisateur doit d’abord créer un compte Meet Me avec cet email.' });
+    }
+  } else {
+    await query("UPDATE public.school_staff_requests SET status = 'rejected', admin_notes = $1, updated_at = NOW() WHERE id = $2", [admin_notes, id]);
+  }
+
+  res.json({ success: true, message: 'Demande staff traitée.' });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -2182,6 +2238,8 @@ module.exports = {
   getSchoolDetailsAdmin,
   getEmployerRequests,
   handleEmployerRequest,
+  getStaffRequests,
+  handleStaffRequest,
   ensureAdminTables,
   processSensitiveAction
 };

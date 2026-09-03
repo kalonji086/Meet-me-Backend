@@ -19,5 +19,6 @@ router.post('/submissions', schoolController.submitAssignment);
 router.post('/grades', schoolController.addGrade);
 router.post('/payments', schoolController.createPayment);
 router.post('/messages', schoolController.sendMessage);
+router.post('/staff-request', schoolController.requestStaffAccount);
 
 module.exports = router;

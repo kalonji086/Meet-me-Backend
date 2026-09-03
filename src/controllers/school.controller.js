@@ -343,6 +343,33 @@ const getMySchool = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows[0] || null });
 });
 
+/**
+ * @desc    Request creation of a staff account (Promoter only)
+ */
+const requestStaffAccount = asyncHandler(async (req, res) => {
+  const promoterId = req.userId;
+  const { schoolId, fullName, email, roleRequested } = req.body;
+
+  if (!schoolId || !fullName || !email || !roleRequested) {
+    return res.status(400).json({ success: false, error: 'Toutes les informations sont requises.' });
+  }
+
+  // Verify requester is promoter of the school
+  const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND role = \'promoter\'', [schoolId, promoterId]);
+  if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const result = await query(
+    `INSERT INTO public.school_staff_requests (school_id, promoter_id, full_name, email, role_requested)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [schoolId, promoterId, fullName, email, roleRequested]
+  );
+
+  // Notify Principal Admin
+  socketService.broadcast('admin:new_staff_request', { schoolId, fullName, role: roleRequested });
+
+  res.status(201).json({ success: true, message: 'Demande de compte staff envoyée à l’administrateur.' });
+});
+
 module.exports = {
   getSchoolOverview,
   createSchool,
@@ -356,5 +383,6 @@ module.exports = {
   createTeacher,
   createAssignment,
   createPayment,
-  sendMessage
+  sendMessage,
+  requestStaffAccount
 };

@@ -52,6 +52,8 @@ router.put('/verifications/:id', adminController.handleVerification);
 
 router.get('/market-requests', adminController.getMarketRequests);
 router.put('/market-requests/:id', adminController.handleMarketRequest);
+router.get('/employer-requests', adminController.getEmployerRequests);
+router.put('/employer-requests/:id', adminController.handleEmployerRequest);
 router.put('/market-requests/:id/toggle-block', adminController.toggleMarketBlock);
 router.delete('/market-requests/:id', adminController.deleteMarketBusiness);
 

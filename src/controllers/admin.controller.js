@@ -1993,6 +1993,69 @@ const blockSchool = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get all pending employer requests
+ * @route   GET /api/admin/employer-requests
+ */
+const getEmployerRequests = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT er.*, p.full_name as user_name, p.email as user_email
+    FROM public.employer_requests er
+    JOIN public.profiles p ON er.user_id = p.id
+    ORDER BY er.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Approve or reject employer request
+ * @route   PUT /api/admin/employer-requests/:id
+ */
+const handleEmployerRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body; // 'approved' or 'rejected'
+
+  const requestRes = await query('SELECT * FROM public.employer_requests WHERE id = $1', [id]);
+  if (requestRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
+
+  const request = requestRes.rows[0];
+
+  if (status === 'approved') {
+    await query(
+      "UPDATE public.employer_requests SET status = 'approved', updated_at = NOW() WHERE id = $1",
+      [id]
+    );
+
+    // Create employer profile
+    await query(
+      `INSERT INTO public.employer_profiles (user_id, request_id, company_name, company_email, industry)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id) DO UPDATE SET is_active = true`,
+      [request.user_id, id, request.company_name, request.company_email, request.industry]
+    );
+
+    // Get user info for email
+    const userRes = await query('SELECT full_name, email FROM public.profiles WHERE id = $1', [request.user_id]);
+    if (userRes.rows.length > 0) {
+      await mailService.sendEmployerApprovalEmail(userRes.rows[0].email, userRes.rows[0].full_name, request.company_name);
+    }
+
+    socketService.sendToUser(request.user_id, 'employer:request_approved', {
+      companyName: request.company_name
+    });
+
+  } else {
+    await query(
+      "UPDATE public.employer_requests SET status = 'rejected', updated_at = NOW() WHERE id = $1",
+      [id]
+    );
+    // You could add a mailService.sendEmployerRejectionEmail here if needed
+  }
+
+  await logAdminAction(req, `employer_request_${status}`, 'employer', id, { companyName: request.company_name });
+  res.json({ success: true, message: `Demande ${status === 'approved' ? 'approuvée' : 'rejetée'}.` });
+});
+
+/**
  * @desc    Get global statistics for all schools
  * @route   GET /api/admin/schools/stats
  */
@@ -2073,6 +2136,8 @@ module.exports = {
   approveSchool,
   blockSchool,
   getSchoolsStats,
+  getEmployerRequests,
+  handleEmployerRequest,
   ensureAdminTables,
   processSensitiveAction
 };

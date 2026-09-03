@@ -1775,6 +1775,7 @@
                             <div>
                                 <h4 class="text-xl font-black text-gray-900 leading-none mb-2">${school.name}</h4>
                                 <p class="text-indigo-500 font-bold text-xs uppercase tracking-widest">${school.school_type} • ${school.city}, ${school.country}</p>
+                                ${school.status === 'approved' ? `<span class="mt-2 inline-block px-2 py-0.5 bg-green-50 text-green-600 text-[8px] font-black rounded uppercase">Approuvée le ${new Date(school.updated_at).toLocaleDateString()}</span>` : ''}
                             </div>
                         </div>
                         <div class="space-y-4">
@@ -1785,8 +1786,10 @@
                             <p class="text-gray-500 text-sm font-medium line-clamp-2">${school.description || 'Pas de description.'}</p>
                         </div>
                         <div class="grid grid-cols-2 gap-4 mt-auto pt-4">
-                            <button onclick="handleSchoolAction('${school.id}', 'approve')" class="px-6 py-4 bg-green-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-600 transition-all active:scale-95">Approuver</button>
-                            <button onclick="handleSchoolAction('${school.id}', 'block')" class="px-6 py-4 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95">Bloquer</button>
+                            ${school.status === 'pending' ? `
+                                <button onclick="handleSchoolAction('${school.id}', 'approve')" class="px-6 py-4 bg-green-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-600 transition-all active:scale-95">Approuver</button>
+                                <button onclick="handleSchoolAction('${school.id}', 'block')" class="px-6 py-4 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95">Bloquer</button>
+                            ` : `<p class="col-span-2 text-center font-black text-[10px] uppercase text-green-500">Déjà traitée</p>`}
                         </div>
                     `;
                     container.appendChild(card);
@@ -3500,8 +3503,17 @@
                     <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
                         <td class="px-8 py-5 flex items-center"><p class="font-bold text-sm text-gray-800">${r.company_name}</p></td>
                         <td class="px-8 py-5 text-sm text-gray-600">${r.user_name}</td>
-                        <td class="px-8 py-5"><span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase">${r.industry}</span></td>
-                        <td class="px-8 py-5 text-right"><button onclick="examineEmployerRequest('${r.id}')" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700">Examiner</button></td>
+                        <td class="px-8 py-5">
+                            <span class="px-3 py-1 ${r.status === 'approved' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'} rounded-lg text-[10px] font-black uppercase">
+                                ${r.status === 'approved' ? 'Approuvé' : r.industry}
+                            </span>
+                            ${r.status === 'approved' ? `<p class="text-[8px] text-gray-400 mt-1">${new Date(r.updated_at).toLocaleDateString()}</p>` : ''}
+                        </td>
+                        <td class="px-8 py-5 text-right">
+                            <button onclick="examineEmployerRequest('${r.id}')" class="px-5 py-2.5 ${r.status === 'approved' ? 'bg-gray-100 text-gray-400' : 'bg-blue-600 text-white shadow-lg'} rounded-xl text-[10px] font-black uppercase hover:opacity-80">
+                                ${r.status === 'approved' ? 'Voir' : 'Examiner'}
+                            </button>
+                        </td>
                     </tr>
                 `).join(''); lucide.createIcons();
             } catch (e) {}

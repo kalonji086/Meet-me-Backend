@@ -1959,11 +1959,17 @@ const approveSchool = asyncHandler(async (req, res) => {
 
   const school = result.rows[0];
 
-  // Notify creator via socket and email
-  socketService.sendToUser(school.created_by, 'school:approved', { schoolName: school.name });
+  // Auto-upgrade member to 'promoter' and ensure it's active
+  await query(
+    "UPDATE public.school_members SET role = 'promoter', is_active = TRUE WHERE school_id = $1 AND user_id = $2",
+    [id, school.created_by]
+  );
 
-  // Optionally send email via mailService if defined
-  // await mailService.sendSchoolApprovalEmail(creator_email, creator_name, school.name);
+  // Notify creator via socket and email
+  socketService.emitToUser(school.created_by, 'school:approved', {
+    schoolId: school.id,
+    schoolName: school.name
+  });
 
   await logAdminAction(req, 'approve_school', 'school', id, { schoolName: school.name });
   res.json({ success: true, message: `L'école ${school.name} a été approuvée.` });
@@ -2039,7 +2045,8 @@ const handleEmployerRequest = asyncHandler(async (req, res) => {
       await mailService.sendEmployerApprovalEmail(userRes.rows[0].email, userRes.rows[0].full_name, request.company_name);
     }
 
-    socketService.sendToUser(request.user_id, 'employer:request_approved', {
+    // Force real-time refresh on client side
+    socketService.emitToUser(request.user_id, 'employer:request_approved', {
       companyName: request.company_name
     });
 
@@ -2048,7 +2055,6 @@ const handleEmployerRequest = asyncHandler(async (req, res) => {
       "UPDATE public.employer_requests SET status = 'rejected', updated_at = NOW() WHERE id = $1",
       [id]
     );
-    // You could add a mailService.sendEmployerRejectionEmail here if needed
   }
 
   await logAdminAction(req, `employer_request_${status}`, 'employer', id, { companyName: request.company_name });

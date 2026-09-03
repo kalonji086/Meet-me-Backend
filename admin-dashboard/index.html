@@ -1744,8 +1744,12 @@
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-2">
-                                <button onclick="handleSchoolAction('${s.id}', 'block')" class="p-2 text-gray-400 hover:text-red-600 transition-all"><i data-lucide="lock" class="w-4 h-4"></i></button>
-                                <button onclick="toast('Détails complets à venir', 'info')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                <button onclick="handleSchoolAction('${s.id}', '${s.status === 'blocked' ? 'approve' : 'block'}')" class="p-2 ${s.status === 'blocked' ? 'text-green-500' : 'text-gray-400'} hover:text-red-600 transition-all">
+                                    <i data-lucide="${s.status === 'blocked' ? 'unlock' : 'lock'}" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="examineSchoolDetail('${s.id}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all">
+                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                </button>
                             </div>
                         </td>
                     `;
@@ -1804,8 +1808,96 @@
                 if (res.data.success) {
                     toast(res.data.message, "success");
                     loadPendingSchools();
+                    loadSchoolsMonitoring();
                 }
             } catch (e) { toast(e.response?.data?.error || "Erreur action school", "error"); }
+        }
+
+        async function examineSchoolDetail(id) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/schools/${id}/details`, { headers: { Authorization: `Bearer ${token}` } });
+                const { school, stats, recentPayments } = res.data.data;
+
+                const modal = document.getElementById('impact-modal');
+                const card = document.getElementById('impact-card');
+                const header = document.getElementById('impact-header');
+                const messageEl = document.getElementById('impact-message');
+                const footer = document.getElementById('impact-footer');
+                const titleEl = document.getElementById('impact-title');
+
+                // Reset states
+                card.classList.remove('draggable-modal', 'minimized-card');
+                document.getElementById('drag-hint').innerText = "Maintenir pour déplacer";
+                card.style.top = ''; card.style.left = '';
+                modal.classList.remove('hidden', 'no-backdrop');
+                modal.classList.add('flex', 'items-center', 'justify-center');
+
+                header.className = `h-40 flex flex-col items-center justify-center bg-indigo-600 drag-handle relative`;
+                titleEl.innerText = "MONITORING TOTAL : " + school.name;
+
+                messageEl.innerHTML = `
+                    <div class="space-y-6 text-left">
+                        <div class="flex items-center gap-6 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                            <img src="${getFullUrl(school.logo_url)}" class="w-16 h-16 rounded-2xl object-cover shadow-lg">
+                            <div>
+                                <p class="text-xl font-black text-gray-900">${school.name}</p>
+                                <p class="text-xs text-indigo-500 font-bold uppercase tracking-widest">${school.school_type} • ${school.city}</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="p-6 bg-blue-50 rounded-[2rem] text-center">
+                                <i data-lucide="users" class="w-6 h-6 text-blue-600 mx-auto mb-2"></i>
+                                <p class="text-2xl font-black text-blue-900">${stats.students}</p>
+                                <p class="text-[9px] font-black text-blue-400 uppercase">Élèves</p>
+                            </div>
+                            <div class="p-6 bg-purple-50 rounded-[2rem] text-center">
+                                <i data-lucide="graduation-cap" class="w-6 h-6 text-purple-600 mx-auto mb-2"></i>
+                                <p class="text-2xl font-black text-purple-900">${stats.teachers}</p>
+                                <p class="text-[9px] font-black text-purple-400 uppercase">Employés</p>
+                            </div>
+                            <div class="p-6 bg-emerald-50 rounded-[2rem] text-center">
+                                <i data-lucide="layout-grid" class="w-6 h-6 text-emerald-600 mx-auto mb-2"></i>
+                                <p class="text-2xl font-black text-emerald-900">${stats.classes}</p>
+                                <p class="text-[9px] font-black text-emerald-400 uppercase">Classes</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 p-6 rounded-[2.5rem]">
+                            <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <i data-lucide="credit-card" class="w-3 h-3"></i> 10 Derniers Paiements
+                            </h4>
+                            <div class="space-y-3">
+                                ${recentPayments.length === 0 ? '<p class="text-center text-[10px] text-gray-400">Aucune transaction enregistrée.</p>' :
+                                  recentPayments.map(p => `
+                                    <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100">
+                                        <div>
+                                            <p class="text-[10px] font-black text-gray-800">${p.parent_name}</p>
+                                            <p class="text-[8px] text-gray-400">${new Date(p.created_at).toLocaleString()}</p>
+                                        </div>
+                                        <p class="text-xs font-black text-emerald-600">+${parseFloat(p.amount).toFixed(2)}$</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="p-6 bg-gray-900 rounded-[2rem] text-white">
+                            <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Coordonnées Promoteur</p>
+                            <p class="font-bold text-sm">${school.promoter_name}</p>
+                            <p class="text-xs text-gray-400 mt-1">${school.promoter_email}</p>
+                        </div>
+                    </div>
+                `;
+
+                footer.innerHTML = `
+                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
+                    <button onclick="handleSchoolAction('${school.id}', '${school.status === 'blocked' ? 'approve' : 'block'}')" class="flex-[2] ${school.status === 'blocked' ? 'bg-green-500 text-white' : 'bg-red-50 text-red-600'} py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">
+                        ${school.status === 'blocked' ? 'DÉBLOQUER ÉTABLISSEMENT' : 'BLOQUER ÉTABLISSEMENT'}
+                    </button>
+                `;
+
+                lucide.createIcons();
+            } catch (e) { toast("Erreur lors de la récupération des détails.", "error"); }
         }
 
         // --- MODERATION & BOOST SYSTEM ---

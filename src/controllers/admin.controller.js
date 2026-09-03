@@ -2085,6 +2085,43 @@ const getSchoolsStats = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Get full details of a specific school for admin examination
+ * @route   GET /api/admin/schools/:id/details
+ */
+const getSchoolDetailsAdmin = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const [schoolRes, students, teachers, classes, payments] = await Promise.all([
+    query(`SELECT s.*, p.full_name as promoter_name, p.email as promoter_email
+           FROM public.school_schools s
+           JOIN public.profiles p ON s.created_by = p.id
+           WHERE s.id = $1`, [id]),
+    query('SELECT count(*) FROM public.school_students WHERE school_id = $1', [id]),
+    query('SELECT count(*) FROM public.school_teachers WHERE school_id = $1', [id]),
+    query('SELECT count(*) FROM public.school_classes WHERE school_id = $1', [id]),
+    query(`SELECT p.*, pr.full_name as parent_name
+           FROM public.school_payments p
+           JOIN public.profiles pr ON p.parent_id = pr.id
+           WHERE p.school_id = $1 ORDER BY p.created_at DESC LIMIT 10`, [id])
+  ]);
+
+  if (schoolRes.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
+
+  res.json({
+    success: true,
+    data: {
+      school: schoolRes.rows[0],
+      stats: {
+        students: parseInt(students.rows[0].count),
+        teachers: parseInt(teachers.rows[0].count),
+        classes: parseInt(classes.rows[0].count)
+      },
+      recentPayments: payments.rows
+    }
+  });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -2142,6 +2179,7 @@ module.exports = {
   approveSchool,
   blockSchool,
   getSchoolsStats,
+  getSchoolDetailsAdmin,
   getEmployerRequests,
   handleEmployerRequest,
   ensureAdminTables,

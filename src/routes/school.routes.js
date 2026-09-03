@@ -9,8 +9,11 @@ router.get('/overview', schoolController.getSchoolOverview);
 router.get('/world', schoolController.getSchools);
 router.get('/my-school', schoolController.getMySchool);
 router.get('/dashboard', schoolController.getDashboard);
+router.get('/profile/:id', schoolController.getSchoolProfile);
 
 router.post('/create', schoolController.createSchool);
+router.post('/enroll', schoolController.submitEnrollmentRequest);
+router.put('/enroll/:id', schoolController.handleEnrollment);
 router.post('/students', schoolController.createParentStudent);
 router.post('/classes', schoolController.createClass);
 router.post('/teachers', schoolController.createTeacher);

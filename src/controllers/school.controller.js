@@ -370,6 +370,89 @@ const requestStaffAccount = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, message: 'Demande de compte staff envoyée à l’administrateur.' });
 });
 
+/**
+ * @desc    Submit an enrollment request to a school (Parent)
+ */
+const submitEnrollmentRequest = asyncHandler(async (req, res) => {
+  const parentId = req.userId;
+  const { schoolId, firstName, lastName, age, level } = req.body;
+
+  if (!schoolId || !firstName || !lastName) {
+    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants.' });
+  }
+
+  const result = await query(
+    `INSERT INTO public.school_enrollment_requests (school_id, parent_id, student_first_name, student_last_name, student_age, previous_level)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [schoolId, parentId, firstName, lastName, age, level]
+  );
+
+  // Notify Promoter
+  const school = await query('SELECT created_by, name FROM public.school_schools WHERE id = $1', [schoolId]);
+  if (school.rows.length > 0) {
+    socketService.sendToUser(school.rows[0].created_by, 'school:new_enrollment', {
+      schoolName: school.rows[0].name,
+      studentName: `${firstName} ${lastName}`
+    });
+  }
+
+  res.status(201).json({ success: true, message: 'Demande d’inscription envoyée avec succès.' });
+});
+
+/**
+ * @desc    Approve enrollment and assign class (Promoter)
+ */
+const handleEnrollment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, classId } = req.body; // 'approved' or 'rejected'
+
+  const requestRes = await query('SELECT * FROM public.school_enrollment_requests WHERE id = $1', [id]);
+  if (requestRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande non trouvée' });
+  const request = requestRes.rows[0];
+
+  if (status === 'approved') {
+    if (!classId) return res.status(400).json({ success: false, error: 'Veuillez assigner une classe.' });
+
+    // 1. Create the student profile
+    const student = await query(
+      `INSERT INTO public.school_students (school_id, parent_id, first_name, last_name, age, grade_level, class_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [request.school_id, request.parent_id, request.student_first_name, request.student_last_name, request.student_age, request.previous_level, classId]
+    );
+
+    // 2. Mark request as approved
+    await query("UPDATE public.school_enrollment_requests SET status = 'approved' WHERE id = $1", [id]);
+
+    socketService.emitToUser(request.parent_id, 'school:enrollment_approved', { studentId: student.rows[0].id });
+  } else {
+    await query("UPDATE public.school_enrollment_requests SET status = 'rejected' WHERE id = $1", [id]);
+  }
+
+  res.json({ success: true, message: 'Statut mis à jour.' });
+});
+
+/**
+ * @desc    Get school full profile for visitors
+ */
+const getSchoolProfile = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const school = await query('SELECT * FROM public.school_schools WHERE id = $1', [id]);
+  const announcements = await query('SELECT * FROM public.school_announcements WHERE school_id = $1 ORDER BY created_at DESC', [id]);
+  const classes = await query('SELECT id, name, level FROM public.school_classes WHERE school_id = $1', [id]);
+
+  if (school.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
+
+  res.json({
+    success: true,
+    data: {
+      school: school.rows[0],
+      announcements: announcements.rows,
+      classes: classes.rows
+    }
+  });
+});
+
 module.exports = {
   getSchoolOverview,
   createSchool,
@@ -384,5 +467,8 @@ module.exports = {
   createAssignment,
   createPayment,
   sendMessage,
-  requestStaffAccount
+  requestStaffAccount,
+  submitEnrollmentRequest,
+  handleEnrollment,
+  getSchoolProfile
 };

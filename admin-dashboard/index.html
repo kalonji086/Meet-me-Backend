@@ -4526,15 +4526,31 @@
         }
 
         function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "", userRightsStr = "") {
-            const allModules = ['stats', 'users', 'groups', 'support', 'verifications', 'audit', 'market-requests', 'campaigns', 'legal', 'config', 'collaboration'];
+            const allModules = [
+                { id: 'stats', label: 'Stats Globales' },
+                { id: 'users', label: 'Utilisateurs' },
+                { id: 'groups', label: 'Groupes' },
+                { id: 'support', label: 'Support & Appeals' },
+                { id: 'market-requests', label: 'Demandes Market' },
+                { id: 'employer-requests', label: 'Demandes Emploi' },
+                { id: 'school-admin', label: 'Gestion School' },
+                { id: 'moderation', label: 'Boost & Modération' },
+                { id: 'verifications', label: 'Vérifications' },
+                { id: 'audit', label: 'Audit (Logs)' },
+                { id: 'campaigns', label: 'Campagnes Push' },
+                { id: 'legal', label: 'Légal (CGU/Privacy)' },
+                { id: 'config', label: 'Config App' },
+                { id: 'approvals', label: 'Approbations' },
+                { id: 'collaboration', label: 'Collaboration' }
+            ];
             const currentModules = modules ? modules.split(',') : [];
             const collabRights = collabRightsStr ? JSON.parse(decodeURIComponent(collabRightsStr)) : {};
             const userRights = userRightsStr ? JSON.parse(decodeURIComponent(userRightsStr)) : {};
 
             let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
                 <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all">
-                    <input type="checkbox" value="${m}" ${currentModules.includes(m) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3" onchange="toggleExtraRightsPanels(this)">
-                    <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m}</span>
+                    <input type="checkbox" value="${m.id}" ${currentModules.includes(m.id) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3" onchange="toggleExtraRightsPanels(this)">
+                    <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m.label}</span>
                 </label>
             `).join('') + `</div>`;
 

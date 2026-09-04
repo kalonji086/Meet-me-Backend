@@ -167,6 +167,9 @@
                 <a href="#" onclick="showSection('moderation')" id="nav-moderation" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="zap" class="w-5 h-5 mr-4 text-yellow-400"></i><span class="font-medium text-sm">Boost & Modération</span>
                 </a>
+                <a href="#" onclick="showSection('accounts')" id="nav-accounts" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="user-cog" class="w-5 h-5 mr-4 text-emerald-400"></i><span class="font-medium text-sm">Gestion des Comptes</span>
+                </a>
                 <a href="#" onclick="showSection('school-admin')" id="nav-school-admin" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="graduation-cap" class="w-5 h-5 mr-4 text-indigo-400"></i><span class="font-medium text-sm">Gestion School</span>
                 </a>
@@ -254,6 +257,51 @@
 
                 <div id="moderation-feed" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     <!-- Feed items injected by JS -->
+                </div>
+            </div>
+
+            <!-- ACCOUNTS MANAGEMENT SECTION (Amazon Style) -->
+            <div id="section-accounts" class="hidden animate-fade-in pb-20">
+                <div class="flex items-center justify-between mb-10">
+                    <div>
+                        <h2 class="text-3xl font-black text-gray-900 tracking-tighter uppercase">Gestion des Comptes</h2>
+                        <p class="text-gray-500 font-medium mt-1">Créez et configurez les accès pour les différents rôles Meet Me.</p>
+                    </div>
+                    <button onclick="showNewAccountModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl font-black text-xs shadow-xl shadow-emerald-100 uppercase tracking-widest transition-all flex items-center gap-3">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer un nouveau compte
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                    <div class="p-8 border-b border-gray-50 bg-gray-50/30 flex gap-4">
+                        <div class="flex-1 bg-white border border-gray-200 rounded-xl flex items-center px-4">
+                            <i data-lucide="search" class="w-4 h-4 text-gray-400 mr-3"></i>
+                            <input type="text" placeholder="Rechercher un compte (Nom, Email)..." class="flex-1 py-3 text-sm font-bold outline-none">
+                        </div>
+                        <select class="bg-white border border-gray-200 rounded-xl px-6 text-xs font-black uppercase outline-none">
+                            <option>Tous les rôles</option>
+                            <option>Étudiant</option>
+                            <option>Parent</option>
+                            <option>Enseignant</option>
+                            <option>Directeur</option>
+                            <option>Promoteur</option>
+                        </select>
+                    </div>
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Utilisateur</th>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Rôle principal</th>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Établissement</th>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Modules Actifs</th>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date Enrôlement</th>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accounts-table-body" class="divide-y divide-gray-50 font-medium">
+                            <!-- Accounts will be injected here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -1214,7 +1262,7 @@
         function continueDashboardLoad(user) {
             if (user.isGlobalAdmin) {
                 // Ensure allowedModules is full for Global Admin
-                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin'];
+                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin'];
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('login-container').classList.add('hidden');
@@ -1683,14 +1731,14 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'school-admin'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'school-admin'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
-                const navId = s === 'market-requests' ? 'nav-market-requests' : (s === 'school-admin' ? 'nav-school-admin' : (s === 'employer-requests' ? 'nav-employer-requests' : 'nav-' + s));
+                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-admin' ? 'nav-school-admin' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : 'nav-' + s)));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
             });
             const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            const navId = name === 'market-requests' ? 'nav-market-requests' : (name === 'school-admin' ? 'nav-school-admin' : (name === 'employer-requests' ? 'nav-employer-requests' : 'nav-' + name));
+            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-admin' ? 'nav-school-admin' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : 'nav-' + name)));
             const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
             document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 
@@ -1709,6 +1757,7 @@
             if (name === 'config') loadConfig();
             if (name === 'collaboration') loadCollaboration();
             if (name === 'moderation') loadModerationFeed();
+            if (name === 'accounts') loadAccounts();
             if (name === 'school-admin') {
                 loadPendingSchools();
                 loadSchoolsMonitoring();
@@ -3772,7 +3821,149 @@
             }
         }
 
-        async function examineMarket(id) {
+        async function showNewAccountModal() {
+            try {
+                // Fetch schools for dropdown
+                const res = await axios.get(`${API_URL}/admin/schools/stats`, { headers: { Authorization: `Bearer ${token}` } });
+                const schools = res.data.data;
+
+                const schoolOptions = schools.map(s => `<option value="${s.id}">${s.name} (${s.city})</option>`).join('');
+                const roles = [
+                    { id: 'student', label: 'Étudiant' },
+                    { id: 'parent', label: 'Parent' },
+                    { id: 'teacher', label: 'Enseignant' },
+                    { id: 'director', label: 'Directeur' },
+                    { id: 'promoter', label: 'Promoteur' },
+                    { id: 'prefect', label: 'Préfet' }
+                ];
+
+                const modules = [
+                    { id: 'grades', label: 'Notes' },
+                    { id: 'assignments', label: 'Devoirs' },
+                    { id: 'payments', label: 'Paiements' },
+                    { id: 'classes', label: 'Classes' },
+                    { id: 'staff', label: 'Gestion Staff' },
+                    { id: 'announcements', label: 'Annonces' },
+                    { id: 'financials', label: 'Dashboard Financier' }
+                ];
+
+                let html = `
+                    <div class="space-y-6 text-left">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Nom Complet</label>
+                                <input type="text" id="acc-name" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" placeholder="Ex: Jean Mukendi">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Adresse Email</label>
+                                <input type="email" id="acc-email" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" placeholder="jean@exemple.com">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Rôle</label>
+                                <select id="acc-role" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm">
+                                    ${roles.map(r => `<option value="${r.id}">${r.label}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Établissement Scolaire</label>
+                                <select id="acc-school" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm">
+                                    <option value="">-- Aucun --</option>
+                                    ${schoolOptions}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Modules Atribués</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                ${modules.map(m => `
+                                    <label class="flex items-center p-3 bg-gray-50 rounded-xl cursor-pointer border border-transparent hover:border-emerald-200 transition-all">
+                                        <input type="checkbox" value="${m.id}" class="acc-module-checkbox w-4 h-4 accent-emerald-600 mr-3">
+                                        <span class="text-[9px] font-bold text-gray-700 uppercase tracking-tight">${m.label}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Mot de passe temporaire</label>
+                                <input type="text" id="acc-pass" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" value="MeetMe2024">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Date d'Enrôlement</label>
+                                <input type="date" id="acc-date" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" value="${new Date().toISOString().split('T')[0]}">
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                Alert.show("Créer un Nouveau Compte", html, async () => {
+                    const data = {
+                        fullName: document.getElementById('acc-name').value,
+                        email: document.getElementById('acc-email').value,
+                        role: document.getElementById('acc-role').value,
+                        schoolId: document.getElementById('acc-school').value,
+                        password: document.getElementById('acc-pass').value,
+                        enrollmentDate: document.getElementById('acc-date').value,
+                        allowedModules: Array.from(document.querySelectorAll('.acc-module-checkbox:checked')).map(cb => cb.value)
+                    };
+
+                    if(!data.email || !data.fullName) return toast("Veuillez remplir les champs obligatoires", "error");
+
+                    try {
+                        const res = await axios.post(`${API_URL}/admin/accounts`, data, { headers: { Authorization: `Bearer ${token}` } });
+                        if(res.data.success) {
+                            toast(res.data.message, "success");
+                            closeImpactModal();
+                            loadAccounts();
+                        }
+                    } catch (e) { toast("Erreur lors de la création", "error"); }
+                }, "CRÉER ET NOTIFIER", "emerald");
+
+            } catch (e) { toast("Erreur chargement données", "error"); }
+        }
+
+        async function loadAccounts() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/accounts`, { headers: { Authorization: `Bearer ${token}` } });
+                const accounts = res.data.data;
+                const container = document.getElementById('accounts-table-body');
+                container.innerHTML = accounts.map(a => `
+                    <tr class="hover:bg-gray-50/50 transition-all border-b border-gray-50">
+                        <td class="px-8 py-5">
+                            <div class="flex items-center gap-4">
+                                <img src="${getFullUrl(a.avatar_url)}" class="w-10 h-10 rounded-xl object-cover shadow-sm">
+                                <div>
+                                    <p class="text-sm font-black text-gray-800">${a.full_name}</p>
+                                    <p class="text-[10px] text-gray-400 font-bold">${a.email}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-8 py-5">
+                            <span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest">${a.role}</span>
+                        </td>
+                        <td class="px-8 py-5 text-sm text-gray-500 font-bold">${a.school_name || '--'}</td>
+                        <td class="px-8 py-5 text-center">
+                            <div class="flex justify-center flex-wrap gap-1 max-w-[150px] mx-auto">
+                                ${a.allowed_modules && a.allowed_modules.length > 0 ? a.allowed_modules.map(m => `
+                                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[8px] font-black uppercase">${m}</span>
+                                `).join('') : '<span class="text-[9px] text-gray-300 italic">Aucun</span>'}
+                            </div>
+                        </td>
+                        <td class="px-8 py-5 text-xs text-gray-400 font-bold">${new Date(a.enrollment_date).toLocaleDateString()}</td>
+                        <td class="px-8 py-5 text-right">
+                            <button class="p-2 text-gray-400 hover:text-indigo-600 transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button class="p-2 text-gray-400 hover:text-red-600 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+                lucide.createIcons();
+            } catch (e) { toast("Erreur chargement comptes", "error"); }
+        }
             try {
                 const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
                 const m = res.data.data.find(x => x.id === id);
@@ -4557,6 +4748,7 @@
                 { id: 'support', label: 'Support & Appeals' },
                 { id: 'market-requests', label: 'Demandes Market' },
                 { id: 'employer-requests', label: 'Demandes Emploi' },
+                { id: 'accounts', label: 'Gestion des Comptes' },
                 { id: 'school-admin', label: 'Gestion School' },
                 { id: 'moderation', label: 'Boost & Modération' },
                 { id: 'verifications', label: 'Vérifications' },

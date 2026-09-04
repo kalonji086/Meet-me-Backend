@@ -2210,6 +2210,102 @@ const handleStaffRequest = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Demande staff traitée.' });
 });
 
+/**
+ * @desc    Create a managed account with specific roles and modules (Amazon style)
+ * @route   POST /api/admin/accounts
+ */
+const createManagedAccount = asyncHandler(async (req, res) => {
+  const adminId = req.userId;
+  const {
+    fullName, email, phone, password,
+    role, schoolId, allowedModules,
+    enrollmentDate, gender, country
+  } = req.body;
+
+  if (!email || !role || !fullName) {
+    return res.status(400).json({ success: false, error: 'Nom, Email et Rôle sont requis.' });
+  }
+
+  try {
+    // 1. Check or Create Profile
+    let userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
+    let userId;
+
+    if (userRes.rows.length === 0) {
+      // Create new profile with temporary password
+      const bcrypt = require('bcryptjs');
+      const hashedPassword = await bcrypt.hash(password || 'MeetMe2024', 10);
+
+      const newProfile = await query(
+        `INSERT INTO public.profiles (full_name, email, phone_number, password, gender, country, created_at, must_change_password)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE) RETURNING id`,
+        [fullName, email, phone || null, hashedPassword, gender || 'M', country || 'RDC', enrollmentDate || new Date()]
+      );
+      userId = newProfile.rows[0].id;
+    } else {
+      userId = userRes.rows[0].id;
+    }
+
+    // 2. Assign to School if provided
+    if (schoolId) {
+      await query(
+        `INSERT INTO public.school_members (school_id, user_id, role, is_active, allowed_modules, enrollment_date)
+         VALUES ($1, $2, $3, TRUE, $4, $5)
+         ON CONFLICT (school_id, user_id) DO UPDATE
+         SET role = $3, allowed_modules = $4, enrollment_date = $5, is_active = TRUE`,
+        [schoolId, userId, role, allowedModules || [], enrollmentDate || new Date()]
+      );
+    }
+
+    // 3. Log Creation
+    await query(
+      `INSERT INTO public.account_creation_logs (created_by, user_id, role, modules)
+       VALUES ($1, $2, $3, $4)`,
+      [adminId, userId, role, allowedModules || []]
+    );
+
+    // 4. Notify concerned user
+    socketService.emitToUser(userId, 'account:created', {
+      message: `Votre compte ${role} a été configuré par l'administration.`,
+      role,
+      modules: allowedModules,
+      enrollmentDate
+    });
+
+    // 5. Audit Log
+    await logAdminAction(req, 'create_account', 'user', userId, { role, modules: allowedModules });
+
+    res.status(201).json({
+      success: true,
+      message: `Compte ${fullName} créé et configuré avec succès.`,
+      data: { userId, email, role }
+    });
+
+  } catch (error) {
+    logger.error('Account Creation Error:', error.message);
+    res.status(500).json({ success: false, error: 'Erreur lors de la création du compte.' });
+  }
+});
+
+/**
+ * @desc    Get list of managed school accounts
+ * @route   GET /api/admin/accounts
+ */
+const getManagedAccounts = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT sm.id as member_id, sm.role, sm.allowed_modules, sm.enrollment_date,
+           p.id as user_id, p.full_name, p.email, p.avatar_url,
+           s.name as school_name
+    FROM public.school_members sm
+    JOIN public.profiles p ON sm.user_id = p.id
+    LEFT JOIN public.school_schools s ON sm.school_id = s.id
+    ORDER BY sm.enrollment_date DESC
+    LIMIT 100
+  `);
+
+  res.json({ success: true, data: result.rows });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -2273,6 +2369,8 @@ module.exports = {
   handleEmployerRequest,
   getStaffRequests,
   handleStaffRequest,
+  createManagedAccount,
+  getManagedAccounts,
   ensureAdminTables,
   processSensitiveAction
 };

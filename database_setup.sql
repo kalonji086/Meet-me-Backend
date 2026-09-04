@@ -664,8 +664,20 @@ CREATE TABLE IF NOT EXISTS public.school_members (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('student', 'parent', 'teacher', 'director', 'promoter', 'prefect', 'admin')),
   is_active BOOLEAN DEFAULT TRUE,
+  allowed_modules TEXT[] DEFAULT '{}',
+  enrollment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(school_id, user_id, role)
+);
+
+CREATE TABLE IF NOT EXISTS public.account_creation_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    modules TEXT[] DEFAULT '{}',
+    notified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.school_classes (

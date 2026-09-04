@@ -1121,8 +1121,11 @@
                 const minTitle = document.getElementById('impact-title-min');
                 const minimizeIcon = document.getElementById('minimize-icon');
 
-                card.classList.remove('draggable-modal', 'minimized-card');
-                modal.classList.remove('no-backdrop');
+                if (card) card.classList.remove('draggable-modal', 'minimized-card');
+                if (modal) {
+                    modal.classList.remove('no-backdrop');
+                    modal.classList.add('items-center', 'justify-center', 'flex');
+                }
                 if(minTitle) minTitle.classList.add('hidden');
                 if(minimizeIcon) minimizeIcon.setAttribute('data-lucide', 'minus');
 
@@ -1132,32 +1135,40 @@
                     backdropBtn.classList.add('bg-white/10', 'text-white');
                 }
 
-                card.style.top = '';
-                card.style.left = '';
-                modal.classList.add('items-center', 'justify-center', 'flex');
-                header.className = `h-40 flex flex-col items-center justify-center bg-${color}-600 drag-handle relative transition-all duration-300`;
+                if (card) {
+                    card.style.top = '';
+                    card.style.left = '';
+                }
+                if (header) header.className = `h-40 flex flex-col items-center justify-center bg-${color}-600 drag-handle relative transition-all duration-300`;
 
-                document.getElementById('impact-title').innerText = title;
-                document.getElementById('impact-message').innerHTML = html;
+                const titleEl = document.getElementById('impact-title');
+                if (titleEl) titleEl.innerText = title;
+
+                const msgEl = document.getElementById('impact-message');
+                if (msgEl) msgEl.innerHTML = html;
+
                 const btn = document.getElementById('impact-confirm-btn');
-                btn.innerText = confirmText;
-                btn.className = `flex-[2] py-4 bg-${color}-600 text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-${color}-700 transition-all`;
+                if (btn) {
+                    btn.innerText = confirmText;
+                    btn.className = `flex-[2] py-4 bg-${color}-600 text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-${color}-700 transition-all`;
+                    btn.onclick = onConfirm || (() => closeImpactModal());
+                }
 
-                btn.onclick = onConfirm || (() => closeImpactModal());
-                modal.classList.remove('hidden');
+                if (modal) modal.classList.remove('hidden');
                 if (window.lucide) lucide.createIcons();
                 makeDraggable('impact-modal', 'impact-card', 'impact-header');
             }
         };
 
-        // Making login globally accessible
-        window.login = async function() {
+        async function login() {
+            console.log("Login function triggered");
             const btn = document.getElementById('login-btn');
             const emailField = document.getElementById('email');
             const passwordField = document.getElementById('password');
 
             if (!emailField || !passwordField) {
-                console.error("Login fields not found in DOM");
+                console.error("Critical Error: Email or Password fields not found");
+                alert("Erreur système : Champs de connexion introuvables.");
                 return;
             }
 
@@ -1165,19 +1176,21 @@
             const password = passwordField.value.trim();
 
             if (!email || !password) {
-                alert("Veuillez remplir tous les champs (Email et Clé d'Accès)");
+                alert("Veuillez saisir votre email et votre clé d'accès.");
                 return;
             }
 
             try {
                 btn.disabled = true;
-                btn.innerHTML = 'CHARGEMENT...';
+                const originalText = btn.innerText;
+                btn.innerText = 'VÉRIFICATION...';
 
-                console.log("Tentative de connexion pour:", email);
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
 
                 if (res.data.success) {
                     const data = res.data.data;
+                    console.log("Login successful for:", data.user.email);
+
                     localStorage.setItem('admin_token', data.token);
                     localStorage.setItem('admin_user', JSON.stringify(data.user));
                     token = data.token;
@@ -1190,33 +1203,38 @@
                         showDashboard();
                     }
                 } else {
-                    alert(res.data.message || "Identifiants invalides.");
+                    alert(res.data.message || "Accès refusé.");
+                    btn.innerText = originalText;
+                    btn.disabled = false;
                 }
             } catch (e) {
-                console.error("Erreur Login:", e);
-                const serverMsg = e.response?.data?.message || e.response?.data?.error;
-                alert(serverMsg || "Impossible de se connecter au serveur. Vérifiez votre connexion.");
-            } finally {
+                console.error("Detailed Login Error:", e);
+                const errorMsg = e.response?.data?.message || e.response?.data?.error || "Erreur de communication avec le serveur.";
+                alert(errorMsg);
+                btn.innerText = 'ENTRER DANS LE DASHBOARD';
                 btn.disabled = false;
-                btn.innerHTML = 'ENTRER DANS LE DASHBOARD';
             }
-        };
+        }
 
-        // Keyboard Enter support
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && document.getElementById('login-container') && !document.getElementById('login-container').classList.contains('hidden')) {
-                window.login();
+        // Global Event for Enter key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const loginContainer = document.getElementById('login-container');
+                if (loginContainer && !loginContainer.classList.contains('hidden')) {
+                    login();
+                }
             }
         });
 
         window.onload = () => {
+            console.log("Window loaded, checking token...");
             if (token) {
                 try {
                     showDashboard();
                 } catch (e) {
-                    console.error("Dashboard load failed", e);
+                    console.error("Auto-login failed", e);
                     localStorage.clear();
-                    location.reload();
+                    if (window.lucide) lucide.createIcons();
                 }
             } else {
                 if (window.lucide) lucide.createIcons();

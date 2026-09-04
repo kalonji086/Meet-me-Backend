@@ -1127,13 +1127,35 @@
 
         window.onload = () => { if (token) showDashboard(); else lucide.createIcons(); };
 
+        // Keyboard support for login
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('login-container').classList.contains('hidden')) {
+                login();
+            }
+        });
+
         async function login() {
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value.trim();
+            const emailEl = document.getElementById('email');
+            const passEl = document.getElementById('password');
+            const email = emailEl.value.trim();
+            const password = passEl.value.trim();
             const btn = document.getElementById('login-btn');
+
+            if (!email || !password) {
+                toast("Veuillez remplir tous les champs", "error");
+                return;
+            }
+
             try {
-                btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>'; lucide.createIcons();
+                btn.disabled = true;
+                const originalContent = btn.innerHTML;
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>';
+                if (window.lucide) lucide.createIcons();
+
+                console.log("Tentative de connexion vers:", `${API_URL}/auth/login`);
+
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+
                 if (res.data.success) {
                     const data = res.data.data;
                     token = data.token;
@@ -1149,12 +1171,19 @@
                     }
 
                     showDashboard();
+                } else {
+                    toast(res.data.message || "Échec de connexion", "error");
                 }
             } catch (e) {
+                console.error("Login Error:", e);
                 const data = e.response?.data;
-                const msg = data?.message || data?.error || "Identifiants incorrects.";
-                alert(msg);
-            } finally { btn.disabled = false; btn.innerText = 'ENTRER DANS LE DASHBOARD'; lucide.createIcons(); }
+                const msg = data?.message || data?.error || "Identifiants incorrects ou erreur réseau.";
+                toast(msg, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'ENTRER DANS LE DASHBOARD';
+                if (window.lucide) lucide.createIcons();
+            }
         }
 
         async function submitForcedPasswordChange() {

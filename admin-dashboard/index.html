@@ -56,8 +56,61 @@
 
     <div id="toast-container" class="fixed top-5 right-5 space-y-4 z-[9999]"></div>
 
+    <!-- BLOCKED SCREEN -->
+    <div id="blocked-container" class="hidden flex-1 flex items-center justify-center bg-gray-900 p-4 z-[1000] fixed inset-0">
+        <div class="max-w-md w-full bg-white p-12 rounded-[3rem] shadow-2xl text-center animate-pop-in">
+            <div class="w-24 h-24 bg-red-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8">
+                <i data-lucide="shield-off" class="w-12 h-12 text-red-600"></i>
+            </div>
+            <h3 class="text-3xl font-black text-gray-900 tracking-tighter mb-4 uppercase">ACCÈS RÉVOQUÉ</h3>
+            <p id="blocked-message" class="text-gray-500 font-medium leading-relaxed mb-10">Vos privilèges d'administration ont été suspendus par l'administrateur principal. Veuillez contacter le support pour toute réclamation.</p>
+            <div id="blocked-actions" class="space-y-4">
+                <button id="apply-collab-btn" onclick="openCollabApplyModal()" class="w-full bg-cyan-500 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all">Demander une Collaboration</button>
+                <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Déconnexion</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-container" class="flex-1 flex items-center justify-center bg-gray-100 p-4">
+        <div class="max-w-md w-full bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in text-center">
+            <div class="w-24 h-24 bg-purple-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
+                <img src="/admin-portal/Together.png" class="w-16 h-16 mx-auto" alt="Logo">
+            </div>
+            <h3 class="text-4xl font-black text-gray-900 tracking-tighter mb-10 uppercase">TOGETHE TECH</h3>
+            <div class="space-y-6 text-left">
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Identifiant Email</label>
+                    <input type="email" id="email" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="votre@email.com" autocomplete="off">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label>
+                    <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password">
+                </div>
+                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PENDING COLLAB SCREEN -->
+    <div id="pending-collab-container" class="hidden flex-1 flex items-center justify-center bg-gray-50 p-4 z-[1000] fixed inset-0">
+        <div class="max-w-xl w-full bg-white p-16 rounded-[4rem] shadow-2xl text-center animate-pop-in border border-cyan-100">
+            <div class="w-24 h-24 bg-cyan-50 rounded-[2rem] flex items-center justify-center mx-auto mb-10 shadow-sm relative">
+                <i data-lucide="clock" class="w-12 h-12 text-cyan-500"></i>
+                <div class="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full animate-ping"></div>
+            </div>
+            <h3 class="text-3xl font-black text-gray-900 tracking-tighter mb-6 uppercase">DOSSIER EN EXAMEN</h3>
+            <p class="text-gray-500 font-medium leading-relaxed mb-12">Bienvenue sur le Panel <b>Together Tech</b>. Votre candidature a bien été reçue. L'Administrateur Principal examine actuellement vos motivations et objectifs. Vous serez notifié dès validation de vos accès.</p>
+            <div class="p-6 bg-cyan-50 rounded-3xl border border-cyan-100 mb-10">
+                <p class="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-1">Statut Actuel</p>
+                <p class="font-bold text-cyan-900 uppercase">Attente de Validation</p>
+            </div>
+            <button onclick="logout()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-black transition-all">Se déconnecter</button>
+        </div>
+    </div>
+
     <!-- MAIN DASHBOARD -->
-    <div id="main-container" class="flex flex-1 h-screen overflow-hidden animate-fade-in relative">
+    <div id="main-container" class="hidden flex flex-1 h-screen overflow-hidden animate-fade-in relative">
         <!-- Sidebar Overlay (Mobile) -->
         <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
 
@@ -931,7 +984,7 @@
     <script>
         const BASE_URL = window.location.origin.replace(/\/$/, "");
         const API_URL = BASE_URL + '/api';
-        let token = localStorage.getItem('admin_token') || ""; // Éviter null
+        let token = localStorage.getItem('admin_token');
         let socket = null;
         let campaignEditor = null;
         const charts = { master: null };
@@ -1107,29 +1160,68 @@
             }
         };
 
+        async function login() {
+            const btn = document.getElementById('login-btn');
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (!email || !password) {
+                alert("Veuillez remplir tous les champs");
+                return;
+            }
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = 'CONNEXION EN COURS...';
+
+                console.log("Login attempt:", email);
+                const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+
+                if (res.data.success) {
+                    const data = res.data.data;
+                    localStorage.setItem('admin_token', data.token);
+                    localStorage.setItem('admin_user', JSON.stringify(data.user));
+                    token = data.token;
+
+                    if (data.user.mustChangePassword) {
+                        document.getElementById('login-container').classList.add('hidden');
+                        document.getElementById('modal-force-password').classList.remove('hidden');
+                        document.getElementById('force-current-pass').value = password;
+                    } else {
+                        showDashboard();
+                    }
+                } else {
+                    alert(res.data.message || "Échec de connexion");
+                }
+            } catch (e) {
+                console.error("Login Error:", e);
+                const msg = e.response?.data?.message || e.response?.data?.error || "Identifiants incorrects ou erreur serveur.";
+                alert(msg);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'ENTRER DANS LE DASHBOARD';
+            }
+        }
+
+        // Keyboard Enter support
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('login-container').classList.contains('hidden')) {
+                login();
+            }
+        });
+
         window.onload = () => {
-            console.log("DASHBOARD EN ACCÈS LIBRE (TEMPORAIRE)");
-
-            // Créer un administrateur fictif pour l'UI
-            const adminUser = {
-                full_name: "ADMINISTRATEUR PRINCIPAL",
-                email: "admin@meetme.com",
-                isGlobalAdmin: true,
-                allowedModules: ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin']
-            };
-            localStorage.setItem('admin_user', JSON.stringify(adminUser));
-
-            // Afficher le dashboard directement
-            const mainCont = document.getElementById('main-container');
-            if (mainCont) mainCont.classList.remove('hidden');
-
-            if (window.lucide) lucide.createIcons();
-
-            document.getElementById('admin-name').innerText = adminUser.full_name.toUpperCase();
-            filterSidebar(adminUser.allowedModules);
-            showSection('stats');
-            initRichEditors();
-            initSocket();
+            if (token) {
+                try {
+                    showDashboard();
+                } catch (e) {
+                    console.error("Auto-login failed", e);
+                    localStorage.clear();
+                    if (window.lucide) lucide.createIcons();
+                }
+            } else {
+                if (window.lucide) lucide.createIcons();
+            }
         };
 
         async function submitForcedPasswordChange() {

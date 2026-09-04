@@ -119,8 +119,50 @@ const postJob = asyncHandler(async (req, res) => {
     category
   } = req.body;
 
-  if (!title || !description) {
-    return res.status(400).json({ success: false, error: 'Titre et description requis' });
+  // Validation des champs obligatoires
+  if (!title || !title.trim()) {
+    return res.status(400).json({ success: false, error: 'Le titre est requis' });
+  }
+  if (!description || !description.trim()) {
+    return res.status(400).json({ success: false, error: 'La description est requise' });
+  }
+  if (!location || !location.trim()) {
+    return res.status(400).json({ success: false, error: 'La localisation est requise' });
+  }
+
+  // Validation de la longueur
+  if (title.trim().length < 5) {
+    return res.status(400).json({ success: false, error: 'Le titre doit contenir au moins 5 caractères' });
+  }
+  if (description.trim().length < 50) {
+    return res.status(400).json({ success: false, error: 'La description doit contenir au moins 50 caractères' });
+  }
+  if (location.trim().length < 3) {
+    return res.status(400).json({ success: false, error: 'La localisation doit contenir au moins 3 caractères' });
+  }
+
+  // Validation du type de contrat
+  const validJobTypes = ['CDI', 'CDD', 'Freelance', 'Stage', 'Alternance', 'Temps partiel'];
+  if (jobType && !validJobTypes.includes(jobType)) {
+    return res.status(400).json({ success: false, error: 'Type de contrat invalide' });
+  }
+
+  // Validation de la catégorie
+  const validCategories = ['all', 'tech', 'sales', 'health', 'manual', 'education', 'finance', 'marketing', 'logistics', 'other'];
+  if (category && !validCategories.includes(category)) {
+    return res.status(400).json({ success: false, error: 'Catégorie invalide' });
+  }
+
+  // Ensure requirements and benefits are arrays
+  const requirementsArray = Array.isArray(requirements) ? requirements : (typeof requirements === 'string' ? requirements.split('\n').filter(r => r.trim()) : []);
+  const benefitsArray = Array.isArray(benefits) ? benefits : (typeof benefits === 'string' ? benefits.split('\n').filter(b => b.trim()) : []);
+
+  // Limiter le nombre d'éléments
+  if (requirementsArray.length > 20) {
+    return res.status(400).json({ success: false, error: 'Maximum 20 pré-requis autorisés' });
+  }
+  if (benefitsArray.length > 15) {
+    return res.status(400).json({ success: false, error: 'Maximum 15 avantages autorisés' });
   }
 
   const result = await query(
@@ -128,7 +170,7 @@ const postJob = asyncHandler(async (req, res) => {
       employer_id, title, description, location, job_type, salary_range, requirements, benefits, category
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *`,
-    [employerId, title, description, location, jobType, salaryRange, requirements || [], benefits || [], category || 'all']
+    [employerId, title, description, location, jobType, salaryRange, requirementsArray, benefitsArray, category || 'all']
   );
 
   res.status(201).json({
@@ -304,6 +346,37 @@ const approveRequest = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get current employer's job postings
+ * @route   GET /api/employer/me/jobs
+ * @access  Private (Employer only)
+ */
+const getMyJobs = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+
+  // Verify user is an employer
+  const employerRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (employerRes.rows.length === 0) {
+    return res.status(403).json({ success: false, error: 'Accès réservé aux employeurs' });
+  }
+
+  const employerId = employerRes.rows[0].id;
+
+  const result = await query(
+    `SELECT j.*, e.company_name, e.company_email, e.industry, e.logo_url as company_logo
+     FROM public.job_postings j
+     JOIN public.employer_profiles e ON j.employer_id = e.id
+     WHERE j.employer_id = $1
+     ORDER BY j.created_at DESC`,
+    [employerId]
+  );
+
+  res.json({
+    success: true,
+    data: result.rows
+  });
+});
+
+/**
  * @desc    Search for talents (users with completed profiles)
  * @route   GET /api/employer/talents
  * @access  Private (Employer only)
@@ -349,5 +422,6 @@ module.exports = {
   addJobComment,
   getJobComments,
   approveRequest,
-  searchTalents
+  searchTalents,
+  getMyJobs
 };

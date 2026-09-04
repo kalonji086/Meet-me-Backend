@@ -1971,6 +1971,16 @@ const approveSchool = asyncHandler(async (req, res) => {
     schoolName: school.name
   });
 
+  // Global broadcast to update world directory in real-time
+  socketService.broadcast('school:new_active', {
+    id: school.id,
+    name: school.name,
+    school_type: school.school_type,
+    city: school.city,
+    country: school.country,
+    logo_url: school.logo_url
+  });
+
   await logAdminAction(req, 'approve_school', 'school', id, { schoolName: school.name });
   res.json({ success: true, message: `L'école ${school.name} a été approuvée.` });
 });

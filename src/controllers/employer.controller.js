@@ -119,65 +119,47 @@ const postJob = asyncHandler(async (req, res) => {
     category
   } = req.body;
 
-  // Validation des champs obligatoires
-  if (!title || !title.trim()) {
-    return res.status(400).json({ success: false, error: 'Le titre est requis' });
-  }
-  if (!description || !description.trim()) {
-    return res.status(400).json({ success: false, error: 'La description est requise' });
-  }
-  if (!location || !location.trim()) {
-    return res.status(400).json({ success: false, error: 'La localisation est requise' });
-  }
+  try {
+    // Validation des champs obligatoires
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Le titre est requis' });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({ success: false, error: 'La description est requise' });
+    }
+    if (!location || !location.trim()) {
+      return res.status(400).json({ success: false, error: 'La localisation est requise' });
+    }
 
-  // Validation de la longueur
-  if (title.trim().length < 5) {
-    return res.status(400).json({ success: false, error: 'Le titre doit contenir au moins 5 caractères' });
-  }
-  if (description.trim().length < 50) {
-    return res.status(400).json({ success: false, error: 'La description doit contenir au moins 50 caractères' });
-  }
-  if (location.trim().length < 3) {
-    return res.status(400).json({ success: false, error: 'La localisation doit contenir au moins 3 caractères' });
-  }
+    // Validation de la longueur
+    if (title.trim().length < 5) {
+      return res.status(400).json({ success: false, error: 'Le titre doit contenir au moins 5 caractères' });
+    }
+    if (description.trim().length < 50) {
+      return res.status(400).json({ success: false, error: 'La description doit contenir au moins 50 caractères' });
+    }
 
-  // Validation du type de contrat
-  const validJobTypes = ['CDI', 'CDD', 'Freelance', 'Stage', 'Alternance', 'Temps partiel'];
-  if (jobType && !validJobTypes.includes(jobType)) {
-    return res.status(400).json({ success: false, error: 'Type de contrat invalide' });
+    // Ensure requirements and benefits are arrays
+    const requirementsArray = Array.isArray(requirements) ? requirements : (typeof requirements === 'string' ? requirements.split('\n').filter(r => r.trim()) : []);
+    const benefitsArray = Array.isArray(benefits) ? benefits : (typeof benefits === 'string' ? benefits.split('\n').filter(b => b.trim()) : []);
+
+    const result = await query(
+      `INSERT INTO public.job_postings (
+        employer_id, title, description, location, job_type, salary_range, requirements, benefits, category
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *`,
+      [employerId, title.trim(), description.trim(), location.trim(), jobType || 'CDI', salaryRange || 'Négociable', requirementsArray, benefitsArray, category || 'other']
+    );
+
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+      message: 'Offre d\'emploi publiée avec succès'
+    });
+  } catch (error) {
+    logger.error('Error in postJob:', error.message);
+    res.status(500).json({ success: false, error: 'Une erreur serveur est survenue lors de la publication' });
   }
-
-  // Validation de la catégorie
-  const validCategories = ['all', 'tech', 'sales', 'health', 'manual', 'education', 'finance', 'marketing', 'logistics', 'other'];
-  if (category && !validCategories.includes(category)) {
-    return res.status(400).json({ success: false, error: 'Catégorie invalide' });
-  }
-
-  // Ensure requirements and benefits are arrays
-  const requirementsArray = Array.isArray(requirements) ? requirements : (typeof requirements === 'string' ? requirements.split('\n').filter(r => r.trim()) : []);
-  const benefitsArray = Array.isArray(benefits) ? benefits : (typeof benefits === 'string' ? benefits.split('\n').filter(b => b.trim()) : []);
-
-  // Limiter le nombre d'éléments
-  if (requirementsArray.length > 20) {
-    return res.status(400).json({ success: false, error: 'Maximum 20 pré-requis autorisés' });
-  }
-  if (benefitsArray.length > 15) {
-    return res.status(400).json({ success: false, error: 'Maximum 15 avantages autorisés' });
-  }
-
-  const result = await query(
-    `INSERT INTO public.job_postings (
-      employer_id, title, description, location, job_type, salary_range, requirements, benefits, category
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    RETURNING *`,
-    [employerId, title, description, location, jobType, salaryRange, requirementsArray, benefitsArray, category || 'all']
-  );
-
-  res.status(201).json({
-    success: true,
-    data: result.rows[0],
-    message: 'Offre d\'emploi publiée avec succès'
-  });
 });
 
 /**

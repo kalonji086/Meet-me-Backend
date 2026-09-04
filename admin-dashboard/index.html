@@ -931,7 +931,7 @@
     <script>
         const BASE_URL = window.location.origin.replace(/\/$/, "");
         const API_URL = BASE_URL + '/api';
-        let token = localStorage.getItem('admin_token');
+        let token = localStorage.getItem('admin_token') || ""; // Éviter null
         let socket = null;
         let campaignEditor = null;
         const charts = { master: null };

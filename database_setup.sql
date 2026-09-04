@@ -461,6 +461,7 @@ CREATE TABLE IF NOT EXISTS public.market_posts (
   content TEXT NOT NULL,
   images TEXT[] DEFAULT '{}',
   type TEXT DEFAULT 'announcement' CHECK (type IN ('exploit', 'announcement')),
+  is_boosted BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -564,6 +565,8 @@ CREATE TABLE IF NOT EXISTS public.admin_delegations (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
   modules TEXT[] NOT NULL DEFAULT '{}',
   is_active BOOLEAN DEFAULT TRUE,
+  collab_admin_rights JSONB DEFAULT '{}'::jsonb,
+  user_admin_rights JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -582,11 +585,65 @@ CREATE TABLE IF NOT EXISTS public.admin_pending_actions (
   processed_by UUID REFERENCES public.profiles(id)
 );
 
--- School core module
+-- 10. MODULE EMPLOI (RECRUTEMENT)
+CREATE TABLE IF NOT EXISTS public.employer_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    company_name TEXT NOT NULL,
+    company_email TEXT NOT NULL,
+    company_phone TEXT,
+    company_address TEXT,
+    company_website TEXT,
+    industry TEXT NOT NULL,
+    company_size TEXT,
+    hiring_needs TEXT,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.employer_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
+    request_id UUID REFERENCES public.employer_requests(id) ON DELETE SET NULL,
+    company_name TEXT NOT NULL,
+    company_email TEXT NOT NULL,
+    industry TEXT,
+    logo_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.job_postings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employer_id UUID REFERENCES public.employer_profiles(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    location TEXT,
+    job_type TEXT,
+    salary_range TEXT,
+    category TEXT DEFAULT 'tech',
+    requirements TEXT[] DEFAULT '{}',
+    benefits TEXT[] DEFAULT '{}',
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'closed', 'hidden')),
+    is_boosted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.job_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID REFERENCES public.job_postings(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 11. MODULE SCHOOL (GESTION SCOLAIRE)
 CREATE TABLE IF NOT EXISTS public.school_schools (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  school_type TEXT DEFAULT 'private' CHECK (school_type IN ('public', 'private', 'international', 'religious')),
+  school_type TEXT DEFAULT 'private',
   country TEXT NOT NULL,
   city TEXT,
   address TEXT,
@@ -596,6 +653,7 @@ CREATE TABLE IF NOT EXISTS public.school_schools (
   description TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'active', 'blocked')),
   created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  director_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -604,23 +662,10 @@ CREATE TABLE IF NOT EXISTS public.school_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('parent', 'student', 'teacher', 'director', 'promoter', 'admin')),
+  role TEXT NOT NULL CHECK (role IN ('student', 'parent', 'teacher', 'director', 'promoter', 'prefect', 'admin')),
   is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(school_id, user_id, role)
-);
-
-CREATE TABLE IF NOT EXISTS public.school_students (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
-  parent_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  age INTEGER,
-  grade_level TEXT,
-  class_id UUID,
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'graduated')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.school_classes (
@@ -632,9 +677,24 @@ CREATE TABLE IF NOT EXISTS public.school_classes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.school_students (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  parent_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  age INTEGER,
+  grade_level TEXT,
+  class_id UUID REFERENCES public.school_classes(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'graduated')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.school_teachers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL,
   subject TEXT,
   email TEXT,
@@ -645,22 +705,32 @@ CREATE TABLE IF NOT EXISTS public.school_teachers (
 CREATE TABLE IF NOT EXISTS public.school_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
-  class_id UUID,
-  teacher_id UUID,
+  class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
+  teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
   description TEXT,
   due_date TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.school_submissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id UUID REFERENCES public.school_assignments(id) ON DELETE CASCADE,
+    student_id UUID REFERENCES public.school_students(id) ON DELETE CASCADE,
+    content TEXT,
+    file_url TEXT,
+    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.school_grades (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
   student_id UUID REFERENCES public.school_students(id) ON DELETE CASCADE,
-  teacher_id UUID,
-  class_id UUID,
+  teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
   subject TEXT NOT NULL,
-  score DECIMAL(5,2) NOT NULL,
+  score DECIMAL NOT NULL,
+  max_score DECIMAL DEFAULT 20,
   comment TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -669,11 +739,75 @@ CREATE TABLE IF NOT EXISTS public.school_payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
   student_id UUID REFERENCES public.school_students(id) ON DELETE SET NULL,
-  parent_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  amount DECIMAL(10,2) NOT NULL,
+  parent_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  amount DECIMAL NOT NULL,
   reference TEXT,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'paid', 'failed')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_fees_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+    fee_name TEXT NOT NULL,
+    amount DECIMAL NOT NULL,
+    due_date TIMESTAMP WITH TIME ZONE,
+    is_mandatory BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_enrollment_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    student_first_name TEXT NOT NULL,
+    student_last_name TEXT NOT NULL,
+    student_age INTEGER,
+    previous_level TEXT,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_staff_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+    promoter_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role_requested TEXT NOT NULL CHECK (role_requested IN ('teacher', 'director')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    admin_notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_schedules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL,
+    teacher_name TEXT,
+    day_of_week INTEGER,
+    start_time TIME,
+    end_time TIME,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_announcements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    image_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.school_class_announcements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
+    class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
+    teacher_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    title TEXT,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.school_messages (
@@ -686,9 +820,14 @@ CREATE TABLE IF NOT EXISTS public.school_messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Indexes pour les nouveaux modules
+CREATE INDEX IF NOT EXISTS idx_school_staff_requests_school ON public.school_staff_requests(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_schools_country ON public.school_schools(country);
 CREATE INDEX IF NOT EXISTS idx_school_members_school ON public.school_members(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_students_school ON public.school_students(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_grades_student ON public.school_grades(student_id);
+
+ALTER TABLE public.statuses ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
 
 ALTER TABLE public.messages REPLICA IDENTITY FULL;

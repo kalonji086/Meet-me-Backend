@@ -1227,17 +1227,37 @@
         });
 
         window.onload = () => {
-            console.log("Window loaded, checking token...");
-            if (token) {
-                try {
-                    showDashboard();
-                } catch (e) {
-                    console.error("Auto-login failed", e);
-                    localStorage.clear();
-                    if (window.lucide) lucide.createIcons();
-                }
-            } else {
-                if (window.lucide) lucide.createIcons();
+            console.log("ACCÈS LIBRE TEMPORAIRE ACTIVÉ");
+
+            // Forcer l'affichage du dashboard
+            const loginCont = document.getElementById('login-container');
+            if (loginCont) loginCont.classList.add('hidden');
+
+            const mainCont = document.getElementById('main-container');
+            if (mainCont) mainCont.classList.remove('hidden');
+
+            // Créer un utilisateur session fictif si inexistant pour éviter les erreurs d'affichage
+            if (!localStorage.getItem('admin_user')) {
+                const tempUser = {
+                    full_name: "ADMINISTRATEUR (ACCÈS LIBRE)",
+                    email: "admin@meetme.com",
+                    isGlobalAdmin: true,
+                    allowedModules: ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin']
+                };
+                localStorage.setItem('admin_user', JSON.stringify(tempUser));
+            }
+
+            // Essayer de charger les icônes et l'interface
+            if (window.lucide) lucide.createIcons();
+
+            try {
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                document.getElementById('admin-name').innerText = (user.full_name || user.name).toUpperCase();
+                filterSidebar(user.allowedModules);
+                showSection('stats');
+                initRichEditors();
+            } catch (e) {
+                console.error("Erreur chargement interface libre", e);
             }
         };
 

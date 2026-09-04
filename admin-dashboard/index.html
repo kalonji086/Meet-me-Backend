@@ -87,7 +87,7 @@
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label>
                     <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password">
                 </div>
-                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
+                <button onclick="handleLoginClick(event)" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
             </div>
         </div>
     </div>
@@ -1160,21 +1160,27 @@
             }
         };
 
+        // Standalone Login function
         async function login() {
             const btn = document.getElementById('login-btn');
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value.trim();
+            const emailField = document.getElementById('email');
+            const passwordField = document.getElementById('password');
+
+            if (!emailField || !passwordField) return alert("Erreur système : Champs de saisie introuvables.");
+
+            const email = emailField.value.trim();
+            const password = passwordField.value.trim();
 
             if (!email || !password) {
-                alert("Veuillez remplir tous les champs");
+                alert("Veuillez saisir votre email et votre clé d'accès.");
                 return;
             }
 
             try {
                 btn.disabled = true;
-                btn.innerHTML = 'CONNEXION EN COURS...';
+                btn.innerHTML = 'CHARGEMENT...';
 
-                console.log("Login attempt:", email);
+                console.log("Login attempt for:", email);
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
 
                 if (res.data.success) {
@@ -1191,22 +1197,32 @@
                         showDashboard();
                     }
                 } else {
-                    alert(res.data.message || "Échec de connexion");
+                    alert(res.data.message || "Identifiants incorrects.");
+                    btn.disabled = false;
+                    btn.innerHTML = 'ENTRER DANS LE DASHBOARD';
                 }
             } catch (e) {
                 console.error("Login Error:", e);
-                const msg = e.response?.data?.message || e.response?.data?.error || "Identifiants incorrects ou erreur serveur.";
+                const msg = e.response?.data?.message || e.response?.data?.error || "Erreur de connexion au serveur.";
                 alert(msg);
-            } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'ENTRER DANS LE DASHBOARD';
             }
         }
 
+        // Event handler for button click
+        function handleLoginClick(e) {
+            if(e) e.preventDefault();
+            login();
+        }
+
         // Keyboard Enter support
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !document.getElementById('login-container').classList.contains('hidden')) {
-                login();
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const loginContainer = document.getElementById('login-container');
+                if (loginContainer && !loginContainer.classList.contains('hidden')) {
+                    login();
+                }
             }
         });
 

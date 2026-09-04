@@ -982,7 +982,7 @@
     </div>
 
     <script>
-        const BASE_URL = window.location.origin;
+        const BASE_URL = window.location.origin.replace(/\/$/, "");
         const API_URL = BASE_URL + '/api';
         let token = localStorage.getItem('admin_token');
         let socket = null;
@@ -991,7 +991,39 @@
         let notifications_list = [];
         let unread_notif_count = 0;
 
-        const getFullUrl = (url) => { if(!url || url === 'null') return 'https://placehold.co/100x100?text=None'; if(url.startsWith('http')) return url; return BASE_URL + (url.startsWith('/') ? '' : '/') + url; };
+        const getFullUrl = (url) => {
+            if(!url || url === 'null') return 'https://placehold.co/100x100?text=None';
+            if(url.startsWith('http')) return url;
+            return BASE_URL + (url.startsWith('/') ? '' : '/') + url;
+        };
+
+        function showToast(title, message, icon = 'bell') {
+            try {
+                const container = document.getElementById('toast-container');
+                if (!container) return;
+                const id = 'toast-' + Date.now();
+                const html = `
+                    <div id="${id}" class="bg-white p-5 rounded-2xl shadow-2xl border border-gray-100 flex items-start w-80 animate-pop-in cursor-pointer hover:scale-105 transition-all" onclick="this.remove()">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center mr-4 bg-purple-50 text-purple-600 shrink-0">
+                            <i data-lucide="${icon}" class="w-5 h-5"></i>
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <p class="text-[11px] font-black text-gray-900 uppercase truncate">${title}</p>
+                            <p class="text-[10px] text-gray-500 line-clamp-2">${message}</p>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+                if (window.lucide) lucide.createIcons();
+                setTimeout(() => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.classList.add('opacity-0', 'translate-x-full');
+                        setTimeout(() => el.remove(), 500);
+                    }
+                }, 5000);
+            } catch (e) { console.error("Toast error", e); }
+        }
 
         function toast(message, type = "info") {
             const title = type === "success" ? "Succès" : (type === "error" ? "Erreur" : "Information");
@@ -1017,12 +1049,9 @@
             handle.onmousedown = (e) => {
                 e = e || window.event;
                 e.preventDefault();
-
-                // Get initial mouse position
                 pos3 = e.clientX;
                 pos4 = e.clientY;
 
-                // Switch to absolute positioning if not already
                 if (!card.classList.contains('draggable-modal')) {
                     const rect = card.getBoundingClientRect();
                     card.style.left = rect.left + 'px';
@@ -1060,7 +1089,6 @@
             if (card.classList.contains('minimized-card')) {
                 icon.setAttribute('data-lucide', 'maximize-2');
                 titleMin.innerText = mainTitle;
-                // En mode réduit, on active le mode sans backdrop pour permettre le travail
                 if (!document.getElementById('impact-modal').classList.contains('no-backdrop')) {
                     toggleBackdropMode();
                 }
@@ -1078,7 +1106,7 @@
             if (modal.classList.contains('no-backdrop')) {
                 btn.classList.add('bg-white', 'text-purple-700');
                 btn.classList.remove('bg-white/10', 'text-white');
-                showToast("Mode Flottant", "Fenêtre détachée. Vous pouvez interagir avec l'arrière-plan.", "layers");
+                showToast("Mode Flottant", "Fenêtre détachée.", "layers");
             } else {
                 btn.classList.remove('bg-white', 'text-purple-700');
                 btn.classList.add('bg-white/10', 'text-white');
@@ -1093,20 +1121,20 @@
                 const minTitle = document.getElementById('impact-title-min');
                 const minimizeIcon = document.getElementById('minimize-icon');
 
-                // Reset states
                 card.classList.remove('draggable-modal', 'minimized-card');
                 modal.classList.remove('no-backdrop');
-                minTitle.classList.add('hidden');
-                minimizeIcon.setAttribute('data-lucide', 'minus');
-                document.getElementById('drag-hint').innerText = "Maintenir pour déplacer";
+                if(minTitle) minTitle.classList.add('hidden');
+                if(minimizeIcon) minimizeIcon.setAttribute('data-lucide', 'minus');
 
                 const backdropBtn = document.getElementById('backdrop-toggle-btn');
-                backdropBtn.classList.remove('bg-white', 'text-purple-700');
-                backdropBtn.classList.add('bg-white/10', 'text-white');
+                if(backdropBtn) {
+                    backdropBtn.classList.remove('bg-white', 'text-purple-700');
+                    backdropBtn.classList.add('bg-white/10', 'text-white');
+                }
 
                 card.style.top = '';
                 card.style.left = '';
-                modal.classList.add('items-center', 'justify-center');
+                modal.classList.add('items-center', 'justify-center', 'flex');
                 header.className = `h-40 flex flex-col items-center justify-center bg-${color}-600 drag-handle relative transition-all duration-300`;
 
                 document.getElementById('impact-title').innerText = title;
@@ -1116,75 +1144,84 @@
                 btn.className = `flex-[2] py-4 bg-${color}-600 text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-${color}-700 transition-all`;
 
                 btn.onclick = onConfirm || (() => closeImpactModal());
-
                 modal.classList.remove('hidden');
                 if (window.lucide) lucide.createIcons();
-
-                // Initialize draggable for this modal
                 makeDraggable('impact-modal', 'impact-card', 'impact-header');
             }
         };
 
-        window.onload = () => { if (token) showDashboard(); else lucide.createIcons(); };
-
-        // Keyboard support for login
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !document.getElementById('login-container').classList.contains('hidden')) {
-                login();
-            }
-        });
-
-        async function login() {
-            const emailEl = document.getElementById('email');
-            const passEl = document.getElementById('password');
-            const email = emailEl.value.trim();
-            const password = passEl.value.trim();
+        // Making login globally accessible
+        window.login = async function() {
             const btn = document.getElementById('login-btn');
+            const emailField = document.getElementById('email');
+            const passwordField = document.getElementById('password');
+
+            if (!emailField || !passwordField) {
+                console.error("Login fields not found in DOM");
+                return;
+            }
+
+            const email = emailField.value.trim();
+            const password = passwordField.value.trim();
 
             if (!email || !password) {
-                toast("Veuillez remplir tous les champs", "error");
+                alert("Veuillez remplir tous les champs (Email et Clé d'Accès)");
                 return;
             }
 
             try {
                 btn.disabled = true;
-                const originalContent = btn.innerHTML;
-                btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>';
-                if (window.lucide) lucide.createIcons();
+                btn.innerHTML = 'CHARGEMENT...';
 
-                console.log("Tentative de connexion vers:", `${API_URL}/auth/login`);
-
+                console.log("Tentative de connexion pour:", email);
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
 
                 if (res.data.success) {
                     const data = res.data.data;
-                    token = data.token;
-                    localStorage.setItem('admin_token', token);
+                    localStorage.setItem('admin_token', data.token);
                     localStorage.setItem('admin_user', JSON.stringify(data.user));
+                    token = data.token;
 
-                    // Vérifier si changement de mot de passe requis
                     if (data.user.mustChangePassword) {
                         document.getElementById('login-container').classList.add('hidden');
                         document.getElementById('modal-force-password').classList.remove('hidden');
                         document.getElementById('force-current-pass').value = password;
-                        return;
+                    } else {
+                        showDashboard();
                     }
-
-                    showDashboard();
                 } else {
-                    toast(res.data.message || "Échec de connexion", "error");
+                    alert(res.data.message || "Identifiants invalides.");
                 }
             } catch (e) {
-                console.error("Login Error:", e);
-                const data = e.response?.data;
-                const msg = data?.message || data?.error || "Identifiants incorrects ou erreur réseau.";
-                toast(msg, "error");
+                console.error("Erreur Login:", e);
+                const serverMsg = e.response?.data?.message || e.response?.data?.error;
+                alert(serverMsg || "Impossible de se connecter au serveur. Vérifiez votre connexion.");
             } finally {
                 btn.disabled = false;
-                btn.innerText = 'ENTRER DANS LE DASHBOARD';
+                btn.innerHTML = 'ENTRER DANS LE DASHBOARD';
+            }
+        };
+
+        // Keyboard Enter support
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && document.getElementById('login-container') && !document.getElementById('login-container').classList.contains('hidden')) {
+                window.login();
+            }
+        });
+
+        window.onload = () => {
+            if (token) {
+                try {
+                    showDashboard();
+                } catch (e) {
+                    console.error("Dashboard load failed", e);
+                    localStorage.clear();
+                    location.reload();
+                }
+            } else {
                 if (window.lucide) lucide.createIcons();
             }
-        }
+        };
 
         async function submitForcedPasswordChange() {
             const currentPassword = document.getElementById('force-current-pass').value;

@@ -12,10 +12,10 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
   const [schoolMembership, worldSchools, myStudents, pendingAssignments] = await Promise.all([
     query(
       `SELECT sm.role, sm.is_active, s.*
-       FROM public.school_members sm
-       JOIN public.school_schools s ON s.id = sm.school_id
-       WHERE sm.user_id = $1 AND sm.is_active = TRUE
-       ORDER BY s.created_at DESC, s.updated_at DESC
+       FROM public.school_schools s
+       LEFT JOIN public.school_members sm ON s.id = sm.school_id AND sm.user_id = $1
+       WHERE s.created_by = $1 OR (sm.user_id = $1 AND sm.is_active = TRUE)
+       ORDER BY s.created_at DESC
        LIMIT 1`,
       [userId]
     ),
@@ -43,11 +43,14 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
     )
   ]);
 
+  const member = schoolMembership.rows[0];
+  const userRole = member ? (member.role || (member.created_by === userId ? 'promoter' : 'none')) : 'none';
+
   res.json({
     success: true,
     data: {
-      role: schoolMembership.rows[0]?.role || 'none',
-      mySchool: schoolMembership.rows[0] || null,
+      role: userRole,
+      mySchool: member || null,
       worldSchools: worldSchools.rows,
       stats: {
         totalStudents: parseInt(myStudents.rows[0]?.total_students || 0),
@@ -66,6 +69,12 @@ const createSchool = asyncHandler(async (req, res) => {
 
   if (!name || !country) {
     return res.status(400).json({ success: false, error: 'Le nom et le pays de l’école sont requis.' });
+  }
+
+  // Vérifier si l'utilisateur a déjà créé une école (Une seule école par promoteur)
+  const existing = await query('SELECT id FROM public.school_schools WHERE created_by = $1 LIMIT 1', [userId]);
+  if (existing.rows.length > 0) {
+    return res.status(400).json({ success: false, error: 'Vous avez déjà soumis une demande pour un établissement.' });
   }
 
   const schoolResult = await query(

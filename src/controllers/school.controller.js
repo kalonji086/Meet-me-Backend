@@ -488,6 +488,69 @@ const getSchoolClasses = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Get school schedules (Calendar)
+ */
+const getSchedules = asyncHandler(async (req, res) => {
+  const { schoolId, classId } = req.query;
+  const userId = req.userId;
+
+  let sql = `SELECT * FROM public.school_schedules WHERE 1=1`;
+  const params = [];
+
+  if (schoolId) {
+    sql += ` AND class_id IN (SELECT id FROM public.school_classes WHERE school_id = $1)`;
+    params.push(schoolId);
+  }
+
+  if (classId) {
+    sql += ` AND class_id = $${params.length + 1}`;
+    params.push(classId);
+  }
+
+  sql += ` ORDER BY day_of_week ASC, start_time ASC`;
+
+  const result = await query(sql, params);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Get school advanced statistics
+ */
+const getStats = asyncHandler(async (req, res) => {
+  const { schoolId } = req.query;
+  const userId = req.userId;
+
+  // Verify access (Promoter or Director only)
+  const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND role IN (\'promoter\', \'director\')', [schoolId, userId]);
+  if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
+
+  const [students, teachers, classes, payments] = await Promise.all([
+    query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1', [schoolId]),
+    query('SELECT COUNT(*) FROM public.school_teachers WHERE school_id = $1', [schoolId]),
+    query('SELECT COUNT(*) FROM public.school_classes WHERE school_id = $1', [schoolId]),
+    query(`SELECT
+            SUM(amount) as total_revenue,
+            COUNT(*) filter (where status = 'completed') as paid_count,
+            COUNT(*) filter (where status = 'pending') as pending_count
+           FROM public.school_payments WHERE school_id = $1`, [schoolId])
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      totalStudents: parseInt(students.rows[0].count),
+      totalTeachers: parseInt(teachers.rows[0].count),
+      totalClasses: parseInt(classes.rows[0].count),
+      revenue: parseFloat(payments.rows[0].total_revenue || 0),
+      payments: {
+        paid: parseInt(payments.rows[0].paid_count),
+        pending: parseInt(payments.rows[0].pending_count)
+      }
+    }
+  });
+});
+
 module.exports = {
   getSchoolOverview,
   createSchool,
@@ -507,5 +570,7 @@ module.exports = {
   handleEnrollment,
   getSchoolProfile,
   getEnrollmentRequests,
-  getSchoolClasses
+  getSchoolClasses,
+  getSchedules,
+  getStats
 };

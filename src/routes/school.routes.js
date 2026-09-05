@@ -12,6 +12,8 @@ router.get('/dashboard', schoolController.getDashboard);
 router.get('/profile/:id', schoolController.getSchoolProfile);
 router.get('/enroll/requests', schoolController.getEnrollmentRequests);
 router.get('/classes', schoolController.getSchoolClasses);
+router.get('/schedules', schoolController.getSchedules);
+router.get('/stats', schoolController.getStats);
 
 router.post('/create', schoolController.createSchool);
 router.post('/enroll', schoolController.submitEnrollmentRequest);

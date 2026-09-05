@@ -982,6 +982,16 @@
     </div>
 
     <script>
+        console.log("Admin Dashboard Script Loading...");
+
+        // Event handler for button click
+        function handleLoginClick(e) {
+            console.log("handleLoginClick triggered");
+            // alert("CLIC SUR LE BOUTON !"); // Loud debug
+            if(e && e.preventDefault) e.preventDefault();
+            login();
+        }
+
         const BASE_URL = window.location.origin.replace(/\/$/, "");
         const API_URL = '/api';
         let token = localStorage.getItem('admin_token');
@@ -1162,6 +1172,7 @@
 
         // Standalone Login function
         async function login() {
+            console.log("login() called");
             const btn = document.getElementById('login-btn');
             const emailField = document.getElementById('email');
             const passwordField = document.getElementById('password');
@@ -1181,6 +1192,7 @@
 
             try {
                 console.log("Starting login process for:", email);
+                // alert("Tentative de connexion pour : " + email); // Debug alert
                 btn.disabled = true;
                 btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mr-2"></i> CHARGEMENT...';
                 if (window.lucide) lucide.createIcons();
@@ -1220,11 +1232,7 @@
             }
         }
 
-        // Event handler for button click
-        function handleLoginClick(e) {
-            if(e) e.preventDefault();
-            login();
-        }
+
 
         // Keyboard Enter support
         window.addEventListener('keydown', (e) => {
@@ -1237,6 +1245,7 @@
         });
 
         window.onload = () => {
+            console.log("Window loaded");
             if (token) {
                 try {
                     showDashboard();

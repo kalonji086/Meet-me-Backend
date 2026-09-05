@@ -1959,9 +1959,11 @@ const approveSchool = asyncHandler(async (req, res) => {
 
   const school = result.rows[0];
 
-  // Auto-upgrade member to 'promoter' and ensure it's active
+  // SÉCURITÉ : S'assurer que le créateur est bien membre et promu 'promoter'
   await query(
-    "UPDATE public.school_members SET role = 'promoter', is_active = TRUE WHERE school_id = $1 AND user_id = $2",
+    `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+     VALUES ($1, $2, 'promoter', TRUE)
+     ON CONFLICT (school_id, user_id, role) DO UPDATE SET is_active = TRUE`,
     [id, school.created_by]
   );
 
@@ -1978,7 +1980,8 @@ const approveSchool = asyncHandler(async (req, res) => {
     school_type: school.school_type,
     city: school.city,
     country: school.country,
-    logo_url: school.logo_url
+    logo_url: school.logo_url,
+    status: 'approved'
   });
 
   await logAdminAction(req, 'approve_school', 'school', id, { schoolName: school.name });

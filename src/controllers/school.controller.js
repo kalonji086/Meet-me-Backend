@@ -15,7 +15,7 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
        FROM public.school_members sm
        JOIN public.school_schools s ON s.id = sm.school_id
        WHERE sm.user_id = $1 AND sm.is_active = TRUE
-       ORDER BY s.created_at DESC
+       ORDER BY s.created_at DESC, s.updated_at DESC
        LIMIT 1`,
       [userId]
     ),
@@ -23,10 +23,10 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
       `SELECT s.*,
               (SELECT COUNT(*) FROM public.school_members sm WHERE sm.school_id = s.id AND sm.is_active = TRUE) AS members_count
        FROM public.school_schools s
-       WHERE s.status IN ('approved', 'active')
+       WHERE s.status IN ('approved', 'active') OR s.created_by = $1
        ORDER BY s.created_at DESC
        LIMIT 50`,
-      []
+      [userId]
     ),
     query(
       `SELECT COUNT(*) AS total_students

@@ -218,6 +218,11 @@ const getJobById = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, error: 'Offre d\'emploi non trouvée' });
   }
 
+  // Enregistrer une vue (Asynchrone, ne bloque pas la réponse)
+  const viewerId = req.userId || null;
+  query('INSERT INTO public.job_views (job_id, viewer_id) VALUES ($1, $2)', [id, viewerId])
+    .catch(err => logger.error('Error logging job view:', err.message));
+
   res.json({
     success: true,
     data: result.rows[0]
@@ -395,6 +400,134 @@ const searchTalents = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Get analytics for employer
+ * @route   GET /api/employer/analytics
+ */
+const getAnalytics = asyncHandler(async (req, res) => {
+  await ensureEmployerTables();
+  const userId = req.userId;
+
+  // Verify employer
+  const empRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
+
+  const employerId = empRes.rows[0].id;
+
+  // 1. Vues totales et par jour (7 derniers jours)
+  const viewsRes = await query(`
+    SELECT
+      COUNT(*) as total_views,
+      ARRAY(
+        SELECT COUNT(*) FROM generate_series(now() - interval '6 days', now(), '1 day') as day
+        LEFT JOIN public.job_views jv ON date_trunc('day', jv.viewed_at) = date_trunc('day', day)
+        JOIN public.job_postings jp ON jv.job_id = jp.id
+        WHERE jp.employer_id = $1
+        GROUP BY date_trunc('day', day)
+        ORDER BY date_trunc('day', day)
+      ) as daily_views
+    FROM public.job_views jv
+    JOIN public.job_postings jp ON jv.job_id = jp.id
+    WHERE jp.employer_id = $1
+  `, [employerId]);
+
+  // 2. Candidatures totales et par jour
+  const appsRes = await query(`
+    SELECT
+      COUNT(*) as total_apps,
+      ARRAY(
+        SELECT COUNT(*) FROM generate_series(now() - interval '6 days', now(), '1 day') as day
+        LEFT JOIN public.job_applications ja ON date_trunc('day', ja.applied_at) = date_trunc('day', day)
+        JOIN public.job_postings jp ON ja.job_id = jp.id
+        WHERE jp.employer_id = $1
+        GROUP BY date_trunc('day', day)
+        ORDER BY date_trunc('day', day)
+      ) as daily_apps
+    FROM public.job_applications ja
+    JOIN public.job_postings jp ON ja.job_id = jp.id
+    WHERE jp.employer_id = $1
+  `, [employerId]);
+
+  // 3. Répartition par catégorie
+  const catRes = await query(`
+    SELECT category as label, COUNT(*) as value
+    FROM public.job_postings
+    WHERE employer_id = $1
+    GROUP BY category
+  `, [employerId]);
+
+  const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336'];
+  const categories = catRes.rows.map((r, i) => ({
+    label: r.label || 'Autre',
+    value: parseInt(r.value),
+    color: colors[i % colors.length]
+  }));
+
+  const stats = {
+    totalViews: parseInt(viewsRes.rows[0]?.total_views || 0),
+    totalApplications: parseInt(appsRes.rows[0]?.total_apps || 0),
+    dailyViews: viewsRes.rows[0]?.daily_views || [0,0,0,0,0,0,0],
+    dailyApplications: appsRes.rows[0]?.daily_apps || [0,0,0,0,0,0,0],
+    categories
+  };
+
+  res.json({
+    success: true,
+    data: stats
+  });
+});
+
+/**
+ * @desc    Export employer data
+ */
+const exportData = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const empRes = await query('SELECT * FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
+
+  const employer = empRes.rows[0];
+  const jobs = await query('SELECT * FROM public.job_postings WHERE employer_id = $1', [employer.id]);
+
+  const exportPayload = {
+    company: employer.company_name,
+    industry: employer.industry,
+    exported_at: new Date(),
+    job_postings: jobs.rows
+  };
+
+  res.json({
+    success: true,
+    data: exportPayload,
+    message: 'Données exportées avec succès (Format JSON)'
+  });
+});
+
+/**
+ * @desc    Update employer settings
+ */
+const updateSettings = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { companyName, industry, logoUrl } = req.body;
+
+  const result = await query(
+    `UPDATE public.employer_profiles
+     SET company_name = COALESCE($1, company_name),
+         industry = COALESCE($2, industry),
+         logo_url = COALESCE($3, logo_url)
+     WHERE user_id = $4
+     RETURNING *`,
+    [companyName, industry, logoUrl, userId]
+  );
+
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Profil non trouvé' });
+
+  res.json({
+    success: true,
+    data: result.rows[0],
+    message: 'Paramètres mis à jour'
+  });
+});
+
 module.exports = {
   submitEmployerRequest,
   getEmployerStatus,
@@ -405,5 +538,35 @@ module.exports = {
   getJobComments,
   approveRequest,
   searchTalents,
-  getMyJobs
+  getMyJobs,
+  getAnalytics,
+  exportData,
+  updateSettings,
+  ensureEmployerTables
 };
+
+async function ensureEmployerTables() {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.job_views (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          job_id UUID REFERENCES public.job_postings(id) ON DELETE CASCADE,
+          viewer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+          viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS public.job_applications (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          job_id UUID REFERENCES public.job_postings(id) ON DELETE CASCADE,
+          applicant_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+          cover_letter TEXT,
+          resume_url TEXT,
+          status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'shortlisted', 'rejected', 'hired')),
+          applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+  } catch (e) {
+    logger.error('Error ensuring employer tables:', e.message);
+  }
+}

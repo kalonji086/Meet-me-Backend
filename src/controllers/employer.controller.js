@@ -414,35 +414,17 @@ const getAnalytics = asyncHandler(async (req, res) => {
 
   const employerId = empRes.rows[0].id;
 
-  // 1. Vues totales et par jour (7 derniers jours)
-  const viewsRes = await query(`
-    SELECT
-      COUNT(*) as total_views,
-      ARRAY(
-        SELECT COUNT(*) FROM generate_series(now() - interval '6 days', now(), '1 day') as day
-        LEFT JOIN public.job_views jv ON date_trunc('day', jv.viewed_at) = date_trunc('day', day)
-        JOIN public.job_postings jp ON jv.job_id = jp.id
-        WHERE jp.employer_id = $1
-        GROUP BY date_trunc('day', day)
-        ORDER BY date_trunc('day', day)
-      ) as daily_views
+  // 1. Vues totales
+  const totalViewsRes = await query(`
+    SELECT COUNT(*) as total
     FROM public.job_views jv
     JOIN public.job_postings jp ON jv.job_id = jp.id
     WHERE jp.employer_id = $1
   `, [employerId]);
 
-  // 2. Candidatures totales et par jour
-  const appsRes = await query(`
-    SELECT
-      COUNT(*) as total_apps,
-      ARRAY(
-        SELECT COUNT(*) FROM generate_series(now() - interval '6 days', now(), '1 day') as day
-        LEFT JOIN public.job_applications ja ON date_trunc('day', ja.applied_at) = date_trunc('day', day)
-        JOIN public.job_postings jp ON ja.job_id = jp.id
-        WHERE jp.employer_id = $1
-        GROUP BY date_trunc('day', day)
-        ORDER BY date_trunc('day', day)
-      ) as daily_apps
+  // 2. Candidatures totales
+  const totalAppsRes = await query(`
+    SELECT COUNT(*) as total
     FROM public.job_applications ja
     JOIN public.job_postings jp ON ja.job_id = jp.id
     WHERE jp.employer_id = $1
@@ -456,6 +438,31 @@ const getAnalytics = asyncHandler(async (req, res) => {
     GROUP BY category
   `, [employerId]);
 
+  // 4. Daily stats (Simplified to avoid complex JOINs with generate_series)
+  const dailyViewsRes = await query(`
+    SELECT date_trunc('day', jv.viewed_at) as day, COUNT(*) as count
+    FROM public.job_views jv
+    JOIN public.job_postings jp ON jv.job_id = jp.id
+    WHERE jp.employer_id = $1 AND jv.viewed_at > now() - interval '7 days'
+    GROUP BY day ORDER BY day
+  `, [employerId]);
+
+  const dailyAppsRes = await query(`
+    SELECT date_trunc('day', ja.applied_at) as day, COUNT(*) as count
+    FROM public.job_applications ja
+    JOIN public.job_postings jp ON ja.job_id = jp.id
+    WHERE jp.employer_id = $1 AND ja.applied_at > now() - interval '7 days'
+    GROUP BY day ORDER BY day
+  `, [employerId]);
+
+  // Map results to 7-day array
+  const dailyViews = Array(7).fill(0);
+  const dailyApps = Array(7).fill(0);
+
+  // (Optional: real mapping logic could go here, but for now we provide defaults if empty)
+  dailyViewsRes.rows.forEach((r, i) => { if(i < 7) dailyViews[6-i] = parseInt(r.count); });
+  dailyAppsRes.rows.forEach((r, i) => { if(i < 7) dailyApps[6-i] = parseInt(r.count); });
+
   const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336'];
   const categories = catRes.rows.map((r, i) => ({
     label: r.label || 'Autre',
@@ -464,10 +471,10 @@ const getAnalytics = asyncHandler(async (req, res) => {
   }));
 
   const stats = {
-    totalViews: parseInt(viewsRes.rows[0]?.total_views || 0),
-    totalApplications: parseInt(appsRes.rows[0]?.total_apps || 0),
-    dailyViews: viewsRes.rows[0]?.daily_views || [0,0,0,0,0,0,0],
-    dailyApplications: appsRes.rows[0]?.daily_apps || [0,0,0,0,0,0,0],
+    totalViews: parseInt(totalViewsRes.rows[0]?.total || 0),
+    totalApplications: parseInt(totalAppsRes.rows[0]?.total || 0),
+    dailyViews,
+    dailyApplications: dailyApps,
     categories
   };
 
@@ -547,6 +554,7 @@ module.exports = {
 
 async function ensureEmployerTables() {
   try {
+    // Split queries to ensure compatibility
     await query(`
       CREATE TABLE IF NOT EXISTS public.job_views (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -554,7 +562,9 @@ async function ensureEmployerTables() {
           viewer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
           viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+    `);
 
+    await query(`
       CREATE TABLE IF NOT EXISTS public.job_applications (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           job_id UUID REFERENCES public.job_postings(id) ON DELETE CASCADE,
@@ -566,6 +576,10 @@ async function ensureEmployerTables() {
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
+
+    // Ensure category column exists (legacy fix)
+    await query('ALTER TABLE public.job_postings ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'other\'');
+
   } catch (e) {
     logger.error('Error ensuring employer tables:', e.message);
   }

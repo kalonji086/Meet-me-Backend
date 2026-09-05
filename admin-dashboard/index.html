@@ -87,7 +87,7 @@
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Clé d'Accès</label>
                     <input type="password" id="password" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm" placeholder="Mot de passe" autocomplete="new-password">
                 </div>
-                <button onclick="handleLoginClick(event)" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
+                <button onclick="login()" id="login-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 transition-all uppercase text-xs tracking-widest active:scale-95">ENTRER DANS LE DASHBOARD</button>
             </div>
         </div>
     </div>
@@ -982,18 +982,8 @@
     </div>
 
     <script>
-        console.log("Admin Dashboard Script Loading...");
-
-        // Event handler for button click
-        function handleLoginClick(e) {
-            console.log("handleLoginClick triggered");
-            // alert("CLIC SUR LE BOUTON !"); // Loud debug
-            if(e && e.preventDefault) e.preventDefault();
-            login();
-        }
-
         const BASE_URL = window.location.origin.replace(/\/$/, "");
-        const API_URL = '/api';
+        const API_URL = BASE_URL + "/api";
         let token = localStorage.getItem('admin_token');
         let socket = null;
         let campaignEditor = null;
@@ -1245,7 +1235,6 @@
         });
 
         window.onload = () => {
-            console.log("Window loaded");
             if (token) {
                 try {
                     showDashboard();
@@ -4066,6 +4055,8 @@
                 lucide.createIcons();
             } catch (e) { toast("Erreur chargement comptes", "error"); }
         }
+
+        async function examineMarket(id) {
             try {
                 const res = await axios.get(`${API_URL}/admin/market-requests`, { headers: { Authorization: `Bearer ${token}` } });
                 const m = res.data.data.find(x => x.id === id);

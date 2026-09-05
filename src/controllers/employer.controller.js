@@ -145,11 +145,13 @@ const postJob = asyncHandler(async (req, res) => {
 
     const result = await query(
       `INSERT INTO public.job_postings (
-        employer_id, title, description, location, job_type, salary_range, requirements, benefits, category
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        employer_id, title, description, location, job_type, salary_range, requirements, benefits, category, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
       RETURNING *`,
       [employerId, title.trim(), description.trim(), location.trim(), jobType || 'CDI', salaryRange || 'Négociable', requirementsArray, benefitsArray, category || 'other']
     );
+
+    logger.info(`Offre publiée : ${result.rows[0].id} par l'employeur ${employerId}`);
 
     res.status(201).json({
       success: true,
@@ -535,6 +537,58 @@ const updateSettings = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Get employer schedules
+ */
+const getSchedules = asyncHandler(async (req, res) => {
+  await ensureEmployerTables();
+  const userId = req.userId;
+  const empRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
+
+  const result = await query(
+    'SELECT * FROM public.employer_schedules WHERE employer_id = $1 ORDER BY start_at ASC',
+    [empRes.rows[0].id]
+  );
+
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Create a new schedule
+ */
+const createSchedule = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { title, description, startAt, endAt, type, candidateName, location } = req.body;
+
+  const empRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
+
+  const result = await query(
+    `INSERT INTO public.employer_schedules (
+      employer_id, title, description, start_at, end_at, type, candidate_name, location
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [empRes.rows[0].id, title, description, startAt, endAt, type || 'interview', candidateName, location]
+  );
+
+  res.status(201).json({ success: true, data: result.rows[0], message: 'Événement planifié avec succès' });
+});
+
+/**
+ * @desc    Delete a schedule
+ */
+const deleteSchedule = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { id } = req.params;
+
+  const empRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
+
+  await query('DELETE FROM public.employer_schedules WHERE id = $1 AND employer_id = $2', [id, empRes.rows[0].id]);
+
+  res.json({ success: true, message: 'Événement supprimé' });
+});
+
 module.exports = {
   submitEmployerRequest,
   getEmployerStatus,
@@ -549,6 +603,9 @@ module.exports = {
   getAnalytics,
   exportData,
   updateSettings,
+  getSchedules,
+  createSchedule,
+  deleteSchedule,
   ensureEmployerTables
 };
 
@@ -579,6 +636,25 @@ async function ensureEmployerTables() {
 
     // Ensure category column exists (legacy fix)
     await query('ALTER TABLE public.job_postings ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'other\'');
+
+    // Planning Table
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.employer_schedules (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          employer_id UUID REFERENCES public.employer_profiles(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          start_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          end_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          type TEXT DEFAULT 'interview' CHECK (type IN ('interview', 'meeting', 'onboarding', 'other')),
+          candidate_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+          candidate_name TEXT,
+          location TEXT,
+          status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled')),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
 
   } catch (e) {
     logger.error('Error ensuring employer tables:', e.message);

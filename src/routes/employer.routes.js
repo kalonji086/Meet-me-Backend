@@ -21,6 +21,11 @@ router.get('/analytics', authenticate, employerController.getAnalytics);
 router.get('/export', authenticate, employerController.exportData);
 router.put('/settings', authenticate, employerController.updateSettings);
 
+// Planning
+router.get('/schedules', authenticate, employerController.getSchedules);
+router.post('/schedules', authenticate, employerController.createSchedule);
+router.delete('/schedules/:id', authenticate, employerController.deleteSchedule);
+
 // Admin routes (Should be restricted by admin middleware in a real app)
 router.put('/approve/:requestId', authenticate, employerController.approveRequest);
 

@@ -440,30 +440,22 @@ const getAnalytics = asyncHandler(async (req, res) => {
     GROUP BY category
   `, [employerId]);
 
-  // 4. Daily stats (Simplified to avoid complex JOINs with generate_series)
-  const dailyViewsRes = await query(`
-    SELECT date_trunc('day', jv.viewed_at) as day, COUNT(*) as count
-    FROM public.job_views jv
-    JOIN public.job_postings jp ON jv.job_id = jp.id
-    WHERE jp.employer_id = $1 AND jv.viewed_at > now() - interval '7 days'
-    GROUP BY day ORDER BY day
+  // 4. Daily stats (Optimized to return 7 days even with zeros)
+  const dailyStatsRes = await query(`
+    WITH days AS (
+      SELECT date_trunc('day', d)::date as day
+      FROM generate_series(now() - interval '6 days', now(), '1 day') d
+    )
+    SELECT
+      days.day,
+      (SELECT COUNT(*) FROM public.job_views jv JOIN public.job_postings jp ON jv.job_id = jp.id WHERE jp.employer_id = $1 AND date_trunc('day', jv.viewed_at)::date = days.day) as views,
+      (SELECT COUNT(*) FROM public.job_applications ja JOIN public.job_postings jp ON ja.job_id = jp.id WHERE jp.employer_id = $1 AND date_trunc('day', ja.applied_at)::date = days.day) as apps
+    FROM days
+    ORDER BY days.day ASC
   `, [employerId]);
 
-  const dailyAppsRes = await query(`
-    SELECT date_trunc('day', ja.applied_at) as day, COUNT(*) as count
-    FROM public.job_applications ja
-    JOIN public.job_postings jp ON ja.job_id = jp.id
-    WHERE jp.employer_id = $1 AND ja.applied_at > now() - interval '7 days'
-    GROUP BY day ORDER BY day
-  `, [employerId]);
-
-  // Map results to 7-day array
-  const dailyViews = Array(7).fill(0);
-  const dailyApps = Array(7).fill(0);
-
-  // (Optional: real mapping logic could go here, but for now we provide defaults if empty)
-  dailyViewsRes.rows.forEach((r, i) => { if(i < 7) dailyViews[6-i] = parseInt(r.count); });
-  dailyAppsRes.rows.forEach((r, i) => { if(i < 7) dailyApps[6-i] = parseInt(r.count); });
+  const dailyViews = dailyStatsRes.rows.map(r => parseInt(r.views));
+  const dailyApps = dailyStatsRes.rows.map(r => parseInt(r.apps));
 
   const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336'];
   const categories = catRes.rows.map((r, i) => ({

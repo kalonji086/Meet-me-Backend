@@ -205,8 +205,8 @@ const login = asyncHandler(async (req, res) => {
   const isPasswordValid = user ? await bcrypt.compare(password, user.password) : false;
 
   if (isPasswordValid) {
-    // SÉCURITÉ : Vérifier si banni manuellement
-    if (user.is_locked) {
+    // SÉCURITÉ : Vérifier si banni manuellement (Sauf pour l'Admin Principal qui peut toujours se reconnecter pour gérer le système)
+    if (user.is_locked && !isGlobalAdmin) {
       return res.status(403).json({
         success: false,
         error: 'Compte banni',
@@ -328,8 +328,9 @@ const refreshToken = asyncHandler(async (req, res) => {
     const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
     const result = await query('SELECT * FROM public.profiles WHERE id = $1', [decoded.userId]);
     const user = result.rows[0];
+    const isGlobalAdmin = user?.is_global_admin || false;
 
-    if (!user || user.is_locked) return res.status(401).json({ success: false, error: 'Session invalide' });
+    if (!user || (user.is_locked && !isGlobalAdmin)) return res.status(401).json({ success: false, error: 'Session invalide' });
 
     const newAccessToken = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
     res.json({ success: true, data: { token: newAccessToken, user } });

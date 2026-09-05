@@ -23,8 +23,8 @@ const authenticate = async (req, res, next) => {
     const user = result.rows[0];
     if (!user) return res.status(401).json({ success: false, error: 'Utilisateur non trouvé.' });
 
-    // SÉCURITÉ CRITIQUE : Bloquer l'accès immédiatement si l'utilisateur est banni
-    if (user.is_locked) {
+    // SÉCURITÉ CRITIQUE : Bloquer l'accès immédiatement si l'utilisateur est banni (L'Admin Global reste exempté pour pouvoir gérer le panel)
+    if (user.is_locked && !user.is_global_admin) {
       return res.status(403).json({
         success: false,
         error: 'Compte banni',

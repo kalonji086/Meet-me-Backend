@@ -983,7 +983,7 @@
 
     <script>
         const BASE_URL = window.location.origin.replace(/\/$/, "");
-        const API_URL = BASE_URL + '/api';
+        const API_URL = '/api';
         let token = localStorage.getItem('admin_token');
         let socket = null;
         let campaignEditor = null;
@@ -1166,7 +1166,10 @@
             const emailField = document.getElementById('email');
             const passwordField = document.getElementById('password');
 
-            if (!emailField || !passwordField) return alert("Erreur système : Champs de saisie introuvables.");
+            if (!emailField || !passwordField) {
+                console.error("Login Error: Input fields not found");
+                return alert("Erreur système : Champs de saisie introuvables.");
+            }
 
             const email = emailField.value.trim();
             const password = passwordField.value.trim();
@@ -1177,17 +1180,21 @@
             }
 
             try {
+                console.log("Starting login process for:", email);
                 btn.disabled = true;
-                btn.innerHTML = 'CHARGEMENT...';
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mr-2"></i> CHARGEMENT...';
+                if (window.lucide) lucide.createIcons();
 
-                console.log("Login attempt for:", email);
                 const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+                console.log("Login API Response:", res.data);
 
                 if (res.data.success) {
                     const data = res.data.data;
                     localStorage.setItem('admin_token', data.token);
                     localStorage.setItem('admin_user', JSON.stringify(data.user));
                     token = data.token;
+
+                    console.log("Login successful, user:", data.user.email);
 
                     if (data.user.mustChangePassword) {
                         document.getElementById('login-container').classList.add('hidden');
@@ -1197,16 +1204,19 @@
                         showDashboard();
                     }
                 } else {
+                    console.warn("Login failed:", res.data.message);
                     alert(res.data.message || "Identifiants incorrects.");
                     btn.disabled = false;
                     btn.innerHTML = 'ENTRER DANS LE DASHBOARD';
+                    if (window.lucide) lucide.createIcons();
                 }
             } catch (e) {
-                console.error("Login Error:", e);
-                const msg = e.response?.data?.message || e.response?.data?.error || "Erreur de connexion au serveur.";
+                console.error("Critical Login Error:", e);
+                const msg = e.response?.data?.message || e.response?.data?.error || "Erreur de connexion au serveur. Vérifiez que le backend est lancé.";
                 alert(msg);
                 btn.disabled = false;
                 btn.innerHTML = 'ENTRER DANS LE DASHBOARD';
+                if (window.lucide) lucide.createIcons();
             }
         }
 

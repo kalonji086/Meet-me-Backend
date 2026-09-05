@@ -99,6 +99,7 @@ const getEmployerStatus = asyncHandler(async (req, res) => {
  * @access  Private (Employer only)
  */
 const postJob = asyncHandler(async (req, res) => {
+  await ensureEmployerTables();
   const userId = req.userId;
 
   // Verify user is an approved employer
@@ -170,6 +171,7 @@ const postJob = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const getAllJobs = asyncHandler(async (req, res) => {
+  await ensureEmployerTables();
   const { category, search } = req.query;
 
   let sql = `
@@ -340,6 +342,7 @@ const approveRequest = asyncHandler(async (req, res) => {
  * @access  Private (Employer only)
  */
 const getMyJobs = asyncHandler(async (req, res) => {
+  await ensureEmployerTables();
   const userId = req.userId;
 
   // Verify user is an employer
@@ -629,6 +632,10 @@ async function ensureEmployerTables() {
     // Ensure category column exists (legacy fix)
     await query('ALTER TABLE public.job_postings ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'other\'');
 
+    // SÉCURITÉ : S'assurer que la colonne 'status' existe et est bien remplie
+    await query('ALTER TABLE public.job_postings ADD COLUMN IF NOT EXISTS status TEXT DEFAULT \'active\'');
+    await query('UPDATE public.job_postings SET status = \'active\' WHERE status IS NULL');
+
     // Planning Table
     await query(`
       CREATE TABLE IF NOT EXISTS public.employer_schedules (
@@ -647,6 +654,9 @@ async function ensureEmployerTables() {
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
+
+    // S'assurer que tous les profils employeurs sont actifs
+    await query('UPDATE public.employer_profiles SET is_active = TRUE WHERE is_active IS NULL');
 
   } catch (e) {
     logger.error('Error ensuring employer tables:', e.message);

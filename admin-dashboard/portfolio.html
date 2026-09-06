@@ -22,8 +22,9 @@
     <nav class="fixed top-0 left-0 right-0 z-50 px-6 py-6 transition-all duration-500" id="navbar">
         <div class="max-w-7xl mx-auto flex items-center justify-between glass px-8 py-4 rounded-[2rem]">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-cyan-500 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                    <i data-lucide="zap" class="text-white fill-current"></i>
+                <div id="nav-logo-container" class="w-10 h-10 overflow-hidden rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20 bg-white">
+                    <img id="site-logo" src="" class="w-full h-full object-contain hidden">
+                    <i id="site-logo-fallback" data-lucide="zap" class="text-cyan-500 fill-current"></i>
                 </div>
                 <span class="font-black text-xl tracking-tighter uppercase">Together Tech</span>
             </div>
@@ -79,6 +80,41 @@
                     </div>
                 </div>
                 <div class="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-full blur-3xl opacity-20"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section (Qui sommes-nous) -->
+    <section id="about" class="py-32 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+                <div class="relative">
+                    <div class="w-full h-[500px] rounded-[4rem] overflow-hidden border-4 border-white/5 shadow-2xl relative z-10">
+                        <img id="about-photo" src="https://ui-avatars.com/api/?name=About&size=512" class="w-full h-full object-cover" alt="About Together Tech">
+                    </div>
+                    <div class="absolute -bottom-10 -right-10 w-64 h-64 bg-cyan-500/20 blur-[100px] rounded-full"></div>
+                    <div class="absolute top-10 -left-10 p-6 glass rounded-3xl z-20 animate-float border-white/10">
+                        <p class="text-3xl font-black text-gradient">5+</p>
+                        <p class="text-[8px] font-black uppercase tracking-widest text-gray-400">Années d'Expérience</p>
+                    </div>
+                </div>
+                <div class="space-y-8">
+                    <h3 class="text-5xl font-black tracking-tighter uppercase italic">Qui <span class="text-cyan-400">sommes-nous ?</span></h3>
+                    <div class="w-20 h-1 bg-cyan-500 rounded-full"></div>
+                    <p id="about-text" class="text-xl text-gray-400 font-medium leading-relaxed italic">
+                        Chargement de la présentation...
+                    </p>
+                    <div class="grid grid-cols-2 gap-6 pt-6">
+                        <div class="p-6 glass rounded-3xl border-white/5">
+                            <i data-lucide="award" class="w-8 h-8 text-cyan-400 mb-4"></i>
+                            <h5 class="font-black text-sm uppercase">Qualité Premium</h5>
+                        </div>
+                        <div class="p-6 glass rounded-3xl border-white/5">
+                            <i data-lucide="users" class="w-8 h-8 text-purple-400 mb-4"></i>
+                            <h5 class="font-black text-sm uppercase">Support Dédié</h5>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -217,13 +253,29 @@
         async function loadData() {
             try {
                 const res = await axios.get(`${API_BASE}/public`);
-                const { skills, experiences, services } = res.data.data;
+                const { skills, experiences, services, profile } = res.data.data;
 
                 renderSkills(skills);
                 renderExperiences(experiences);
                 renderServices(services);
+                renderProfile(profile);
                 lucide.createIcons();
             } catch (e) { console.error("Erreur chargement données portfolio"); }
+        }
+
+        function renderProfile(p) {
+            if (!p) return;
+            // Logo update
+            const logoImg = document.getElementById('site-logo');
+            const logoFallback = document.getElementById('site-logo-fallback');
+            if (p.logo_url) {
+                logoImg.src = getFullUrl(p.logo_url);
+                logoImg.classList.remove('hidden');
+                logoFallback.classList.add('hidden');
+            }
+            // About section
+            if (p.about_photo_url) document.getElementById('about-photo').src = getFullUrl(p.about_photo_url);
+            if (p.about_description) document.getElementById('about-text').innerText = p.about_description;
         }
 
         function getFullUrl(url) {

@@ -368,10 +368,45 @@
                 </div>
 
                 <div class="flex gap-2 mb-8 bg-gray-100 p-1.5 rounded-2xl w-fit">
-                    <button onclick="switchPortfolioTab('skills')" id="port-tab-skills" class="port-tab-btn active px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Compétences</button>
+                    <button onclick="switchPortfolioTab('identity')" id="port-tab-identity" class="port-tab-btn active px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Identité & Logo</button>
+                    <button onclick="switchPortfolioTab('skills')" id="port-tab-skills" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Compétences</button>
                     <button onclick="switchPortfolioTab('experiences')" id="port-tab-experiences" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Expériences</button>
                     <button onclick="switchPortfolioTab('services')" id="port-tab-services" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Services</button>
                     <button onclick="switchPortfolioTab('quotes')" id="port-tab-quotes" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Inbox Devis</button>
+                </div>
+
+                <!-- Tab: Identity -->
+                <div id="port-section-identity" class="port-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                        <div class="space-y-8">
+                            <div class="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                                <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter">Logo du Portfolio</h3>
+                                <div class="flex items-center gap-8">
+                                    <img id="port-logo-preview" src="https://ui-avatars.com/api/?name=LOGO" class="w-24 h-24 rounded-3xl object-contain bg-gray-50 border border-gray-100 p-2">
+                                    <div class="space-y-3">
+                                        <input type="file" id="port-logo-input" class="hidden" onchange="previewPortfolioImg(this, 'port-logo-preview')">
+                                        <button onclick="document.getElementById('port-logo-input').click()" class="w-full px-8 py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest">Changer le Logo</button>
+                                        <p class="text-[9px] text-gray-400 font-bold uppercase text-center">Format recommandé : PNG Transparent</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                                <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter">Photo "Qui sommes-nous ?"</h3>
+                                <div class="relative group w-full h-64 rounded-[2.5rem] overflow-hidden bg-gray-100 border border-gray-100">
+                                    <img id="port-about-preview" src="https://ui-avatars.com/api/?name=Photo" class="w-full h-full object-cover">
+                                    <button onclick="document.getElementById('port-about-input').click()" class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                        <i data-lucide="camera" class="w-10 h-10 text-white"></i>
+                                    </button>
+                                    <input type="file" id="port-about-input" class="hidden" onchange="previewPortfolioImg(this, 'port-about-preview')">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-10 rounded-[3.5rem] border border-gray-100 shadow-sm">
+                            <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter">Description Présentation</h3>
+                            <textarea id="port-about-desc" rows="12" class="w-full p-8 bg-gray-50 border border-gray-100 rounded-[2.5rem] outline-none font-medium text-gray-600 leading-relaxed focus:border-cyan-500 transition-all" placeholder="Présentez Together Tech Community ici..."></textarea>
+                            <button onclick="savePortfolioIdentity()" id="btn-save-identity" class="w-full mt-8 py-6 bg-cyan-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-100 hover:bg-cyan-600 transition-all">Mettre à jour l'identité</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab: Skills -->
@@ -5435,14 +5470,53 @@
             document.querySelectorAll('.port-tab-btn').forEach(btn => btn.classList.remove('active', 'bg-cyan-500', 'text-white'));
             document.querySelectorAll('.port-content').forEach(el => el.classList.add('hidden'));
 
-            document.getElementById('port-tab-' + tab).classList.add('active', 'bg-cyan-500', 'text-white');
-            document.getElementById('port-section-' + tab).classList.remove('hidden');
+            const btn = document.getElementById('port-tab-' + tab);
+            if (btn) btn.classList.add('active', 'bg-cyan-500', 'text-white');
+            const content = document.getElementById('port-section-' + tab);
+            if (content) content.classList.remove('hidden');
 
+            if (tab === 'identity') loadPortfolioIdentity();
             if (tab === 'skills') loadSkills();
             if (tab === 'experiences') loadExperiences();
             if (tab === 'services') loadServices();
             if (tab === 'quotes') loadQuotes();
             lucide.createIcons();
+        }
+
+        async function loadPortfolioIdentity() {
+            try {
+                const res = await axios.get(`${API_URL}/portfolio/public`);
+                const p = res.data.data.profile;
+                if (p) {
+                    if (p.logo_url) document.getElementById('port-logo-preview').src = getFullUrl(p.logo_url);
+                    if (p.about_photo_url) document.getElementById('port-about-preview').src = getFullUrl(p.about_photo_url);
+                    document.getElementById('port-about-desc').value = p.about_description || "";
+                }
+            } catch (e) {}
+        }
+
+        async function savePortfolioIdentity() {
+            const btn = document.getElementById('btn-save-identity');
+            const logoFile = document.getElementById('port-logo-input').files[0];
+            const aboutFile = document.getElementById('port-about-input').files[0];
+            const aboutDescription = document.getElementById('port-about-desc').value;
+
+            try {
+                btn.disabled = true; btn.innerText = "Mise à jour...";
+                let logoUrl = null, aboutPhotoUrl = null;
+
+                if (logoFile) {
+                    const up = await apiService_upload(logoFile);
+                    if (up.success) logoUrl = up.data.fileUrl;
+                }
+                if (aboutFile) {
+                    const up = await apiService_upload(aboutFile);
+                    if (up.success) aboutPhotoUrl = up.data.fileUrl;
+                }
+
+                await axios.put(`${API_URL}/portfolio/admin/profile`, { logoUrl, aboutPhotoUrl, aboutDescription }, { headers: { Authorization: `Bearer ${token}` } });
+                toast("Identité mise à jour", "success");
+            } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "Mettre à jour l'identité"; }
         }
 
         async function loadSkills() {

@@ -8,10 +8,11 @@ const socketService = require('../services/socket.service');
  * @route   GET /api/portfolio/public
  */
 const getPublicData = asyncHandler(async (req, res) => {
-  const [skills, experiences, services] = await Promise.all([
+  const [skills, experiences, services, profile] = await Promise.all([
     query('SELECT * FROM public.web_portfolio_skills ORDER BY level DESC'),
     query('SELECT * FROM public.web_portfolio_experiences ORDER BY order_index ASC, created_at DESC'),
-    query('SELECT * FROM public.web_portfolio_services ORDER BY created_at ASC')
+    query('SELECT * FROM public.web_portfolio_services ORDER BY created_at ASC'),
+    query('SELECT * FROM public.web_portfolio_profile LIMIT 1')
   ]);
 
   res.json({
@@ -19,9 +20,31 @@ const getPublicData = asyncHandler(async (req, res) => {
     data: {
       skills: skills.rows,
       experiences: experiences.rows,
-      services: services.rows
+      services: services.rows,
+      profile: profile.rows[0] || {}
     }
   });
+});
+
+/**
+ * @desc    Update Portfolio Profile/Logo
+ */
+const updateProfile = asyncHandler(async (req, res) => {
+  const { logoUrl, aboutPhotoUrl, aboutDescription } = req.body;
+
+  const result = await query(
+    `UPDATE public.web_portfolio_profile
+     SET logo_url = COALESCE($1, logo_url),
+         about_photo_url = COALESCE($2, about_photo_url),
+         about_description = COALESCE($3, about_description),
+         updated_at = NOW()
+     RETURNING *`,
+    [logoUrl, aboutPhotoUrl, aboutDescription]
+  );
+
+  socketService.broadcast('portfolio:data_updated', { type: 'profile', data: result.rows[0] });
+
+  res.json({ success: true, data: result.rows[0] });
 });
 
 /**

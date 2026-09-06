@@ -502,6 +502,17 @@ const ensureAdminTables = async () => {
         status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'contacted', 'accepted', 'rejected')),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_profile (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        logo_url TEXT,
+        about_photo_url TEXT,
+        about_description TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      -- Insérer une ligne par défaut si elle n'existe pas
+      INSERT INTO public.web_portfolio_profile (about_description)
+      SELECT 'Bienvenue chez Together Tech. Nous sommes une communauté de passionnés...'
+      WHERE NOT EXISTS (SELECT 1 FROM public.web_portfolio_profile);
     `);
 
     logger.info('✅ Admin Schema Synchronized (including Portfolio)');

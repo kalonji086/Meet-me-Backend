@@ -1731,6 +1731,11 @@
                 addNotification('security', 'Nouvelle École', `L'établissement ${data.schoolName} attend validation.`, 'graduation-cap');
             });
 
+            socket.on('admin:new_web_quote', (data) => {
+                if(!document.getElementById('section-portfolio').classList.contains('hidden')) loadQuotes();
+                addNotification('market', 'Nouveau Devis Web', `Une demande de ${data.client_name} vient d'arriver via le portfolio.`, 'layout-template');
+            });
+
             socket.on('admin:new_pending_action', (data) => {
                 if(!document.getElementById('section-approvals').classList.contains('hidden')) loadApprovals();
                 addNotification('security', 'Action à Approuver', `${data.requestedBy} veut ${data.actionType} sur ${data.targetName}`, 'check-square');

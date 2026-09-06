@@ -370,7 +370,7 @@
                 <div class="flex gap-2 mb-8 bg-gray-100 p-1.5 rounded-2xl w-fit">
                     <button onclick="switchPortfolioTab('identity')" id="port-tab-identity" class="port-tab-btn active px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Identité & Logo</button>
                     <button onclick="switchPortfolioTab('skills')" id="port-tab-skills" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Compétences</button>
-                    <button onclick="switchPortfolioTab('experiences')" id="port-tab-experiences" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Expériences</button>
+                    <button onclick="switchPortfolioTab('experiences')" id="port-tab-experiences" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Parcours & Impact</button>
                     <button onclick="switchPortfolioTab('services')" id="port-tab-services" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Services</button>
                     <button onclick="switchPortfolioTab('quotes')" id="port-tab-quotes" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Inbox Devis</button>
                 </div>
@@ -452,38 +452,40 @@
                 </div>
 
                 <!-- Tab: Experiences -->
+                <!-- Tab: Experiences (Parcours & Impact) -->
                 <div id="port-section-experiences" class="port-content hidden">
                     <div class="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm mb-8">
+                         <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter italic">Gérer Parcours & Impact</h3>
                          <div class="flex flex-col md:flex-row gap-6 mb-8">
                              <div class="flex-1">
-                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Poste / Titre</label>
+                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Titre de l'Accomplissement / Poste</label>
                                  <input type="text" id="exp-title" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold">
                              </div>
                              <div class="flex-1">
-                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Entreprise</label>
+                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Application / Institution / Projet</label>
                                  <input type="text" id="exp-company" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold">
                              </div>
                              <div class="w-full md:w-48">
-                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Période</label>
+                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Période (ex: 2024)</label>
                                  <input type="text" id="exp-period" placeholder="2022 - Présent" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500">
                              </div>
                          </div>
                          <div class="flex items-center gap-6 mb-8">
                              <div class="flex-1">
-                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Logo de l'App / Entreprise</label>
+                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Logo du Projet / Impact</label>
                                  <div class="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                                      <img id="exp-logo-preview" src="https://ui-avatars.com/api/?name=EXP" class="w-16 h-16 rounded-xl object-cover shadow-sm bg-white">
                                      <input type="file" id="exp-logo-input" class="hidden" onchange="previewPortfolioImg(this, 'exp-logo-preview')">
-                                     <button onclick="document.getElementById('exp-logo-input').click()" class="px-6 py-3 bg-white border border-gray-100 rounded-xl text-[10px] font-black uppercase shadow-sm">Uploader Logo</button>
+                                     <button onclick="document.getElementById('exp-logo-input').click()" class="px-6 py-3 bg-white border border-gray-100 rounded-xl text-[10px] font-black uppercase shadow-sm">Uploader Image</button>
                                  </div>
                              </div>
                          </div>
                          <div>
-                             <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Description des réalisations</label>
-                             <textarea id="exp-desc" rows="4" class="w-full p-6 bg-gray-50 border border-gray-100 rounded-[2rem] outline-none font-medium text-sm focus:border-indigo-500" placeholder="Décrivez ce que vous avez accompli..."></textarea>
+                             <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Impact & Description détaillée</label>
+                             <textarea id="exp-desc" rows="4" class="w-full p-6 bg-gray-50 border border-gray-100 rounded-[2rem] outline-none font-medium text-sm focus:border-indigo-500" placeholder="Décrivez l'impact de ce projet ou votre rôle..."></textarea>
                          </div>
                          <button onclick="saveExperience()" class="mt-8 px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
-                             <i data-lucide="plus"></i> AJOUTER AU PARCOURS
+                             <i data-lucide="plus"></i> ENREGISTRER L'IMPACT
                          </button>
                     </div>
                     <div id="experiences-list" class="space-y-4">

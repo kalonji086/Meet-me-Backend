@@ -2014,27 +2014,34 @@ const approveSchool = asyncHandler(async (req, res) => {
 
   const school = result.rows[0];
 
-  // SÉCURITÉ : S'assurer que le créateur est bien membre et promu 'promoter'
+  // SÉCURITÉ : S'assurer que le créateur est bien membre et promu 'promoter' avec accès complet par défaut
+  const defaultModules = ['dashboard', 'students', 'teachers', 'finance', 'schedule', 'messages'];
+
   const memberResult = await query(
     `UPDATE public.school_members
-     SET role = 'promoter', is_active = TRUE
+     SET role = 'promoter', is_active = TRUE, allowed_modules = $3
      WHERE school_id = $1 AND user_id = $2
      RETURNING id`,
-    [id, school.created_by]
+    [id, school.created_by, defaultModules]
   );
 
   if (memberResult.rows.length === 0) {
     await query(
-      `INSERT INTO public.school_members (school_id, user_id, role, is_active)
-       VALUES ($1, $2, 'promoter', TRUE)`,
-      [id, school.created_by]
+      `INSERT INTO public.school_members (school_id, user_id, role, is_active, allowed_modules)
+       VALUES ($1, $2, 'promoter', TRUE, $3)`,
+      [id, school.created_by, defaultModules]
     );
   }
+
+  // Marquer le profil utilisateur comme vérifié/promoteur si nécessaire (optionnel selon vos règles)
+  await query('UPDATE public.profiles SET is_verified = TRUE WHERE id = $1', [school.created_by]);
 
   // Notify creator via socket and email
   socketService.emitToUser(school.created_by, 'school:approved', {
     schoolId: school.id,
-    schoolName: school.name
+    schoolName: school.name,
+    role: 'promoter',
+    modules: defaultModules
   });
 
   // Global broadcast to update world directory in real-time

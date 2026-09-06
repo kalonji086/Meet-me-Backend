@@ -48,7 +48,14 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
 
   // Prioritize "my" school where I am promoter or the most recent one I created
   const member = mySchools.rows[0];
-  const userRole = member ? (member.role || (member.created_by === userId ? 'promoter' : 'none')) : 'none';
+  let userRole = 'none';
+  if (member) {
+    userRole = member.role;
+    // Si membre mais role non défini (cas rare) ou si créateur sans ligne membre active
+    if ((!userRole || userRole === 'none') && member.created_by === userId) {
+      userRole = 'promoter';
+    }
+  }
 
   res.json({
     success: true,
@@ -56,7 +63,7 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
       userId,
       role: userRole,
       mySchool: member || null,
-      mySchools: mySchools.rows, // Return all schools where user is involved
+      mySchools: mySchools.rows,
       worldSchools: worldSchools.rows,
       stats: {
         totalStudents: parseInt(myStudents.rows[0]?.total_students || 0),

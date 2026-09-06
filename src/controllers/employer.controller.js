@@ -354,7 +354,8 @@ const getMyJobs = asyncHandler(async (req, res) => {
   const employerId = employerRes.rows[0].id;
 
   const result = await query(
-    `SELECT j.*, e.company_name, e.company_email, e.industry, e.logo_url as company_logo
+    `SELECT j.*, e.company_name, e.company_email, e.industry, e.logo_url as company_logo,
+           (SELECT COUNT(*) FROM public.job_applications WHERE job_id = j.id) as applications_count
      FROM public.job_postings j
      JOIN public.employer_profiles e ON j.employer_id = e.id
      WHERE j.employer_id = $1
@@ -366,6 +367,113 @@ const getMyJobs = asyncHandler(async (req, res) => {
     success: true,
     data: result.rows
   });
+});
+
+/**
+ * @desc    Apply for a job
+ * @route   POST /api/employer/jobs/:jobId/apply
+ * @access  Private
+ */
+const applyForJob = asyncHandler(async (req, res) => {
+  await ensureEmployerTables();
+  const userId = req.userId;
+  const { jobId } = req.params;
+  const { coverLetter, resumeUrl } = req.body;
+
+  // Check if already applied
+  const existing = await query('SELECT id FROM public.job_applications WHERE job_id = $1 AND applicant_id = $2', [jobId, userId]);
+  if (existing.rows.length > 0) {
+    return res.status(400).json({ success: false, error: 'Vous avez déjà postulé à cette offre.' });
+  }
+
+  const result = await query(
+    `INSERT INTO public.job_applications (job_id, applicant_id, cover_letter, resume_url)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [jobId, userId, coverLetter, resumeUrl]
+  );
+
+  const application = result.rows[0];
+
+  // Notify Employer
+  const jobRes = await query(
+    'SELECT j.title, e.user_id as employer_user_id, e.company_name FROM public.job_postings j JOIN public.employer_profiles e ON j.employer_id = e.id WHERE j.id = $1',
+    [jobId]
+  );
+
+  if (jobRes.rows.length > 0) {
+    const job = jobRes.rows[0];
+    socketService.emitToUser(job.employer_user_id, 'employer:new_application', {
+      jobTitle: job.title,
+      applicationId: application.id
+    });
+  }
+
+  res.status(201).json({
+    success: true,
+    data: application,
+    message: 'Votre candidature a été envoyée avec succès.'
+  });
+});
+
+/**
+ * @desc    Get applications for employer (All or specific job)
+ * @route   GET /api/employer/applications
+ * @access  Private (Employer only)
+ */
+const getApplications = asyncHandler(async (req, res) => {
+  await ensureEmployerTables();
+  const userId = req.userId;
+  const { jobId } = req.query;
+
+  const empRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
+
+  const employerId = empRes.rows[0].id;
+
+  let sql = `
+    SELECT ja.*, p.full_name as applicant_name, p.email as applicant_email, p.avatar_url as applicant_avatar,
+           j.title as job_title
+    FROM public.job_applications ja
+    JOIN public.profiles p ON ja.applicant_id = p.id
+    JOIN public.job_postings j ON ja.job_id = j.id
+    WHERE j.employer_id = $1
+  `;
+  const params = [employerId];
+
+  if (jobId) {
+    sql += ` AND ja.job_id = $2`;
+    params.push(jobId);
+  }
+
+  sql += ` ORDER BY ja.applied_at DESC`;
+
+  const result = await query(sql, params);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Update application status
+ */
+const updateApplicationStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // 'reviewed', 'shortlisted', 'rejected', 'hired'
+
+  const result = await query(
+    'UPDATE public.job_applications SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+    [status, id]
+  );
+
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Candidature non trouvée' });
+
+  const app = result.rows[0];
+
+  // Notify Candidate
+  socketService.emitToUser(app.applicant_id, 'job:application_updated', {
+    applicationId: app.id,
+    status
+  });
+
+  res.json({ success: true, message: 'Statut de la candidature mis à jour.', data: app });
 });
 
 /**
@@ -554,19 +662,57 @@ const getSchedules = asyncHandler(async (req, res) => {
  */
 const createSchedule = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const { title, description, startAt, endAt, type, candidateName, location } = req.body;
+  const { title, description, startAt, endAt, type, candidateName, candidateId, location } = req.body;
 
-  const empRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  const empRes = await query('SELECT id, company_name FROM public.employer_profiles WHERE user_id = $1', [userId]);
   if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
 
   const result = await query(
     `INSERT INTO public.employer_schedules (
-      employer_id, title, description, start_at, end_at, type, candidate_name, location
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [empRes.rows[0].id, title, description, startAt, endAt, type || 'interview', candidateName, location]
+      employer_id, title, description, start_at, end_at, type, candidate_name, candidate_id, location
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [empRes.rows[0].id, title, description, startAt, endAt, type || 'interview', candidateName, candidateId || null, location]
   );
 
-  res.status(201).json({ success: true, data: result.rows[0], message: 'Événement planifié avec succès' });
+  const schedule = result.rows[0];
+
+  // Notify Candidate if ID is provided
+  if (candidateId) {
+    socketService.emitToUser(candidateId, 'job:interview_scheduled', {
+      scheduleId: schedule.id,
+      title,
+      startAt,
+      companyName: empRes.rows[0].company_name
+    });
+  }
+
+  res.status(201).json({ success: true, data: schedule, message: 'Événement planifié avec succès' });
+});
+
+/**
+ * @desc    Get employer's recent chats with candidates
+ */
+const getEmployerRecentChats = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+
+  // Verify employer
+  const empRes = await query('SELECT id FROM public.employer_profiles WHERE user_id = $1', [userId]);
+  if (empRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès restreint' });
+
+  // Get chats where the employer is a participant and that involve job applications or recent messages
+  const result = await query(`
+    SELECT c.id, c.name, c.last_message, c.last_message_at,
+           p.full_name as peer_name, p.avatar_url as peer_avatar, p.id as peer_id
+    FROM public.chats c
+    JOIN public.chat_participants cp1 ON c.id = cp1.chat_id AND cp1.user_id = $1
+    JOIN public.chat_participants cp2 ON c.id = cp2.chat_id AND cp2.user_id != $1
+    JOIN public.profiles p ON cp2.user_id = p.id
+    WHERE c.type = 'private'
+    ORDER BY c.last_message_at DESC
+    LIMIT 10
+  `, [userId]);
+
+  res.json({ success: true, data: result.rows });
 });
 
 /**
@@ -601,6 +747,10 @@ module.exports = {
   getSchedules,
   createSchedule,
   deleteSchedule,
+  applyForJob,
+  getApplications,
+  updateApplicationStatus,
+  getEmployerRecentChats,
   ensureEmployerTables
 };
 
@@ -645,15 +795,22 @@ async function ensureEmployerTables() {
           description TEXT,
           start_at TIMESTAMP WITH TIME ZONE NOT NULL,
           end_at TIMESTAMP WITH TIME ZONE NOT NULL,
-          type TEXT DEFAULT 'interview' CHECK (type IN ('interview', 'meeting', 'onboarding', 'other')),
+          type TEXT DEFAULT 'interview',
           candidate_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
           candidate_name TEXT,
           location TEXT,
-          status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled')),
+          status TEXT DEFAULT 'scheduled',
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
+
+    // Migration for candidate_id and type check if table exists
+    try {
+        await query('ALTER TABLE public.employer_schedules ADD COLUMN IF NOT EXISTS candidate_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL');
+        await query('ALTER TABLE public.employer_schedules DROP CONSTRAINT IF EXISTS employer_schedules_type_check');
+        await query('ALTER TABLE public.employer_schedules ADD CONSTRAINT employer_schedules_type_check CHECK (type IN (\'interview\', \'meeting\', \'onboarding\', \'other\'))');
+    } catch (e) {}
 
     // S'assurer que tous les profils employeurs sont actifs
     await query('UPDATE public.employer_profiles SET is_active = TRUE WHERE is_active IS NULL');

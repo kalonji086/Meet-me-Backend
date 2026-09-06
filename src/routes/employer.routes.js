@@ -12,6 +12,7 @@ router.get('/jobs/:jobId/comments', employerController.getJobComments);
 router.post('/request', authenticate, employerController.submitEmployerRequest);
 router.get('/status', authenticate, employerController.getEmployerStatus);
 router.post('/jobs/:jobId/comments', authenticate, employerController.addJobComment);
+router.post('/jobs/:jobId/apply', authenticate, employerController.applyForJob);
 
 // Employer specific routes
 router.post('/jobs', authenticate, employerController.postJob);
@@ -20,6 +21,9 @@ router.get('/talents', authenticate, employerController.searchTalents);
 router.get('/analytics', authenticate, employerController.getAnalytics);
 router.get('/export', authenticate, employerController.exportData);
 router.put('/settings', authenticate, employerController.updateSettings);
+router.get('/applications', authenticate, employerController.getApplications);
+router.put('/applications/:id/status', authenticate, employerController.updateApplicationStatus);
+router.get('/recent-chats', authenticate, employerController.getEmployerRecentChats);
 
 // Planning
 router.get('/schedules', authenticate, employerController.getSchedules);

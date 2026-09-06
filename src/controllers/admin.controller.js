@@ -442,10 +442,31 @@ const ensureAdminTables = async () => {
     logger.error('Error ensuring school tables:', e.message);
   }
 
-  // Ensure director_id column exists
+  // Final robust schema synchronization for Admin Modules
   try {
+    // School Management & Monitoring
     await query('ALTER TABLE public.school_schools ADD COLUMN IF NOT EXISTS director_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL');
-  } catch (e) {}
+    await query('ALTER TABLE public.school_members ADD COLUMN IF NOT EXISTS allowed_modules TEXT[] DEFAULT \'{}\'');
+    await query('ALTER TABLE public.school_members ADD COLUMN IF NOT EXISTS enrollment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
+    await query('ALTER TABLE public.school_members ADD COLUMN IF NOT EXISTS joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
+
+    // Moderation & Boost
+    await query('ALTER TABLE public.statuses ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.market_posts ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.job_postings ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
+
+    // Employer Profiles consistency
+    await query('ALTER TABLE public.employer_profiles ADD COLUMN IF NOT EXISTS company_name TEXT');
+    await query('ALTER TABLE public.employer_profiles ADD COLUMN IF NOT EXISTS logo_url TEXT');
+
+    // Market Businesses consistency
+    await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS business_name TEXT');
+    await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS logo_url TEXT');
+
+    logger.info('✅ Admin Schema Synchronized');
+  } catch (err) {
+    logger.warn('⚠️ Some schema migrations were skipped or failed: ' + err.message);
+  }
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {

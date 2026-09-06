@@ -91,5 +91,7 @@ router.get('/schools/staff-requests', adminController.getStaffRequests);
 router.put('/schools/staff-requests/:id', adminController.handleStaffRequest);
 router.post('/accounts', adminController.createManagedAccount);
 router.get('/accounts', adminController.getManagedAccounts);
+router.put('/accounts/:id', adminController.updateManagedAccount);
+router.delete('/accounts/:id', adminController.deleteManagedAccount);
 
 module.exports = router;

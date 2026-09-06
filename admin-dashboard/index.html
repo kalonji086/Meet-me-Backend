@@ -981,6 +981,76 @@
         </div>
     </div>
 
+    <!-- MODAL EDIT ACCOUNT -->
+    <div id="modal-edit-account" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-scale-up">
+            <div class="p-10">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h3 class="text-2xl font-black text-gray-900 tracking-tighter">MODIFIER COMPTE</h3>
+                        <p id="edit-acc-name" class="text-xs font-bold text-indigo-500 uppercase mt-1">Chargement...</p>
+                    </div>
+                    <button onclick="closeEditAccountModal()" class="p-3 bg-gray-50 text-gray-400 hover:text-gray-900 rounded-2xl transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+
+                <input type="hidden" id="edit-acc-id">
+
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Rôle de l'utilisateur</label>
+                        <select id="edit-acc-role" class="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-indigo-500 font-bold transition-all">
+                            <option value="student">Élève (Student)</option>
+                            <option value="parent">Parent</option>
+                            <option value="teacher">Enseignant (Teacher)</option>
+                            <option value="director">Directeur</option>
+                            <option value="promoter">Promoteur</option>
+                            <option value="prefect">Préfet</option>
+                            <option value="admin">Administrateur École</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Modules autorisés (Dashboard)</label>
+                        <div id="edit-acc-modules-list" class="grid grid-cols-2 gap-3">
+                            <!-- Modules checkboxes -->
+                            <label class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-all border border-transparent">
+                                <input type="checkbox" value="dashboard" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 acc-mod-check">
+                                <span class="text-xs font-bold text-gray-700">Dashboard</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-all border border-transparent">
+                                <input type="checkbox" value="students" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 acc-mod-check">
+                                <span class="text-xs font-bold text-gray-700">Élèves</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-all border border-transparent">
+                                <input type="checkbox" value="teachers" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 acc-mod-check">
+                                <span class="text-xs font-bold text-gray-700">Enseignants</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-all border border-transparent">
+                                <input type="checkbox" value="finance" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 acc-mod-check">
+                                <span class="text-xs font-bold text-gray-700">Finance</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-all border border-transparent">
+                                <input type="checkbox" value="schedule" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 acc-mod-check">
+                                <span class="text-xs font-bold text-gray-700">Horaires</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-all border border-transparent">
+                                <input type="checkbox" value="messages" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 acc-mod-check">
+                                <span class="text-xs font-bold text-gray-700">Messages</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 mt-10">
+                    <button onclick="closeEditAccountModal()" class="flex-1 px-8 py-5 bg-gray-50 text-gray-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition-all">Annuler</button>
+                    <button id="btn-save-acc" onclick="saveAccountChanges()" class="flex-1 px-8 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i data-lucide="save" class="w-4 h-4"></i> ENREGISTRER
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const BASE_URL = window.location.origin.replace(/\/$/, "");
         const API_URL = BASE_URL + "/api";
@@ -4047,13 +4117,75 @@
                         </td>
                         <td class="px-8 py-5 text-xs text-gray-400 font-bold">${new Date(a.enrollment_date).toLocaleDateString()}</td>
                         <td class="px-8 py-5 text-right">
-                            <button class="p-2 text-gray-400 hover:text-indigo-600 transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                            <button class="p-2 text-gray-400 hover:text-red-600 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            <button onclick="openEditAccountModal('${a.member_id}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button onclick="deleteAccountAction('${a.member_id}', '${a.full_name.replace(/'/g, "\\'")}')" class="p-2 text-gray-400 hover:text-red-600 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </td>
                     </tr>
                 `).join('');
                 lucide.createIcons();
             } catch (e) { toast("Erreur chargement comptes", "error"); }
+        }
+
+        async function openEditAccountModal(memberId) {
+            try {
+                const res = await axios.get(`${API_URL}/admin/accounts`, { headers: { Authorization: `Bearer ${token}` } });
+                const a = res.data.data.find(x => x.member_id === memberId);
+                if (!a) return;
+
+                document.getElementById('edit-acc-id').value = memberId;
+                document.getElementById('edit-acc-name').innerText = a.full_name;
+                document.getElementById('edit-acc-role').value = a.role;
+
+                // Reset and set checkboxes
+                const checks = document.querySelectorAll('.acc-mod-check');
+                checks.forEach(c => {
+                    c.checked = a.allowed_modules && a.allowed_modules.includes(c.value);
+                });
+
+                document.getElementById('modal-edit-account').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (e) { toast("Erreur lors de la récupération du compte", "error"); }
+        }
+
+        function closeEditAccountModal() {
+            document.getElementById('modal-edit-account').classList.add('hidden');
+        }
+
+        async function saveAccountChanges() {
+            const id = document.getElementById('edit-acc-id').value;
+            const role = document.getElementById('edit-acc-role').value;
+            const allowedModules = Array.from(document.querySelectorAll('.acc-mod-check:checked')).map(c => c.value);
+
+            const btn = document.getElementById('btn-save-acc');
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="animate-spin" data-lucide="loader-2"></i> ENREGISTREMENT...';
+            lucide.createIcons();
+
+            try {
+                await axios.put(`${API_URL}/admin/accounts/${id}`, { role, allowedModules }, { headers: { Authorization: `Bearer ${token}` } });
+                toast("Compte mis à jour avec succès !", "success");
+                closeEditAccountModal();
+                loadAccounts();
+            } catch (e) {
+                toast(e.response?.data?.error || "Erreur lors de la sauvegarde", "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+                lucide.createIcons();
+            }
+        }
+
+        async function deleteAccountAction(id, name) {
+            if (!confirm(`Êtes-vous sûr de vouloir retirer ${name} de cet établissement ?`)) return;
+
+            try {
+                await axios.delete(`${API_URL}/admin/accounts/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                toast("Compte retiré avec succès.", "success");
+                loadAccounts();
+            } catch (e) {
+                toast("Erreur lors de la suppression.", "error");
+            }
         }
 
         async function examineMarket(id) {

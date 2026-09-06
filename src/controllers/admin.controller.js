@@ -2373,6 +2373,57 @@ const getManagedAccounts = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+/**
+ * @desc    Update a managed account (Role and Modules)
+ * @route   PUT /api/admin/accounts/:id
+ */
+const updateManagedAccount = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { role, allowedModules, is_active } = req.body;
+
+  const result = await query(
+    `UPDATE public.school_members
+     SET role = COALESCE($1, role),
+         allowed_modules = COALESCE($2, allowed_modules),
+         is_active = COALESCE($3, is_active)
+     WHERE id = $4 RETURNING *`,
+    [role, allowedModules, is_active, id]
+  );
+
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Compte non trouvé' });
+
+  const updated = result.rows[0];
+
+  // Notifier l'utilisateur en temps réel
+  socketService.emitToUser(updated.user_id, 'account:updated', {
+    role: updated.role,
+    modules: updated.allowed_modules,
+    isActive: updated.is_active
+  });
+
+  res.json({ success: true, message: 'Compte mis à jour avec succès.', data: updated });
+});
+
+/**
+ * @desc    Delete a managed account from a school
+ * @route   DELETE /api/admin/accounts/:id
+ */
+const deleteManagedAccount = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const check = await query('SELECT user_id, school_id FROM public.school_members WHERE id = $1', [id]);
+  if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Compte non trouvé' });
+
+  const { user_id } = check.rows[0];
+
+  await query('DELETE FROM public.school_members WHERE id = $1', [id]);
+
+  // Optionnel: Déconnecter l'utilisateur si on veut "temps réel"
+  socketService.emitToUser(user_id, 'account:removed', { id });
+
+  res.json({ success: true, message: 'Compte supprimé de l\'établissement.' });
+});
+
 module.exports = {
   getStats,
   getUsers,
@@ -2438,6 +2489,8 @@ module.exports = {
   handleStaffRequest,
   createManagedAccount,
   getManagedAccounts,
+  updateManagedAccount,
+  deleteManagedAccount,
   ensureAdminTables,
   processSensitiveAction
 };

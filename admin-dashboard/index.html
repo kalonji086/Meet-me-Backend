@@ -5668,20 +5668,63 @@
 
         function showAddServiceModal() {
             let html = `
-                <div class="space-y-4 text-left">
-                    <input type="text" id="srv-title" placeholder="Titre du Service" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold">
-                    <textarea id="srv-desc" placeholder="Description..." class="w-full h-32 p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-medium"></textarea>
-                    <input type="text" id="srv-price" placeholder="Prix indicatif (ex: 500$)" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold">
+                <div class="space-y-6 text-left">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Titre du Service</label>
+                        <input type="text" id="srv-title" placeholder="Ex: Développement App Mobile" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Description</label>
+                        <textarea id="srv-desc" placeholder="Détaillez ce que comprend ce service..." class="w-full h-32 p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-medium text-sm focus:border-cyan-500"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Prix indicatif (ex: 500$)</label>
+                            <input type="text" id="srv-price" placeholder="500$" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm focus:border-cyan-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Logo / Icône du Service</label>
+                            <div class="flex items-center gap-3">
+                                <img id="srv-img-preview" src="https://ui-avatars.com/api/?name=SRV" class="w-12 h-12 rounded-xl object-cover border border-gray-100 bg-white">
+                                <input type="file" id="srv-img-input" class="hidden" onchange="previewPortfolioImg(this, 'srv-img-preview')">
+                                <button onclick="document.getElementById('srv-img-input').click()" class="flex-1 px-3 py-2 bg-white border border-gray-100 rounded-xl text-[8px] font-black uppercase shadow-sm">Choisir</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
-            Alert.show("Ajouter un Service", html, async () => {
+            Alert.show("Créer un Nouveau Service", html, async () => {
                 const title = document.getElementById('srv-title').value;
                 const description = document.getElementById('srv-desc').value;
                 const priceRange = document.getElementById('srv-price').value;
-                if (!title) return alert("Titre requis");
-                await axios.post(`${API_URL}/portfolio/admin/services`, { action: 'add', title, description, priceRange }, { headers: { Authorization: `Bearer ${token}` } });
-                loadServices();
-                closeImpactModal();
+                const imgFile = document.getElementById('srv-img-input').files[0];
+
+                if (!title) return alert("Le titre du service est obligatoire.");
+
+                try {
+                    const btn = document.getElementById('impact-confirm-btn');
+                    btn.disabled = true; btn.innerText = "CRÉATION EN COURS...";
+
+                    let imageUrl = null;
+                    if (imgFile) {
+                        const up = await apiService_upload(imgFile);
+                        if (up.success) imageUrl = up.data.fileUrl;
+                    }
+
+                    await axios.post(`${API_URL}/portfolio/admin/services`, {
+                        action: 'add', title, description, priceRange, imageUrl
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+
+                    toast("Service créé avec succès", "success");
+                    loadServices();
+                    closeImpactModal();
+                } catch (e) {
+                    console.error(e);
+                    alert("Erreur lors de la création du service.");
+                } finally {
+                    const btn = document.getElementById('impact-confirm-btn');
+                    if(btn) { btn.disabled = false; btn.innerText = "CRÉER SERVICE"; }
+                }
             }, "Créer Service", "cyan");
         }
 

@@ -17,14 +17,15 @@
         .animate-float { animation: float 6s ease-in-out infinite; }
 
         /* Circular/3D Carousel Styles */
-        .carousel-container { perspective: 1000px; padding: 100px 0; overflow: hidden; }
-        .carousel-inner { position: relative; width: 100%; height: 500px; transform-style: preserve-3d; transition: transform 1s cubic-bezier(0.23, 1, 0.32, 1); }
-        .carousel-item { position: absolute; width: 350px; left: 50%; margin-left: -175px; transform-style: preserve-3d; transition: all 1s; opacity: 0; pointer-events: none; }
-        .carousel-item.active { opacity: 1; transform: translate3d(0, 0, 0); pointer-events: auto; z-index: 10; }
-        .carousel-item.prev { opacity: 0.5; transform: translate3d(-300px, 0, -200px) rotateY(30deg); pointer-events: auto; z-index: 5; }
-        .carousel-item.next { opacity: 0.5; transform: translate3d(300px, 0, -200px) rotateY(-30deg); pointer-events: auto; z-index: 5; }
-        .carousel-item.hidden-left { opacity: 0; transform: translate3d(-600px, 0, -400px); }
-        .carousel-item.hidden-right { opacity: 0; transform: translate3d(600px, 0, -400px); }
+        .carousel-container { perspective: 2000px; padding: 100px 0; overflow: visible; height: 600px; }
+        .carousel-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .carousel-item { position: absolute; width: 400px; left: 50%; margin-left: -200px; transform-style: preserve-3d; transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1); opacity: 0; pointer-events: none; }
+        .carousel-item.active { opacity: 1; transform: translate3d(0, 0, 100px); pointer-events: auto; z-index: 100; }
+        .carousel-item.prev { opacity: 0.6; transform: translate3d(-350px, 0, -250px) rotateY(45deg); pointer-events: auto; z-index: 50; }
+        .carousel-item.next { opacity: 0.6; transform: translate3d(350px, 0, -250px) rotateY(-45deg); pointer-events: auto; z-index: 50; }
+        .carousel-item.far-prev { opacity: 0.2; transform: translate3d(-600px, 0, -500px) rotateY(60deg); z-index: 20; }
+        .carousel-item.far-next { opacity: 0.2; transform: translate3d(600px, 0, -500px) rotateY(-60deg); z-index: 20; }
+        .carousel-item.hidden { opacity: 0; transform: translate3d(0, 0, -1000px) scale(0.5); z-index: 0; }
     </style>
 </head>
 <body class="bg-[#0a0a0c] text-white selection:bg-cyan-500/30 overflow-x-hidden">
@@ -431,26 +432,40 @@
 
             items.forEach((item, idx) => {
                 item.className = 'carousel-item';
-                const diff = (idx - currentCarouselIndex + servicesData.length) % servicesData.length;
+                let diff = idx - currentCarouselIndex;
+
+                // Handle wrap-around for circular movement
+                if (diff > servicesData.length / 2) diff -= servicesData.length;
+                if (diff < -servicesData.length / 2) diff += servicesData.length;
 
                 if (diff === 0) {
                     item.classList.add('active');
-                    item.style.transform = `translate3d(0, 0, 0) scale(1)`;
+                    item.style.transform = `translate3d(0, 0, 100px) scale(1)`;
                     item.style.opacity = "1";
-                    item.style.zIndex = "10";
-                } else if (diff === 1 || diff === - (servicesData.length - 1)) {
+                    item.style.zIndex = "100";
+                } else if (diff === 1) {
                     item.classList.add('next');
-                    item.style.transform = `translate3d(300px, 0, -200px) rotateY(-30deg) scale(0.8)`;
+                    item.style.transform = `translate3d(350px, 0, -250px) rotateY(-45deg) scale(0.8)`;
                     item.style.opacity = "0.6";
-                    item.style.zIndex = "5";
-                } else if (diff === servicesData.length - 1 || diff === -1) {
+                    item.style.zIndex = "50";
+                } else if (diff === -1) {
                     item.classList.add('prev');
-                    item.style.transform = `translate3d(-300px, 0, -200px) rotateY(30deg) scale(0.8)`;
+                    item.style.transform = `translate3d(-350px, 0, -250px) rotateY(45deg) scale(0.8)`;
                     item.style.opacity = "0.6";
-                    item.style.zIndex = "5";
+                    item.style.zIndex = "50";
+                } else if (diff === 2) {
+                    item.classList.add('far-next');
+                    item.style.transform = `translate3d(600px, 0, -500px) rotateY(-60deg) scale(0.6)`;
+                    item.style.opacity = "0.2";
+                    item.style.zIndex = "20";
+                } else if (diff === -2) {
+                    item.classList.add('far-prev');
+                    item.style.transform = `translate3d(-600px, 0, -500px) rotateY(60deg) scale(0.6)`;
+                    item.style.opacity = "0.2";
+                    item.style.zIndex = "20";
                 } else {
-                    item.classList.add('hidden-right');
-                    item.style.transform = `translate3d(0, 0, -500px) scale(0.5)`;
+                    item.classList.add('hidden');
+                    item.style.transform = `translate3d(0, 0, -1000px) scale(0.4)`;
                     item.style.opacity = "0";
                     item.style.zIndex = "0";
                 }

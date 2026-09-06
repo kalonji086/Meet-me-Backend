@@ -463,7 +463,13 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS business_name TEXT');
     await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS logo_url TEXT');
 
-    // Portfolio Management Tables
+    // Portfolio Management Tables Consistency (Ensuring columns exist)
+    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS image_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'technical\'');
+    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS logo_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_services ADD COLUMN IF NOT EXISTS image_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS specifications TEXT');
+
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_skills (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -500,6 +506,7 @@ const ensureAdminTables = async () => {
         project_description TEXT,
         budget TEXT,
         status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'contacted', 'accepted', 'rejected')),
+        specifications TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
       CREATE TABLE IF NOT EXISTS public.web_portfolio_profile (
@@ -515,11 +522,7 @@ const ensureAdminTables = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM public.web_portfolio_profile);
     `);
 
-    await query(`
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS specifications TEXT;
-    `);
-
-    logger.info('✅ Admin Schema Synchronized (including Portfolio & Specs)');
+    logger.info('✅ Admin Schema Synchronized (Full Portfolio Consistency)');
   } catch (err) {
     logger.warn('⚠️ Some schema migrations were skipped or failed: ' + err.message);
   }

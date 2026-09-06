@@ -88,7 +88,7 @@ const manageSkill = asyncHandler(async (req, res) => {
   if (action === 'add') {
     const resAdd = await query(
       'INSERT INTO public.web_portfolio_skills (name, level, icon, image_url, category) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, level || 50, icon, imageUrl, category || 'technical']
+      [name, level || 50, icon || null, imageUrl || null, category || 'technical']
     );
     socketService.broadcast('portfolio:data_updated', { type: 'skill', action: 'add', data: resAdd.rows[0] });
     return res.json({ success: true, data: resAdd.rows[0] });
@@ -136,7 +136,7 @@ const manageService = asyncHandler(async (req, res) => {
   if (action === 'add') {
     const resAdd = await query(
       'INSERT INTO public.web_portfolio_services (title, description, price_range, icon, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [title, description, priceRange, icon, imageUrl]
+      [title, description, priceRange, icon || null, imageUrl || null]
     );
     socketService.broadcast('portfolio:data_updated', { type: 'service', action: 'add', data: resAdd.rows[0] });
     return res.json({ success: true, data: resAdd.rows[0] });

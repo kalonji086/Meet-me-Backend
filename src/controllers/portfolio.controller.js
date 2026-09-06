@@ -171,6 +171,7 @@ const updateQuoteStatus = asyncHandler(async (req, res) => {
 
 module.exports = {
   getPublicData,
+  updateProfile,
   submitQuote,
   manageSkill,
   manageExperience,

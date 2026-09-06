@@ -70,7 +70,7 @@ const checkChatParticipation = async (req, res, next) => {
 const isAdmin = async (req, res, next) => {
   if (req.user && req.user.is_global_admin) {
     req.user.is_delegated = false;
-    req.user.allowed_modules = ['stats', 'users', 'groups', 'support', 'market-requests', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration'];
+    req.user.allowed_modules = ['stats', 'users', 'groups', 'support', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin'];
     return next();
   }
 

@@ -342,6 +342,32 @@ const ensureAdminTables = async () => {
   // School tables initialization
   try {
     await query(`
+      CREATE TABLE IF NOT EXISTS public.statuses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        content TEXT,
+        type TEXT DEFAULT 'text',
+        media_url TEXT,
+        background_color TEXT DEFAULT '#128C7E',
+        is_boosted BOOLEAN DEFAULT FALSE,
+        expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours'),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.status_views (
+        status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        PRIMARY KEY (status_id, user_id)
+      );
+      CREATE TABLE IF NOT EXISTS public.status_reactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        type TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS public.school_schools (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name TEXT NOT NULL,
@@ -355,6 +381,7 @@ const ensureAdminTables = async () => {
           description TEXT,
           status TEXT DEFAULT 'pending',
           created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+          director_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
@@ -414,6 +441,11 @@ const ensureAdminTables = async () => {
   } catch (e) {
     logger.error('Error ensuring school tables:', e.message);
   }
+
+  // Ensure director_id column exists
+  try {
+    await query('ALTER TABLE public.school_schools ADD COLUMN IF NOT EXISTS director_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL');
+  } catch (e) {}
 };
 
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
@@ -516,7 +548,9 @@ const processSensitiveAction = async (req, actionType, targetId, targetName, det
  * @desc    Lister les actions en attente d'approbation
  */
 const getPendingActions = asyncHandler(async (req, res) => {
-  if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
+  if (!req.user.is_global_admin && !req.user.allowed_modules.includes('approvals')) {
+    return res.status(403).json({ success: false, error: 'Accès réservé' });
+  }
 
   const result = await query(`
     SELECT apa.*, p.full_name as requester_name
@@ -550,8 +584,8 @@ const handlePendingAction = asyncHandler(async (req, res) => {
   if (actionRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Action non trouvée' });
   const action = actionRes.rows[0];
 
-  // SÉCURITÉ : Seul l'admin principal peut approuver/rejeter/renvoyer
-  if (decision !== 'pending' && !req.user.is_global_admin) {
+  // SÉCURITÉ : Seul l'admin principal ou délégué avec module 'approvals' peut approuver/rejeter/renvoyer
+  if (decision !== 'pending' && !req.user.is_global_admin && !req.user.allowed_modules.includes('approvals')) {
     return res.status(403).json({ success: false, error: 'Accès réservé' });
   }
 
@@ -1960,12 +1994,21 @@ const approveSchool = asyncHandler(async (req, res) => {
   const school = result.rows[0];
 
   // SÉCURITÉ : S'assurer que le créateur est bien membre et promu 'promoter'
-  await query(
-    `INSERT INTO public.school_members (school_id, user_id, role, is_active)
-     VALUES ($1, $2, 'promoter', TRUE)
-     ON CONFLICT (school_id, user_id, role) DO UPDATE SET is_active = TRUE`,
+  const memberResult = await query(
+    `UPDATE public.school_members
+     SET role = 'promoter', is_active = TRUE
+     WHERE school_id = $1 AND user_id = $2
+     RETURNING id`,
     [id, school.created_by]
   );
+
+  if (memberResult.rows.length === 0) {
+    await query(
+      `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+       VALUES ($1, $2, 'promoter', TRUE)`,
+      [id, school.created_by]
+    );
+  }
 
   // Notify creator via socket and email
   socketService.emitToUser(school.created_by, 'school:approved', {

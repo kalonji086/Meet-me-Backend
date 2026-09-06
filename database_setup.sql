@@ -302,6 +302,35 @@ CREATE TABLE IF NOT EXISTS public.contacts (
   PRIMARY KEY (user_id, contact_id)
 );
 
+-- status (v19.0.3)
+CREATE TABLE IF NOT EXISTS public.statuses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT,
+  type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image', 'video', 'background')),
+  media_url TEXT,
+  background_color TEXT DEFAULT '#128C7E',
+  is_boosted BOOLEAN DEFAULT FALSE,
+  expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours'),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.status_views (
+  status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (status_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.status_reactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status_id UUID REFERENCES public.statuses(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  type TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- reported_content (v19.0.3)
 CREATE TABLE IF NOT EXISTS public.reported_content (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -838,6 +867,10 @@ CREATE INDEX IF NOT EXISTS idx_school_schools_country ON public.school_schools(c
 CREATE INDEX IF NOT EXISTS idx_school_members_school ON public.school_members(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_students_school ON public.school_students(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_grades_student ON public.school_grades(student_id);
+CREATE INDEX IF NOT EXISTS idx_statuses_created_at ON public.statuses(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_statuses_expires_at ON public.statuses(expires_at);
+CREATE INDEX IF NOT EXISTS idx_market_posts_created_at ON public.market_posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_postings_created_at ON public.job_postings(created_at DESC);
 
 ALTER TABLE public.statuses ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;

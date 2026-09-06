@@ -470,6 +470,7 @@ const ensureAdminTables = async () => {
         name TEXT NOT NULL,
         level INTEGER DEFAULT 50,
         icon TEXT,
+        image_url TEXT,
         category TEXT DEFAULT 'technical',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
@@ -479,6 +480,7 @@ const ensureAdminTables = async () => {
         company TEXT NOT NULL,
         period TEXT,
         description TEXT,
+        logo_url TEXT,
         order_index INTEGER DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
@@ -488,6 +490,7 @@ const ensureAdminTables = async () => {
         description TEXT,
         price_range TEXT,
         icon TEXT,
+        image_url TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
       CREATE TABLE IF NOT EXISTS public.web_portfolio_quotes (

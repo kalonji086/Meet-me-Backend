@@ -397,6 +397,14 @@
                                         <option value="tools">Outils</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Logo / Image</label>
+                                    <div class="flex items-center gap-4">
+                                        <img id="skill-img-preview" src="https://ui-avatars.com/api/?name=?" class="w-12 h-12 rounded-xl object-cover border border-gray-100">
+                                        <input type="file" id="skill-img-input" class="hidden" onchange="previewPortfolioImg(this, 'skill-img-preview')">
+                                        <button onclick="document.getElementById('skill-img-input').click()" class="px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[9px] font-black uppercase">Choisir Logo</button>
+                                    </div>
+                                </div>
                                 <button onclick="saveSkill()" class="w-full py-4 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-cyan-100 hover:bg-cyan-600 transition-all mt-4">ENREGISTRER</button>
                             </div>
                         </div>
@@ -422,12 +430,22 @@
                              </div>
                              <div class="w-full md:w-48">
                                  <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Période</label>
-                                 <input type="text" id="exp-period" placeholder="2022 - Présent" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold">
+                                 <input type="text" id="exp-period" placeholder="2022 - Présent" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500">
+                             </div>
+                         </div>
+                         <div class="flex items-center gap-6 mb-8">
+                             <div class="flex-1">
+                                 <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Logo de l'App / Entreprise</label>
+                                 <div class="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                                     <img id="exp-logo-preview" src="https://ui-avatars.com/api/?name=EXP" class="w-16 h-16 rounded-xl object-cover shadow-sm bg-white">
+                                     <input type="file" id="exp-logo-input" class="hidden" onchange="previewPortfolioImg(this, 'exp-logo-preview')">
+                                     <button onclick="document.getElementById('exp-logo-input').click()" class="px-6 py-3 bg-white border border-gray-100 rounded-xl text-[10px] font-black uppercase shadow-sm">Uploader Logo</button>
+                                 </div>
                              </div>
                          </div>
                          <div>
                              <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Description des réalisations</label>
-                             <textarea id="exp-desc" rows="4" class="w-full p-6 bg-gray-50 border border-gray-100 rounded-[2rem] outline-none font-medium text-sm" placeholder="Décrivez ce que vous avez accompli..."></textarea>
+                             <textarea id="exp-desc" rows="4" class="w-full p-6 bg-gray-50 border border-gray-100 rounded-[2rem] outline-none font-medium text-sm focus:border-indigo-500" placeholder="Décrivez ce que vous avez accompli..."></textarea>
                          </div>
                          <button onclick="saveExperience()" class="mt-8 px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
                              <i data-lucide="plus"></i> AJOUTER AU PARCOURS
@@ -5434,8 +5452,8 @@
                 document.getElementById('skills-list').innerHTML = skills.map(s => `
                     <div class="bg-white p-5 rounded-3xl border border-gray-100 flex items-center justify-between group">
                         <div class="flex items-center">
-                            <div class="w-10 h-10 bg-cyan-50 text-cyan-600 rounded-xl flex items-center justify-center mr-4">
-                                <i data-lucide="code-2" class="w-5 h-5"></i>
+                            <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center mr-4 overflow-hidden border border-gray-100">
+                                ${s.image_url ? `<img src="${getFullUrl(s.image_url)}" class="w-full h-full object-cover">` : `<i data-lucide="code-2" class="w-6 h-6 text-cyan-600"></i>`}
                             </div>
                             <div>
                                 <p class="font-black text-gray-800 text-sm uppercase">${s.name}</p>
@@ -5449,16 +5467,33 @@
             } catch (e) {}
         }
 
+        function previewPortfolioImg(input, previewId) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => document.getElementById(previewId).src = e.target.result;
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
         async function saveSkill() {
             const name = document.getElementById('skill-name').value;
             const level = document.getElementById('skill-level').value;
             const category = document.getElementById('skill-category').value;
+            const imgFile = document.getElementById('skill-img-input').files[0];
 
             if (!name) return alert("Nom requis");
 
             try {
-                await axios.post(`${API_URL}/portfolio/admin/skills`, { action: 'add', name, level, category }, { headers: { Authorization: `Bearer ${token}` } });
+                let imageUrl = null;
+                if (imgFile) {
+                    const up = await apiService_upload(imgFile);
+                    if (up.success) imageUrl = up.data.fileUrl;
+                }
+
+                await axios.post(`${API_URL}/portfolio/admin/skills`, { action: 'add', name, level, category, imageUrl }, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('skill-name').value = '';
+                document.getElementById('skill-img-input').value = '';
+                document.getElementById('skill-img-preview').src = 'https://ui-avatars.com/api/?name=?';
                 loadSkills();
                 toast("Compétence ajoutée", "success");
             } catch (e) { alert("Erreur de sauvegarde"); }
@@ -5477,7 +5512,8 @@
                 const res = await axios.get(`${API_URL}/portfolio/public`);
                 const exps = res.data.data.experiences;
                 document.getElementById('experiences-list').innerHTML = exps.map(e => `
-                    <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 flex justify-between items-start group">
+                    <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 flex gap-6 items-start group">
+                        ${e.logo_url ? `<img src="${getFullUrl(e.logo_url)}" class="w-20 h-20 rounded-2xl object-cover shadow-lg border border-gray-50 bg-white">` : ''}
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest">${e.period}</span>
@@ -5498,14 +5534,23 @@
             const company = document.getElementById('exp-company').value;
             const period = document.getElementById('exp-period').value;
             const description = document.getElementById('exp-desc').value;
+            const logoFile = document.getElementById('exp-logo-input').files[0];
 
             if (!title || !company) return alert("Titre et Entreprise requis");
 
             try {
-                await axios.post(`${API_URL}/portfolio/admin/experiences`, { action: 'add', title, company, period, description }, { headers: { Authorization: `Bearer ${token}` } });
+                let logoUrl = null;
+                if (logoFile) {
+                    const up = await apiService_upload(logoFile);
+                    if (up.success) logoUrl = up.data.fileUrl;
+                }
+
+                await axios.post(`${API_URL}/portfolio/admin/experiences`, { action: 'add', title, company, period, description, logoUrl }, { headers: { Authorization: `Bearer ${token}` } });
                 document.getElementById('exp-title').value = '';
                 document.getElementById('exp-company').value = '';
                 document.getElementById('exp-desc').value = '';
+                document.getElementById('exp-logo-input').value = '';
+                document.getElementById('exp-logo-preview').src = 'https://ui-avatars.com/api/?name=EXP';
                 loadExperiences();
                 toast("Expérience ajoutée", "success");
             } catch (e) { alert("Erreur"); }

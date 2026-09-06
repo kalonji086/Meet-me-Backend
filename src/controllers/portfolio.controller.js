@@ -60,27 +60,21 @@ const submitQuote = asyncHandler(async (req, res) => {
  * @desc    Manage Skills
  */
 const manageSkill = asyncHandler(async (req, res) => {
-  const { action, id, name, level, icon, category } = req.body;
+  const { action, id, name, level, icon, imageUrl, category } = req.body;
 
   if (action === 'add') {
     const resAdd = await query(
-      'INSERT INTO public.web_portfolio_skills (name, level, icon, category) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, level || 50, icon, category || 'technical']
+      'INSERT INTO public.web_portfolio_skills (name, level, icon, image_url, category) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, level || 50, icon, imageUrl, category || 'technical']
     );
+    socketService.broadcast('portfolio:data_updated', { type: 'skill', action: 'add', data: resAdd.rows[0] });
     return res.json({ success: true, data: resAdd.rows[0] });
   }
 
   if (action === 'delete') {
     await query('DELETE FROM public.web_portfolio_skills WHERE id = $1', [id]);
+    socketService.broadcast('portfolio:data_updated', { type: 'skill', action: 'delete', id });
     return res.json({ success: true, message: 'Compétence supprimée' });
-  }
-
-  if (action === 'update') {
-    const resUpd = await query(
-      'UPDATE public.web_portfolio_skills SET name = $1, level = $2, icon = $3, category = $4 WHERE id = $5 RETURNING *',
-      [name, level, icon, category, id]
-    );
-    return res.json({ success: true, data: resUpd.rows[0] });
   }
 
   res.status(400).json({ success: false, error: 'Action invalide' });
@@ -90,18 +84,20 @@ const manageSkill = asyncHandler(async (req, res) => {
  * @desc    Manage Experiences
  */
 const manageExperience = asyncHandler(async (req, res) => {
-  const { action, id, title, company, period, description, orderIndex } = req.body;
+  const { action, id, title, company, period, description, logoUrl, orderIndex } = req.body;
 
   if (action === 'add') {
     const resAdd = await query(
-      'INSERT INTO public.web_portfolio_experiences (title, company, period, description, order_index) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [title, company, period, description, orderIndex || 0]
+      'INSERT INTO public.web_portfolio_experiences (title, company, period, description, logo_url, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [title, company, period, description, logoUrl, orderIndex || 0]
     );
+    socketService.broadcast('portfolio:data_updated', { type: 'experience', action: 'add', data: resAdd.rows[0] });
     return res.json({ success: true, data: resAdd.rows[0] });
   }
 
   if (action === 'delete') {
     await query('DELETE FROM public.web_portfolio_experiences WHERE id = $1', [id]);
+    socketService.broadcast('portfolio:data_updated', { type: 'experience', action: 'delete', id });
     return res.json({ success: true, message: 'Expérience supprimée' });
   }
 
@@ -112,18 +108,20 @@ const manageExperience = asyncHandler(async (req, res) => {
  * @desc    Manage Services
  */
 const manageService = asyncHandler(async (req, res) => {
-  const { action, id, title, description, priceRange, icon } = req.body;
+  const { action, id, title, description, priceRange, icon, imageUrl } = req.body;
 
   if (action === 'add') {
     const resAdd = await query(
-      'INSERT INTO public.web_portfolio_services (title, description, price_range, icon) VALUES ($1, $2, $3, $4) RETURNING *',
-      [title, description, priceRange, icon]
+      'INSERT INTO public.web_portfolio_services (title, description, price_range, icon, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [title, description, priceRange, icon, imageUrl]
     );
+    socketService.broadcast('portfolio:data_updated', { type: 'service', action: 'add', data: resAdd.rows[0] });
     return res.json({ success: true, data: resAdd.rows[0] });
   }
 
   if (action === 'delete') {
     await query('DELETE FROM public.web_portfolio_services WHERE id = $1', [id]);
+    socketService.broadcast('portfolio:data_updated', { type: 'service', action: 'delete', id });
     return res.json({ success: true, message: 'Service supprimé' });
   }
 

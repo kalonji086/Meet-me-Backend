@@ -26,10 +26,9 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
       `SELECT s.*,
               (SELECT COUNT(*) FROM public.school_members sm WHERE sm.school_id = s.id AND sm.is_active = TRUE) AS members_count
        FROM public.school_schools s
-       WHERE s.status IN ('approved', 'active') OR s.created_by = $1
        ORDER BY s.created_at DESC
        LIMIT 100`,
-      [userId]
+      []
     ),
     query(
       `SELECT COUNT(*) AS total_students
@@ -107,7 +106,8 @@ const createSchool = asyncHandler(async (req, res) => {
     [school.id, userId]
   );
 
-  // Notify Principal Admin
+  // Notify Everyone and Principal Admin
+  socketService.broadcast('school:new_created', school);
   socketService.broadcast('admin:new_school_request', { schoolName: school.name, promoterId: userId });
 
   res.status(201).json({
@@ -243,11 +243,10 @@ const addGrade = asyncHandler(async (req, res) => {
 
 const getSchools = asyncHandler(async (req, res) => {
   const { country, city, type } = req.query;
-  const userId = req.userId;
 
-  let sql = `SELECT * FROM public.school_schools WHERE (status IN ('approved', 'active') OR created_by = $1)`;
-  const params = [userId];
-  let index = 2;
+  let sql = `SELECT * FROM public.school_schools WHERE 1=1`;
+  const params = [];
+  let index = 1;
 
   if (country) {
     sql += ` AND country ILIKE $${index}`;

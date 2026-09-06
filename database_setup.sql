@@ -865,6 +865,7 @@ CREATE TABLE IF NOT EXISTS public.school_messages (
 CREATE INDEX IF NOT EXISTS idx_school_staff_requests_school ON public.school_staff_requests(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_schools_country ON public.school_schools(country);
 CREATE INDEX IF NOT EXISTS idx_school_members_school ON public.school_members(school_id);
+CREATE INDEX IF NOT EXISTS idx_school_members_user ON public.school_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_school_students_school ON public.school_students(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_grades_student ON public.school_grades(student_id);
 CREATE INDEX IF NOT EXISTS idx_statuses_created_at ON public.statuses(created_at DESC);

@@ -9,14 +9,17 @@ const logger = require('../utils/logger');
 const getSchoolOverview = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
-  const [schoolMembership, worldSchools, myStudents, pendingAssignments] = await Promise.all([
+  const [mySchools, worldSchools, myStudents, pendingAssignments] = await Promise.all([
     query(
       `SELECT sm.role, sm.is_active, s.*
        FROM public.school_schools s
        LEFT JOIN public.school_members sm ON s.id = sm.school_id AND sm.user_id = $1
        WHERE s.created_by = $1 OR (sm.user_id = $1 AND sm.is_active = TRUE)
-       ORDER BY s.created_at DESC
-       LIMIT 1`,
+       ORDER BY (CASE
+         WHEN sm.role = 'promoter' THEN 0
+         WHEN sm.role = 'director' THEN 1
+         WHEN s.created_by = $1 THEN 2
+         ELSE 3 END) ASC, s.created_at DESC`,
       [userId]
     ),
     query(
@@ -25,7 +28,7 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
        FROM public.school_schools s
        WHERE s.status IN ('approved', 'active') OR s.created_by = $1
        ORDER BY s.created_at DESC
-       LIMIT 50`,
+       LIMIT 100`,
       [userId]
     ),
     query(
@@ -43,14 +46,17 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
     )
   ]);
 
-  const member = schoolMembership.rows[0];
+  // Prioritize "my" school where I am promoter or the most recent one I created
+  const member = mySchools.rows[0];
   const userRole = member ? (member.role || (member.created_by === userId ? 'promoter' : 'none')) : 'none';
 
   res.json({
     success: true,
     data: {
+      userId,
       role: userRole,
       mySchool: member || null,
+      mySchools: mySchools.rows, // Return all schools where user is involved
       worldSchools: worldSchools.rows,
       stats: {
         totalStudents: parseInt(myStudents.rows[0]?.total_students || 0),
@@ -230,10 +236,11 @@ const addGrade = asyncHandler(async (req, res) => {
 
 const getSchools = asyncHandler(async (req, res) => {
   const { country, city, type } = req.query;
+  const userId = req.userId;
 
-  let sql = `SELECT * FROM public.school_schools WHERE status IN ('approved', 'active')`;
-  const params = [];
-  let index = 1;
+  let sql = `SELECT * FROM public.school_schools WHERE (status IN ('approved', 'active') OR created_by = $1)`;
+  const params = [userId];
+  let index = 2;
 
   if (country) {
     sql += ` AND country ILIKE $${index}`;

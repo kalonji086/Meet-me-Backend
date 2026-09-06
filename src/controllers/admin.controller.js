@@ -463,7 +463,45 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS business_name TEXT');
     await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS logo_url TEXT');
 
-    logger.info('✅ Admin Schema Synchronized');
+    // Portfolio Management Tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_skills (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        level INTEGER DEFAULT 50,
+        icon TEXT,
+        category TEXT DEFAULT 'technical',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_experiences (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT NOT NULL,
+        company TEXT NOT NULL,
+        period TEXT,
+        description TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_services (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT NOT NULL,
+        description TEXT,
+        price_range TEXT,
+        icon TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_quotes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_name TEXT NOT NULL,
+        client_email TEXT NOT NULL,
+        project_description TEXT,
+        budget TEXT,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'contacted', 'accepted', 'rejected')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    logger.info('✅ Admin Schema Synchronized (including Portfolio)');
   } catch (err) {
     logger.warn('⚠️ Some schema migrations were skipped or failed: ' + err.message);
   }

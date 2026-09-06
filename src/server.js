@@ -25,6 +25,7 @@ const marketRoutes = require('./routes/market.routes');
 const schoolRoutes = require('./routes/school.routes');
 const collabRoutes = require('./routes/collab.routes');
 const employerRoutes = require('./routes/employer.routes');
+const portfolioRoutes = require('./routes/portfolio.routes');
 
 // Controllers pour routes directes
 const userController = require('./controllers/user.controller');
@@ -111,12 +112,18 @@ class Server {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
     this.app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+    this.app.use('/admin', express.static(path.join(__dirname, '..', 'admin-dashboard')));
   }
 
   initializeRoutes() {
     this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me', version: '92.0.0' }));
     this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '92.0.0' }));
-    
+
+    // Portfolio Public Route
+    this.app.get('/portfolio', (req, res) => {
+      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'portfolio.html'));
+    });
+
     // Route de ping pour garder le serveur actif sur Render
     this.app.get('/api/ping', (req, res) => {
       res.json({ 
@@ -172,6 +179,7 @@ class Server {
     this.app.use('/api/school', schoolRoutes);
     this.app.use('/api/collab', collabRoutes);
     this.app.use('/api/employer', employerRoutes);
+    this.app.use('/api/portfolio', portfolioRoutes);
 
     // Servir le Dashboard Admin
     const adminPath = path.join(__dirname, '..', 'admin-dashboard');

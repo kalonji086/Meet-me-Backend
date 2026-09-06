@@ -22,8 +22,8 @@
     <nav class="fixed top-0 left-0 right-0 z-50 px-6 py-6 transition-all duration-500" id="navbar">
         <div class="max-w-7xl mx-auto flex items-center justify-between glass px-8 py-4 rounded-[2rem]">
             <div class="flex items-center gap-3">
-                <div id="nav-logo-container" class="w-10 h-10 overflow-hidden rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20 bg-white">
-                    <img id="site-logo" src="" class="w-full h-full object-contain hidden">
+                <div id="nav-logo-container" class="w-12 h-12 overflow-hidden rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20 bg-white aspect-square border border-white/10">
+                    <img id="site-logo" src="" class="w-full h-full object-contain p-1 hidden" alt="Logo">
                     <i id="site-logo-fallback" data-lucide="zap" class="text-cyan-500 fill-current"></i>
                 </div>
                 <span class="font-black text-xl tracking-tighter uppercase">Together Tech</span>
@@ -194,8 +194,12 @@
                             <option value="2000$ - 5000$">2000$ - 5000$</option>
                             <option value="5000$+">5000$+</option>
                         </select>
-                        <textarea id="projectDesc" rows="5" placeholder="Décrivez votre projet en quelques lignes..." required class="w-full bg-white/5 border border-white/5 p-8 rounded-[2.5rem] outline-none focus:border-cyan-500 transition-all font-medium"></textarea>
-                        <button type="submit" id="submit-btn" class="w-full py-6 bg-white text-black rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-500 hover:text-white transition-all shadow-xl shadow-white/5">Envoyer la demande</button>
+                        <div>
+                            <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-4 mb-2 block">Cahier des charges / Spécifications</label>
+                            <textarea id="specifications" rows="6" placeholder="Détaillez vos besoins techniques, fonctionnalités souhaitées, délais..." class="w-full bg-white/5 border border-white/5 p-8 rounded-[2.5rem] outline-none focus:border-cyan-500 transition-all font-medium"></textarea>
+                        </div>
+                        <input type="hidden" id="projectDesc">
+                        <button type="submit" id="submit-btn" class="w-full py-6 bg-white text-black rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-500 hover:text-white transition-all shadow-xl shadow-white/5">Envoyer la demande complète</button>
                     </form>
                 </div>
             </div>
@@ -327,18 +331,31 @@
         function renderServices(services) {
             const grid = document.getElementById('services-grid');
             grid.innerHTML = services.map(s => `
-                <div class="glass p-12 rounded-[3.5rem] border-white/5 relative group hover:bg-white/[0.02] transition-all">
+                <div class="glass p-12 rounded-[3.5rem] border-white/5 relative group hover:bg-white/[0.02] transition-all flex flex-col h-full">
                     <div class="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-10 group-hover:bg-cyan-500 group-hover:text-white transition-all shadow-xl">
                         <i data-lucide="layout" class="w-10 h-10"></i>
                     </div>
                     <h4 class="text-2xl font-black uppercase tracking-tighter mb-4">${s.title}</h4>
-                    <p class="text-gray-500 font-medium text-sm leading-relaxed mb-10">${s.description}</p>
-                    <div class="flex items-center justify-between mt-auto">
-                        <p class="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Dès ${s.price_range || 'N/C'}</p>
-                        <i data-lucide="arrow-up-right" class="text-gray-700 group-hover:text-cyan-400 transition-all"></i>
+                    <p class="text-gray-500 font-medium text-sm leading-relaxed mb-10 flex-1">${s.description}</p>
+                    <div class="pt-6 border-t border-white/5 mt-auto">
+                        <div class="flex items-center justify-between mb-6">
+                            <p class="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Dès ${s.price_range || 'N/C'}</p>
+                            <i data-lucide="arrow-up-right" class="text-gray-700 group-hover:text-cyan-400 transition-all"></i>
+                        </div>
+                        <button onclick="requestService('${s.title.replace(/'/g, "\\'")}')" class="w-full py-4 bg-white/5 hover:bg-cyan-500 hover:text-white border border-white/10 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all">Demander un Devis</button>
                     </div>
                 </div>
             `).join('');
+        }
+
+        function requestService(serviceTitle) {
+            document.getElementById('projectDesc').value = "Demande pour le service : " + serviceTitle;
+            document.getElementById('specifications').placeholder = "Détaillez vos besoins spécifiques pour " + serviceTitle + "...";
+            document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+            // Highlight the form
+            const form = document.getElementById('quote-form');
+            form.classList.add('ring-2', 'ring-cyan-500');
+            setTimeout(() => form.classList.remove('ring-2', 'ring-cyan-500'), 2000);
         }
 
         // Form Submission
@@ -351,7 +368,8 @@
                 clientName: document.getElementById('clientName').value,
                 clientEmail: document.getElementById('clientEmail').value,
                 budget: document.getElementById('budget').value,
-                projectDescription: document.getElementById('projectDesc').value
+                projectDescription: document.getElementById('projectDesc').value,
+                specifications: document.getElementById('specifications').value
             };
 
             try {

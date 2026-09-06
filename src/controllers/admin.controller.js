@@ -515,7 +515,11 @@ const ensureAdminTables = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM public.web_portfolio_profile);
     `);
 
-    logger.info('✅ Admin Schema Synchronized (including Portfolio)');
+    await query(`
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS specifications TEXT;
+    `);
+
+    logger.info('✅ Admin Schema Synchronized (including Portfolio & Specs)');
   } catch (err) {
     logger.warn('⚠️ Some schema migrations were skipped or failed: ' + err.message);
   }

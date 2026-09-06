@@ -5754,8 +5754,12 @@
                             </div>
                         </div>
                         <div class="bg-white p-6 rounded-3xl border border-gray-100">
-                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Description du Projet</p>
-                            <p class="text-sm font-medium text-gray-600 leading-relaxed">${q.project_description || 'Aucun détail fourni.'}</p>
+                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Description du Projet / Service</p>
+                            <p class="text-sm font-bold text-indigo-600 leading-relaxed">${q.project_description || 'Aucun détail fourni.'}</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100">
+                            <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Cahier des charges complet</p>
+                            <p class="text-sm font-medium text-gray-600 leading-relaxed whitespace-pre-wrap">${q.specifications || 'Aucune spécification technique fournie.'}</p>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">

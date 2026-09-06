@@ -52,16 +52,16 @@ const updateProfile = asyncHandler(async (req, res) => {
  * @route   POST /api/portfolio/quote
  */
 const submitQuote = asyncHandler(async (req, res) => {
-  const { clientName, clientEmail, projectDescription, budget } = req.body;
+  const { clientName, clientEmail, projectDescription, budget, specifications } = req.body;
 
   if (!clientName || !clientEmail) {
     return res.status(400).json({ success: false, error: 'Nom et Email requis' });
   }
 
   const result = await query(
-    `INSERT INTO public.web_portfolio_quotes (client_name, client_email, project_description, budget)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [clientName, clientEmail, projectDescription, budget]
+    `INSERT INTO public.web_portfolio_quotes (client_name, client_email, project_description, budget, specifications)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [clientName, clientEmail, projectDescription, budget, specifications]
   );
 
   // Notify Main Admin via Socket

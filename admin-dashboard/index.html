@@ -5795,6 +5795,7 @@
                 const q = res.data.data.find(x => x.id === id);
                 if (!q) return;
 
+                const footer = document.getElementById('impact-footer');
                 let html = `
                     <div class="space-y-6 text-left">
                         <div class="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 flex items-center">

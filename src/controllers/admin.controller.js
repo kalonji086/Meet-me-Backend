@@ -526,6 +526,11 @@ const ensureAdminTables = async () => {
       ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS admin_reply_message TEXT;
       ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS final_price TEXT;
       ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS estimated_duration TEXT;
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_content TEXT;
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_signature_data TEXT;
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_signed_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_contract_archived BOOLEAN DEFAULT FALSE;
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_specs_archived BOOLEAN DEFAULT FALSE;
 
       CREATE TABLE IF NOT EXISTS public.web_portfolio_messages (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

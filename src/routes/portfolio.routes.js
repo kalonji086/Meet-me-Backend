@@ -9,6 +9,8 @@ router.post('/quote', portfolioController.submitQuote);
 router.get('/client/tracking', portfolioController.getClientQuotes);
 router.get('/chat/:quoteId', portfolioController.handleChat);
 router.post('/chat/:quoteId', portfolioController.handleChat);
+router.post('/client/quotes/:id/sign', portfolioController.signContract);
+router.put('/client/quotes/:id/specs', portfolioController.updateSpecs);
 
 // Admin restricted access
 router.use(authenticate);
@@ -21,5 +23,6 @@ router.put('/admin/profile', portfolioController.updateProfile);
 router.get('/admin/quotes', portfolioController.getQuotes);
 router.put('/admin/quotes/:id', portfolioController.updateQuoteStatus);
 router.post('/admin/quotes/:id/reply', portfolioController.replyToQuote);
+router.put('/admin/quotes/:id/contract', portfolioController.updateContract);
 
 module.exports = router;

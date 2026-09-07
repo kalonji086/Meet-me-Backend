@@ -82,6 +82,44 @@ const replyToQuote = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Update Contract (Admin)
+ */
+const updateContract = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { content } = req.body;
+  await query('UPDATE public.web_portfolio_quotes SET contract_content = $1, updated_at = NOW() WHERE id = $2', [content, id]);
+  socketService.broadcast('portfolio:contract_updated', { quoteId: id, content });
+  res.json({ success: true, message: 'Contrat mis à jour et envoyé au client.' });
+});
+
+/**
+ * @desc    Sign Contract (Client)
+ */
+const signContract = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { signatureData } = req.body;
+  const result = await query(
+    `UPDATE public.web_portfolio_quotes
+     SET contract_signature_data = $1, contract_signed_at = NOW(), is_contract_archived = TRUE, updated_at = NOW()
+     WHERE id = $2 RETURNING *`,
+    [signatureData, id]
+  );
+  socketService.broadcast('portfolio:contract_signed', result.rows[0]);
+  res.json({ success: true, message: 'Contrat signé avec succès !' });
+});
+
+/**
+ * @desc    Update Specifications (Client)
+ */
+const updateSpecs = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { specs } = req.body;
+  await query('UPDATE public.web_portfolio_quotes SET specifications = $1, updated_at = NOW() WHERE id = $2', [specs, id]);
+  socketService.broadcast('portfolio:specs_updated', { quoteId: id, specs });
+  res.json({ success: true, message: 'Cahier des charges mis à jour.' });
+});
+
+/**
  * @desc    Update Portfolio Profile/Logo
  */
 const updateProfile = asyncHandler(async (req, res) => {
@@ -231,6 +269,9 @@ module.exports = {
   getClientQuotes,
   handleChat,
   replyToQuote,
+  updateContract,
+  signContract,
+  updateSpecs,
   manageSkill,
   manageExperience,
   manageService,

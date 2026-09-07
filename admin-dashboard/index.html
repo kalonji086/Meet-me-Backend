@@ -5797,57 +5797,76 @@
 
                 const footer = document.getElementById('impact-footer');
                 let html = `
-                    <div class="space-y-6 text-left">
-                        <div class="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 flex items-center">
-                            <div class="w-12 h-12 bg-white text-indigo-600 rounded-2xl flex items-center justify-center mr-4 shadow-sm"><i data-lucide="user" class="w-6 h-6"></i></div>
-                            <div>
-                                <p class="text-xs font-black text-indigo-800 uppercase tracking-widest">Client</p>
-                                <p class="text-lg font-black text-indigo-600 uppercase">${q.client_name}</p>
-                            </div>
-                        </div>
-                        <div class="bg-white p-6 rounded-3xl border border-gray-100">
-                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Description du Projet / Service</p>
-                            <p class="text-sm font-bold text-indigo-600 leading-relaxed">${q.project_description || 'Aucun détail fourni.'}</p>
-                        </div>
-                        <div class="bg-white p-6 rounded-3xl border border-gray-100">
-                            <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Cahier des charges complet</p>
-                            <p class="text-sm font-medium text-gray-600 leading-relaxed whitespace-pre-wrap">${q.specifications || 'Aucune spécification technique fournie.'}</p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Email</p>
-                                <p class="text-xs font-bold text-gray-800 truncate">${q.client_email}</p>
-                            </div>
-                            <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Budget estimé</p>
-                                <p class="text-xs font-bold text-emerald-600 uppercase">${q.budget || 'N/C'}</p>
+                    <div class="flex h-[750px] overflow-hidden">
+                        <!-- Left: Project Info Sidebar -->
+                        <div class="w-80 border-r border-gray-100 p-8 overflow-y-auto custom-scrollbar bg-gray-50/50">
+                            <div class="space-y-8">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white"><i data-lucide="user"></i></div>
+                                    <div><p class="text-[10px] font-black text-gray-400 uppercase">Client</p><p class="text-sm font-black text-gray-900">${q.client_name}</p></div>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <div class="p-4 bg-white rounded-2xl border border-gray-100">
+                                        <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Email</p>
+                                        <p class="text-xs font-bold text-indigo-600 truncate">${q.client_email}</p>
+                                    </div>
+                                    <div class="p-4 bg-white rounded-2xl border border-gray-100">
+                                        <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Budget Estimé Client</p>
+                                        <p class="text-xs font-bold text-gray-800">${q.budget || 'N/C'}</p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Cahier des charges</p>
+                                    <p class="text-xs font-medium text-gray-600 leading-relaxed italic border-l-4 border-indigo-200 pl-4">${q.specifications || 'Aucune spécification technique fournie.'}</p>
+                                </div>
+
+                                <div class="pt-6">
+                                    <button onclick="openAdminReplyModal('${q.id}')" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                                        DÉFINIR OFFRE & STATUT
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- CHAT LIVE ADMIN -->
-                        <div class="bg-gray-900 rounded-[2.5rem] overflow-hidden flex flex-col h-[500px]">
-                            <div class="p-6 bg-white/5 border-b border-white/5 flex justify-between items-center">
-                                <h5 class="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Discussion Live avec le Client</h5>
-                                <div class="flex items-center gap-2">
-                                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                    <span class="text-[8px] font-black text-gray-400 uppercase">Client Connecté</span>
+                        <!-- Right: Classic Chat Interface -->
+                        <div class="flex-1 flex flex-col bg-white">
+                            <!-- Chat Header -->
+                            <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-white">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-green-500 animate-pulse"></div>
+                                    <div>
+                                        <h5 class="text-xs font-black text-gray-900 uppercase">Discussion avec ${q.client_name}</h5>
+                                        <p class="text-[8px] text-gray-400 font-bold uppercase">Projet : ${q.project_description || 'Sans titre'}</p>
+                                    </div>
                                 </div>
+                                <i data-lucide="message-square" class="text-gray-200"></i>
                             </div>
-                            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-dot"></div>
-                            <div class="p-4 bg-white/5 flex gap-3">
-                                <input type="text" id="admin-chat-input" placeholder="Répondre au client..." class="flex-1 bg-white/10 border-none p-4 rounded-xl text-white text-sm outline-none focus:ring-1 focus:ring-cyan-500">
-                                <button onclick="sendAdminChatMessage('${q.id}')" class="w-12 h-12 bg-cyan-500 text-white rounded-xl flex items-center justify-center hover:bg-cyan-600 transition-all shadow-lg"><i data-lucide="send" class="w-5 h-5"></i></button>
+
+                            <!-- Messages Scrolling Area -->
+                            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar bg-gray-50/30"></div>
+
+                            <!-- Chat Input -->
+                            <div class="p-6 bg-white border-t border-gray-100">
+                                <div class="flex gap-4">
+                                    <input type="text" id="admin-chat-input" placeholder="Écrire un message..." class="flex-1 bg-gray-50 border border-gray-100 p-5 rounded-2xl text-sm outline-none focus:border-indigo-500 font-medium transition-all">
+                                    <button onclick="sendAdminChatMessage('${q.id}')" class="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100">
+                                        <i data-lucide="send" class="w-6 h-6"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 `;
 
                 footer.innerHTML = `
-                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
-                    <button onclick="openAdminReplyModal('${q.id}')" class="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100">
-                        RÉPONDRE OFFICIELLEMENT & MARQUER STATUT
-                    </button>
+                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Quitter le Chat</button>
                 `;
+
+                // Set wider modal for chat
+                document.getElementById('impact-card').classList.add('max-w-6xl');
+                document.getElementById('impact-card').classList.remove('max-w-2xl');
 
                 setTimeout(() => {
                     loadAdminChat(q.id);

@@ -5970,6 +5970,8 @@
                 toast("Contrat envoyé au client !", "success");
             } catch (e) { alert("Erreur lors de l'envoi du contrat."); }
         }
+
+        async function openAdminReplyModal(quoteId) {
             let html = `
                 <div class="space-y-6 text-left">
                     <div class="grid grid-cols-2 gap-4">

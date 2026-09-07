@@ -44,6 +44,7 @@
                 <a href="#skills" class="hover:text-cyan-400 transition-all">Expertise</a>
                 <a href="#experience" class="hover:text-cyan-400 transition-all">Parcours</a>
                 <a href="#services" class="hover:text-cyan-400 transition-all">Services</a>
+                <button onclick="openTrackingModal()" class="text-white bg-white/5 px-4 py-2 rounded-lg hover:bg-cyan-500 transition-all">Mes Demandes</button>
             </div>
             <a href="#contact" class="px-8 py-3 bg-white text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-cyan-400 hover:text-white transition-all shadow-xl shadow-white/5">
                 Devis Express
@@ -250,6 +251,46 @@
             </div>
         </div>
     </footer>
+
+    <!-- MODAL TRACKING CLIENT -->
+    <div id="modal-tracking" class="hidden fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 backdrop-blur-xl">
+        <div class="max-w-4xl w-full bg-[#111115] rounded-[3rem] border border-white/5 shadow-2xl overflow-hidden animate-pop-in flex flex-col h-[85vh]">
+            <div class="p-10 border-b border-white/5 flex justify-between items-center bg-dot">
+                <div>
+                    <h3 class="text-3xl font-black uppercase tracking-tighter text-white">Mes Demandes <span class="text-cyan-400">& Projets</span></h3>
+                    <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-2">Suivi en temps réel de vos devis</p>
+                </div>
+                <button onclick="closeTrackingModal()" class="w-12 h-12 glass rounded-2xl flex items-center justify-center hover:bg-red-500 transition-all text-white"><i data-lucide="x"></i></button>
+            </div>
+
+            <div id="tracking-auth" class="flex-1 flex flex-col items-center justify-center p-10 space-y-8">
+                <div class="w-20 h-20 bg-cyan-500/10 rounded-[2rem] flex items-center justify-center text-cyan-400"><i data-lucide="shield-check" class="w-10 h-10"></i></div>
+                <div class="text-center space-y-2">
+                    <h4 class="text-xl font-black uppercase text-white">Accès Sécurisé</h4>
+                    <p class="text-gray-500 text-sm font-medium">Saisissez l'email utilisé lors de votre demande de devis.</p>
+                </div>
+                <div class="w-full max-w-sm space-y-4">
+                    <input type="email" id="track-email" placeholder="votre@email.com" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-cyan-500 transition-all font-bold text-center text-white">
+                    <button onclick="authTracking()" class="w-full py-5 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-cyan-500/10 hover:bg-cyan-600">Vérifier mes demandes</button>
+                </div>
+            </div>
+
+            <div id="tracking-content" class="hidden flex-1 flex flex-col lg:flex-row overflow-hidden">
+                <!-- Sidebar: List of Quotes -->
+                <div class="w-full lg:w-80 border-r border-white/5 overflow-y-auto custom-scrollbar p-6 space-y-4 bg-white/5">
+                    <h5 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Historique</h5>
+                    <div id="quotes-list-client" class="space-y-3"></div>
+                </div>
+                <!-- Main: Quote Details & Chat -->
+                <div id="quote-detail-view" class="flex-1 flex flex-col bg-[#0a0a0c] relative">
+                    <div class="p-10 flex items-center justify-center h-full flex-col text-gray-600 space-y-4">
+                        <i data-lucide="mouse-pointer-2" class="w-12 h-12 opacity-20 text-white"></i>
+                        <p class="font-black text-[10px] uppercase tracking-widest text-center">Sélectionnez une demande pour voir les détails et chatter</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>

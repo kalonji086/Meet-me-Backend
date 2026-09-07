@@ -116,8 +116,8 @@ class Server {
   }
 
   initializeRoutes() {
-    this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me', version: '92.0.0' }));
-    this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '92.0.0' }));
+    this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me', version: '93.0.0' }));
+    this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '93.0.0' }));
 
     // Portfolio Public Route
     this.app.get('/portfolio', (req, res) => {

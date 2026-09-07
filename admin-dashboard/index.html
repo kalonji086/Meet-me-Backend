@@ -124,7 +124,7 @@
                     <img src="/admin-portal/Together.png" class="w-7 h-7 mr-2" alt="Logo">
                     <h1 class="text-xl font-black text-white tracking-tighter uppercase">TOGETHE TECH</h1>
                 </div>
-                <p class="text-[9px] text-purple-400 uppercase tracking-[0.2em] font-black">COMMUNITY V51</p>
+                <p class="text-[9px] text-purple-400 uppercase tracking-[0.2em] font-black">COMMUNITY V93</p>
             </div>
             <nav id="admin-sidebar-nav" class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll custom-scrollbar">
                 <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
@@ -704,7 +704,7 @@
                             </div>
                             <div>
                                 <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Version</label>
-                                <input type="text" id="legal-version" value="50.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                                <input type="text" id="legal-version" value="93.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
                             </div>
                         </div>
 
@@ -743,7 +743,7 @@
                                 <div class="space-y-4">
                                     <div>
                                         <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-1 block">Version Cible</label>
-                                        <input type="text" id="up-version" placeholder="50.0.0" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
+                                        <input type="text" id="up-version" placeholder="93.0.0" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-purple-500">
                                     </div>
                                     <div>
                                         <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-1 block">Lien de Téléchargement</label>
@@ -1555,8 +1555,8 @@
 
             // SÉCURITÉ : Vérifier les mises à jour légales forcées SEULEMENT pour les délégués
             if (user && !user.isGlobalAdmin) {
-                // EXCEPTION VERSION 50 : Si l'utilisateur a déjà la version 50, on ne le bloque pas
-                if (user.accepted_tos_version === '50.0.0' || user.accepted_tos_version === '50') {
+                // EXCEPTION VERSION 93 : Si l'utilisateur a déjà la version 93, on ne le bloque pas
+                if (user.accepted_tos_version === '93.0.0' || user.accepted_tos_version === '93') {
                     return continueDashboardLoad(user);
                 }
 
@@ -1586,10 +1586,10 @@
             try {
                 // Simuler l'acceptation (Mettre à jour le profil utilisateur côté backend)
                 // Normalement, vous auriez une route /api/users/accept-legal
-                await axios.put(`${API_URL}/users/profile`, { accepted_tos_version: '50.0.0' }, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.put(`${API_URL}/users/profile`, { accepted_tos_version: '93.0.0' }, { headers: { Authorization: `Bearer ${token}` } });
 
                 // Mettre à jour l'utilisateur local
-                user.accepted_tos_version = '50.0.0';
+                user.accepted_tos_version = '93.0.0';
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('modal-legal-accept').classList.add('hidden');

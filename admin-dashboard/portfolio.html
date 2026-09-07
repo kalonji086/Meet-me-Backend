@@ -255,12 +255,20 @@
     <script>
         const API_BASE = '/api/portfolio';
         let socket;
+        let currentQuoteId = null;
 
         // Initialisation
         window.addEventListener('DOMContentLoaded', () => {
             loadData();
             initSocket();
             lucide.createIcons();
+
+            // Check for saved email in session
+            const savedEmail = localStorage.getItem('track_email');
+            if (savedEmail) {
+                document.getElementById('track-email').value = savedEmail;
+                authTracking();
+            }
 
             // Navbar Scroll Effect
             window.addEventListener('scroll', () => {
@@ -279,6 +287,170 @@
                 console.log('Real-time update received:', data);
                 loadData(); // Rafraîchir les données instantanément
             });
+
+            socket.on('portfolio:new_message', (msg) => {
+                if (currentQuoteId === msg.quote_id) {
+                    appendMessage(msg);
+                }
+            });
+
+            socket.on('portfolio:quote_updated', (data) => {
+                const email = localStorage.getItem('track_email');
+                if (email === data.client_email) {
+                    loadClientQuotes(email);
+                    if (currentQuoteId === data.id) {
+                        viewQuoteDetails(data.id);
+                    }
+                }
+            });
+        }
+
+        // --- TRACKING CLIENT LOGIC ---
+        function openTrackingModal() {
+            document.getElementById('modal-tracking').classList.remove('hidden');
+        }
+
+        function closeTrackingModal() {
+            document.getElementById('modal-tracking').classList.add('hidden');
+        }
+
+        async function authTracking() {
+            const email = document.getElementById('track-email').value.trim();
+            if (!email) return alert("Veuillez saisir votre email");
+
+            try {
+                const res = await axios.get(`${API_BASE}/client/tracking?email=${email}`);
+                if (res.data.success) {
+                    localStorage.setItem('track_email', email);
+                    document.getElementById('tracking-auth').classList.add('hidden');
+                    document.getElementById('tracking-content').classList.remove('hidden');
+                    renderClientQuotes(res.data.data);
+                }
+            } catch (e) { alert("Erreur lors de la récupération des données"); }
+        }
+
+        function renderClientQuotes(quotes) {
+            const container = document.getElementById('quotes-list-client');
+            if (quotes.length === 0) {
+                container.innerHTML = '<p class="text-[9px] text-gray-500 uppercase font-black text-center py-10 italic">Aucune demande trouvée</p>';
+                return;
+            }
+            container.innerHTML = quotes.map(q => {
+                let statusColor = "text-orange-500";
+                if (q.status === 'processing') statusColor = "text-blue-500";
+                if (q.status === 'accepted') statusColor = "text-green-500";
+                if (q.status === 'rejected') statusColor = "text-red-500";
+
+                return `
+                    <button onclick="viewQuoteDetails('${q.id}')" class="w-full text-left p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-all group">
+                        <p class="text-[10px] font-black uppercase mb-1 ${statusColor}">${q.status}</p>
+                        <p class="text-xs font-bold text-white truncate">${q.project_description || 'Sans titre'}</p>
+                        <p class="text-[8px] text-gray-500 mt-2 uppercase font-black tracking-widest">${new Date(q.created_at).toLocaleDateString()}</p>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        async function viewQuoteDetails(id) {
+            currentQuoteId = id;
+            try {
+                const email = localStorage.getItem('track_email');
+                const res = await axios.get(`${API_BASE}/client/tracking?email=${email}&quoteId=${id}`);
+                const q = res.data.data[0];
+                if (!q) return;
+
+                const view = document.getElementById('quote-detail-view');
+                view.innerHTML = `
+                    <div class="flex-1 flex flex-col overflow-hidden">
+                        <div class="p-8 border-b border-white/5 space-y-6">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="text-xl font-black uppercase text-gradient">Détails de la demande</h4>
+                                    <p class="text-[8px] text-gray-500 uppercase font-black tracking-widest mt-1">ID: ${q.id}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-lg bg-white/5 text-[9px] font-black uppercase tracking-widest border border-white/5">${q.status}</span>
+                            </div>
+
+                            ${q.admin_reply_message ? `
+                                <div class="p-6 rounded-[2rem] bg-cyan-500/5 border border-cyan-500/20">
+                                    <p class="text-[9px] font-black text-cyan-400 uppercase tracking-widest mb-3">Réponse de l'Admin</p>
+                                    <p class="text-sm text-gray-300 italic">"${q.admin_reply_message}"</p>
+                                    <div class="grid grid-cols-2 gap-4 mt-6">
+                                        <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+                                            <p class="text-[8px] text-gray-500 uppercase font-black mb-1">Budget Fixé</p>
+                                            <p class="text-sm font-black text-white">${q.final_price || 'N/A'}</p>
+                                        </div>
+                                        <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+                                            <p class="text-[8px] text-gray-500 uppercase font-black mb-1">Délai</p>
+                                            <p class="text-sm font-black text-white">${q.estimated_duration || 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="p-6 rounded-[2rem] bg-white/5 border border-white/10 text-center">
+                                    <p class="text-[9px] font-black text-gray-500 uppercase tracking-widest">En attente d'examen par l'administrateur</p>
+                                </div>
+                            `}
+                        </div>
+
+                        <!-- Chat Area -->
+                        <div id="client-chat-messages" class="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar bg-dot"></div>
+
+                        <div class="p-6 border-t border-white/5 bg-white/5 flex gap-4">
+                            <input type="text" id="client-chat-input" placeholder="Écrire à l'Admin..." class="flex-1 bg-[#111115] border border-white/10 p-4 rounded-2xl text-white text-sm outline-none focus:border-cyan-500 transition-all">
+                            <button onclick="sendClientMessage()" class="w-14 h-14 bg-cyan-500 text-white rounded-2xl flex items-center justify-center hover:bg-cyan-600 transition-all shadow-xl shadow-cyan-500/20"><i data-lucide="send"></i></button>
+                        </div>
+                    </div>
+                `;
+                lucide.createIcons();
+                loadChatMessages(id);
+            } catch (e) {}
+        }
+
+        async function loadChatMessages(quoteId) {
+            try {
+                const res = await axios.get(`${API_BASE}/chat/${quoteId}`);
+                const container = document.getElementById('client-chat-messages');
+                if(!container) return;
+                container.innerHTML = "";
+                res.data.data.forEach(appendMessage);
+            } catch (e) {}
+        }
+
+        function appendMessage(msg) {
+            const container = document.getElementById('client-chat-messages') || document.getElementById('admin-chat-messages');
+            if(!container) return;
+
+            const isMe = (container.id === 'client-chat-messages' && msg.sender_type === 'client') ||
+                         (container.id === 'admin-chat-messages' && msg.sender_type === 'admin');
+
+            const html = `
+                <div class="flex ${isMe ? 'justify-end' : 'justify-start'} animate-pop-in">
+                    <div class="max-w-[80%] p-4 rounded-2xl ${isMe ? 'bg-cyan-600 text-white rounded-tr-none shadow-lg shadow-cyan-500/20' : 'bg-white/10 text-gray-200 rounded-tl-none border border-white/5'}">
+                        <p class="text-sm font-medium leading-relaxed">${msg.content}</p>
+                        <p class="text-[7px] font-bold opacity-50 mt-2 uppercase text-right">${new Date(msg.created_at).toLocaleTimeString()}</p>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendClientMessage() {
+            const input = document.getElementById('client-chat-input');
+            const content = input.value.trim();
+            if(!content || !currentQuoteId) return;
+
+            try {
+                const res = await axios.post(`${API_BASE}/chat/${currentQuoteId}`, {
+                    content,
+                    senderType: 'client'
+                });
+                if(res.data.success) {
+                    input.value = "";
+                    appendMessage(res.data.data);
+                }
+            } catch (e) { alert("Erreur d'envoi"); }
         }
 
         async function loadData() {

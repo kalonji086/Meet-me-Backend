@@ -5822,10 +5822,110 @@
                                 <p class="text-xs font-bold text-emerald-600 uppercase">${q.budget || 'N/C'}</p>
                             </div>
                         </div>
+
+                        <!-- CHAT LIVE ADMIN -->
+                        <div class="bg-gray-900 rounded-[2.5rem] overflow-hidden flex flex-col h-[500px]">
+                            <div class="p-6 bg-white/5 border-b border-white/5 flex justify-between items-center">
+                                <h5 class="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Discussion Live avec le Client</h5>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                    <span class="text-[8px] font-black text-gray-400 uppercase">Client Connecté</span>
+                                </div>
+                            </div>
+                            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-dot"></div>
+                            <div class="p-4 bg-white/5 flex gap-3">
+                                <input type="text" id="admin-chat-input" placeholder="Répondre au client..." class="flex-1 bg-white/10 border-none p-4 rounded-xl text-white text-sm outline-none focus:ring-1 focus:ring-cyan-500">
+                                <button onclick="sendAdminChatMessage('${q.id}')" class="w-12 h-12 bg-cyan-500 text-white rounded-xl flex items-center justify-center hover:bg-cyan-600 transition-all shadow-lg"><i data-lucide="send" class="w-5 h-5"></i></button>
+                            </div>
+                        </div>
                     </div>
                 `;
+
+                footer.innerHTML = `
+                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
+                    <button onclick="openAdminReplyModal('${q.id}')" class="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100">
+                        RÉPONDRE OFFICIELLEMENT & MARQUER STATUT
+                    </button>
+                `;
+
+                setTimeout(() => {
+                    loadAdminChat(q.id);
+                    if (window.lucide) lucide.createIcons();
+                }, 100);
+
                 Alert.show("Détails Demande Devis", html, null, "Fermer", "indigo");
             } catch (e) {}
+        }
+
+        async function loadAdminChat(quoteId) {
+            try {
+                const res = await axios.get(`${API_URL}/portfolio/chat/${quoteId}`);
+                const container = document.getElementById('admin-chat-messages');
+                if(!container) return;
+                container.innerHTML = res.data.data.map(m => `
+                    <div class="flex ${m.sender_type === 'admin' ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-[80%] p-4 rounded-2xl ${m.sender_type === 'admin' ? 'bg-cyan-600 text-white rounded-tr-none' : 'bg-white/10 text-gray-200 rounded-tl-none border border-white/5'}">
+                            <p class="text-sm font-medium leading-relaxed">${m.content}</p>
+                            <p class="text-[7px] font-bold opacity-50 mt-2 uppercase text-right">${new Date(m.created_at).toLocaleTimeString()}</p>
+                        </div>
+                    </div>
+                `).join('');
+                container.scrollTop = container.scrollHeight;
+            } catch (e) {}
+        }
+
+        async function sendAdminChatMessage(quoteId) {
+            const input = document.getElementById('admin-chat-input');
+            const content = input.value.trim();
+            if(!content) return;
+            try {
+                await axios.post(`${API_URL}/portfolio/chat/${quoteId}`, { content, senderType: 'admin' });
+                input.value = "";
+                loadAdminChat(quoteId);
+            } catch (e) {}
+        }
+
+        function openAdminReplyModal(quoteId) {
+            let html = `
+                <div class="space-y-6 text-left">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Statut de la demande</label>
+                            <select id="reply-status" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm">
+                                <option value="processing">Traitement en cours</option>
+                                <option value="accepted">Accepter le Projet</option>
+                                <option value="rejected">Refuser le Projet</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Prix / Budget Final ($)</label>
+                            <input type="text" id="reply-price" placeholder="Ex: 1200$" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Délai estimé</label>
+                        <input type="text" id="reply-duration" placeholder="Ex: 3 semaines" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Message Officiel (Explication)</label>
+                        <textarea id="reply-message" rows="6" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-medium text-sm focus:border-indigo-500" placeholder="Bonjour, après examen de votre cahier des charges..."></textarea>
+                    </div>
+                </div>
+            `;
+            Alert.show("Réponse Officielle au Devis", html, async () => {
+                const data = {
+                    status: document.getElementById('reply-status').value,
+                    message: document.getElementById('reply-message').value,
+                    price: document.getElementById('reply-price').value,
+                    duration: document.getElementById('reply-duration').value
+                };
+                try {
+                    await axios.post(`${API_URL}/portfolio/admin/quotes/${quoteId}/reply`, data, { headers: { Authorization: `Bearer ${token}` } });
+                    toast("Réponse envoyée au client", "success");
+                    closeImpactModal();
+                    loadQuotes();
+                } catch(e) { alert("Erreur lors de l'envoi de la réponse"); }
+            }, "Envoyer la réponse", "indigo");
         }
     </script>
 </body>

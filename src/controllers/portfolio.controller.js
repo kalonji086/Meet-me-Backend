@@ -27,6 +27,61 @@ const getPublicData = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Client Login to view quotes
+ */
+const getClientQuotes = asyncHandler(async (req, res) => {
+  const { email, quoteId } = req.query;
+  const result = await query(
+    'SELECT * FROM public.web_portfolio_quotes WHERE client_email = $1 AND (id::text = $2 OR $2 IS NULL) ORDER BY created_at DESC',
+    [email, quoteId]
+  );
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Send/Get messages for a quote
+ */
+const handleChat = asyncHandler(async (req, res) => {
+  const { quoteId } = req.params;
+  const { content, senderType } = req.body;
+
+  if (req.method === 'POST') {
+    const result = await query(
+      'INSERT INTO public.web_portfolio_messages (quote_id, sender_type, content) VALUES ($1, $2, $3) RETURNING *',
+      [quoteId, senderType, content]
+    );
+    // Notify recipient
+    socketService.broadcast('portfolio:new_message', result.rows[0]);
+    return res.json({ success: true, data: result.rows[0] });
+  }
+
+  const messages = await query(
+    'SELECT * FROM public.web_portfolio_messages WHERE quote_id = $1 ORDER BY created_at ASC',
+    [quoteId]
+  );
+  res.json({ success: true, data: messages.rows });
+});
+
+/**
+ * @desc    Admin reply to a quote
+ */
+const replyToQuote = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, message, price, duration } = req.body;
+
+  const result = await query(
+    `UPDATE public.web_portfolio_quotes
+     SET status = $1, admin_reply_message = $2, final_price = $3, estimated_duration = $4, updated_at = NOW()
+     WHERE id = $5 RETURNING *`,
+    [status, message, price, duration, id]
+  );
+
+  socketService.broadcast('portfolio:quote_updated', result.rows[0]);
+
+  res.json({ success: true, message: 'Réponse envoyée au client.' });
+});
+
+/**
  * @desc    Update Portfolio Profile/Logo
  */
 const updateProfile = asyncHandler(async (req, res) => {
@@ -173,6 +228,9 @@ module.exports = {
   getPublicData,
   updateProfile,
   submitQuote,
+  getClientQuotes,
+  handleChat,
+  replyToQuote,
   manageSkill,
   manageExperience,
   manageService,

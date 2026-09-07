@@ -6,6 +6,9 @@ const { authenticate, isAdmin } = require('../middleware/auth.middleware');
 // Public access
 router.get('/public', portfolioController.getPublicData);
 router.post('/quote', portfolioController.submitQuote);
+router.get('/client/tracking', portfolioController.getClientQuotes);
+router.get('/chat/:quoteId', portfolioController.handleChat);
+router.post('/chat/:quoteId', portfolioController.handleChat);
 
 // Admin restricted access
 router.use(authenticate);
@@ -17,5 +20,6 @@ router.post('/admin/services', portfolioController.manageService);
 router.put('/admin/profile', portfolioController.updateProfile);
 router.get('/admin/quotes', portfolioController.getQuotes);
 router.put('/admin/quotes/:id', portfolioController.updateQuoteStatus);
+router.post('/admin/quotes/:id/reply', portfolioController.replyToQuote);
 
 module.exports = router;

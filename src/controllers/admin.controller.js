@@ -522,7 +522,22 @@ const ensureAdminTables = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM public.web_portfolio_profile);
     `);
 
-    logger.info('✅ Admin Schema Synchronized (Full Portfolio Consistency)');
+    await query(`
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS admin_reply_message TEXT;
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS final_price TEXT;
+      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS estimated_duration TEXT;
+
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id UUID REFERENCES public.web_portfolio_quotes(id) ON DELETE CASCADE,
+        sender_type TEXT NOT NULL CHECK (sender_type IN ('admin', 'client')),
+        content TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    logger.info('✅ Admin Schema Synchronized (Portfolio Chat & Responses)');
   } catch (err) {
     logger.warn('⚠️ Some schema migrations were skipped or failed: ' + err.message);
   }

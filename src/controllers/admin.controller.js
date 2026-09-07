@@ -119,13 +119,13 @@ const ensureAdminTables = async () => {
       logger.info('✅ Compte Admin principal créé.');
     } else {
       const admin = existingAdminRes.rows[0];
-      // Vérifier si on doit forcer la mise à jour (par précaution)
-      const hashedPass = await bcrypt.hash(adminPass, 10);
+      // On ne réinitialise PAS le mot de passe s'il existe déjà
+      // On s'assure juste que les droits et le déblocage sont corrects
       await query(
-        'UPDATE public.profiles SET password = $1, is_global_admin = TRUE, is_locked = FALSE, login_attempts = 0 WHERE id = $2',
-        [hashedPass, admin.id]
+        'UPDATE public.profiles SET is_global_admin = TRUE, is_locked = FALSE, login_attempts = 0 WHERE id = $1',
+        [admin.id]
       );
-      logger.info('✅ Compte Admin synchronisé et débloqué.');
+      logger.info('✅ Compte Admin synchronisé et débloqué (Mot de passe préservé).');
     }
 
     // Retirer les droits admin des autres
@@ -463,13 +463,7 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS business_name TEXT');
     await query('ALTER TABLE public.market_businesses ADD COLUMN IF NOT EXISTS logo_url TEXT');
 
-    // Portfolio Management Tables Consistency (Ensuring columns exist)
-    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS image_url TEXT');
-    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'technical\'');
-    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS logo_url TEXT');
-    await query('ALTER TABLE public.web_portfolio_services ADD COLUMN IF NOT EXISTS image_url TEXT');
-    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS specifications TEXT');
-
+    // Portfolio Management Tables Consistency (Ensuring tables exist first)
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_skills (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -506,7 +500,6 @@ const ensureAdminTables = async () => {
         project_description TEXT,
         budget TEXT,
         status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'contacted', 'accepted', 'rejected')),
-        specifications TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
       CREATE TABLE IF NOT EXISTS public.web_portfolio_profile (
@@ -522,16 +515,23 @@ const ensureAdminTables = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM public.web_portfolio_profile);
     `);
 
-    await query(`
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS admin_reply_message TEXT;
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS final_price TEXT;
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS estimated_duration TEXT;
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_content TEXT;
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_signature_data TEXT;
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_signed_at TIMESTAMP WITH TIME ZONE;
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_contract_archived BOOLEAN DEFAULT FALSE;
-      ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_specs_archived BOOLEAN DEFAULT FALSE;
+    // Ensure all columns exist for existing tables
+    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS image_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'technical\'');
+    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS logo_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_services ADD COLUMN IF NOT EXISTS image_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS specifications TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS admin_reply_message TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS final_price TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS estimated_duration TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_content TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_signature_data TEXT');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS contract_signed_at TIMESTAMP WITH TIME ZONE');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_contract_archived BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_specs_archived BOOLEAN DEFAULT FALSE');
 
+    // Create Chat Message table for Portfolio
+    await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_messages (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         quote_id UUID REFERENCES public.web_portfolio_quotes(id) ON DELETE CASCADE,
@@ -542,7 +542,7 @@ const ensureAdminTables = async () => {
       );
     `);
 
-    logger.info('✅ Admin Schema Synchronized (Portfolio Chat & Responses)');
+    logger.info('✅ Admin Schema Synchronized (Portfolio Full Consistency)');
   } catch (err) {
     logger.warn('⚠️ Some schema migrations were skipped or failed: ' + err.message);
   }

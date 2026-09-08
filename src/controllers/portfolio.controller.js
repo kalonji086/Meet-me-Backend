@@ -98,6 +98,8 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
   if (action === 'approved') {
     // 1. Check if user exists, otherwise create a base account for them
     let ownerId = request.user_id;
+    let tempPassword = null;
+
     if (!ownerId) {
         const userCheck = await query('SELECT id FROM public.profiles WHERE email = $1', [request.email]);
         if (userCheck.rows.length > 0) {
@@ -105,8 +107,8 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
         } else {
             const crypto = require('crypto');
             const bcrypt = require('bcryptjs');
-            const tempPass = crypto.randomBytes(4).toString('hex').toUpperCase();
-            const hashed = await bcrypt.hash(tempPass, 10);
+            tempPassword = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8 chars
+            const hashed = await bcrypt.hash(tempPassword, 10);
             const newUser = await query(
                 'INSERT INTO public.profiles (id, full_name, email, password, username, is_verified, must_change_password) VALUES ($1, $2, $3, $4, $5, TRUE, TRUE) RETURNING id',
                 [crypto.randomUUID(), request.full_name, request.email, hashed, request.desired_slug]
@@ -139,7 +141,8 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
         request.full_name,
         portfolioTitle,
         request.desired_slug,
-        request.preferred_color || '#06b6d4'
+        request.preferred_color || '#06b6d4',
+        tempPassword // Pass temp password to email
     );
 
     socketService.emitToUser(ownerId, 'portfolio:request_approved', { slug: request.desired_slug });

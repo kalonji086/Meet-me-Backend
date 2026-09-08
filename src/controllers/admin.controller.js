@@ -559,18 +559,26 @@ const ensureAdminTables = async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_pages (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        slug TEXT UNIQUE NOT NULL,
+        slug TEXT NOT NULL,
         title TEXT NOT NULL,
         content TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+    `);
 
-      INSERT INTO public.web_portfolio_pages (slug, title, content)
+    // Ensure composite unique constraint for multi-tenancy
+    try {
+      await query('ALTER TABLE public.web_portfolio_pages DROP CONSTRAINT IF EXISTS web_portfolio_pages_slug_key');
+      await query('ALTER TABLE public.web_portfolio_pages ADD CONSTRAINT web_portfolio_pages_slug_portfolio_id_key UNIQUE (slug, portfolio_id)');
+    } catch (e) { /* Already applied or table empty */ }
+
+    await query(`
+      INSERT INTO public.web_portfolio_pages (slug, title, content, portfolio_id)
       VALUES
-        ('policy', 'Politique de Confidentialité', '<h1>Politique de Confidentialité</h1><p>Contenu à rédiger...</p>'),
-        ('terms', 'Conditions d''Utilisation', '<h1>Conditions d''Utilisation</h1><p>Contenu à rédiger...</p>')
-      ON CONFLICT (slug) DO NOTHING;
+        ('policy', 'Politique de Confidentialité', '<h1>Politique de Confidentialité</h1><p>Contenu à rédiger...</p>', '00000000-0000-0000-0000-000000000000'),
+        ('terms', 'Conditions d''Utilisation', '<h1>Conditions d''Utilisation</h1><p>Contenu à rédiger...</p>', '00000000-0000-0000-0000-000000000000')
+      ON CONFLICT (slug, portfolio_id) DO NOTHING;
     `);
 
     // Community Enhancements: Pinned Messages, Audio, Documents

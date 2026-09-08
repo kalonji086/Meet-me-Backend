@@ -56,20 +56,22 @@ const getPublicData = asyncHandler(async (req, res) => {
  * @desc    Submit a portfolio creation request
  */
 const submitPortfolioRequest = asyncHandler(async (req, res) => {
-  const { fullName, email, profession, desiredSlug, preferredColor, motivation } = req.body;
-  const userId = req.userId;
+  const { fullName, email, profession, desiredSlug, preferredColor, motivation, logoUrl } = req.body;
 
-  if (!desiredSlug || !fullName) {
-    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants.' });
+  // If user is authenticated, we use their ID, otherwise it's null (public request)
+  const userId = req.userId || null;
+
+  if (!desiredSlug || !fullName || !email) {
+    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants (Nom, Email, Slug).' });
   }
 
   const existing = await query('SELECT id FROM public.web_portfolios WHERE slug = $1', [desiredSlug.toLowerCase()]);
   if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Ce nom de domaine (slug) est déjà utilisé.' });
 
   const result = await query(
-    `INSERT INTO public.web_portfolio_requests (user_id, full_name, email, profession, desired_slug, preferred_color, motivation)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [userId, fullName, email, profession, desiredSlug.toLowerCase(), preferredColor || '#06b6d4', motivation]
+    `INSERT INTO public.web_portfolio_requests (user_id, full_name, email, profession, desired_slug, preferred_color, motivation, logo_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [userId, fullName, email, profession, desiredSlug.toLowerCase(), preferredColor || '#06b6d4', motivation, logoUrl || null]
   );
 
   const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
@@ -77,7 +79,7 @@ const submitPortfolioRequest = asyncHandler(async (req, res) => {
     socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_portfolio_request', result.rows[0]);
   }
 
-  res.status(201).json({ success: true, message: 'Votre demande a été envoyée.', data: result.rows[0] });
+  res.status(201).json({ success: true, message: 'Votre demande a été envoyée avec succès !', data: result.rows[0] });
 });
 
 /**
@@ -92,14 +94,35 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
   const request = requestRes.rows[0];
 
   if (action === 'approved') {
+    // 1. Check if user exists, otherwise create a base account for them
+    let ownerId = request.user_id;
+    if (!ownerId) {
+        const userCheck = await query('SELECT id FROM public.profiles WHERE email = $1', [request.email]);
+        if (userCheck.rows.length > 0) {
+            ownerId = userCheck.rows[0].id;
+        } else {
+            // Create a shadow account (password must be reset or sent)
+            const crypto = require('crypto');
+            const bcrypt = require('bcryptjs');
+            const tempPass = crypto.randomBytes(4).toString('hex');
+            const hashed = await bcrypt.hash(tempPass, 10);
+            const newUser = await query(
+                'INSERT INTO public.profiles (full_name, email, password, username, is_verified) VALUES ($1, $2, $3, $4, TRUE) RETURNING id',
+                [request.full_name, request.email, hashed, request.desired_slug, true]
+            );
+            ownerId = newUser.rows[0].id;
+            // Send email with credentials (future)
+        }
+    }
+
     const portfolio = await query(
-      `INSERT INTO public.web_portfolios (user_id, slug, title, owner_name, theme_color, status)
-       VALUES ($1, $2, $3, $4, $5, 'approved') RETURNING *`,
-      [request.user_id, request.desired_slug, `Portfolio de ${request.full_name}`, request.full_name, request.preferred_color]
+      `INSERT INTO public.web_portfolios (user_id, slug, title, owner_name, theme_color, logo_url, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'approved') RETURNING *`,
+      [ownerId, request.desired_slug, `Portfolio de ${request.full_name}`, request.full_name, request.preferred_color, request.logo_url]
     );
 
-    await query('INSERT INTO public.web_portfolio_profile (portfolio_id, about_description) VALUES ($1, $2)',
-      [portfolio.rows[0].id, `Bienvenue sur mon portfolio professionnel. Je suis ${request.profession}.`]);
+    await query('INSERT INTO public.web_portfolio_profile (portfolio_id, about_description, logo_url) VALUES ($1, $2, $3)',
+      [portfolio.rows[0].id, `Bienvenue sur mon portfolio professionnel. Je suis ${request.profession}.`, request.logo_url]);
 
     await query(`INSERT INTO public.web_portfolio_pages (portfolio_id, slug, title, content) VALUES
       ($1, 'policy', 'Politique de Confidentialité', '<h1>Politique de Confidentialité</h1><p>Contenu à rédiger...</p>'),

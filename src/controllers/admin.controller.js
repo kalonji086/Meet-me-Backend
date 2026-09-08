@@ -646,6 +646,7 @@ const ensureAdminTables = async () => {
         profession TEXT NOT NULL,
         desired_slug TEXT UNIQUE NOT NULL,
         preferred_color TEXT DEFAULT '#06b6d4',
+        logo_url TEXT,
         motivation TEXT,
         status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

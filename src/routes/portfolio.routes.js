@@ -19,11 +19,14 @@ router.get('/community/groups/:groupId/messages', portfolioController.getCommuni
 router.post('/community/groups/:groupId/messages', portfolioController.sendCommunityMessage);
 router.put('/community/messages/:messageId/pin', portfolioController.togglePinMessage);
 
+// Request a new portfolio (Public or Auth)
+router.post('/request', (req, res, next) => {
+    if (req.headers.authorization) return authenticate(req, res, next);
+    next();
+}, portfolioController.submitPortfolioRequest);
+
 // Admin restricted access
 router.use(authenticate);
-
-// Request a new portfolio (Auth required)
-router.post('/request', portfolioController.submitPortfolioRequest);
 
 // Admin only (Global Admin)
 router.get('/admin/requests', isAdmin, portfolioController.getPortfolioRequests);

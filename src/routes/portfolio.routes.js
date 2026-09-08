@@ -16,6 +16,7 @@ router.put('/client/quotes/:id/specs', portfolioController.updateSpecs);
 router.get('/community/groups', portfolioController.getCommunityGroups);
 router.get('/community/groups/:groupId/messages', portfolioController.getCommunityMessages);
 router.post('/community/groups/:groupId/messages', portfolioController.sendCommunityMessage);
+router.put('/community/messages/:messageId/pin', portfolioController.togglePinMessage);
 
 // Admin restricted access
 router.use(authenticate);

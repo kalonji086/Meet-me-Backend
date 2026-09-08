@@ -188,23 +188,36 @@
             <div class="w-60 discord-channels flex flex-col shrink-0">
                 <div class="h-12 px-4 flex items-center justify-between shadow-sm border-b border-black/20 text-white font-black uppercase text-xs tracking-tight">
                     Together Tech
-                    <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
                 </div>
-                <div class="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                    <div class="mb-6 mt-4">
-                        <div class="flex items-center text-gray-400 font-black text-[10px] uppercase tracking-widest px-2 mb-2 hover:text-white cursor-pointer transition-all">
-                            <i data-lucide="chevron-down" class="w-3 h-3 mr-1"></i> ESPACE PUBLIC
+                <div class="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-6">
+                    <!-- Announcements Section -->
+                    <div>
+                        <div class="flex items-center text-gray-400 font-black text-[10px] uppercase tracking-widest px-2 mb-3 hover:text-white cursor-pointer transition-all">
+                            <i data-lucide="megaphone" class="w-3 h-3 mr-1"></i> Annonces
                         </div>
-                        <div class="space-y-[2px]">
-                            <div class="flex items-center px-2 py-1.5 rounded bg-white/10 text-white font-medium text-sm cursor-pointer group">
-                                <i data-lucide="hash" class="w-4 h-4 mr-2 text-gray-400 group-hover:text-white"></i> général
-                            </div>
-                            <div class="flex items-center px-2 py-1.5 rounded text-gray-400 font-medium text-sm cursor-pointer hover:bg-white/5 hover:text-white group transition-all">
-                                <i data-lucide="megaphone" class="w-4 h-4 mr-2 text-gray-400 group-hover:text-white"></i> annonces-tech
-                            </div>
-                            <div class="flex items-center px-2 py-1.5 rounded text-gray-400 font-medium text-sm cursor-pointer hover:bg-white/5 hover:text-white group transition-all">
-                                <i data-lucide="help-circle" class="w-4 h-4 mr-2 text-gray-400 group-hover:text-white"></i> support-live
-                            </div>
+                        <div id="discord-announcements-list" class="space-y-1">
+                            <!-- Injected -->
+                        </div>
+                    </div>
+
+                    <!-- Sports Live Section -->
+                    <div>
+                        <div class="flex items-center text-gray-400 font-black text-[10px] uppercase tracking-widest px-2 mb-3 hover:text-white cursor-pointer transition-all">
+                            <i data-lucide="trophy" class="w-3 h-3 mr-1"></i> Sports Live
+                        </div>
+                        <div id="discord-sports-list" class="space-y-2 px-1">
+                            <!-- Injected -->
+                        </div>
+                    </div>
+
+                    <!-- Groups Section -->
+                    <div>
+                        <div class="flex items-center text-gray-400 font-black text-[10px] uppercase tracking-widest px-2 mb-3 hover:text-white cursor-pointer transition-all">
+                            <i data-lucide="chevron-down" class="w-3 h-3 mr-1"></i> Salons Textuels
+                        </div>
+                        <div id="discord-channels-list" class="space-y-[2px]">
+                            <!-- Injected by JS -->
                         </div>
                     </div>
                 </div>
@@ -228,39 +241,45 @@
                 <div class="h-12 px-4 border-b border-black/20 flex items-center justify-between text-white shadow-sm shrink-0">
                     <div class="flex items-center gap-2">
                         <i data-lucide="hash" class="text-gray-400"></i>
-                        <span class="font-black text-sm uppercase tracking-tight">général</span>
+                        <span id="active-group-title" class="font-black text-sm uppercase tracking-tight">général</span>
                     </div>
                     <div class="flex items-center gap-4 text-gray-400">
-                        <i data-lucide="bell-off" class="w-5 h-5 cursor-pointer hover:text-white"></i>
-                        <i data-lucide="pin" class="w-5 h-5 cursor-pointer hover:text-white"></i>
+                        <i data-lucide="pin" class="w-5 h-5 cursor-pointer hover:text-white" title="Messages épinglés" onclick="togglePinnedMessages()"></i>
                         <i data-lucide="users" class="w-5 h-5 cursor-pointer hover:text-white" onclick="document.getElementById('discord-member-list').classList.toggle('hidden')"></i>
-                        <div class="bg-black/20 px-2 py-0.5 rounded flex items-center">
-                            <input type="text" placeholder="Rechercher" class="bg-transparent border-none outline-none text-xs w-24 focus:w-40 transition-all text-white">
-                            <i data-lucide="search" class="w-3.5 h-3.5"></i>
-                        </div>
                     </div>
                 </div>
+
+                <!-- Pinned Messages Panel -->
+                <div id="pinned-messages-panel" class="hidden absolute top-12 right-4 w-80 max-h-[60vh] bg-[#1e1f22] rounded-xl shadow-2xl z-[150] border border-black/20 flex flex-col overflow-hidden">
+                    <div class="p-4 bg-black/10 border-b border-black/20 font-black text-[10px] uppercase tracking-widest text-white">Épingles</div>
+                    <div id="pinned-messages-list" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"></div>
+                </div>
+
                 <!-- Chat Messages -->
                 <div id="discord-messages-container" class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                    <div class="flex flex-col items-center py-10 text-center space-y-4">
-                        <div class="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center text-cyan-400"><i data-lucide="hash" class="w-10 h-10"></i></div>
-                        <h4 class="text-3xl font-black text-white">Bienvenue dans #général !</h4>
-                        <p class="text-gray-400 text-sm">Ceci est le début du salon #général. Discutez avec la communauté Together Tech.</p>
-                    </div>
-                    <div id="discord-messages-list" class="space-y-6">
-                        <!-- Messages Injected here -->
-                    </div>
+                    <div id="discord-messages-list" class="space-y-6"></div>
                 </div>
-                <!-- Message Input -->
-                <div class="px-4 pb-6 shrink-0">
+
+                <!-- Message Input & Extras -->
+                <div class="px-4 pb-6 shrink-0 space-y-2">
+                    <!-- Stickers Picker (Simple) -->
+                    <div id="sticker-picker" class="hidden bg-[#2b2d31] p-4 rounded-xl border border-black/20 grid grid-cols-4 gap-2 mb-2">
+                        <button onclick="sendSticker('🔥')" class="text-2xl hover:bg-white/5 p-2 rounded">🔥</button>
+                        <button onclick="sendSticker('🚀')" class="text-2xl hover:bg-white/5 p-2 rounded">🚀</button>
+                        <button onclick="sendSticker('💎')" class="text-2xl hover:bg-white/5 p-2 rounded">💎</button>
+                        <button onclick="sendSticker('👑')" class="text-2xl hover:bg-white/5 p-2 rounded">👑</button>
+                    </div>
+
                     <div class="bg-[#383a40] rounded-lg p-3 flex flex-col gap-2 shadow-lg">
                         <div class="flex items-center gap-4">
-                            <button class="w-6 h-6 rounded-full bg-gray-500 text-[#313338] flex items-center justify-center hover:bg-white transition-all"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                            <input type="text" id="discord-chat-input" placeholder="Envoyer un message dans #général" class="flex-1 bg-transparent border-none outline-none text-white text-sm font-medium">
+                            <button onclick="document.getElementById('discord-file-input').click()" class="w-6 h-6 rounded-full bg-gray-500 text-[#313338] flex items-center justify-center hover:bg-white transition-all"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            <input type="file" id="discord-file-input" class="hidden" onchange="uploadDiscordFile(this)">
+
+                            <input type="text" id="discord-chat-input" placeholder="Envoyer un message..." class="flex-1 bg-transparent border-none outline-none text-white text-sm font-medium">
+
                             <div class="flex gap-3 text-gray-400">
-                                <i data-lucide="gift" class="w-5 h-5 hover:text-white cursor-pointer"></i>
-                                <i data-lucide="sticky-note" class="w-5 h-5 hover:text-white cursor-pointer"></i>
-                                <i data-lucide="smile" class="w-5 h-5 hover:text-white cursor-pointer"></i>
+                                <button id="audio-record-btn" onclick="toggleAudioRecording()" class="hover:text-red-400 transition-all"><i data-lucide="mic" class="w-5 h-5"></i></button>
+                                <i data-lucide="smile" class="w-5 h-5 hover:text-white cursor-pointer" onclick="document.getElementById('sticker-picker').classList.toggle('hidden')"></i>
                             </div>
                         </div>
                     </div>
@@ -358,6 +377,7 @@
         let activePage = 'home';
 
         let activeDiscordGroupId = null;
+        let mediaRecorder, audioChunks = [];
 
         window.addEventListener('DOMContentLoaded', () => {
             loadData();
@@ -416,19 +436,58 @@
         async function loadDiscordCommunity() {
             try {
                 const res = await axios.get(`${API_BASE}/community/groups`);
-                const groups = res.data.data;
-                const list = document.getElementById('discord-groups-list');
+                const { groups, sports, announcements } = res.data.data;
 
-                list.innerHTML = groups.map(g => `
+                // Render Server Sidebar
+                document.getElementById('discord-groups-list').innerHTML = groups.map(g => `
                     <div id="discord-group-${g.id}" class="discord-server-icon flex items-center justify-center bg-white/5 text-gray-400 hover:bg-[#5865f2] hover:text-white group" onclick="selectDiscordGroup('${g.id}', '${g.name.replace(/'/g, "\\'")}')" title="${g.name}">
                         ${g.avatar_url ? `<img src="${getFullUrl(g.avatar_url)}" class="w-full h-full object-cover rounded-[inherit]">` : g.name.charAt(0)}
                         <span class="discord-tooltip">${g.name}</span>
                     </div>
                 `).join('');
 
+                // Render Channels List
+                document.getElementById('discord-channels-list').innerHTML = groups.map(g => `
+                    <div class="flex items-center px-2 py-1.5 rounded ${activeDiscordGroupId === g.id ? 'bg-white/10 text-white' : 'text-gray-400'} font-medium text-sm cursor-pointer hover:bg-white/5 transition-all group" onclick="selectDiscordGroup('${g.id}', '${g.name}')">
+                        <i data-lucide="hash" class="w-4 h-4 mr-2 text-gray-400"></i> ${g.name.toLowerCase()}
+                    </div>
+                `).join('');
+
+                // Render Sports Live
+                document.getElementById('discord-sports-list').innerHTML = sports.map(s => `
+                    <div class="bg-black/20 p-3 rounded-lg border border-white/5 space-y-2">
+                        <div class="flex justify-between items-center"><span class="text-[8px] font-black text-red-500 uppercase animate-pulse">● ${s.status}</span><span class="text-[8px] font-bold text-gray-500">${s.minute || ''}'</span></div>
+                        <div class="flex justify-between items-center text-[10px] font-black uppercase">
+                            <span>${s.team_a}</span><span class="text-cyan-400">${s.score_a} - ${s.score_b}</span><span>${s.team_b}</span>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-[9px] text-gray-600 text-center italic">Aucun live</p>';
+
+                // Render Announcements
+                document.getElementById('discord-announcements-list').innerHTML = announcements.map(a => `
+                    <div class="px-2 py-2 rounded hover:bg-white/5 cursor-pointer transition-all border-l-2 border-transparent hover:border-cyan-500">
+                        <p class="text-[10px] font-black text-white truncate uppercase">${a.title}</p>
+                        <p class="text-[8px] text-gray-500 line-clamp-1">${a.content}</p>
+                    </div>
+                `).join('') || '<p class="text-[9px] text-gray-600 text-center italic">Aucune annonce</p>';
+
                 if (groups.length > 0 && !activeDiscordGroupId) {
                     selectDiscordGroup(groups[0].id, groups[0].name);
                 }
+
+                // Real members display
+                const membersRes = await axios.get('/api/admin/users');
+                const members = membersRes.data.data;
+                document.getElementById('discord-online-list').innerHTML = members.slice(0, 15).map(m => `
+                    <div class="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer group">
+                        <div class="relative">
+                            <img src="${getFullUrl(m.avatar_url)}" class="w-8 h-8 rounded-full object-cover">
+                            <div class="absolute bottom-0 right-0 w-3 h-3 ${m.status === 'online' ? 'bg-green-500' : 'bg-gray-500'} rounded-full border-2 border-[#2b2d31]"></div>
+                        </div>
+                        <span class="text-sm font-medium ${m.status === 'online' ? 'text-gray-200' : 'text-gray-500'} group-hover:text-white truncate">${m.full_name}</span>
+                    </div>
+                `).join('');
+
                 lucide.createIcons();
             } catch (e) {}
         }
@@ -438,9 +497,7 @@
             document.querySelectorAll('.discord-server-icon').forEach(el => el.classList.remove('active'));
             document.getElementById('discord-group-' + id)?.classList.add('active');
 
-            const header = document.querySelector('.discord-channels h4');
-            if (header) header.innerText = name.toUpperCase();
-
+            document.getElementById('active-group-title').innerText = name.toLowerCase();
             loadDiscordMessages(id);
         }
 
@@ -460,22 +517,43 @@
                 const avatar = m.sender_avatar ? getFullUrl(m.sender_avatar) : `https://ui-avatars.com/api/?name=${name}&background=random`;
                 const date = new Date(m.created_at).toLocaleString();
 
+                let contentHtml = `<p class="text-gray-300 text-sm leading-relaxed">${m.content}</p>`;
+                if (m.type === 'audio') contentHtml = `<audio src="${getFullUrl(m.file_url)}" controls class="h-8 mt-2 opacity-80"></audio>`;
+                if (m.type === 'document') contentHtml = `<a href="${getFullUrl(m.file_url)}" target="_blank" class="flex items-center gap-3 p-4 bg-black/20 rounded-xl border border-white/5 mt-2 hover:bg-black/40 transition-all">
+                    <i data-lucide="file" class="text-cyan-400"></i>
+                    <div class="overflow-hidden"><p class="text-xs font-bold text-white truncate">${m.file_name || 'Document'}</p><p class="text-[8px] text-gray-500 uppercase">Fichier</p></div>
+                </a>`;
+
                 return `
-                    <div class="flex items-start gap-4 hover:bg-black/5 p-2 rounded-lg transition-all group">
-                        <img src="${avatar}" class="w-10 h-10 rounded-full bg-gray-700">
+                    <div class="flex items-start gap-4 hover:bg-black/5 p-2 rounded-lg transition-all group ${m.is_pinned ? 'bg-cyan-500/5 border-l-2 border-cyan-500' : ''}">
+                        <img src="${avatar}" class="w-10 h-10 rounded-full bg-gray-700 shadow-xl">
                         <div class="flex-1">
                             <div class="flex items-center gap-2">
                                 <span class="font-bold text-white text-sm hover:underline cursor-pointer">${name}</span>
                                 <span class="text-[10px] text-gray-400 font-medium">${date}</span>
+                                ${m.is_pinned ? '<i data-lucide="pin" class="w-3 h-3 text-cyan-400"></i>' : ''}
                             </div>
-                            <p class="text-gray-300 text-sm leading-relaxed">${m.content}</p>
+                            ${contentHtml}
+                        </div>
+                        <div class="opacity-0 group-hover:opacity-100 transition-all flex gap-2">
+                             <button onclick="togglePin('${m.id}', ${!m.is_pinned})" class="p-1 hover:bg-white/10 rounded"><i data-lucide="pin" class="w-4 h-4 text-gray-400"></i></button>
                         </div>
                     </div>
                 `;
             }).join('');
 
+            // Update Pinned List
+            const pinned = messages.filter(m => m.is_pinned);
+            document.getElementById('pinned-messages-list').innerHTML = pinned.map(m => `
+                <div class="bg-black/20 p-3 rounded-lg border border-white/5">
+                    <p class="text-[10px] font-bold text-cyan-400 mb-1">${m.sender_name || 'Visiteur'}</p>
+                    <p class="text-xs text-gray-300 line-clamp-2">${m.content}</p>
+                </div>
+            `).join('') || '<p class="text-center text-gray-600 text-[10px] py-4">Aucun message épinglé</p>';
+
             const container = document.getElementById('discord-messages-container');
             container.scrollTop = container.scrollHeight;
+            lucide.createIcons();
         }
 
         async function sendDiscordMessage() {
@@ -487,15 +565,74 @@
                 const visitorName = localStorage.getItem('visitor_name') || 'Visiteur_' + Math.floor(Math.random() * 1000);
                 if (!localStorage.getItem('visitor_name')) localStorage.setItem('visitor_name', visitorName);
 
-                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, {
-                    content,
-                    visitorName
-                });
+                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { content, visitorName });
                 input.value = '';
                 loadDiscordMessages(activeDiscordGroupId);
-            } catch (e) {
-                alert("Erreur d'envoi");
+            } catch (e) {}
+        }
+
+        async function sendSticker(sticker) {
+            document.getElementById('sticker-picker').classList.add('hidden');
+            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+            await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { content: sticker, visitorName, type: 'sticker' });
+            loadDiscordMessages(activeDiscordGroupId);
+        }
+
+        async function uploadDiscordFile(input) {
+            const file = input.files[0];
+            if (!file || !activeDiscordGroupId) return;
+            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const upRes = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, {
+                    visitorName,
+                    type: 'document',
+                    fileUrl: upRes.data.data.fileUrl,
+                    fileName: file.name
+                });
+                loadDiscordMessages(activeDiscordGroupId);
+            } catch (e) { alert("Erreur upload"); }
+        }
+
+        async function toggleAudioRecording() {
+            const btn = document.getElementById('audio-record-btn');
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = async () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+                        const file = new File([blob], "voice_msg.ogg", { type: 'audio/ogg' });
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const upRes = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                        const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+                        await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { visitorName, type: 'audio', fileUrl: upRes.data.data.fileUrl });
+                        loadDiscordMessages(activeDiscordGroupId);
+                    };
+                    mediaRecorder.start();
+                    btn.classList.add('text-red-500', 'animate-pulse');
+                    showToast("Enregistrement...", "Parlez maintenant", "mic");
+                } catch (e) { alert("Micro non autorisé"); }
+            } else {
+                mediaRecorder.stop();
+                btn.classList.remove('text-red-500', 'animate-pulse');
             }
+        }
+
+        async function togglePin(msgId, isPinned) {
+            await axios.put(`${API_BASE}/community/messages/${msgId}/pin`, { isPinned });
+            loadDiscordMessages(activeDiscordGroupId);
+        }
+
+        function togglePinnedMessages() {
+            document.getElementById('pinned-messages-panel').classList.toggle('hidden');
         }
 
         function initSocket() {
@@ -503,10 +640,19 @@
             socket = io();
             socket.on('portfolio:data_updated', () => loadData());
             socket.on('community:new_message', (msg) => {
-                if (activeDiscordGroupId === msg.chat_id) {
-                    loadDiscordMessages(activeDiscordGroupId);
-                }
+                if (activeDiscordGroupId === msg.chat_id) loadDiscordMessages(activeDiscordGroupId);
+                showNotification("Nouveau message", msg.content, "message-square");
             });
+            socket.on('community:message_pinned', () => loadDiscordMessages(activeDiscordGroupId));
+        }
+
+        function showNotification(title, msg, icon) {
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: msg });
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+            showToast(title, msg, icon);
         }
 
         async function loadData() {

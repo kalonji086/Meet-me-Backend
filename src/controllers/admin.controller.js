@@ -546,6 +546,43 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_community TEXT');
     await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_contact TEXT');
 
+    // Community Enhancements: Pinned Messages, Audio, Documents
+    await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS type TEXT DEFAULT \'text\'');
+    await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_url TEXT');
+    await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_name TEXT');
+
+    // Sports & Announcements
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.live_sports (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        event_name TEXT NOT NULL,
+        status TEXT DEFAULT 'live',
+        score_a INTEGER DEFAULT 0,
+        score_b INTEGER DEFAULT 0,
+        team_a TEXT NOT NULL,
+        team_b TEXT NOT NULL,
+        minute TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_announcements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        priority TEXT DEFAULT 'normal',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Initial Demo Data for Community
+      INSERT INTO public.live_sports (event_name, team_a, team_b, score_a, score_b, minute)
+      SELECT 'Champions League', 'Real Madrid', 'Man City', 2, 1, '75'
+      WHERE NOT EXISTS (SELECT 1 FROM public.live_sports);
+
+      INSERT INTO public.web_portfolio_announcements (title, content, priority)
+      SELECT 'Nouvelle Version Mobile', 'La v93 est maintenant disponible sur le store !', 'high'
+      WHERE NOT EXISTS (SELECT 1 FROM public.web_portfolio_announcements);
+    `);
+
     // Create Chat Message table for Portfolio
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_messages (

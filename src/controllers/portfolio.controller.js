@@ -322,8 +322,19 @@ module.exports = {
  */
 async function getCommunityGroups(req, res) {
   try {
-    const result = await query("SELECT id, name, avatar_url, description FROM public.chats WHERE type = 'group' AND is_banned = FALSE ORDER BY created_at ASC");
-    res.json({ success: true, data: result.rows });
+    const [groups, sports, annon] = await Promise.all([
+      query("SELECT id, name, avatar_url, description FROM public.chats WHERE type = 'group' AND is_banned = FALSE ORDER BY created_at ASC"),
+      query("SELECT * FROM public.live_sports ORDER BY created_at DESC LIMIT 5"),
+      query("SELECT * FROM public.web_portfolio_announcements ORDER BY created_at DESC LIMIT 10")
+    ]);
+    res.json({
+      success: true,
+      data: {
+        groups: groups.rows,
+        sports: sports.rows,
+        announcements: annon.rows
+      }
+    });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 }
 
@@ -349,13 +360,13 @@ async function getCommunityMessages(req, res) {
  */
 async function sendCommunityMessage(req, res) {
   const { groupId } = req.params;
-  const { content, visitorName } = req.body;
-  if (!content) return res.status(400).json({ error: 'Message vide' });
+  const { content, visitorName, type, fileUrl, fileName } = req.body;
+  if (!content && !fileUrl) return res.status(400).json({ error: 'Message vide' });
 
   try {
     const result = await query(
-      "INSERT INTO public.messages (chat_id, content, metadata) VALUES ($1, $2, $3) RETURNING *",
-      [groupId, content, JSON.stringify({ visitorName: visitorName || 'Visiteur' })]
+      "INSERT INTO public.messages (chat_id, content, type, file_url, file_name, metadata) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [groupId, content, type || 'text', fileUrl || null, fileName || null, JSON.stringify({ visitorName: visitorName || 'Visiteur' })]
     );
 
     const msg = {
@@ -366,5 +377,18 @@ async function sendCommunityMessage(req, res) {
 
     socketService.broadcast('community:new_message', msg);
     res.json({ success: true, data: msg });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+}
+
+/**
+ * @desc    Toggle pin message
+ */
+async function togglePinMessage(req, res) {
+  const { messageId } = req.params;
+  const { isPinned } = req.body;
+  try {
+    await query("UPDATE public.messages SET is_pinned = $1 WHERE id = $2", [isPinned, messageId]);
+    socketService.broadcast('community:message_pinned', { messageId, isPinned });
+    res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 }

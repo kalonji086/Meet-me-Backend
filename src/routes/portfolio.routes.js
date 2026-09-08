@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const portfolioController = require('../controllers/portfolio.controller');
 const { authenticate, isAdmin } = require('../middleware/auth.middleware');
+const { asyncHandler } = require('../middleware/error.middleware');
 
 // Public access
 router.get('/public', portfolioController.getPublicData); // Default (Together Tech)

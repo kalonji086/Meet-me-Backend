@@ -12,6 +12,11 @@ router.post('/chat/:quoteId', portfolioController.handleChat);
 router.post('/client/quotes/:id/sign', portfolioController.signContract);
 router.put('/client/quotes/:id/specs', portfolioController.updateSpecs);
 
+// Community Public access
+router.get('/community/groups', portfolioController.getCommunityGroups);
+router.get('/community/groups/:groupId/messages', portfolioController.getCommunityMessages);
+router.post('/community/groups/:groupId/messages', portfolioController.sendCommunityMessage);
+
 // Admin restricted access
 router.use(authenticate);
 router.use(isAdmin);

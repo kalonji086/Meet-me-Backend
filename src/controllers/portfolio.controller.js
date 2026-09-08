@@ -311,5 +311,60 @@ module.exports = {
   manageService,
   manageTeam,
   getQuotes,
-  updateQuoteStatus
+  updateQuoteStatus,
+  getCommunityGroups,
+  getCommunityMessages,
+  sendCommunityMessage
 };
+
+/**
+ * @desc    Get public groups for community page
+ */
+async function getCommunityGroups(req, res) {
+  try {
+    const result = await query("SELECT id, name, avatar_url, description FROM public.chats WHERE type = 'group' AND is_banned = FALSE ORDER BY created_at ASC");
+    res.json({ success: true, data: result.rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+}
+
+/**
+ * @desc    Get messages for a community group
+ */
+async function getCommunityMessages(req, res) {
+  const { groupId } = req.params;
+  try {
+    const messages = await query(`
+      SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar
+      FROM public.messages m
+      LEFT JOIN public.profiles p ON m.sender_id = p.id
+      WHERE m.chat_id = $1
+      ORDER BY m.created_at ASC LIMIT 100
+    `, [groupId]);
+    res.json({ success: true, data: messages.rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+}
+
+/**
+ * @desc    Send a message in community as visitor
+ */
+async function sendCommunityMessage(req, res) {
+  const { groupId } = req.params;
+  const { content, visitorName } = req.body;
+  if (!content) return res.status(400).json({ error: 'Message vide' });
+
+  try {
+    const result = await query(
+      "INSERT INTO public.messages (chat_id, content, metadata) VALUES ($1, $2, $3) RETURNING *",
+      [groupId, content, JSON.stringify({ visitorName: visitorName || 'Visiteur' })]
+    );
+
+    const msg = {
+      ...result.rows[0],
+      sender_name: visitorName || 'Visiteur',
+      sender_avatar: null
+    };
+
+    socketService.broadcast('community:new_message', msg);
+    res.json({ success: true, data: msg });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+}

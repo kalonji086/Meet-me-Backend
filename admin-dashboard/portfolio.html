@@ -357,6 +357,8 @@
         let currentCarouselIndex = 0;
         let activePage = 'home';
 
+        let activeDiscordGroupId = null;
+
         window.addEventListener('DOMContentLoaded', () => {
             loadData();
             initSocket();
@@ -369,6 +371,11 @@
                 const nav = document.getElementById('navbar');
                 if (window.scrollY > 100) nav.classList.add('py-2', 'px-4', 'bg-[#0a0a0c]/80');
                 else nav.classList.remove('py-2', 'px-4', 'bg-[#0a0a0c]/80');
+            });
+
+            // Discord Input handler
+            document.getElementById('discord-chat-input')?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') sendDiscordMessage();
             });
         });
 
@@ -408,34 +415,98 @@
 
         async function loadDiscordCommunity() {
             try {
-                // For visitor community, we show public groups
-                const res = await axios.get('/api/admin/groups');
+                const res = await axios.get(`${API_BASE}/community/groups`);
                 const groups = res.data.data;
-                document.getElementById('discord-groups-list').innerHTML = groups.map(g => `
-                    <div class="discord-server-icon flex items-center justify-center bg-white/5 text-gray-400 hover:bg-[#5865f2] hover:text-white" title="${g.name}">
-                        ${g.avatar_url ? `<img src="${getFullUrl(g.avatar_url)}" class="w-full h-full object-cover rounded-inherit">` : g.name.charAt(0)}
+                const list = document.getElementById('discord-groups-list');
+
+                list.innerHTML = groups.map(g => `
+                    <div id="discord-group-${g.id}" class="discord-server-icon flex items-center justify-center bg-white/5 text-gray-400 hover:bg-[#5865f2] hover:text-white group" onclick="selectDiscordGroup('${g.id}', '${g.name.replace(/'/g, "\\'")}')" title="${g.name}">
+                        ${g.avatar_url ? `<img src="${getFullUrl(g.avatar_url)}" class="w-full h-full object-cover rounded-[inherit]">` : g.name.charAt(0)}
+                        <span class="discord-tooltip">${g.name}</span>
                     </div>
                 `).join('');
 
-                // Add some dummy members for visual
-                document.getElementById('discord-online-list').innerHTML = ['Alice', 'Marc', 'Jean-Pierre', 'Sophie', 'Kevin', 'Lina'].map(name => `
-                    <div class="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer group">
-                        <div class="relative">
-                            <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center font-bold text-xs text-white">${name.charAt(0)}</div>
-                            <div class="absolute bottom-0 right-0 w-3 h-3 bg-gray-500 rounded-full border-2 border-[#2b2d31]"></div>
-                        </div>
-                        <span class="text-sm font-medium text-gray-400 group-hover:text-white">${name}</span>
-                    </div>
-                `).join('');
-
+                if (groups.length > 0 && !activeDiscordGroupId) {
+                    selectDiscordGroup(groups[0].id, groups[0].name);
+                }
                 lucide.createIcons();
             } catch (e) {}
+        }
+
+        async function selectDiscordGroup(id, name) {
+            activeDiscordGroupId = id;
+            document.querySelectorAll('.discord-server-icon').forEach(el => el.classList.remove('active'));
+            document.getElementById('discord-group-' + id)?.classList.add('active');
+
+            const header = document.querySelector('.discord-channels h4');
+            if (header) header.innerText = name.toUpperCase();
+
+            loadDiscordMessages(id);
+        }
+
+        async function loadDiscordMessages(groupId) {
+            try {
+                const res = await axios.get(`${API_BASE}/community/groups/${groupId}/messages`);
+                renderDiscordMessages(res.data.data);
+            } catch (e) {}
+        }
+
+        function renderDiscordMessages(messages) {
+            const list = document.getElementById('discord-messages-list');
+            if (!list) return;
+
+            list.innerHTML = messages.map(m => {
+                const name = m.sender_name || (m.metadata?.visitorName) || 'Visiteur';
+                const avatar = m.sender_avatar ? getFullUrl(m.sender_avatar) : `https://ui-avatars.com/api/?name=${name}&background=random`;
+                const date = new Date(m.created_at).toLocaleString();
+
+                return `
+                    <div class="flex items-start gap-4 hover:bg-black/5 p-2 rounded-lg transition-all group">
+                        <img src="${avatar}" class="w-10 h-10 rounded-full bg-gray-700">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-white text-sm hover:underline cursor-pointer">${name}</span>
+                                <span class="text-[10px] text-gray-400 font-medium">${date}</span>
+                            </div>
+                            <p class="text-gray-300 text-sm leading-relaxed">${m.content}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const container = document.getElementById('discord-messages-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendDiscordMessage() {
+            const input = document.getElementById('discord-chat-input');
+            const content = input.value.trim();
+            if (!content || !activeDiscordGroupId) return;
+
+            try {
+                const visitorName = localStorage.getItem('visitor_name') || 'Visiteur_' + Math.floor(Math.random() * 1000);
+                if (!localStorage.getItem('visitor_name')) localStorage.setItem('visitor_name', visitorName);
+
+                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, {
+                    content,
+                    visitorName
+                });
+                input.value = '';
+                loadDiscordMessages(activeDiscordGroupId);
+            } catch (e) {
+                alert("Erreur d'envoi");
+            }
         }
 
         function initSocket() {
             if (typeof io === 'undefined') return;
             socket = io();
             socket.on('portfolio:data_updated', () => loadData());
+            socket.on('community:new_message', (msg) => {
+                if (activeDiscordGroupId === msg.chat_id) {
+                    loadDiscordMessages(activeDiscordGroupId);
+                }
+            });
         }
 
         async function loadData() {

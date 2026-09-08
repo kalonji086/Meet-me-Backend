@@ -442,43 +442,27 @@
 
                 <!-- Tab: Footer Management -->
                 <div id="port-section-footer" class="port-content hidden">
-                    <div class="max-w-4xl mx-auto bg-white p-12 rounded-[3.5rem] border border-gray-100 shadow-xl">
-                        <div class="flex items-center gap-4 mb-10">
-                            <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
-                                <i data-lucide="layout-panel-top" class="w-8 h-8"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-2xl font-black text-gray-900 uppercase tracking-tighter">Gestion du Pied de page</h3>
-                                <p class="text-gray-500 text-sm font-medium">Configurez les liens légaux et de contact de votre site.</p>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div class="space-y-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Politique de Confidentialité</label>
-                                <input type="text" id="footer-policy-new" placeholder="Ex: https://..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
-                            </div>
-                            <div class="space-y-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Conditions Générales</label>
-                                <input type="text" id="footer-conditions-new" placeholder="Ex: https://..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
-                            </div>
-                            <div class="space-y-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Blog (Bloque)</label>
-                                <input type="text" id="footer-blog-new" placeholder="URL de votre blog..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
-                            </div>
-                            <div class="space-y-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Espace Communautés</label>
-                                <input type="text" id="footer-community-new" placeholder="Lien Discord ou autre..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
-                            </div>
-                            <div class="col-span-full space-y-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Infos de Contact Footer (Texte libre)</label>
-                                <input type="text" id="footer-contact-new" placeholder="Ex: contact@togethertech.cd | +243 ..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
+                    <div class="max-w-5xl mx-auto space-y-8">
+                        <!-- Contact Info Section -->
+                        <div class="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                            <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter">Contact du Pied de page</h3>
+                            <div class="flex gap-4">
+                                <input type="text" id="footer-contact-new" placeholder="Ex: contact@togethertech.cd | +243 ..." class="flex-1 p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500">
+                                <button onclick="savePortfolioFooterOnly()" class="px-8 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase">Enregistrer</button>
                             </div>
                         </div>
 
-                        <button onclick="savePortfolioFooter()" id="btn-save-footer" class="w-full mt-12 py-6 bg-indigo-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                            ENREGISTRER LES MODIFICATIONS DU FOOTER
-                        </button>
+                        <!-- Pages Management Section -->
+                        <div class="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                            <div class="flex justify-between items-center mb-10">
+                                <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter italic">Gestion des Pages Légales & Liens</h3>
+                                <button onclick="showAddPageModal()" class="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase">+ Ajouter une Page</button>
+                            </div>
+
+                            <div id="port-pages-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Dynamic Pages injected here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -5621,31 +5605,98 @@
             try {
                 const res = await axios.get(`${API_URL}/portfolio/public`);
                 const p = res.data.data.profile;
+                const pages = res.data.data.pages || [];
+
                 if (p) {
-                    document.getElementById('footer-policy-new').value = p.footer_policy || "";
-                    document.getElementById('footer-conditions-new').value = p.footer_conditions || "";
-                    document.getElementById('footer-blog-new').value = p.footer_blog || "";
-                    document.getElementById('footer-community-new').value = p.footer_community || "";
                     document.getElementById('footer-contact-new').value = p.footer_contact || "";
                 }
+
+                document.getElementById('port-pages-list').innerHTML = pages.map(page => `
+                    <div class="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 flex items-center justify-between group">
+                        <div>
+                            <h4 class="font-black text-gray-900 uppercase text-sm">${page.title}</h4>
+                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Slug: ${page.slug} • ${page.is_active ? 'Actif' : 'Masqué'}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="editPortfolioPage('${page.id}')" class="p-3 bg-white text-indigo-600 rounded-xl shadow-sm hover:bg-indigo-600 hover:text-white transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button onclick="deletePortfolioPage('${page.id}')" class="p-3 bg-white text-red-500 rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="col-span-full text-center py-10 text-gray-400 text-xs font-black uppercase tracking-widest">Aucune page créée</p>';
+                lucide.createIcons();
             } catch (e) {}
         }
 
-        async function savePortfolioFooter() {
-            const btn = document.getElementById('btn-save-footer');
-            const footerPolicy = document.getElementById('footer-policy-new').value;
-            const footerConditions = document.getElementById('footer-conditions-new').value;
-            const footerBlog = document.getElementById('footer-blog-new').value;
-            const footerCommunity = document.getElementById('footer-community-new').value;
+        async function savePortfolioFooterOnly() {
             const footerContact = document.getElementById('footer-contact-new').value;
-
             try {
-                btn.disabled = true; btn.innerText = "Enregistrement...";
-                await axios.put(`${API_URL}/portfolio/admin/profile`, {
-                    footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact
-                }, { headers: { Authorization: `Bearer ${token}` } });
-                toast("Pied de page mis à jour", "success");
-            } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "ENREGISTRER LES MODIFICATIONS DU FOOTER"; }
+                await axios.put(`${API_URL}/portfolio/admin/profile`, { footerContact }, { headers: { Authorization: `Bearer ${token}` } });
+                toast("Contact footer mis à jour", "success");
+            } catch (e) { alert("Erreur"); }
+        }
+
+        let currentPageId = null;
+        let pageEditor = null;
+
+        function showAddPageModal() {
+            const html = `
+                <div class="space-y-4 text-left">
+                    <input type="text" id="page-form-title" placeholder="Titre de la page (ex: Politique de Confidentialité)" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold">
+                    <input type="text" id="page-form-slug" placeholder="Slug URL (ex: privacy)" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold">
+                    <div id="page-quill-editor" style="height: 300px;" class="bg-white"></div>
+                </div>
+            `;
+            Alert.show("Créer une nouvelle page", html, async () => {
+                const title = document.getElementById('page-form-title').value;
+                const slug = document.getElementById('page-form-slug').value;
+                const content = pageEditor.root.innerHTML;
+                try {
+                    await axios.post(`${API_URL}/portfolio/admin/pages`, { action: 'add', title, slug, content }, { headers: { Authorization: `Bearer ${token}` } });
+                    closeImpactModal();
+                    loadPortfolioFooter();
+                } catch (e) { alert("Erreur"); }
+            }, "Créer la page", "indigo");
+
+            setTimeout(() => {
+                pageEditor = new Quill('#page-quill-editor', { theme: 'snow' });
+            }, 100);
+        }
+
+        async function editPortfolioPage(id) {
+            try {
+                const res = await axios.get(`${API_URL}/portfolio/public`);
+                const page = res.data.data.pages.find(p => p.id === id);
+                if (!page) return;
+
+                const html = `
+                    <div class="space-y-4 text-left">
+                        <input type="text" id="edit-page-title" value="${page.title}" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold">
+                        <div id="edit-page-quill" style="height: 300px;" class="bg-white"></div>
+                    </div>
+                `;
+                Alert.show("Modifier la page", html, async () => {
+                    const title = document.getElementById('edit-page-title').value;
+                    const content = pageEditor.root.innerHTML;
+                    try {
+                        await axios.post(`${API_URL}/portfolio/admin/pages`, { action: 'update', id, title, content }, { headers: { Authorization: `Bearer ${token}` } });
+                        closeImpactModal();
+                        loadPortfolioFooter();
+                    } catch (e) { alert("Erreur"); }
+                }, "Enregistrer les modifications", "indigo");
+
+                setTimeout(() => {
+                    pageEditor = new Quill('#edit-page-quill', { theme: 'snow' });
+                    pageEditor.root.innerHTML = page.content;
+                }, 100);
+            } catch (e) {}
+        }
+
+        async function deletePortfolioPage(id) {
+            if (!confirm("Supprimer cette page définitivement ?")) return;
+            try {
+                await axios.post(`${API_URL}/portfolio/admin/pages`, { action: 'delete', id }, { headers: { Authorization: `Bearer ${token}` } });
+                loadPortfolioFooter();
+            } catch (e) {}
         }
 
         async function savePortfolioIdentity() {

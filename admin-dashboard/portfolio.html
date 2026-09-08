@@ -157,6 +157,20 @@
             </div>
         </div>
 
+        <!-- PAGE: GENERIC CONTENT (Policy, Terms, etc.) -->
+        <div id="page-content" class="page py-48 px-6">
+            <div class="max-w-4xl mx-auto">
+                <div class="mb-20">
+                    <h3 id="generic-page-title" class="text-6xl font-black tracking-tighter uppercase italic text-white">Titre de la page</h3>
+                    <div class="w-24 h-1 bg-cyan-500 rounded-full mt-6"></div>
+                </div>
+                <div id="generic-page-body" class="prose prose-invert prose-lg max-w-none text-gray-400 leading-relaxed font-medium">
+                    <!-- Content injected -->
+                </div>
+                <button onclick="navigateTo('home')" class="mt-20 px-10 py-5 glass rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all">Retour à l'accueil</button>
+            </div>
+        </div>
+
         <!-- PAGE: COMMUNITY (DISCORD STYLE) -->
         <div id="page-community" class="page bg-[#313338] h-screen !fixed inset-0 z-[100] flex-page">
             <!-- Sidebar: Server Icons -->
@@ -332,17 +346,15 @@
                     <div id="footer-contact-info" class="text-cyan-400 font-bold text-xs uppercase tracking-[0.3em]"></div>
                 </div>
                 <div class="space-y-6">
-                    <h5 class="text-white font-black text-[10px] uppercase tracking-[0.3em]">Légal</h5>
-                    <ul class="space-y-4 text-gray-500 text-xs font-bold uppercase tracking-widest">
-                        <li><a id="link-policy" href="#" class="hover:text-cyan-400 transition-all">Politique</a></li>
-                        <li><a id="link-conditions" href="#" class="hover:text-cyan-400 transition-all">Condition</a></li>
+                    <h5 class="text-white font-black text-[10px] uppercase tracking-[0.3em]">Légal & Infos</h5>
+                    <ul id="footer-pages-list" class="space-y-4 text-gray-500 text-xs font-bold uppercase tracking-widest">
+                        <!-- Dynamic Pages injected -->
                     </ul>
                 </div>
                 <div class="space-y-6">
                     <h5 class="text-white font-black text-[10px] uppercase tracking-[0.3em]">Ressources</h5>
-                    <ul class="space-y-4 text-gray-500 text-xs font-bold uppercase tracking-widest">
-                        <li><a id="link-blog" href="#" class="hover:text-cyan-400 transition-all">Le Blog (Bloque)</a></li>
-                        <li><a id="link-community" href="#community" onclick="navigateTo('community')" class="hover:text-cyan-400 transition-all">Communautés</a></li>
+                    <ul id="footer-resources-list" class="space-y-4 text-gray-500 text-xs font-bold uppercase tracking-widest">
+                        <!-- Injected -->
                     </ul>
                 </div>
                 <div class="space-y-6">
@@ -680,13 +692,41 @@
         async function loadData() {
             try {
                 const res = await axios.get(`${API_BASE}/public`);
-                const { skills, experiences, services, team, profile } = res.data.data;
+                const { skills, experiences, services, team, profile, pages } = res.data.data;
                 renderSkills(skills);
                 renderExperiences(experiences);
                 renderServices(services);
                 renderTeam(team);
                 renderProfile(profile);
+                renderFooterPages(pages, profile);
                 lucide.createIcons();
+            } catch (e) {}
+        }
+
+        function renderFooterPages(pages, profile) {
+            const list = document.getElementById('footer-pages-list');
+            const resList = document.getElementById('footer-resources-list');
+            if (!list || !resList) return;
+
+            list.innerHTML = pages.map(p => `
+                <li><button onclick="viewGenericPage('${p.slug}')" class="hover:text-cyan-400 transition-all uppercase">${p.title}</button></li>
+            `).join('');
+
+            resList.innerHTML = `
+                <li><a href="${profile.footer_blog || '#'}" target="_blank" class="hover:text-cyan-400 transition-all">Le Blog (Bloque)</a></li>
+                <li><a href="#community" onclick="navigateTo('community')" class="hover:text-cyan-400 transition-all">Communautés</a></li>
+            `;
+        }
+
+        async function viewGenericPage(slug) {
+            try {
+                const res = await axios.get(`${API_BASE}/public`);
+                const page = res.data.data.pages.find(p => p.slug === slug);
+                if (page) {
+                    document.getElementById('generic-page-title').innerText = page.title;
+                    document.getElementById('generic-page-body').innerHTML = page.content;
+                    navigateTo('content');
+                }
             } catch (e) {}
         }
 

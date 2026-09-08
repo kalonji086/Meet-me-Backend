@@ -8,12 +8,13 @@ const socketService = require('../services/socket.service');
  * @route   GET /api/portfolio/public
  */
 const getPublicData = asyncHandler(async (req, res) => {
-  const [skills, experiences, services, team, profile] = await Promise.all([
+  const [skills, experiences, services, team, profile, pages] = await Promise.all([
     query('SELECT * FROM public.web_portfolio_skills ORDER BY level DESC'),
     query('SELECT * FROM public.web_portfolio_experiences ORDER BY order_index ASC, created_at DESC'),
     query('SELECT * FROM public.web_portfolio_services ORDER BY created_at ASC'),
     query('SELECT * FROM public.web_portfolio_team ORDER BY order_index ASC, created_at ASC'),
-    query('SELECT * FROM public.web_portfolio_profile LIMIT 1')
+    query('SELECT * FROM public.web_portfolio_profile LIMIT 1'),
+    query('SELECT * FROM public.web_portfolio_pages WHERE is_active = TRUE')
   ]);
 
   res.json({
@@ -23,7 +24,8 @@ const getPublicData = asyncHandler(async (req, res) => {
       experiences: experiences.rows,
       services: services.rows,
       team: team.rows,
-      profile: profile.rows[0] || {}
+      profile: profile.rows[0] || {},
+      pages: pages.rows
     }
   });
 });
@@ -315,8 +317,42 @@ module.exports = {
   getCommunityGroups,
   getCommunityMessages,
   sendCommunityMessage,
-  togglePinMessage
+  togglePinMessage,
+  managePage
 };
+
+/**
+ * @desc    Manage Portfolio Pages (Policy, Terms, etc.)
+ */
+const managePage = asyncHandler(async (req, res) => {
+  const { action, id, slug, title, content, isActive } = req.body;
+
+  if (action === 'update') {
+    const result = await query(
+      `UPDATE public.web_portfolio_pages
+       SET title = COALESCE($1, title), content = COALESCE($2, content), is_active = COALESCE($3, is_active), updated_at = NOW()
+       WHERE id = $4 OR slug = $5 RETURNING *`,
+      [title, content, isActive, id, slug]
+    );
+    socketService.broadcast('portfolio:data_updated', { type: 'page', data: result.rows[0] });
+    return res.json({ success: true, data: result.rows[0] });
+  }
+
+  if (action === 'add') {
+    const result = await query(
+      `INSERT INTO public.web_portfolio_pages (slug, title, content) VALUES ($1, $2, $3) RETURNING *`,
+      [slug, title, content]
+    );
+    return res.json({ success: true, data: result.rows[0] });
+  }
+
+  if (action === 'delete') {
+    await query('DELETE FROM public.web_portfolio_pages WHERE id = $1', [id]);
+    return res.json({ success: true, message: 'Page supprimée' });
+  }
+
+  res.status(400).json({ success: false, error: 'Action invalide' });
+});
 
 /**
  * @desc    Get public groups for community page

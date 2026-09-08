@@ -546,6 +546,24 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_community TEXT');
     await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_contact TEXT');
 
+    // Portfolio Pages (Policy, Terms, etc.)
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_pages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        slug TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      INSERT INTO public.web_portfolio_pages (slug, title, content)
+      VALUES
+        ('policy', 'Politique de Confidentialité', '<h1>Politique de Confidentialité</h1><p>Contenu à rédiger...</p>'),
+        ('terms', 'Conditions d''Utilisation', '<h1>Conditions d''Utilisation</h1><p>Contenu à rédiger...</p>')
+      ON CONFLICT (slug) DO NOTHING;
+    `);
+
     // Community Enhancements: Pinned Messages, Audio, Documents
     await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE');
     await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS type TEXT DEFAULT \'text\'');

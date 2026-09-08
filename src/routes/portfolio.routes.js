@@ -26,6 +26,7 @@ router.post('/admin/skills', portfolioController.manageSkill);
 router.post('/admin/experiences', portfolioController.manageExperience);
 router.post('/admin/services', portfolioController.manageService);
 router.post('/admin/team', portfolioController.manageTeam);
+router.post('/admin/pages', portfolioController.managePage);
 router.put('/admin/profile', portfolioController.updateProfile);
 router.get('/admin/quotes', portfolioController.getQuotes);
 router.put('/admin/quotes/:id', portfolioController.updateQuoteStatus);

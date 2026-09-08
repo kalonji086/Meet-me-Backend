@@ -124,6 +124,11 @@ class Server {
       res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'portfolio.html'));
     });
 
+    // SaaS Portfolio Route (Dynamic slug)
+    this.app.get('/p/:slug', (req, res) => {
+      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'portfolio.html'));
+    });
+
     // Route de ping pour garder le serveur actif sur Render
     this.app.get('/api/ping', (req, res) => {
       res.json({ 

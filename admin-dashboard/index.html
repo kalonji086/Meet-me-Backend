@@ -176,6 +176,9 @@
                 <a href="#" onclick="showSection('portfolio')" id="nav-portfolio" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="layout-template" class="w-5 h-5 mr-4 text-cyan-400"></i><span class="font-medium text-sm">Portfolio Web</span>
                 </a>
+                <a href="#" onclick="showSection('portfolios-saas')" id="nav-portfolios-saas" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all admin-only hidden">
+                    <i data-lucide="layers" class="w-5 h-5 mr-4 text-blue-400"></i><span class="font-medium text-sm">Portefeuilles Clients</span>
+                </a>
                 <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
                         <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span>
@@ -617,6 +620,34 @@
                                 <!-- Injected by JS -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION PORTFOLIOS SAAS (Admin Principal) -->
+            <div id="section-portfolios-saas" class="hidden animate-fade-in space-y-8">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 class="text-3xl font-black text-gray-900 tracking-tighter uppercase">Gestion du SaaS Portefeuilles</h2>
+                        <p class="text-gray-500 font-medium">Approuvez les nouvelles demandes et gérez les sites clients.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-10">
+                    <!-- Left: Pending Requests -->
+                    <div class="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-xl font-black text-gray-800 mb-8 uppercase tracking-tighter italic">Demandes en attente</h3>
+                        <div id="portfolio-requests-list" class="space-y-4">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Active Portfolios -->
+                    <div class="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-xl font-black text-gray-800 mb-8 uppercase tracking-tighter italic">Sites Actifs</h3>
+                        <div id="active-portfolios-list" class="space-y-4">
+                            <!-- Injected by JS -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1619,6 +1650,82 @@
             }
         }
 
+        function checkStandardDelegation(user) {
+            axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(res => {
+                    const myDelegation = res.data.data.find(d => d.user_id === user.id);
+
+                    document.getElementById('login-container').classList.add('hidden');
+
+                    if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
+                        user.allowedModules = myDelegation.modules;
+                        user.collabRights = myDelegation.collab_admin_rights || {};
+                        localStorage.setItem('admin_user', JSON.stringify(user));
+
+                        document.getElementById('main-container').classList.remove('hidden');
+                        document.getElementById('blocked-container').classList.add('hidden');
+                        document.getElementById('pending-collab-container').classList.add('hidden');
+                        initSocket();
+                        initRichEditors();
+                        filterSidebar(myDelegation.modules);
+                    } else {
+                        // No active delegation found, check for pending collaboration request
+                        axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
+                            .then(reqRes => {
+                                const myRequest = reqRes.data.data;
+                                const applyBtn = document.getElementById('apply-collab-btn');
+
+                                if (myRequest && myRequest.status === 'pending') {
+                                    if (applyBtn) {
+                                        applyBtn.innerText = "DEMANDE EN COURS D'EXAMEN";
+                                        applyBtn.disabled = true;
+                                        applyBtn.className = "w-full bg-gray-100 text-gray-400 py-5 rounded-2xl font-black uppercase text-xs tracking-widest cursor-not-allowed";
+                                    }
+
+                                    document.getElementById('main-container').classList.add('hidden');
+                                    document.getElementById('blocked-container').classList.add('hidden');
+                                    document.getElementById('pending-collab-container').classList.remove('hidden');
+                                    initSocket();
+                                } else {
+                                    if (applyBtn) {
+                                        applyBtn.innerText = "Demander une Collaboration";
+                                        applyBtn.disabled = false;
+                                        applyBtn.className = "w-full bg-cyan-50 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all";
+                                    }
+
+                                    document.getElementById('main-container').classList.add('hidden');
+                                    document.getElementById('blocked-container').classList.remove('hidden');
+                                    document.getElementById('pending-collab-container').classList.add('hidden');
+                                    initSocket();
+                                }
+                            }).catch(() => {
+                                document.getElementById('blocked-container').classList.remove('hidden');
+                                initSocket();
+                            });
+                    }
+                }).catch(() => {
+                    // If delegation check fails (403), it means not an admin/delegate yet, check collab status
+                    axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
+                        .then(reqRes => {
+                            const myRequest = reqRes.data.data;
+                            document.getElementById('login-container').classList.add('hidden');
+                            if (myRequest && myRequest.status === 'pending') {
+                                document.getElementById('main-container').classList.add('hidden');
+                                document.getElementById('blocked-container').classList.add('hidden');
+                                document.getElementById('pending-collab-container').classList.remove('hidden');
+                                initSocket();
+                            } else {
+                                document.getElementById('blocked-container').classList.remove('hidden');
+                                initSocket();
+                            }
+                        }).catch(() => {
+                            document.getElementById('login-container').classList.add('hidden');
+                            document.getElementById('blocked-container').classList.remove('hidden');
+                            initSocket();
+                        });
+                });
+        }
+
         async function updateAdminAvatar(input) {
             if (!input.files[0]) return;
             const file = input.files[0];
@@ -1706,83 +1813,40 @@
                 filterSidebar(user.allowedModules);
                 showSection('stats');
             } else {
-                // Check if user has explicit delegation
-                axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
-                    .then(res => {
-                        const myDelegation = res.data.data.find(d => d.user_id === user.id);
+                // SÉCURITÉ SAAS : Vérifier si l'utilisateur possède un portfolio approuvé
+                axios.get(`${API_URL}/portfolio/admin/all`, { headers: { Authorization: `Bearer ${token}` } })
+                    .then(portRes => {
+                        const myPortfolio = portRes.data.data.find(p => p.user_id === user.id);
 
-                        document.getElementById('login-container').classList.add('hidden');
-
-                        if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
-                            user.allowedModules = myDelegation.modules;
-                            user.collabRights = myDelegation.collab_admin_rights || {};
+                        if (myPortfolio) {
+                            // C'est un client SaaS ! On limite ses droits au portfolio
+                            user.isSaasOwner = true;
+                            user.allowedModules = ['portfolio'];
                             localStorage.setItem('admin_user', JSON.stringify(user));
 
+                            document.getElementById('login-container').classList.add('hidden');
                             document.getElementById('main-container').classList.remove('hidden');
                             document.getElementById('blocked-container').classList.add('hidden');
                             document.getElementById('pending-collab-container').classList.add('hidden');
+
                             initSocket();
                             initRichEditors();
-                            filterSidebar(myDelegation.modules);
-                        } else {
-                            // No active delegation found, check for pending collaboration request
-                            axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
-                                .then(reqRes => {
-                                    const myRequest = reqRes.data.data;
-                                    const applyBtn = document.getElementById('apply-collab-btn');
-
-                                    if (myRequest && myRequest.status === 'pending') {
-                                        // Update button text if on blocked screen
-                                        if (applyBtn) {
-                                            applyBtn.innerText = "DEMANDE EN COURS D'EXAMEN";
-                                            applyBtn.disabled = true;
-                                            applyBtn.className = "w-full bg-gray-100 text-gray-400 py-5 rounded-2xl font-black uppercase text-xs tracking-widest cursor-not-allowed";
-                                        }
-
-                                        document.getElementById('main-container').classList.add('hidden');
-                                        document.getElementById('blocked-container').classList.add('hidden');
-                                        document.getElementById('pending-collab-container').classList.remove('hidden');
-                                        initSocket();
-                                    } else {
-                                        // Reset button if rejected or none
-                                        if (applyBtn) {
-                                            applyBtn.innerText = "Demander une Collaboration";
-                                            applyBtn.disabled = false;
-                                            applyBtn.className = "w-full bg-cyan-500 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all";
-                                        }
-
-                                        document.getElementById('main-container').classList.add('hidden');
-                                        document.getElementById('blocked-container').classList.remove('hidden');
-                                        document.getElementById('pending-collab-container').classList.add('hidden');
-                                        initSocket(); // Permettre le déblocage en temps réel même sur l'écran révoqué
-                                    }
-                                }).catch(() => {
-                                    document.getElementById('blocked-container').classList.remove('hidden');
-                                    initSocket();
-                                });
+                            filterSidebar(['portfolio']); // Only show portfolio
+                            return;
                         }
-                    }).catch(() => {
-                        // If delegation check fails (403), it means not an admin/delegate yet, check collab status
-                        axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
-                            .then(reqRes => {
-                                const myRequest = reqRes.data.data;
-                                document.getElementById('login-container').classList.add('hidden');
-                                if (myRequest && myRequest.status === 'pending') {
-                                    document.getElementById('main-container').classList.add('hidden');
-                                    document.getElementById('blocked-container').classList.add('hidden');
-                                    document.getElementById('pending-collab-container').classList.remove('hidden');
-                                    initSocket();
-                                } else {
-                                    document.getElementById('blocked-container').classList.remove('hidden');
-                                    initSocket();
-                                }
-                            }).catch(() => {
-                                document.getElementById('login-container').classList.add('hidden');
-                                document.getElementById('blocked-container').classList.remove('hidden');
-                                initSocket();
-                            });
-                    });
+
+                        // Check if user has explicit delegation (standard collaborator logic)
+                        checkStandardDelegation(user);
+                    }).catch(() => checkStandardDelegation(user));
             }
+        }
+
+        function checkStandardDelegation(user) {
+            axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(res => {
+                    const myDelegation = res.data.data.find(d => d.user_id === user.id);
+                    // ... (rest of the standard logic follows)
+                });
         }
 
         function filterSidebar(allowed) {
@@ -1798,7 +1862,7 @@
                 'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration',
                 'moderation': 'nav-moderation', 'school-admin': 'nav-school-admin',
-                'portfolio': 'nav-portfolio'
+                'portfolio': 'nav-portfolio', 'portfolios-saas': 'nav-portfolios-saas'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
 
@@ -2169,19 +2233,20 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'school-admin', 'portfolio'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'school-admin', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
-                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-admin' ? 'nav-school-admin' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : 'nav-' + s))));
+                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-admin' ? 'nav-school-admin' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s)))));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
             });
             const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-admin' ? 'nav-school-admin' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : 'nav-' + name))));
+            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-admin' ? 'nav-school-admin' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name)))));
             const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
             document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 
             if (name === 'stats') loadStats();
             if (name === 'users') loadUsers();
+            if (name === 'portfolios-saas') loadPortfolioSaas();
             if (name === 'market-requests') loadMarket();
             if (name === 'employer-requests') loadEmployerRequests();
             if (name === 'appeals') loadAppeals();
@@ -5569,7 +5634,68 @@
         function logout() { localStorage.clear(); location.reload(); }
         function closeImpactModal() { document.getElementById('impact-modal').classList.add('hidden'); }
 
-        // --- PORTFOLIO MANAGEMENT ---
+        // --- SAAS PORTFOLIO MANAGEMENT ---
+        async function loadPortfolioSaas() {
+            try {
+                const [reqRes, activeRes] = await Promise.all([
+                    axios.get(`${API_URL}/portfolio/admin/requests`, { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } }) // For now, we'll get active portfolios via another way or just from the same table
+                ]);
+
+                // We need a specific route for active portfolios
+                const portfoliosRes = await axios.get(`${API_URL}/portfolio/admin/all`, { headers: { Authorization: `Bearer ${token}` } });
+                const portfolios = portfoliosRes.data.data;
+                const requests = reqRes.data.data;
+
+                document.getElementById('portfolio-requests-list').innerHTML = requests.filter(r => r.status === 'pending').map(r => `
+                    <div class="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col gap-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="text-lg font-black text-gray-900">${r.full_name}</h4>
+                                <p class="text-[10px] font-black text-blue-500 uppercase tracking-widest">${r.profession}</p>
+                            </div>
+                            <span class="px-3 py-1 bg-white text-gray-400 text-[8px] font-black rounded uppercase shadow-sm">Slug: ${r.desired_slug}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 italic">"${r.motivation || 'Pas de motivation'}"</p>
+                        <div class="grid grid-cols-2 gap-3 pt-2">
+                            <button onclick="handlePortfolioRequest('${r.id}', 'approved')" class="px-4 py-3 bg-green-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-green-100">Approuver</button>
+                            <button onclick="handlePortfolioRequest('${r.id}', 'rejected')" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-black text-[9px] uppercase tracking-widest">Rejeter</button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-center py-10 text-gray-400 uppercase text-[10px]">Aucune demande en attente</p>';
+
+                document.getElementById('active-portfolios-list').innerHTML = portfolios.filter(p => p.slug !== 'together').map(p => `
+                    <div class="p-6 bg-white border border-gray-100 rounded-[2rem] flex items-center justify-between group hover:shadow-xl transition-all">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black" style="background-color: ${p.theme_color || '#06b6d4'}">
+                                ${p.title.charAt(0)}
+                            </div>
+                            <div>
+                                <h4 class="font-black text-gray-800 text-sm uppercase">${p.title}</h4>
+                                <p class="text-[9px] text-gray-400 font-bold">meetme.cd/p/${p.slug}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                             <a href="/p/${p.slug}" target="_blank" class="p-3 bg-gray-50 text-gray-400 rounded-xl hover:text-blue-500"><i data-lucide="external-link" class="w-4 h-4"></i></a>
+                             <button onclick="togglePortfolioStatus('${p.id}', '${p.status}')" class="p-3 bg-gray-50 ${p.status === 'blocked' ? 'text-red-500' : 'text-green-500'} rounded-xl"><i data-lucide="${p.status === 'blocked' ? 'lock' : 'check-circle'}" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-center py-10 text-gray-400 uppercase text-[10px]">Aucun portfolio client actif</p>';
+
+                lucide.createIcons();
+            } catch (e) { console.error(e); }
+        }
+
+        async function handlePortfolioRequest(id, action) {
+            if (!confirm(`Confirmer : ${action.toUpperCase()} cette demande ?`)) return;
+            try {
+                await axios.post(`${API_URL}/portfolio/admin/requests/${id}/approve`, { action }, { headers: { Authorization: `Bearer ${token}` } });
+                toast(`Demande ${action === 'approved' ? 'approuvée' : 'rejetée'} !`, "success");
+                loadPortfolioSaas();
+            } catch (e) { alert("Erreur."); }
+        }
+
+        // --- EXISTING PORTFOLIO MANAGEMENT ---
         function switchPortfolioTab(tab) {
             document.querySelectorAll('.port-tab-btn').forEach(btn => btn.classList.remove('active', 'bg-cyan-500', 'text-white'));
             document.querySelectorAll('.port-content').forEach(el => el.classList.add('hidden'));

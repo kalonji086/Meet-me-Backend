@@ -601,6 +601,57 @@ const ensureAdminTables = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM public.web_portfolio_announcements);
     `);
 
+    // --- MULTI-TENANT PORTFOLIO SYSTEM (Phase 1) ---
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.web_portfolios (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        slug TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        owner_name TEXT NOT NULL,
+        description TEXT,
+        theme_color TEXT DEFAULT '#06b6d4',
+        logo_url TEXT,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'blocked')),
+        enabled_modules TEXT[] DEFAULT '{"home", "about", "skills", "services", "contact"}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Ensure Master Portfolio (Together Tech) exists
+      INSERT INTO public.web_portfolios (id, user_id, slug, title, owner_name, status, enabled_modules)
+      SELECT '00000000-0000-0000-0000-000000000000', id, 'together', 'Together Tech', 'Main Admin', 'approved', '{"home", "about", "team", "skills", "experience", "services", "community", "contact"}'
+      FROM public.profiles WHERE email = 'wecanconcept@gmail.com'
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // Add portfolio_id to all related tables
+    const portfolioTables = [
+      'web_portfolio_skills', 'web_portfolio_experiences', 'web_portfolio_services',
+      'web_portfolio_quotes', 'web_portfolio_profile', 'web_portfolio_team',
+      'web_portfolio_messages', 'web_portfolio_pages', 'web_portfolio_announcements'
+    ];
+
+    for (const table of portfolioTables) {
+      await query(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS portfolio_id UUID REFERENCES public.web_portfolios(id) DEFAULT '00000000-0000-0000-0000-000000000000'`);
+    }
+
+    // Create Table for Portfolio Requests
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        full_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        profession TEXT NOT NULL,
+        desired_slug TEXT UNIQUE NOT NULL,
+        preferred_color TEXT DEFAULT '#06b6d4',
+        motivation TEXT,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     // Create Chat Message table for Portfolio
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_messages (

@@ -4,7 +4,8 @@ const portfolioController = require('../controllers/portfolio.controller');
 const { authenticate, isAdmin } = require('../middleware/auth.middleware');
 
 // Public access
-router.get('/public', portfolioController.getPublicData);
+router.get('/public', portfolioController.getPublicData); // Default (Together Tech)
+router.get('/:slug/public', portfolioController.getPublicData); // Custom Portfolio
 router.post('/quote', portfolioController.submitQuote);
 router.get('/client/tracking', portfolioController.getClientQuotes);
 router.get('/chat/:quoteId', portfolioController.handleChat);
@@ -20,8 +21,17 @@ router.put('/community/messages/:messageId/pin', portfolioController.togglePinMe
 
 // Admin restricted access
 router.use(authenticate);
-router.use(isAdmin);
 
+// Request a new portfolio (Auth required)
+router.post('/request', portfolioController.submitPortfolioRequest);
+
+// Admin only (Global Admin)
+router.get('/admin/requests', isAdmin, portfolioController.getPortfolioRequests);
+router.post('/admin/requests/:id/approve', isAdmin, portfolioController.approvePortfolioRequest);
+router.get('/admin/all', isAdmin, portfolioController.getAllPortfolios);
+router.put('/admin/:id/status', isAdmin, portfolioController.togglePortfolioStatus);
+
+// Portfolio Management (Any authorized admin/owner)
 router.post('/admin/skills', portfolioController.manageSkill);
 router.post('/admin/experiences', portfolioController.manageExperience);
 router.post('/admin/services', portfolioController.manageService);

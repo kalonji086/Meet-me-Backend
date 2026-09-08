@@ -10,9 +10,10 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;400;600;800&display=swap" rel="stylesheet">
     <style>
+        :root { --primary-color: #06b6d4; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; background: #0a0a0c; color: white; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .text-gradient { background: linear-gradient(to right, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .text-gradient { background: linear-gradient(to right, var(--primary-color), #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .bg-dot { background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 30px 30px; }
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
         .animate-float { animation: float 6s ease-in-out infinite; }
@@ -43,6 +44,12 @@
 
         /* Carousel for Home */
         .carousel-item { transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        /* Use primary color for dynamic elements */
+        .text-cyan-400 { color: var(--primary-color) !important; }
+        .bg-cyan-500 { background-color: var(--primary-color) !important; }
+        .border-cyan-500 { border-color: var(--primary-color) !important; }
+        .shadow-cyan-500\/20 { shadow-color: var(--primary-color) !important; }
     </style>
 </head>
 <body class="selection:bg-cyan-500/30">
@@ -54,7 +61,7 @@
                     <img id="site-logo" src="" class="w-full h-full object-contain p-1 hidden" alt="Logo">
                     <i id="site-logo-fallback" data-lucide="zap" class="text-cyan-500 fill-current"></i>
                 </div>
-                <span class="font-black text-xl tracking-tighter uppercase">Together Tech</span>
+                <span id="brand-name" class="font-black text-xl tracking-tighter uppercase">Together Tech</span>
             </div>
             <div class="hidden md:flex items-center gap-10 font-bold text-[10px] uppercase tracking-[0.2em] text-gray-400">
                 <button onclick="navigateTo('home')" class="hover:text-cyan-400 transition-all uppercase">Accueil</button>
@@ -63,7 +70,7 @@
                 <button onclick="navigateTo('skills')" class="hover:text-cyan-400 transition-all uppercase">Expertise</button>
                 <button onclick="navigateTo('experience')" class="hover:text-cyan-400 transition-all uppercase">Impact</button>
                 <button onclick="navigateTo('services')" class="hover:text-cyan-400 transition-all uppercase">Services</button>
-                <button onclick="showPortfolioRequestModal()" class="px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-xl hover:bg-purple-600 hover:text-white transition-all font-black text-[9px] uppercase tracking-widest">Créer mon Portfolio</button>
+                <button id="btn-create-saas" onclick="showPortfolioRequestModal()" class="px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-xl hover:bg-purple-600 hover:text-white transition-all font-black text-[9px] uppercase tracking-widest hidden">Créer mon Portfolio</button>
                 <button onclick="openTrackingModal()" class="text-white bg-white/5 px-4 py-2 rounded-xl hover:bg-cyan-500 transition-all font-black text-[9px] uppercase tracking-widest border border-white/10">Mes Demandes</button>
             </div>
             <button onclick="scrollToContact()" class="px-8 py-3 bg-white text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-cyan-400 hover:text-white transition-all shadow-xl shadow-white/5">
@@ -341,7 +348,7 @@
                             <img id="footer-logo" src="" class="w-full h-full object-contain p-1 hidden" alt="Logo Footer">
                             <i id="footer-logo-fallback" data-lucide="zap" class="text-cyan-500 fill-current w-8 h-8"></i>
                         </div>
-                        <span class="font-black text-2xl tracking-tighter uppercase text-white">Together Tech</span>
+                        <span id="footer-brand-name" class="font-black text-2xl tracking-tighter uppercase text-white">Together Tech</span>
                     </div>
                     <p class="text-gray-500 text-sm font-medium leading-relaxed max-w-sm italic">"Nous donnons vie à l'impossible."</p>
                     <div id="footer-contact-info" class="text-cyan-400 font-bold text-xs uppercase tracking-[0.3em]"></div>
@@ -641,15 +648,33 @@
             try {
                 const res = await axios.get(`${API_BASE}/${portfolioSlug}/public`);
                 const { skills, experiences, services, team, profile, pages, config } = res.data.data;
+
+                // Apply dynamic configuration
                 if (config) {
                     document.title = config.title + " | Portfolio";
-                    document.querySelectorAll('.text-cyan-400').forEach(el => el.style.color = config.theme_color);
-                    document.querySelectorAll('.bg-cyan-500').forEach(el => el.style.backgroundColor = config.theme_color);
-                    document.querySelectorAll('.font-black.text-xl, .font-black.text-2xl').forEach(el => { if (el.innerText === "Together Tech") el.innerText = config.title; });
+
+                    // Set CSS Primary Color
+                    if (config.theme_color) {
+                        document.documentElement.style.setProperty('--primary-color', config.theme_color);
+                    }
+
+                    // Update brand names
+                    const bName = document.getElementById('brand-name');
+                    if (bName) bName.innerText = config.title;
+                    const fName = document.getElementById('footer-brand-name');
+                    if (fName) fName.innerText = config.title;
+
+                    // Show/Hide SaaS Creation Button
+                    const saasBtn = document.getElementById('btn-create-saas');
+                    if (saasBtn) {
+                        saasBtn.classList.toggle('hidden', portfolioSlug !== 'together');
+                    }
                 }
+
                 renderSkills(skills); renderExperiences(experiences); renderServices(services); renderTeam(team); renderProfile(profile); renderFooterPages(pages, profile);
                 lucide.createIcons();
             } catch (e) {
+                console.error("Load Data Error:", e);
                 if (e.response?.status === 404) {
                     document.body.innerHTML = `<div class="h-screen flex items-center justify-center flex-col space-y-4"><h1 class="text-4xl font-black">404 - Portfolio Non Trouvé</h1><button onclick="location.href='/portfolio'" class="px-6 py-3 bg-cyan-500 rounded-xl">Retour à l'accueil</button></div>`;
                 }

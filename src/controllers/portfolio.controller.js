@@ -174,9 +174,19 @@ const getPortfolioRequestDetail = asyncHandler(async (req, res) => {
  */
 const deletePortfolio = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    // We need to cascade delete manually if foreign keys don't handle it
+
+    // Manual cascading cleanup for safety
+    await query('DELETE FROM public.web_portfolio_profile WHERE portfolio_id = $1', [id]);
+    await query('DELETE FROM public.web_portfolio_skills WHERE portfolio_id = $1', [id]);
+    await query('DELETE FROM public.web_portfolio_experiences WHERE portfolio_id = $1', [id]);
+    await query('DELETE FROM public.web_portfolio_services WHERE portfolio_id = $1', [id]);
+    await query('DELETE FROM public.web_portfolio_team WHERE portfolio_id = $1', [id]);
+    await query('DELETE FROM public.web_portfolio_pages WHERE portfolio_id = $1', [id]);
+    await query('DELETE FROM public.web_portfolio_quotes WHERE portfolio_id = $1', [id]);
+    await query('DELETE FROM public.web_portfolio_announcements WHERE portfolio_id = $1', [id]);
+
     await query('DELETE FROM public.web_portfolios WHERE id = $1', [id]);
-    res.json({ success: true, message: 'Portfolio supprimé définitivement.' });
+    res.json({ success: true, message: 'Portfolio et toutes ses données supprimés définitivement.' });
 });
 
 /**

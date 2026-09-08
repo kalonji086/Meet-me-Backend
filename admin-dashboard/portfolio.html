@@ -28,9 +28,14 @@
         .discord-channels { background: #2b2d31; }
         .discord-chat { background: #313338; }
         .discord-members { background: #2b2d31; }
-        .discord-server-icon { width: 48px; height: 48px; border-radius: 50%; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); cursor: pointer; position: relative; }
+        .discord-server-icon { width: 48px; height: 48px; border-radius: 50%; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; }
         .discord-server-icon:hover, .discord-server-icon.active { border-radius: 30%; background: #5865f2; color: white; }
-        .discord-server-icon.active::before { content: ''; position: absolute; left: -15px; top: 12px; width: 4px; height: 24px; background: white; border-radius: 0 4px 4px 0; }
+        .discord-server-icon.active::before { content: ''; position: absolute; left: -12px; top: 12px; width: 4px; height: 24px; background: white; border-radius: 0 4px 4px 0; }
+        .discord-server-icon.home-btn { background: #313338; color: #23a559; }
+        .discord-server-icon.home-btn:hover { background: #23a559; color: white; }
+
+        .discord-tooltip { position: absolute; left: 65px; background: black; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; white-space: nowrap; opacity: 0; pointer-events: none; transition: all 0.2s; z-index: 1000; }
+        .discord-server-icon:hover .discord-tooltip { opacity: 1; transform: translateX(5px); }
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -155,15 +160,26 @@
         <div id="page-community" class="page bg-[#313338] h-screen !fixed inset-0 z-[100] flex">
             <!-- Sidebar: Server Icons -->
             <div class="w-[72px] discord-sidebar flex flex-col items-center py-3 space-y-2 shrink-0">
-                <div class="discord-server-icon active flex items-center justify-center bg-[#5865f2] text-white" onclick="navigateTo('home')">
-                    <i data-lucide="zap" class="w-7 h-7"></i>
+                <!-- Back to Site Button -->
+                <div class="discord-server-icon home-btn mb-2 group" onclick="navigateTo('home')">
+                    <i data-lucide="home" class="w-6 h-6"></i>
+                    <span class="discord-tooltip">Retour au Site</span>
                 </div>
-                <div class="w-8 h-[2px] bg-white/10 rounded-full mx-auto my-1"></div>
+
+                <div class="w-8 h-[2px] bg-white/10 rounded-full mx-auto mb-2"></div>
+
+                <div class="discord-server-icon active flex items-center justify-center bg-[#5865f2] text-white group">
+                    <i data-lucide="zap" class="w-6 h-6"></i>
+                    <span class="discord-tooltip">Together Tech</span>
+                </div>
+
                 <div id="discord-groups-list" class="flex flex-col space-y-2">
                     <!-- Groups injected by JS -->
                 </div>
-                <div class="discord-server-icon flex items-center justify-center bg-[#313338] text-green-500 hover:bg-green-500 hover:text-white mt-auto mb-4">
+
+                <div class="discord-server-icon flex items-center justify-center bg-[#313338] text-green-500 hover:bg-green-500 hover:text-white mt-auto mb-4 group" onclick="scrollToContact()">
                     <i data-lucide="plus" class="w-6 h-6"></i>
+                    <span class="discord-tooltip">Nouveau Devis</span>
                 </div>
             </div>
 

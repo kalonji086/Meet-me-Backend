@@ -96,25 +96,29 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
   const request = requestRes.rows[0];
 
   if (action === 'approved') {
-    // 1. Check if user exists, otherwise create a base account for them
+    // 1. Determine Owner and Generate Temporary Password
     let ownerId = request.user_id;
-    let tempPassword = null;
+    const crypto = require('crypto');
+    const bcrypt = require('bcryptjs');
+    const tempPassword = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8 chars
+    const hashed = await bcrypt.hash(tempPassword, 10);
 
     if (!ownerId) {
         const userCheck = await query('SELECT id FROM public.profiles WHERE email = $1', [request.email]);
         if (userCheck.rows.length > 0) {
             ownerId = userCheck.rows[0].id;
+            // Ensure they can log in with a fresh temp password as requested
+            await query('UPDATE public.profiles SET password = $1, must_change_password = TRUE WHERE id = $2', [hashed, ownerId]);
         } else {
-            const crypto = require('crypto');
-            const bcrypt = require('bcryptjs');
-            tempPassword = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8 chars
-            const hashed = await bcrypt.hash(tempPassword, 10);
             const newUser = await query(
                 'INSERT INTO public.profiles (id, full_name, email, password, username, is_verified, must_change_password) VALUES ($1, $2, $3, $4, $5, TRUE, TRUE) RETURNING id',
                 [crypto.randomUUID(), request.full_name, request.email, hashed, request.desired_slug]
             );
             ownerId = newUser.rows[0].id;
         }
+    } else {
+        // Force update even if already registered to ensure they have the new credentials sent in email
+        await query('UPDATE public.profiles SET password = $1, must_change_password = TRUE WHERE id = $2', [hashed, ownerId]);
     }
 
     const portfolioTitle = `Portfolio de ${request.full_name}`;

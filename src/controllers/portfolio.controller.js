@@ -3,6 +3,8 @@ const { asyncHandler } = require('../middleware/error.middleware');
 const logger = require('../utils/logger');
 const socketService = require('../services/socket.service');
 
+const mailService = require('../services/mail.service');
+
 /**
  * Helper: Get the portfolio ID managed by the current user
  */
@@ -101,42 +103,80 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
         if (userCheck.rows.length > 0) {
             ownerId = userCheck.rows[0].id;
         } else {
-            // Create a shadow account (password must be reset or sent)
             const crypto = require('crypto');
             const bcrypt = require('bcryptjs');
-            const tempPass = crypto.randomBytes(4).toString('hex');
+            const tempPass = crypto.randomBytes(4).toString('hex').toUpperCase();
             const hashed = await bcrypt.hash(tempPass, 10);
             const newUser = await query(
-                'INSERT INTO public.profiles (full_name, email, password, username, is_verified) VALUES ($1, $2, $3, $4, TRUE) RETURNING id',
-                [request.full_name, request.email, hashed, request.desired_slug, true]
+                'INSERT INTO public.profiles (id, full_name, email, password, username, is_verified, must_change_password) VALUES ($1, $2, $3, $4, $5, TRUE, TRUE) RETURNING id',
+                [crypto.randomUUID(), request.full_name, request.email, hashed, request.desired_slug]
             );
             ownerId = newUser.rows[0].id;
-            // Send email with credentials (future)
         }
     }
+
+    const portfolioTitle = `Portfolio de ${request.full_name}`;
 
     const portfolio = await query(
       `INSERT INTO public.web_portfolios (user_id, slug, title, owner_name, theme_color, logo_url, enabled_modules, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved') RETURNING *`,
-      [ownerId, request.desired_slug, `Portfolio de ${request.full_name}`, request.full_name, request.preferred_color, request.logo_url, request.enabled_modules]
+      [ownerId, request.desired_slug, portfolioTitle, request.full_name, request.preferred_color, request.logo_url, request.enabled_modules]
     );
 
     await query('INSERT INTO public.web_portfolio_profile (portfolio_id, about_description, logo_url) VALUES ($1, $2, $3)',
       [portfolio.rows[0].id, `Bienvenue sur mon portfolio professionnel. Je suis ${request.profession}.`, request.logo_url]);
 
-    // Create default legal pages
     await query(`INSERT INTO public.web_portfolio_pages (portfolio_id, slug, title, content) VALUES
       ($1, 'policy', 'Politique de Confidentialité', '<h1>Politique de Confidentialité</h1><p>Contenu à rédiger...</p>'),
       ($1, 'terms', 'Conditions d''Utilisation', '<h1>Conditions d''Utilisation</h1><p>Contenu à rédiger...</p>')`,
       [portfolio.rows[0].id]);
 
     await query('UPDATE public.web_portfolio_requests SET status = \'approved\' WHERE id = $1', [id]);
+
+    // 2. Send Email Notification
+    await mailService.sendPortfolioApprovalEmail(
+        request.email,
+        request.full_name,
+        portfolioTitle,
+        request.desired_slug,
+        request.preferred_color || '#06b6d4'
+    );
+
     socketService.emitToUser(ownerId, 'portfolio:request_approved', { slug: request.desired_slug });
   } else {
     await query('UPDATE public.web_portfolio_requests SET status = \'rejected\' WHERE id = $1', [id]);
   }
 
   res.json({ success: true, message: `Demande de portfolio ${action}.` });
+});
+
+/**
+ * @desc    Admin: Delete Portfolio Request
+ */
+const deletePortfolioRequest = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    await query('DELETE FROM public.web_portfolio_requests WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Demande supprimée.' });
+});
+
+/**
+ * @desc    Admin: Get single portfolio request detail
+ */
+const getPortfolioRequestDetail = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const result = await query('SELECT * FROM public.web_portfolio_requests WHERE id = $1', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Demande introuvable.' });
+    res.json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Admin: Delete active portfolio
+ */
+const deletePortfolio = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    // We need to cascade delete manually if foreign keys don't handle it
+    await query('DELETE FROM public.web_portfolios WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Portfolio supprimé définitivement.' });
 });
 
 /**
@@ -437,5 +477,6 @@ module.exports = {
   getPublicData, submitPortfolioRequest, approvePortfolioRequest, getPortfolioRequests, getAllPortfolios, togglePortfolioStatus,
   getClientQuotes, handleChat, replyToQuote, updateContract, signContract, updateSpecs, submitQuote,
   manageSkill, manageExperience, manageService, manageTeam, getQuotes, updateQuoteStatusAdmin, updateProfileAdmin, managePage,
-  getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage, getCommunityMembers
+  getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage, getCommunityMembers,
+  getPortfolioRequestDetail, deletePortfolioRequest, deletePortfolio
 };

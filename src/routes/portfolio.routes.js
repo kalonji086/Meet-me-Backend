@@ -36,9 +36,12 @@ router.use(authenticate);
 
 // Admin only (Global Admin)
 router.get('/admin/requests', isAdmin, portfolioController.getPortfolioRequests);
+router.get('/admin/requests/:id', isAdmin, portfolioController.getPortfolioRequestDetail);
 router.post('/admin/requests/:id/approve', isAdmin, portfolioController.approvePortfolioRequest);
+router.delete('/admin/requests/:id', isAdmin, portfolioController.deletePortfolioRequest);
 router.get('/admin/all', isAdmin, portfolioController.getAllPortfolios);
 router.put('/admin/:id/status', isAdmin, portfolioController.togglePortfolioStatus);
+router.delete('/admin/:id', isAdmin, portfolioController.deletePortfolio);
 
 // Portfolio Management (Any authorized admin/owner)
 router.post('/admin/skills', portfolioController.manageSkill);

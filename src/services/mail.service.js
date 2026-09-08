@@ -484,6 +484,48 @@ class MailService {
 
     return this.sendSystemEmail(email, `Modération Meet Me : ${contentTitle}`, content, 'amazon', name);
   }
+
+  /**
+   * Envoyer un email d'approbation Portfolio SaaS
+   */
+  async sendPortfolioApprovalEmail(email, name, portfolioTitle, slug, themeColor) {
+    const portfolioUrl = `https://meet-me-backend-sg5c.onrender.com/p/${slug}`;
+    const dashboardUrl = `https://meet-me-backend-sg5c.onrender.com/admin-portal`;
+
+    const content = `
+      <div style="text-align: center; margin-bottom: 30px;">
+        <div style="width: 80px; height: 80px; background-color: ${themeColor}; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 900;">
+          ${portfolioTitle.charAt(0).toUpperCase()}
+        </div>
+      </div>
+      <p>Félicitations <strong>${name}</strong>,</p>
+      <p>Votre demande de création de portfolio professionnel a été <strong>approuvée</strong> par l'administrateur !</p>
+
+      <div style="background-color: #f0fdfa; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #ccfbf1;">
+        <p style="margin: 0; color: #0d9488; font-weight: bold; font-size: 16px;">🚀 VOTRE SITE EST EN LIGNE</p>
+        <p style="margin: 10px 0 0 0; font-size: 15px; color: #134e4a;">Vous pouvez le consulter dès maintenant à l'adresse suivante :</p>
+        <p style="margin: 10px 0 0 0; font-family: monospace; font-weight: bold; background: white; padding: 10px; border-radius: 8px;">${portfolioUrl}</p>
+      </div>
+
+      <h3 style="color: #111; font-size: 18px; margin-top: 30px;">Comment gérer votre contenu ?</h3>
+      <p>Vous disposez d'un tableau de bord complet pour modifier votre équipe, vos services et vos informations de contact.</p>
+      <ol style="line-height: 1.8;">
+        <li>Connectez-vous sur : <strong>${dashboardUrl}</strong></li>
+        <li>Utilisez votre compte <strong>Meet Me</strong> (${email}).</li>
+        <li>Allez dans l'onglet <strong>"Portfolio Web"</strong>.</li>
+      </ol>
+
+      <div style="text-align: center; margin-top: 35px;">
+        <a href="${portfolioUrl}" class="btn" style="background-color: ${themeColor}; color: #ffffff !important;">VOIR MON PORTFOLIO</a>
+      </div>
+
+      <p style="margin-top: 40px; font-size: 12px; color: #888; text-align: center;">
+        <em>L'équipe Together Tech SaaS.</em>
+      </p>
+    `;
+
+    return this.sendSystemEmail(email, `Votre Portfolio "${portfolioTitle}" est prêt !`, content, 'modern', name);
+  }
 }
 
 module.exports = new MailService();

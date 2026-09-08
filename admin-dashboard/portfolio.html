@@ -905,6 +905,13 @@
             const btn = e.target.querySelector('button');
             const logoFile = document.getElementById('saas-logo-input').files[0];
 
+            // Get selected modules
+            const selectedModules = Array.from(document.querySelectorAll('input[name="saas-modules"]:checked')).map(cb => cb.value);
+            // Default essential modules
+            if (!selectedModules.includes('home')) selectedModules.push('home');
+            if (!selectedModules.includes('about')) selectedModules.push('about');
+            if (!selectedModules.includes('contact')) selectedModules.push('contact');
+
             try {
                 btn.innerText = "ENVOI...";
                 btn.disabled = true;
@@ -924,6 +931,7 @@
                     desiredSlug: document.getElementById('saas-slug').value,
                     preferredColor: document.getElementById('saas-color').value,
                     motivation: document.getElementById('saas-motivation').value,
+                    enabledModules: selectedModules,
                     logoUrl
                 };
 
@@ -956,8 +964,37 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <input type="text" id="saas-profession" placeholder="Votre Métier (ex: Avocat)" required class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-purple-500 text-white font-bold">
                     <div class="flex gap-4">
-                        <input type="text" id="saas-slug" placeholder="slug-url" required class="flex-1 bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-purple-500 text-white font-bold">
-                        <input type="color" id="saas-color" value="#06b6d4" class="w-16 h-full bg-transparent border-none cursor-pointer">
+                        <div class="flex-1 relative group">
+                            <input type="text" id="saas-slug" placeholder="nom-du-site" required class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-purple-500 text-white font-bold">
+                            <span class="absolute -top-3 left-4 bg-[#111115] px-2 text-[8px] font-black text-purple-400 uppercase">Adresse du site (URL)</span>
+                        </div>
+                        <input type="color" id="saas-color" value="#06b6d4" class="w-16 h-full bg-transparent border-none cursor-pointer" title="Couleur du thème">
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Modules à activer sur votre site</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <label class="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
+                            <input type="checkbox" name="saas-modules" value="team" checked class="w-4 h-4 accent-purple-500">
+                            <span class="text-[10px] font-bold uppercase">Équipe</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
+                            <input type="checkbox" name="saas-modules" value="skills" checked class="w-4 h-4 accent-purple-500">
+                            <span class="text-[10px] font-bold uppercase">Expertise</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
+                            <input type="checkbox" name="saas-modules" value="experience" checked class="w-4 h-4 accent-purple-500">
+                            <span class="text-[10px] font-bold uppercase">Parcours</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
+                            <input type="checkbox" name="saas-modules" value="services" checked class="w-4 h-4 accent-purple-500">
+                            <span class="text-[10px] font-bold uppercase">Services</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
+                            <input type="checkbox" name="saas-modules" value="community" class="w-4 h-4 accent-purple-500">
+                            <span class="text-[10px] font-bold uppercase">Communauté</span>
+                        </label>
                     </div>
                 </div>
                 <div class="space-y-2">

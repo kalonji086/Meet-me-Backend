@@ -648,6 +648,7 @@ const ensureAdminTables = async () => {
         preferred_color TEXT DEFAULT '#06b6d4',
         logo_url TEXT,
         motivation TEXT,
+        enabled_modules TEXT[] DEFAULT '{"home", "about", "contact"}',
         status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );

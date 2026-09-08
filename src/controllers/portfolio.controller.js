@@ -56,7 +56,7 @@ const getPublicData = asyncHandler(async (req, res) => {
  * @desc    Submit a portfolio creation request
  */
 const submitPortfolioRequest = asyncHandler(async (req, res) => {
-  const { fullName, email, profession, desiredSlug, preferredColor, motivation, logoUrl } = req.body;
+  const { fullName, email, profession, desiredSlug, preferredColor, motivation, logoUrl, enabledModules } = req.body;
 
   // If user is authenticated, we use their ID, otherwise it's null (public request)
   const userId = req.userId || null;
@@ -69,9 +69,9 @@ const submitPortfolioRequest = asyncHandler(async (req, res) => {
   if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Ce nom de domaine (slug) est déjà utilisé.' });
 
   const result = await query(
-    `INSERT INTO public.web_portfolio_requests (user_id, full_name, email, profession, desired_slug, preferred_color, motivation, logo_url)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [userId, fullName, email, profession, desiredSlug.toLowerCase(), preferredColor || '#06b6d4', motivation, logoUrl || null]
+    `INSERT INTO public.web_portfolio_requests (user_id, full_name, email, profession, desired_slug, preferred_color, motivation, logo_url, enabled_modules)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [userId, fullName, email, profession, desiredSlug.toLowerCase(), preferredColor || '#06b6d4', motivation, logoUrl || null, enabledModules || ['home', 'about', 'contact']]
   );
 
   const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
@@ -116,21 +116,22 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
     }
 
     const portfolio = await query(
-      `INSERT INTO public.web_portfolios (user_id, slug, title, owner_name, theme_color, logo_url, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'approved') RETURNING *`,
-      [ownerId, request.desired_slug, `Portfolio de ${request.full_name}`, request.full_name, request.preferred_color, request.logo_url]
+      `INSERT INTO public.web_portfolios (user_id, slug, title, owner_name, theme_color, logo_url, enabled_modules, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved') RETURNING *`,
+      [ownerId, request.desired_slug, `Portfolio de ${request.full_name}`, request.full_name, request.preferred_color, request.logo_url, request.enabled_modules]
     );
 
     await query('INSERT INTO public.web_portfolio_profile (portfolio_id, about_description, logo_url) VALUES ($1, $2, $3)',
       [portfolio.rows[0].id, `Bienvenue sur mon portfolio professionnel. Je suis ${request.profession}.`, request.logo_url]);
 
+    // Create default legal pages
     await query(`INSERT INTO public.web_portfolio_pages (portfolio_id, slug, title, content) VALUES
       ($1, 'policy', 'Politique de Confidentialité', '<h1>Politique de Confidentialité</h1><p>Contenu à rédiger...</p>'),
       ($1, 'terms', 'Conditions d''Utilisation', '<h1>Conditions d''Utilisation</h1><p>Contenu à rédiger...</p>')`,
       [portfolio.rows[0].id]);
 
     await query('UPDATE public.web_portfolio_requests SET status = \'approved\' WHERE id = $1', [id]);
-    socketService.emitToUser(request.user_id, 'portfolio:request_approved', { slug: request.desired_slug });
+    socketService.emitToUser(ownerId, 'portfolio:request_approved', { slug: request.desired_slug });
   } else {
     await query('UPDATE public.web_portfolio_requests SET status = \'rejected\' WHERE id = $1', [id]);
   }

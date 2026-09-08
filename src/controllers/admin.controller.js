@@ -28,6 +28,15 @@ const getStats = asyncHandler(async (req, res) => {
 });
 
 const ensureAdminTables = async () => {
+  // SÉCURITÉ : Forcer les colonnes critiques si elles manquent
+  try {
+    await query('ALTER TABLE public.web_portfolio_requests ADD COLUMN IF NOT EXISTS logo_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_requests ADD COLUMN IF NOT EXISTS enabled_modules TEXT[] DEFAULT \'{"home", "about", "contact"}\'');
+    logger.info('🚀 Migration SaaS for web_portfolio_requests check done.');
+  } catch (e) {
+    // Si la table n'existe pas encore, on ignore cette erreur car le CREATE TABLE plus bas s'en chargera
+  }
+
   await query(`
     CREATE TABLE IF NOT EXISTS public.app_legal_docs (
       id SERIAL PRIMARY KEY,

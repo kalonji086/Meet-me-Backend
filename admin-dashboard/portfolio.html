@@ -18,9 +18,9 @@
         .animate-float { animation: float 6s ease-in-out infinite; }
 
         /* SPA Pages */
-        .page { display: none; width: 100%; min-height: 100vh; animation: pageIn 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
-        .page.active { display: block; }
-        .page.active.flex-page { display: flex; }
+        .page { display: none !important; width: 100%; min-height: 100vh; animation: pageIn 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
+        .page.active { display: block !important; }
+        .page.active.flex-page { display: flex !important; }
         @keyframes pageIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Discord-style Community */
@@ -162,10 +162,10 @@
             <!-- Sidebar: Server Icons -->
             <div class="w-[72px] discord-sidebar flex flex-col items-center py-3 space-y-2 shrink-0">
                 <!-- Back to Site Button -->
-                <div class="discord-server-icon home-btn mb-2 group" onclick="navigateTo('home')">
+                <button class="discord-server-icon home-btn mb-2 group border-none outline-none" onclick="navigateTo('home')">
                     <i data-lucide="home" class="w-6 h-6"></i>
                     <span class="discord-tooltip">Retour au Site</span>
-                </div>
+                </button>
 
                 <div class="w-8 h-[2px] bg-white/10 rounded-full mx-auto mb-2"></div>
 
@@ -378,20 +378,31 @@
         }
 
         function navigateTo(pageId, updateHash = true) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            console.log('Navigating to:', pageId);
+            // Force hide all pages first
+            const allPages = document.querySelectorAll('.page');
+            allPages.forEach(p => {
+                p.classList.remove('active');
+                p.style.display = 'none'; // Direct style fallback
+            });
+
             const target = document.getElementById('page-' + pageId);
             if (target) {
                 target.classList.add('active');
+                // Use flex for community, block for others
+                target.style.display = (pageId === 'community') ? 'flex' : 'block';
+
                 activePage = pageId;
                 if (updateHash) window.location.hash = pageId;
 
-                // Toggle Navbar and Footer visibility for Community (Discord view)
                 const isDiscord = pageId === 'community';
                 document.getElementById('navbar').style.display = isDiscord ? 'none' : 'block';
                 document.getElementById('global-footer').style.display = isDiscord ? 'none' : 'block';
 
                 if (isDiscord) loadDiscordCommunity();
                 window.scrollTo(0, 0);
+            } else {
+                console.error('Page not found:', pageId);
             }
         }
 

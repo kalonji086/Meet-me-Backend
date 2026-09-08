@@ -37,9 +37,9 @@ router.post('/admin/experiences', portfolioController.manageExperience);
 router.post('/admin/services', portfolioController.manageService);
 router.post('/admin/team', portfolioController.manageTeam);
 router.post('/admin/pages', portfolioController.managePage);
-router.put('/admin/profile', portfolioController.updateProfile);
+router.put('/admin/profile', portfolioController.updateProfileAdmin);
 router.get('/admin/quotes', portfolioController.getQuotes);
-router.put('/admin/quotes/:id', portfolioController.updateQuoteStatus);
+router.put('/admin/quotes/:id', portfolioController.updateQuoteStatusAdmin);
 router.post('/admin/quotes/:id/reply', portfolioController.replyToQuote);
 router.put('/admin/quotes/:id/contract', portfolioController.updateContract);
 

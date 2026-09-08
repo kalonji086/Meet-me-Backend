@@ -93,7 +93,7 @@
                         </div>
                     </div>
                     <div class="relative hidden lg:block animate-float">
-                        <img src="https://placehold.co/600x600/000/06b6d4?text=PREMIUM+TECH" class="rounded-[4rem] border-white/5 shadow-2xl">
+                        <img src="https://placehold.co/600x600/000/06b6d4?text=PREMIUM+TECH" class="rounded-[4rem] border-white/5 shadow-2xl" alt="Premium Tech">
                     </div>
                 </div>
             </section>
@@ -376,7 +376,6 @@
     <!-- MODAL TRACKING CLIENT (Mes Demandes) -->
     <div id="modal-tracking" class="hidden fixed inset-0 bg-black/95 z-[500] flex items-center justify-center p-6 backdrop-blur-xl">
         <div class="max-w-6xl w-full bg-[#111115] rounded-[3rem] border border-white/5 shadow-2xl overflow-hidden flex flex-col h-[85vh] animate-pop-in">
-             <!-- Modal Content same as before -->
              <div class="p-8 border-b border-white/5 flex justify-between items-center bg-dot">
                 <div><h3 class="text-3xl font-black uppercase tracking-tighter text-white">Mes Demandes <span class="text-cyan-400">& Projets</span></h3></div>
                 <button onclick="closeTrackingModal()" class="w-12 h-12 glass rounded-2xl flex items-center justify-center hover:bg-red-500 transition-all text-white"><i data-lucide="x"></i></button>
@@ -391,563 +390,6 @@
             </div>
         </div>
     </div>
-
-    <script>
-        const API_BASE = '/api/portfolio';
-        let socket;
-        let currentQuoteId = null;
-        let servicesData = [];
-        let currentCarouselIndex = 0;
-        let activePage = 'home';
-        let portfolioSlug = 'together'; // Default
-
-        let activeDiscordGroupId = null;
-        let mediaRecorder, audioChunks = [];
-
-        window.addEventListener('DOMContentLoaded', () => {
-            // Determine slug from URL
-            const pathParts = window.location.pathname.split('/');
-            if (pathParts.includes('p')) {
-                portfolioSlug = pathParts[pathParts.indexOf('p') + 1];
-            }
-
-            loadData();
-            initSocket();
-            lucide.createIcons();
-
-            window.addEventListener('hashchange', handleRoute);
-            handleRoute();
-
-            window.addEventListener('scroll', () => {
-                const nav = document.getElementById('navbar');
-                if (window.scrollY > 100) nav.classList.add('py-2', 'px-4', 'bg-[#0a0a0c]/80');
-                else nav.classList.remove('py-2', 'px-4', 'bg-[#0a0a0c]/80');
-            });
-
-            // Discord Input handler
-            document.getElementById('discord-chat-input')?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') sendDiscordMessage();
-            });
-        });
-
-        function handleRoute() {
-            const hash = window.location.hash.replace('#', '') || 'home';
-            navigateTo(hash, false);
-        }
-
-        function navigateTo(pageId, updateHash = true) {
-            console.log('Navigating to:', pageId);
-            // Force hide all pages first
-            const allPages = document.querySelectorAll('.page');
-            allPages.forEach(p => {
-                p.classList.remove('active');
-                p.style.display = 'none'; // Direct style fallback
-            });
-
-            const target = document.getElementById('page-' + pageId);
-            if (target) {
-                target.classList.add('active');
-                // Use flex for community, block for others
-                target.style.display = (pageId === 'community') ? 'flex' : 'block';
-
-                activePage = pageId;
-                if (updateHash) window.location.hash = pageId;
-
-                const isDiscord = pageId === 'community';
-                document.getElementById('navbar').style.display = isDiscord ? 'none' : 'block';
-                document.getElementById('global-footer').style.display = isDiscord ? 'none' : 'block';
-
-                if (isDiscord) loadDiscordCommunity();
-                window.scrollTo(0, 0);
-            } else {
-                console.error('Page not found:', pageId);
-            }
-        }
-
-        async function loadDiscordCommunity() {
-            try {
-                const res = await axios.get(`${API_BASE}/community/groups`);
-                const { groups, announcements } = res.data.data;
-
-                // Update visitor name in UI
-                const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
-                document.getElementById('discord-visitor-name').innerText = visitorName;
-
-                // Render Server Sidebar
-                document.getElementById('discord-groups-list').innerHTML = groups.map(g => `
-                    <div id="discord-group-${g.id}" class="discord-server-icon flex items-center justify-center bg-white/5 text-gray-400 hover:bg-[#5865f2] hover:text-white group" onclick="selectDiscordGroup('${g.id}', '${g.name.replace(/'/g, "\\'")}')" title="${g.name}">
-                        ${g.avatar_url ? `<img src="${getFullUrl(g.avatar_url)}" class="w-full h-full object-cover rounded-[inherit]">` : g.name.charAt(0)}
-                        <span class="discord-tooltip">${g.name}</span>
-                    </div>
-                `).join('');
-
-                // Render Channels List
-                document.getElementById('discord-channels-list').innerHTML = groups.map(g => `
-                    <div class="flex items-center px-2 py-1.5 rounded ${activeDiscordGroupId === g.id ? 'bg-white/10 text-white' : 'text-gray-400'} font-medium text-sm cursor-pointer hover:bg-white/5 transition-all group" onclick="selectDiscordGroup('${g.id}', '${g.name}')">
-                        <i data-lucide="hash" class="w-4 h-4 mr-2 text-gray-400"></i> ${g.name.toLowerCase()}
-                    </div>
-                `).join('');
-
-                // Render Announcements
-                document.getElementById('discord-announcements-list').innerHTML = announcements.map(a => `
-                    <div class="px-2 py-2 rounded hover:bg-white/5 cursor-pointer transition-all border-l-2 border-transparent hover:border-cyan-500">
-                        <p class="text-[10px] font-black text-white truncate uppercase">${a.title}</p>
-                        <p class="text-[8px] text-gray-500 line-clamp-1">${a.content}</p>
-                    </div>
-                `).join('') || '<p class="text-[9px] text-gray-600 text-center italic">Aucune annonce</p>';
-
-                if (groups.length > 0 && !activeDiscordGroupId) {
-                    selectDiscordGroup(groups[0].id, groups[0].name);
-                }
-
-                loadDiscordMembersList();
-                lucide.createIcons();
-            } catch (e) {}
-        }
-
-        async function loadDiscordMembersList() {
-            try {
-                const membersRes = await axios.get('/api/admin/users');
-                const members = membersRes.data.data;
-                const onlineCount = members.filter(m => m.status === 'online').length;
-
-                const memberHeader = document.querySelector('#discord-member-list h5');
-                if (memberHeader) memberHeader.innerText = `EN LIGNE — ${onlineCount}`;
-
-                document.getElementById('discord-online-list').innerHTML = members.slice(0, 30).map(m => `
-                    <div class="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer group">
-                        <div class="relative">
-                            <img src="${getFullUrl(m.avatar_url)}" class="w-8 h-8 rounded-full object-cover shadow-lg">
-                            <div class="absolute bottom-0 right-0 w-3 h-3 ${m.status === 'online' ? 'bg-green-500' : 'bg-gray-500'} rounded-full border-2 border-[#2b2d31]"></div>
-                        </div>
-                        <span class="text-sm font-medium ${m.status === 'online' ? 'text-gray-200' : 'text-gray-500'} group-hover:text-white truncate">${m.full_name}</span>
-                    </div>
-                `).join('');
-            } catch (e) {}
-        }
-
-        async function selectDiscordGroup(id, name) {
-            activeDiscordGroupId = id;
-            document.querySelectorAll('.discord-server-icon').forEach(el => el.classList.remove('active'));
-            document.getElementById('discord-group-' + id)?.classList.add('active');
-
-            document.getElementById('active-group-title').innerText = name.toLowerCase();
-            loadDiscordMessages(id);
-        }
-
-        async function loadDiscordMessages(groupId) {
-            try {
-                const res = await axios.get(`${API_BASE}/community/groups/${groupId}/messages`);
-                renderDiscordMessages(res.data.data);
-            } catch (e) {}
-        }
-
-        function renderDiscordMessages(messages) {
-            const list = document.getElementById('discord-messages-list');
-            if (!list) return;
-
-            list.innerHTML = messages.map(m => {
-                const name = m.sender_name || (m.metadata?.visitorName) || 'Visiteur';
-                const avatar = m.sender_avatar ? getFullUrl(m.sender_avatar) : `https://ui-avatars.com/api/?name=${name}&background=random`;
-                const date = new Date(m.created_at).toLocaleString();
-
-                let contentHtml = `<p class="text-gray-300 text-sm leading-relaxed">${m.content}</p>`;
-                if (m.type === 'audio') contentHtml = `<audio src="${getFullUrl(m.file_url)}" controls class="h-8 mt-2 opacity-80"></audio>`;
-                if (m.type === 'document') contentHtml = `<a href="${getFullUrl(m.file_url)}" target="_blank" class="flex items-center gap-3 p-4 bg-black/20 rounded-xl border border-white/5 mt-2 hover:bg-black/40 transition-all">
-                    <i data-lucide="file" class="text-cyan-400"></i>
-                    <div class="overflow-hidden"><p class="text-xs font-bold text-white truncate">${m.file_name || 'Document'}</p><p class="text-[8px] text-gray-500 uppercase">Fichier</p></div>
-                </a>`;
-
-                return `
-                    <div class="flex items-start gap-4 hover:bg-black/5 p-2 rounded-lg transition-all group ${m.is_pinned ? 'bg-cyan-500/5 border-l-2 border-cyan-500' : ''}">
-                        <img src="${avatar}" class="w-10 h-10 rounded-full bg-gray-700 shadow-xl">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-white text-sm hover:underline cursor-pointer">${name}</span>
-                                <span class="text-[10px] text-gray-400 font-medium">${date}</span>
-                                ${m.is_pinned ? '<i data-lucide="pin" class="w-3 h-3 text-cyan-400"></i>' : ''}
-                            </div>
-                            ${contentHtml}
-                        </div>
-                        <div class="opacity-0 group-hover:opacity-100 transition-all flex gap-2">
-                             <button onclick="togglePin('${m.id}', ${!m.is_pinned})" class="p-1 hover:bg-white/10 rounded"><i data-lucide="pin" class="w-4 h-4 text-gray-400"></i></button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            // Update Pinned List
-            const pinned = messages.filter(m => m.is_pinned);
-            document.getElementById('pinned-messages-list').innerHTML = pinned.map(m => `
-                <div class="bg-black/20 p-3 rounded-lg border border-white/5">
-                    <p class="text-[10px] font-bold text-cyan-400 mb-1">${m.sender_name || 'Visiteur'}</p>
-                    <p class="text-xs text-gray-300 line-clamp-2">${m.content}</p>
-                </div>
-            `).join('') || '<p class="text-center text-gray-600 text-[10px] py-4">Aucun message épinglé</p>';
-
-            const container = document.getElementById('discord-messages-container');
-            container.scrollTop = container.scrollHeight;
-            lucide.createIcons();
-        }
-
-        async function sendDiscordMessage() {
-            const input = document.getElementById('discord-chat-input');
-            const content = input.value.trim();
-            if (!content || !activeDiscordGroupId) return;
-
-            try {
-                const visitorName = localStorage.getItem('visitor_name') || 'Visiteur_' + Math.floor(Math.random() * 1000);
-                if (!localStorage.getItem('visitor_name')) localStorage.setItem('visitor_name', visitorName);
-
-                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { content, visitorName });
-                input.value = '';
-                loadDiscordMessages(activeDiscordGroupId);
-            } catch (e) {}
-        }
-
-        async function sendSticker(sticker) {
-            document.getElementById('sticker-picker').classList.add('hidden');
-            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
-            await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { content: sticker, visitorName, type: 'sticker' });
-            loadDiscordMessages(activeDiscordGroupId);
-        }
-
-        async function uploadDiscordFile(input) {
-            const file = input.files[0];
-            if (!file || !activeDiscordGroupId) return;
-            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
-
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-                const upRes = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-
-                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, {
-                    visitorName,
-                    type: 'document',
-                    fileUrl: upRes.data.data.fileUrl,
-                    fileName: file.name
-                });
-                loadDiscordMessages(activeDiscordGroupId);
-            } catch (e) { alert("Erreur upload"); }
-        }
-
-        async function toggleAudioRecording() {
-            const btn = document.getElementById('audio-record-btn');
-            if (document.getElementById('discord-mic-btn').classList.contains('muted')) {
-                alert("Votre micro est désactivé.");
-                return;
-            }
-            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                    mediaRecorder.onstop = async () => {
-                        const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
-                        const file = new File([blob], "voice_msg.ogg", { type: 'audio/ogg' });
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        const upRes = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                        const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
-                        await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { visitorName, type: 'audio', fileUrl: upRes.data.data.fileUrl });
-                        loadDiscordMessages(activeDiscordGroupId);
-                    };
-                    mediaRecorder.start();
-                    btn.classList.add('text-red-500', 'animate-pulse');
-                    showToast("Enregistrement...", "Parlez maintenant", "mic");
-                } catch (e) { alert("Micro non autorisé"); }
-            } else {
-                mediaRecorder.stop();
-                btn.classList.remove('text-red-500', 'animate-pulse');
-            }
-        }
-
-        async function togglePin(msgId, isPinned) {
-            await axios.put(`${API_BASE}/community/messages/${msgId}/pin`, { isPinned });
-            loadDiscordMessages(activeDiscordGroupId);
-        }
-
-        function togglePinnedMessages() {
-            document.getElementById('pinned-messages-panel').classList.toggle('hidden');
-        }
-
-        function initSocket() {
-            if (typeof io === 'undefined') return;
-            socket = io();
-            socket.on('portfolio:data_updated', () => loadData());
-            socket.on('community:new_message', (msg) => {
-                if (activeDiscordGroupId === msg.chat_id) loadDiscordMessages(activeDiscordGroupId);
-                showNotification("Nouveau message", msg.content, "message-square");
-            });
-            socket.on('community:message_pinned', () => loadDiscordMessages(activeDiscordGroupId));
-
-            // Real-time member updates
-            socket.on('admin_user_login', () => loadDiscordMembersList());
-            socket.on('admin_user_logout', () => loadDiscordMembersList());
-        }
-
-        function showNotification(title, msg, icon) {
-            if (Notification.permission === "granted") {
-                new Notification(title, { body: msg });
-            } else if (Notification.permission !== "denied") {
-                Notification.requestPermission();
-            }
-            showToast(title, msg, icon);
-        }
-
-        async function loadData() {
-            try {
-                const res = await axios.get(`${API_BASE}/${portfolioSlug}/public`);
-                const { skills, experiences, services, team, profile, pages, config } = res.data.data;
-
-                // Apply dynamic configuration
-                if (config) {
-                    document.title = config.title + " | Portfolio";
-                    document.querySelectorAll('.text-cyan-400').forEach(el => el.style.color = config.theme_color);
-                    document.querySelectorAll('.bg-cyan-500').forEach(el => el.style.backgroundColor = config.theme_color);
-                    // Update main brand name
-                    document.querySelectorAll('.font-black.text-xl, .font-black.text-2xl').forEach(el => {
-                        if (el.innerText === "Together Tech") el.innerText = config.title;
-                    });
-                }
-
-                renderSkills(skills);
-                renderExperiences(experiences);
-                renderServices(services);
-                renderTeam(team);
-                renderProfile(profile);
-                renderFooterPages(pages, profile);
-                lucide.createIcons();
-            } catch (e) {
-                console.error("Load Data Error:", e);
-                if (e.response?.status === 404) {
-                    document.body.innerHTML = `<div class="h-screen flex items-center justify-center flex-col space-y-4">
-                        <h1 class="text-4xl font-black">404 - Portfolio Non Trouvé</h1>
-                        <button onclick="location.href='/portfolio'" class="px-6 py-3 bg-cyan-500 rounded-xl">Retour à l'accueil</button>
-                    </div>`;
-                }
-            }
-        }
-
-        function renderFooterPages(pages, profile) {
-            const list = document.getElementById('footer-pages-list');
-            const resList = document.getElementById('footer-resources-list');
-            if (!list || !resList) return;
-
-            list.innerHTML = pages.map(p => `
-                <li><button onclick="viewGenericPage('${p.slug}')" class="hover:text-cyan-400 transition-all uppercase">${p.title}</button></li>
-            `).join('');
-
-            resList.innerHTML = `
-                <li><a href="${profile.footer_blog || '#'}" target="_blank" class="hover:text-cyan-400 transition-all">Le Blog (Bloque)</a></li>
-                <li><a href="#community" onclick="navigateTo('community')" class="hover:text-cyan-400 transition-all">Communautés</a></li>
-            `;
-        }
-
-        async function viewGenericPage(slug) {
-            try {
-                const res = await axios.get(`${API_BASE}/public`);
-                const page = res.data.data.pages.find(p => p.slug === slug);
-                if (page) {
-                    document.getElementById('generic-page-title').innerText = page.title;
-                    document.getElementById('generic-page-body').innerHTML = page.content;
-                    navigateTo('content');
-                }
-            } catch (e) {}
-        }
-
-        function renderTeam(team) {
-            const container = document.getElementById('team-grid');
-            if (!container) return;
-            container.innerHTML = team.map(m => `
-                <div class="group relative flex flex-col items-center">
-                    <div class="relative w-full aspect-[3/4] rounded-[3.5rem] overflow-hidden border border-white/5 glass mb-8 shadow-2xl">
-                        <img src="${getFullUrl(m.image_url)}" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110">
-                        <div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-transparent to-transparent opacity-80"></div>
-                        <div class="absolute bottom-8 left-8 right-8">
-                            <p class="text-[10px] font-black text-cyan-400 uppercase tracking-[0.4em] mb-2">${m.role}</p>
-                            <h4 class="text-3xl font-black text-white uppercase tracking-tighter">${m.name}</h4>
-                        </div>
-                    </div>
-                    <p class="text-gray-500 text-sm font-medium leading-relaxed italic text-center max-w-xs group-hover:text-gray-300 transition-all">"${m.bio || ''}"</p>
-                </div>
-            `).join('') || '<p class="col-span-full text-center py-20 text-gray-600 uppercase text-xs">L\'équipe est en cours de déploiement</p>';
-        }
-
-        function renderSkills(skills) {
-            document.getElementById('skills-grid').innerHTML = skills.map(s => `
-                <div class="glass p-12 rounded-[3.5rem] border-white/5 hover:border-cyan-500/40 transition-all hover:scale-105 group relative overflow-hidden">
-                    <div class="absolute -top-10 -left-10 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl"></div>
-                    <div class="flex justify-between items-start mb-10">
-                        <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center overflow-hidden border border-white/10 shadow-2xl">
-                            ${s.image_url ? `<img src="${getFullUrl(s.image_url)}" class="w-full h-full object-cover">` : `<i data-lucide="terminal" class="w-10 h-10 text-cyan-400"></i>`}
-                        </div>
-                        <span class="text-xs font-black text-gray-600 group-hover:text-cyan-400">${s.level}%</span>
-                    </div>
-                    <p class="font-black text-xl uppercase text-white tracking-tight">${s.name}</p>
-                    <div class="w-full h-1.5 bg-white/5 rounded-full mt-6 overflow-hidden"><div class="h-full bg-gradient-to-r from-cyan-500 to-purple-500" style="width: ${s.level}%"></div></div>
-                </div>
-            `).join('');
-        }
-
-        function renderExperiences(exps) {
-            document.getElementById('experience-timeline').innerHTML = exps.map((e, idx) => `
-                <div class="flex flex-col md:flex-row gap-20 group">
-                    <div class="md:w-56 pt-8 flex flex-col items-center md:items-end text-center md:text-right">
-                        <span class="text-lg font-black uppercase text-gradient mb-3">${e.period}</span>
-                        <div class="w-20 h-1 bg-white/5 rounded-full group-hover:w-32 group-hover:bg-cyan-500 transition-all"></div>
-                    </div>
-                    <div class="flex-1 pb-32 border-l border-white/5 pl-20 relative">
-                        <div class="absolute -left-[9px] top-8 w-4 h-4 bg-[#0a0a0c] border-2 border-cyan-500 rounded-full group-hover:scale-[2] group-hover:bg-cyan-500 transition-all shadow-[0_0_30px_rgba(6,182,212,0.6)]"></div>
-                        <div class="flex flex-col sm:flex-row gap-12 items-start mb-12">
-                             ${e.logo_url ? `<div class="w-40 h-40 rounded-[2.5rem] overflow-hidden bg-white p-3 shadow-2xl border border-white/10"><img src="${getFullUrl(e.logo_url)}" class="w-full h-full object-contain"></div>` : ''}
-                             <div><h4 class="text-6xl font-black uppercase text-white group-hover:text-cyan-400 transition-all tracking-tighter leading-none">${e.title}</h4><p class="text-sm font-black text-purple-400 uppercase tracking-[0.5em] mt-4">${e.company}</p></div>
-                        </div>
-                        <div class="glass p-12 rounded-[4rem] border-white/10 bg-white/[0.01] shadow-2xl relative">
-                            <div class="absolute top-8 right-12 opacity-5"><i data-lucide="quote" class="w-20 h-20"></i></div>
-                            <p class="text-gray-400 font-medium leading-relaxed max-w-4xl text-xl italic relative z-10">"${e.description}"</p>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderServices(services) {
-            servicesData = services;
-            document.getElementById('services-grid').innerHTML = services.map(s => `
-                <div class="glass p-20 rounded-[5rem] border-white/10 flex flex-col h-full hover:border-cyan-500/30 transition-all group relative overflow-hidden">
-                    <div class="absolute -top-32 -right-32 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl group-hover:bg-cyan-500/10 transition-all"></div>
-                    <div class="w-28 h-28 bg-cyan-500/10 text-cyan-400 rounded-[2.5rem] flex items-center justify-center mb-16 group-hover:bg-cyan-500 group-hover:text-white transition-all shadow-2xl border border-white/5"><i data-lucide="layout" class="w-14 h-14"></i></div>
-                    <h4 class="text-5xl font-black uppercase text-white mb-8 tracking-tighter">${s.title}</h4>
-                    <p class="text-gray-400 font-medium text-xl leading-relaxed mb-16 flex-1">${s.description}</p>
-                    <div class="pt-10 border-t border-white/5 mt-auto flex items-center justify-between">
-                        <p class="text-lg font-black text-cyan-400 uppercase tracking-widest">Dès ${s.price_range || 'N/C'}</p>
-                        <button onclick="requestService('${s.title.replace(/'/g, "\\'")}')" class="px-10 py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all shadow-xl">Devis Immédiat</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderProfile(p) {
-            if (!p) return;
-            const logoImg = document.getElementById('site-logo');
-            const logoFallback = document.getElementById('site-logo-fallback');
-            const footerLogo = document.getElementById('footer-logo');
-            const footerFallback = document.getElementById('footer-logo-fallback');
-
-            if (p.logo_url) {
-                const url = getFullUrl(p.logo_url);
-                logoImg.src = url; logoImg.classList.remove('hidden'); logoFallback.classList.add('hidden');
-                footerLogo.src = url; footerLogo.classList.remove('hidden'); footerFallback.classList.add('hidden');
-            }
-            if (p.about_photo_url) document.getElementById('about-photo').src = getFullUrl(p.about_photo_url);
-            if (p.about_description) document.getElementById('about-text').innerText = p.about_description;
-
-            if (p.footer_policy) document.getElementById('link-policy').href = p.footer_policy;
-            if (p.footer_conditions) document.getElementById('link-conditions').href = p.footer_conditions;
-            if (p.footer_blog) document.getElementById('link-blog').href = p.footer_blog;
-            if (p.footer_community) document.getElementById('link-community').href = p.footer_community;
-            if (p.footer_contact) document.getElementById('footer-contact-info').innerText = p.footer_contact;
-        }
-
-        function requestLiveSupport() {
-            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
-            const msg = prompt("Bonjour " + visitorName + ", décrivez votre problème pour recevoir une aide en direct :", "");
-            if (msg) {
-                // Find a default support group or the active one
-                if (activeDiscordGroupId) {
-                    axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, {
-                        content: "🚨 DEMANDE DE SUPPORT : " + msg,
-                        visitorName,
-                        type: 'text'
-                    }).then(() => {
-                        alert("Votre demande de support a été envoyée dans le groupe. Un administrateur vous répondra ici.");
-                        loadDiscordMessages(activeDiscordGroupId);
-                    });
-                }
-            }
-        }
-
-        function toggleDiscordMic() {
-            const btn = document.getElementById('discord-mic-btn');
-            btn.classList.toggle('muted');
-            const isMuted = btn.classList.contains('muted');
-            btn.querySelector('i').style.color = isMuted ? '#ed4245' : '';
-            btn.querySelector('.discord-tooltip').innerText = isMuted ? "Activer Micro" : "Désactiver Micro";
-        }
-
-        function toggleDiscordDeaf() {
-            const btn = document.getElementById('discord-deaf-btn');
-            btn.classList.toggle('muted');
-            const isDeaf = btn.classList.contains('muted');
-            btn.querySelector('i').style.color = isDeaf ? '#ed4245' : '';
-            btn.querySelector('.discord-tooltip').innerText = isDeaf ? "Activer Son" : "Désactiver Son";
-
-            // Logically mute all audio on page
-            const audios = document.querySelectorAll('audio');
-            audios.forEach(a => a.muted = isDeaf);
-        }
-
-        function getFullUrl(url) { if (!url || url === 'null') return 'https://placehold.co/400x400/000/fff?text=Photo'; if (url.startsWith('http')) return url; return '/' + url.replace(/^\//, ''); }
-        function scrollToContact() { navigateTo('home'); setTimeout(() => document.getElementById('page-home').scrollTo(0, document.body.scrollHeight), 100); }
-        function openTrackingModal() { document.getElementById('modal-tracking').classList.remove('hidden'); }
-        function closeTrackingModal() { document.getElementById('modal-tracking').classList.add('hidden'); }
-
-        function showPortfolioRequestModal() {
-            document.getElementById('modal-request-portfolio').classList.remove('hidden');
-            lucide.createIcons();
-        }
-
-        async function submitSaasRequest(e) {
-            e.preventDefault();
-            const btn = e.target.querySelector('button');
-            const logoFile = document.getElementById('saas-logo-input').files[0];
-
-            // Get selected modules
-            const selectedModules = Array.from(document.querySelectorAll('input[name="saas-modules"]:checked')).map(cb => cb.value);
-            // Default essential modules
-            if (!selectedModules.includes('home')) selectedModules.push('home');
-            if (!selectedModules.includes('about')) selectedModules.push('about');
-            if (!selectedModules.includes('contact')) selectedModules.push('contact');
-
-            try {
-                btn.innerText = "ENVOI...";
-                btn.disabled = true;
-
-                let logoUrl = null;
-                if (logoFile) {
-                    const formData = new FormData();
-                    formData.append('file', logoFile);
-                    const upRes = await axios.post(`${API_BASE}/upload-logo`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                    logoUrl = upRes.data.data.fileUrl;
-                }
-
-                const data = {
-                    fullName: document.getElementById('saas-name').value,
-                    email: document.getElementById('saas-email').value,
-                    profession: document.getElementById('saas-profession').value,
-                    desiredSlug: document.getElementById('saas-slug').value,
-                    preferredColor: document.getElementById('saas-color').value,
-                    motivation: document.getElementById('saas-motivation').value,
-                    enabledModules: selectedModules,
-                    logoUrl
-                };
-
-                await axios.post(`${API_BASE}/request`, data);
-                alert("Demande envoyée avec succès ! L'administrateur va l'examiner.");
-                document.getElementById('modal-request-portfolio').classList.add('hidden');
-                e.target.reset();
-                document.getElementById('saas-logo-preview').src = 'https://ui-avatars.com/api/?name=Logo';
-            } catch (err) {
-                alert(err.response?.data?.error || "Erreur lors de l'envoi.");
-            } finally {
-                btn.innerText = "SOUMETTRE MA DEMANDE";
-                btn.disabled = false;
-            }
-        }
-    </script>
 
     <!-- MODAL: REQUEST PORTFOLIO SAAS -->
     <div id="modal-request-portfolio" class="hidden fixed inset-0 bg-black/95 z-[600] flex items-center justify-center p-6 backdrop-blur-xl">
@@ -1014,5 +456,272 @@
             </form>
         </div>
     </div>
+
+    <script>
+        const API_BASE = '/api/portfolio';
+        let socket;
+        let currentQuoteId = null;
+        let servicesData = [];
+        let currentCarouselIndex = 0;
+        let activePage = 'home';
+        let portfolioSlug = 'together'; // Default
+        let activeDiscordGroupId = null;
+        let mediaRecorder, audioChunks = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const pathParts = window.location.pathname.split('/');
+            if (pathParts.includes('p')) { portfolioSlug = pathParts[pathParts.indexOf('p') + 1]; }
+            loadData();
+            initSocket();
+            lucide.createIcons();
+            window.addEventListener('hashchange', handleRoute);
+            handleRoute();
+            window.addEventListener('scroll', () => {
+                const nav = document.getElementById('navbar');
+                if (window.scrollY > 100) nav.classList.add('py-2', 'px-4', 'bg-[#0a0a0c]/80');
+                else nav.classList.remove('py-2', 'px-4', 'bg-[#0a0a0c]/80');
+            });
+            document.getElementById('discord-chat-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendDiscordMessage(); });
+        });
+
+        function handleRoute() { const hash = window.location.hash.replace('#', '') || 'home'; navigateTo(hash, false); }
+
+        function navigateTo(pageId, updateHash = true) {
+            const allPages = document.querySelectorAll('.page');
+            allPages.forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+            const target = document.getElementById('page-' + pageId);
+            if (target) {
+                target.classList.add('active');
+                target.style.display = (pageId === 'community') ? 'flex' : 'block';
+                activePage = pageId;
+                if (updateHash) window.location.hash = pageId;
+                const isDiscord = pageId === 'community';
+                document.getElementById('navbar').style.display = isDiscord ? 'none' : 'block';
+                document.getElementById('global-footer').style.display = isDiscord ? 'none' : 'block';
+                if (isDiscord) loadDiscordCommunity();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        async function loadDiscordCommunity() {
+            try {
+                const res = await axios.get(`${API_BASE}/community/groups`);
+                const { groups, announcements } = res.data.data;
+                const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+                document.getElementById('discord-visitor-name').innerText = visitorName;
+                document.getElementById('discord-groups-list').innerHTML = groups.map(g => `
+                    <div id="discord-group-${g.id}" class="discord-server-icon flex items-center justify-center bg-white/5 text-gray-400 hover:bg-[#5865f2] hover:text-white group" onclick="selectDiscordGroup('${g.id}', '${g.name.replace(/'/g, "\\'")}')" title="${g.name}">
+                        ${g.avatar_url ? `<img src="${getFullUrl(g.avatar_url)}" class="w-full h-full object-cover rounded-[inherit]">` : g.name.charAt(0)}
+                        <span class="discord-tooltip">${g.name}</span>
+                    </div>
+                `).join('');
+                document.getElementById('discord-channels-list').innerHTML = groups.map(g => `
+                    <div class="flex items-center px-2 py-1.5 rounded ${activeDiscordGroupId === g.id ? 'bg-white/10 text-white' : 'text-gray-400'} font-medium text-sm cursor-pointer hover:bg-white/5 transition-all group" onclick="selectDiscordGroup('${g.id}', '${g.name}')">
+                        <i data-lucide="hash" class="w-4 h-4 mr-2 text-gray-400"></i> ${g.name.toLowerCase()}
+                    </div>
+                `).join('');
+                document.getElementById('discord-announcements-list').innerHTML = announcements.map(a => `<div class="px-2 py-2 rounded hover:bg-white/5 cursor-pointer transition-all border-l-2 border-transparent hover:border-cyan-500"><p class="text-[10px] font-black text-white truncate uppercase">${a.title}</p><p class="text-[8px] text-gray-500 line-clamp-1">${a.content}</p></div>`).join('') || '<p class="text-[9px] text-gray-600 text-center italic">Aucune annonce</p>';
+                if (groups.length > 0 && !activeDiscordGroupId) { selectDiscordGroup(groups[0].id, groups[0].name); }
+                loadDiscordMembersList();
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function loadDiscordMembersList() {
+            try {
+                const membersRes = await axios.get(`${API_BASE}/community/members`);
+                const members = membersRes.data.data;
+                const onlineCount = members.filter(m => m.status === 'online').length;
+                const memberHeader = document.querySelector('#discord-member-list h5');
+                if (memberHeader) memberHeader.innerText = `EN LIGNE — ${onlineCount}`;
+                document.getElementById('discord-online-list').innerHTML = members.slice(0, 30).map(m => `<div class="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer group"><div class="relative"><img src="${getFullUrl(m.avatar_url)}" class="w-8 h-8 rounded-full object-cover shadow-lg"><div class="absolute bottom-0 right-0 w-3 h-3 ${m.status === 'online' ? 'bg-green-500' : 'bg-gray-500'} rounded-full border-2 border-[#2b2d31]"></div></div><span class="text-sm font-medium ${m.status === 'online' ? 'text-gray-200' : 'text-gray-500'} group-hover:text-white truncate">${m.full_name}</span></div>`).join('');
+            } catch (e) {}
+        }
+
+        async function selectDiscordGroup(id, name) { activeDiscordGroupId = id; document.querySelectorAll('.discord-server-icon').forEach(el => el.classList.remove('active')); document.getElementById('discord-group-' + id)?.classList.add('active'); document.getElementById('active-group-title').innerText = name.toLowerCase(); loadDiscordMessages(id); }
+        async function loadDiscordMessages(groupId) { try { const res = await axios.get(`${API_BASE}/community/groups/${groupId}/messages`); renderDiscordMessages(res.data.data); } catch (e) {} }
+
+        function renderDiscordMessages(messages) {
+            const list = document.getElementById('discord-messages-list');
+            if (!list) return;
+            list.innerHTML = messages.map(m => {
+                const name = m.sender_name || (m.metadata?.visitorName) || 'Visiteur';
+                const avatar = m.sender_avatar ? getFullUrl(m.sender_avatar) : `https://ui-avatars.com/api/?name=${name}&background=random`;
+                const date = new Date(m.created_at).toLocaleString();
+                let contentHtml = `<p class="text-gray-300 text-sm leading-relaxed">${m.content}</p>`;
+                if (m.type === 'audio') contentHtml = `<audio src="${getFullUrl(m.file_url)}" controls class="h-8 mt-2 opacity-80"></audio>`;
+                if (m.type === 'document') contentHtml = `<a href="${getFullUrl(m.file_url)}" target="_blank" class="flex items-center gap-3 p-4 bg-black/20 rounded-xl border border-white/5 mt-2 hover:bg-black/40 transition-all"><i data-lucide="file" class="text-cyan-400"></i><div class="overflow-hidden"><p class="text-xs font-bold text-white truncate">${m.file_name || 'Document'}</p><p class="text-[8px] text-gray-500 uppercase">Fichier</p></div></a>`;
+                return `<div class="flex items-start gap-4 hover:bg-black/5 p-2 rounded-lg transition-all group ${m.is_pinned ? 'bg-cyan-500/5 border-l-2 border-cyan-500' : ''}"><img src="${avatar}" class="w-10 h-10 rounded-full bg-gray-700 shadow-xl"><div class="flex-1"><div class="flex items-center gap-2"><span class="font-bold text-white text-sm hover:underline cursor-pointer">${name}</span><span class="text-[10px] text-gray-400 font-medium">${date}</span>${m.is_pinned ? '<i data-lucide="pin" class="w-3 h-3 text-cyan-400"></i>' : ''}</div>${contentHtml}</div><div class="opacity-0 group-hover:opacity-100 transition-all flex gap-2"><button onclick="togglePin('${m.id}', ${!m.is_pinned})" class="p-1 hover:bg-white/10 rounded"><i data-lucide="pin" class="w-4 h-4 text-gray-400"></i></button></div></div>`;
+            }).join('');
+            const pinned = messages.filter(m => m.is_pinned);
+            document.getElementById('pinned-messages-list').innerHTML = pinned.map(m => `<div class="bg-black/20 p-3 rounded-lg border border-white/5"><p class="text-[10px] font-bold text-cyan-400 mb-1">${m.sender_name || 'Visiteur'}</p><p class="text-xs text-gray-300 line-clamp-2">${m.content}</p></div>`).join('') || '<p class="text-center text-gray-600 text-[10px] py-4">Aucun message épinglé</p>';
+            const container = document.getElementById('discord-messages-container');
+            container.scrollTop = container.scrollHeight;
+            lucide.createIcons();
+        }
+
+        async function sendDiscordMessage() {
+            const input = document.getElementById('discord-chat-input');
+            const content = input.value.trim();
+            if (!content || !activeDiscordGroupId) return;
+            try {
+                const visitorName = localStorage.getItem('visitor_name') || 'Visiteur_' + Math.floor(Math.random() * 1000);
+                if (!localStorage.getItem('visitor_name')) localStorage.setItem('visitor_name', visitorName);
+                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { content, visitorName });
+                input.value = '';
+                loadDiscordMessages(activeDiscordGroupId);
+            } catch (e) {}
+        }
+
+        async function sendSticker(sticker) {
+            document.getElementById('sticker-picker').classList.add('hidden');
+            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+            await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { content: sticker, visitorName, type: 'sticker' });
+            loadDiscordMessages(activeDiscordGroupId);
+        }
+
+        async function uploadDiscordFile(input) {
+            const file = input.files[0];
+            if (!file || !activeDiscordGroupId) return;
+            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const upRes = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { visitorName, type: 'document', fileUrl: upRes.data.data.fileUrl, fileName: file.name });
+                loadDiscordMessages(activeDiscordGroupId);
+            } catch (e) { alert("Erreur upload"); }
+        }
+
+        async function toggleAudioRecording() {
+            const btn = document.getElementById('audio-record-btn');
+            if (document.getElementById('discord-mic-btn').classList.contains('muted')) { alert("Votre micro est désactivé."); return; }
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = async () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+                        const file = new File([blob], "voice_msg.ogg", { type: 'audio/ogg' });
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const upRes = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                        const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+                        await axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { visitorName, type: 'audio', fileUrl: upRes.data.data.fileUrl });
+                        loadDiscordMessages(activeDiscordGroupId);
+                    };
+                    mediaRecorder.start();
+                    btn.classList.add('text-red-500', 'animate-pulse');
+                } catch (e) { alert("Micro non autorisé"); }
+            } else { mediaRecorder.stop(); btn.classList.remove('text-red-500', 'animate-pulse'); }
+        }
+
+        async function togglePin(msgId, isPinned) { await axios.put(`${API_BASE}/community/messages/${msgId}/pin`, { isPinned }); loadDiscordMessages(activeDiscordGroupId); }
+        function togglePinnedMessages() { document.getElementById('pinned-messages-panel').classList.toggle('hidden'); }
+
+        function initSocket() {
+            if (typeof io === 'undefined') return;
+            socket = io();
+            socket.on('portfolio:data_updated', () => loadData());
+            socket.on('community:new_message', (msg) => { if (activeDiscordGroupId === msg.chat_id) loadDiscordMessages(activeDiscordGroupId); showNotification("Nouveau message", msg.content, "message-square"); });
+            socket.on('community:message_pinned', () => loadDiscordMessages(activeDiscordGroupId));
+            socket.on('admin_user_login', () => loadDiscordMembersList());
+            socket.on('admin_user_logout', () => loadDiscordMembersList());
+        }
+
+        function showNotification(title, msg, icon) { if (Notification.permission === "granted") { new Notification(title, { body: msg }); } else if (Notification.permission !== "denied") { Notification.requestPermission(); } showToast(title, msg, icon); }
+
+        async function loadData() {
+            try {
+                const res = await axios.get(`${API_BASE}/${portfolioSlug}/public`);
+                const { skills, experiences, services, team, profile, pages, config } = res.data.data;
+                if (config) {
+                    document.title = config.title + " | Portfolio";
+                    document.querySelectorAll('.text-cyan-400').forEach(el => el.style.color = config.theme_color);
+                    document.querySelectorAll('.bg-cyan-500').forEach(el => el.style.backgroundColor = config.theme_color);
+                    document.querySelectorAll('.font-black.text-xl, .font-black.text-2xl').forEach(el => { if (el.innerText === "Together Tech") el.innerText = config.title; });
+                }
+                renderSkills(skills); renderExperiences(experiences); renderServices(services); renderTeam(team); renderProfile(profile); renderFooterPages(pages, profile);
+                lucide.createIcons();
+            } catch (e) {
+                if (e.response?.status === 404) {
+                    document.body.innerHTML = `<div class="h-screen flex items-center justify-center flex-col space-y-4"><h1 class="text-4xl font-black">404 - Portfolio Non Trouvé</h1><button onclick="location.href='/portfolio'" class="px-6 py-3 bg-cyan-500 rounded-xl">Retour à l'accueil</button></div>`;
+                }
+            }
+        }
+
+        function renderFooterPages(pages, profile) {
+            const list = document.getElementById('footer-pages-list');
+            const resList = document.getElementById('footer-resources-list');
+            if (!list || !resList) return;
+            list.innerHTML = pages.map(p => `<li><button onclick="viewGenericPage('${p.slug}')" class="hover:text-cyan-400 transition-all uppercase">${p.title}</button></li>`).join('');
+            resList.innerHTML = `<li><a href="${profile.footer_blog || '#'}" target="_blank" class="hover:text-cyan-400 transition-all">Le Blog (Bloque)</a></li><li><a href="#community" onclick="navigateTo('community')" class="hover:text-cyan-400 transition-all">Communautés</a></li>`;
+        }
+
+        async function viewGenericPage(slug) { try { const res = await axios.get(`${API_BASE}/public`); const page = res.data.data.pages.find(p => p.slug === slug); if (page) { document.getElementById('generic-page-title').innerText = page.title; document.getElementById('generic-page-body').innerHTML = page.content; navigateTo('content'); } } catch (e) {} }
+        function renderTeam(team) { const container = document.getElementById('team-grid'); if (!container) return; container.innerHTML = team.map(m => `<div class="group relative flex flex-col items-center"><div class="relative w-full aspect-[3/4] rounded-[3.5rem] overflow-hidden border border-white/5 glass mb-8 shadow-2xl"><img src="${getFullUrl(m.image_url)}" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"><div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-transparent to-transparent opacity-80"></div><div class="absolute bottom-8 left-8 right-8"><p class="text-[10px] font-black text-cyan-400 uppercase tracking-[0.4em] mb-2">${m.role}</p><h4 class="text-3xl font-black text-white uppercase tracking-tighter">${m.name}</h4></div></div><p class="text-gray-500 text-sm font-medium leading-relaxed italic text-center max-w-xs group-hover:text-gray-300 transition-all">"${m.bio || ''}"</p></div>`).join('') || '<p class="col-span-full text-center py-20 text-gray-600 uppercase text-xs">L\'équipe est en cours de déploiement</p>'; }
+        function renderSkills(skills) { document.getElementById('skills-grid').innerHTML = skills.map(s => `<div class="glass p-12 rounded-[3.5rem] border-white/5 hover:border-cyan-500/40 transition-all hover:scale-105 group relative overflow-hidden"><div class="absolute -top-10 -left-10 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl"></div><div class="flex justify-between items-start mb-10"><div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center overflow-hidden border border-white/10 shadow-2xl">${s.image_url ? `<img src="${getFullUrl(s.image_url)}" class="w-full h-full object-cover">` : `<i data-lucide="terminal" class="w-10 h-10 text-cyan-400"></i>`}</div><span class="text-xs font-black text-gray-600 group-hover:text-cyan-400">${s.level}%</span></div><p class="font-black text-xl uppercase text-white tracking-tight">${s.name}</p><div class="w-full h-1.5 bg-white/5 rounded-full mt-6 overflow-hidden"><div class="h-full bg-gradient-to-r from-cyan-500 to-purple-500" style="width: ${s.level}%"></div></div></div>`).join(''); }
+        function renderExperiences(exps) { document.getElementById('experience-timeline').innerHTML = exps.map((e, idx) => `<div class="flex flex-col md:flex-row gap-20 group"><div class="md:w-56 pt-8 flex flex-col items-center md:items-end text-center md:text-right"><span class="text-lg font-black uppercase text-gradient mb-3">${e.period}</span><div class="w-20 h-1 bg-white/5 rounded-full group-hover:w-32 group-hover:bg-cyan-500 transition-all"></div></div><div class="flex-1 pb-32 border-l border-white/5 pl-20 relative"><div class="absolute -left-[9px] top-8 w-4 h-4 bg-[#0a0a0c] border-2 border-cyan-500 rounded-full group-hover:scale-[2] group-hover:bg-cyan-500 transition-all shadow-[0_0_30px_rgba(6,182,212,0.6)]"></div><div class="flex flex-col sm:flex-row gap-12 items-start mb-12">${e.logo_url ? `<div class="w-40 h-40 rounded-[2.5rem] overflow-hidden bg-white p-3 shadow-2xl border border-white/10"><img src="${getFullUrl(e.logo_url)}" class="w-full h-full object-contain"></div>` : ''}<div><h4 class="text-6xl font-black uppercase text-white group-hover:text-cyan-400 transition-all tracking-tighter leading-none">${e.title}</h4><p class="text-sm font-black text-purple-400 uppercase tracking-[0.5em] mt-4">${e.company}</p></div></div><div class="glass p-12 rounded-[4rem] border-white/10 bg-white/[0.01] shadow-2xl relative"><div class="absolute top-8 right-12 opacity-5"><i data-lucide="quote" class="w-20 h-20"></i></div><p class="text-gray-400 font-medium leading-relaxed max-w-4xl text-xl italic relative z-10">"${e.description}"</p></div></div></div>`).join(''); }
+        function renderServices(services) { servicesData = services; document.getElementById('services-grid').innerHTML = services.map(s => `<div class="glass p-20 rounded-[5rem] border-white/10 flex flex-col h-full hover:border-cyan-500/30 transition-all group relative overflow-hidden"><div class="absolute -top-32 -right-32 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl group-hover:bg-cyan-500/10 transition-all"></div><div class="w-28 h-28 bg-cyan-500/10 text-cyan-400 rounded-[2.5rem] flex items-center justify-center mb-16 group-hover:bg-cyan-500 group-hover:text-white transition-all shadow-2xl border border-white/5"><i data-lucide="layout" class="w-14 h-14"></i></div><h4 class="text-5xl font-black uppercase text-white mb-8 tracking-tighter">${s.title}</h4><p class="text-gray-400 font-medium text-xl leading-relaxed mb-16 flex-1">${s.description}</p><div class="pt-10 border-t border-white/5 mt-auto flex items-center justify-between"><p class="text-lg font-black text-cyan-400 uppercase tracking-widest">Dès ${s.price_range || 'N/C'}</p><button onclick="requestService('${s.title.replace(/'/g, "\\'")}')" class="px-10 py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all shadow-xl">Devis Immédiat</button></div></div>`).join(''); }
+
+        function renderProfile(p) {
+            if (!p) return;
+            const logoImg = document.getElementById('site-logo');
+            const logoFallback = document.getElementById('site-logo-fallback');
+            const footerLogo = document.getElementById('footer-logo');
+            const footerFallback = document.getElementById('footer-logo-fallback');
+            if (p.logo_url) { const url = getFullUrl(p.logo_url); logoImg.src = url; logoImg.classList.remove('hidden'); logoFallback.classList.add('hidden'); footerLogo.src = url; footerLogo.classList.remove('hidden'); footerFallback.classList.add('hidden'); }
+            if (p.about_photo_url) document.getElementById('about-photo').src = getFullUrl(p.about_photo_url);
+            if (p.about_description) document.getElementById('about-text').innerText = p.about_description;
+            if (p.footer_policy) document.getElementById('link-policy').href = p.footer_policy;
+            if (p.footer_conditions) document.getElementById('link-conditions').href = p.footer_conditions;
+            if (p.footer_blog) document.getElementById('link-blog').href = p.footer_blog;
+            if (p.footer_community) document.getElementById('link-community').href = p.footer_community;
+            if (p.footer_contact) document.getElementById('footer-contact-info').innerText = p.footer_contact;
+        }
+
+        function requestLiveSupport() {
+            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+            const msg = prompt("Bonjour " + visitorName + ", décrivez votre problème pour recevoir une aide en direct :", "");
+            if (msg) { if (activeDiscordGroupId) { axios.post(`${API_BASE}/community/groups/${activeDiscordGroupId}/messages`, { content: "🚨 DEMANDE DE SUPPORT : " + msg, visitorName, type: 'text' }).then(() => { alert("Votre demande de support a été envoyée dans le groupe. Un administrateur vous répondra ici."); loadDiscordMessages(activeDiscordGroupId); }); } }
+        }
+
+        function toggleDiscordMic() { const btn = document.getElementById('discord-mic-btn'); btn.classList.toggle('muted'); const isMuted = btn.classList.contains('muted'); btn.querySelector('i').style.color = isMuted ? '#ed4245' : ''; btn.querySelector('.discord-tooltip').innerText = isMuted ? "Activer Micro" : "Désactiver Micro"; }
+        function toggleDiscordDeaf() { const btn = document.getElementById('discord-deaf-btn'); btn.classList.toggle('muted'); const isDeaf = btn.classList.contains('muted'); btn.querySelector('i').style.color = isDeaf ? '#ed4245' : ''; btn.querySelector('.discord-tooltip').innerText = isDeaf ? "Activer Son" : "Désactiver Son"; const audios = document.querySelectorAll('audio'); audios.forEach(a => a.muted = isDeaf); }
+        function getFullUrl(url) { if (!url || url === 'null') return 'https://placehold.co/400x400/000/fff?text=Photo'; if (url.startsWith('http')) return url; return '/' + url.replace(/^\//, ''); }
+        function scrollToContact() { navigateTo('home'); setTimeout(() => document.getElementById('page-home').scrollTo(0, document.body.scrollHeight), 100); }
+        function openTrackingModal() { document.getElementById('modal-tracking').classList.remove('hidden'); }
+        function closeTrackingModal() { document.getElementById('modal-tracking').classList.add('hidden'); }
+        function showPortfolioRequestModal() { document.getElementById('modal-request-portfolio').classList.remove('hidden'); lucide.createIcons(); }
+
+        async function submitSaasRequest(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            const logoFile = document.getElementById('saas-logo-input').files[0];
+            const selectedModules = Array.from(document.querySelectorAll('input[name="saas-modules"]:checked')).map(cb => cb.value);
+            if (!selectedModules.includes('home')) selectedModules.push('home');
+            if (!selectedModules.includes('about')) selectedModules.push('about');
+            if (!selectedModules.includes('contact')) selectedModules.push('contact');
+            try {
+                btn.innerText = "ENVOI...";
+                btn.disabled = true;
+                let logoUrl = null;
+                if (logoFile) {
+                    const formData = new FormData();
+                    formData.append('file', logoFile);
+                    const upRes = await axios.post(`${API_BASE}/upload-logo`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    logoUrl = upRes.data.data.fileUrl;
+                }
+                const data = { fullName: document.getElementById('saas-name').value, email: document.getElementById('saas-email').value, profession: document.getElementById('saas-profession').value, desiredSlug: document.getElementById('saas-slug').value, preferredColor: document.getElementById('saas-color').value, motivation: document.getElementById('saas-motivation').value, enabledModules: selectedModules, logoUrl };
+                await axios.post(`${API_BASE}/request`, data);
+                alert("Demande envoyée avec succès ! L'administrateur va l'examiner.");
+                document.getElementById('modal-request-portfolio').classList.add('hidden');
+                e.target.reset();
+                document.getElementById('saas-logo-preview').src = 'https://ui-avatars.com/api/?name=Logo';
+            } catch (err) { alert(err.response?.data?.error || "Erreur lors de l'envoi."); } finally { btn.innerText = "SOUMETTRE MA DEMANDE"; btn.disabled = false; }
+        }
+    </script>
 </body>
 </html>

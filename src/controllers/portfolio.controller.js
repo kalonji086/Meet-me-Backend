@@ -419,9 +419,23 @@ const togglePinMessage = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
+/**
+ * @desc    Get members for community (Publicly visible info)
+ */
+const getCommunityMembers = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT full_name, avatar_url, status
+    FROM public.profiles
+    WHERE is_global_admin = FALSE
+    ORDER BY status = 'online' DESC, full_name ASC
+    LIMIT 50
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
 module.exports = {
   getPublicData, submitPortfolioRequest, approvePortfolioRequest, getPortfolioRequests, getAllPortfolios, togglePortfolioStatus,
   getClientQuotes, handleChat, replyToQuote, updateContract, signContract, updateSpecs, submitQuote,
   manageSkill, manageExperience, manageService, manageTeam, getQuotes, updateQuoteStatusAdmin, updateProfileAdmin, managePage,
-  getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage
+  getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage, getCommunityMembers
 };

@@ -19,6 +19,7 @@ router.get('/community/groups', portfolioController.getCommunityGroups);
 router.get('/community/groups/:groupId/messages', portfolioController.getCommunityMessages);
 router.post('/community/groups/:groupId/messages', portfolioController.sendCommunityMessage);
 router.put('/community/messages/:messageId/pin', portfolioController.togglePinMessage);
+router.get('/community/members', portfolioController.getCommunityMembers);
 
 // Request a new portfolio (Publicly accessible)
 const uploadController = require('../controllers/upload.controller');

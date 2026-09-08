@@ -1710,7 +1710,7 @@
         function continueDashboardLoad(user) {
             if (user.isGlobalAdmin) {
                 // Ensure allowedModules is full for Global Admin
-                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin'];
+                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin', 'portfolio'];
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('login-container').classList.add('hidden');
@@ -1813,7 +1813,8 @@
                 'audit': 'nav-audit', 'campaigns': 'nav-campaigns', 'legal': 'nav-legal',
                 'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration',
-                'moderation': 'nav-moderation', 'school-admin': 'nav-school-admin'
+                'moderation': 'nav-moderation', 'school-admin': 'nav-school-admin',
+                'portfolio': 'nav-portfolio'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
 
@@ -5275,7 +5276,8 @@
                 { id: 'legal', label: 'Légal (CGU/Privacy)' },
                 { id: 'config', label: 'Config App' },
                 { id: 'approvals', label: 'Approbations' },
-                { id: 'collaboration', label: 'Collaboration' }
+                { id: 'collaboration', label: 'Collaboration' },
+                { id: 'portfolio', label: 'Portfolio & Communauté' }
             ];
             const currentModules = modules ? modules.split(',') : [];
             const collabRights = collabRightsStr ? JSON.parse(decodeURIComponent(collabRightsStr)) : {};

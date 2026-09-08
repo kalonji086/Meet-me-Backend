@@ -234,7 +234,7 @@ const submitQuote = asyncHandler(async (req, res) => {
 const manageSkill = asyncHandler(async (req, res) => {
   const { action, id, name, level, icon, imageUrl, category } = req.body;
   const portfolioId = await getManagedPortfolioId(req);
-  if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
+  if (!portfolioId) return res.status(403).json({ error: 'Aucun portfolio associé à ce compte.' });
 
   if (action === 'add') {
     const resAdd = await query(
@@ -305,6 +305,13 @@ const manageTeam = asyncHandler(async (req, res) => {
     return res.json({ success: true });
   }
   res.status(400).json({ error: 'Action invalide' });
+});
+
+const getQuotes = asyncHandler(async (req, res) => {
+  const portfolioId = await getManagedPortfolioId(req);
+  if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
+  const result = await query('SELECT * FROM public.web_portfolio_quotes WHERE portfolio_id = $1 ORDER BY created_at DESC', [portfolioId]);
+  res.json({ success: true, data: result.rows });
 });
 
 const updateQuoteStatusAdmin = asyncHandler(async (req, res) => {

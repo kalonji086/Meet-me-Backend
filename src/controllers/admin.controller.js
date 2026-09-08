@@ -654,6 +654,14 @@ const ensureAdminTables = async () => {
       );
     `);
 
+    // Ensure columns exist if table was already created
+    try {
+      await query('ALTER TABLE public.web_portfolio_requests ADD COLUMN IF NOT EXISTS logo_url TEXT');
+      await query('ALTER TABLE public.web_portfolio_requests ADD COLUMN IF NOT EXISTS enabled_modules TEXT[] DEFAULT \'{"home", "about", "contact"}\'');
+    } catch (e) {
+      logger.warn('Migration for web_portfolio_requests skipped: ' + e.message);
+    }
+
     // Create Chat Message table for Portfolio
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_messages (

@@ -8,10 +8,11 @@ const socketService = require('../services/socket.service');
  * @route   GET /api/portfolio/public
  */
 const getPublicData = asyncHandler(async (req, res) => {
-  const [skills, experiences, services, profile] = await Promise.all([
+  const [skills, experiences, services, team, profile] = await Promise.all([
     query('SELECT * FROM public.web_portfolio_skills ORDER BY level DESC'),
     query('SELECT * FROM public.web_portfolio_experiences ORDER BY order_index ASC, created_at DESC'),
     query('SELECT * FROM public.web_portfolio_services ORDER BY created_at ASC'),
+    query('SELECT * FROM public.web_portfolio_team ORDER BY order_index ASC, created_at ASC'),
     query('SELECT * FROM public.web_portfolio_profile LIMIT 1')
   ]);
 
@@ -21,6 +22,7 @@ const getPublicData = asyncHandler(async (req, res) => {
       skills: skills.rows,
       experiences: experiences.rows,
       services: services.rows,
+      team: team.rows,
       profile: profile.rows[0] || {}
     }
   });
@@ -245,6 +247,30 @@ const manageService = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Manage Team Members
+ */
+const manageTeam = asyncHandler(async (req, res) => {
+  const { action, id, name, role, bio, imageUrl, orderIndex } = req.body;
+
+  if (action === 'add') {
+    const resAdd = await query(
+      'INSERT INTO public.web_portfolio_team (name, role, bio, image_url, order_index) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, role, bio, imageUrl || null, orderIndex || 0]
+    );
+    socketService.broadcast('portfolio:data_updated', { type: 'team', action: 'add', data: resAdd.rows[0] });
+    return res.json({ success: true, data: resAdd.rows[0] });
+  }
+
+  if (action === 'delete') {
+    await query('DELETE FROM public.web_portfolio_team WHERE id = $1', [id]);
+    socketService.broadcast('portfolio:data_updated', { type: 'team', action: 'delete', id });
+    return res.json({ success: true, message: 'Membre supprimé' });
+  }
+
+  res.status(400).json({ success: false, error: 'Action invalide' });
+});
+
+/**
  * @desc    Get all quotes (Admin)
  */
 const getQuotes = asyncHandler(async (req, res) => {
@@ -275,6 +301,7 @@ module.exports = {
   manageSkill,
   manageExperience,
   manageService,
+  manageTeam,
   getQuotes,
   updateQuoteStatus
 };

@@ -252,19 +252,61 @@
     </section>
 
     <!-- Footer -->
-    <footer class="py-20 px-6 border-t border-white/5">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
-            <div class="flex items-center gap-3 text-white">
-                <div class="w-8 h-8 bg-gray-800 rounded-xl flex items-center justify-center">
-                    <i data-lucide="zap" class="w-4 h-4 text-white fill-current"></i>
+    <footer class="py-24 px-6 border-t border-white/5 bg-[#08080a]">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-16 mb-20">
+                <!-- Logo & Brand -->
+                <div class="lg:col-span-2 space-y-8">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 overflow-hidden rounded-2xl flex items-center justify-center bg-white aspect-square border border-white/10 shadow-xl shadow-cyan-500/10">
+                            <img id="footer-logo" src="" class="w-full h-full object-contain p-1 hidden" alt="Logo Footer">
+                            <i id="footer-logo-fallback" data-lucide="zap" class="text-cyan-500 fill-current w-8 h-8"></i>
+                        </div>
+                        <span class="font-black text-2xl tracking-tighter uppercase text-white">Together Tech</span>
+                    </div>
+                    <p class="text-gray-500 text-sm font-medium leading-relaxed max-w-sm">
+                        L'excellence digitale au service de votre vision. Nous créons des expériences mémorables et des outils performants.
+                    </p>
+                    <div id="footer-contact-info" class="text-cyan-400 font-bold text-xs uppercase tracking-widest">
+                        <!-- Injected by JS -->
+                    </div>
                 </div>
-                <span class="font-black text-sm uppercase tracking-widest">Together Tech</span>
+
+                <!-- Links Column 1 -->
+                <div class="space-y-6">
+                    <h5 class="text-white font-black text-[10px] uppercase tracking-[0.3em]">Légal</h5>
+                    <ul class="space-y-4 text-gray-500 text-xs font-bold uppercase tracking-widest">
+                        <li><a id="link-policy" href="#" class="hover:text-cyan-400 transition-all">Politique</a></li>
+                        <li><a id="link-conditions" href="#" class="hover:text-cyan-400 transition-all">Condition</a></li>
+                    </ul>
+                </div>
+
+                <!-- Links Column 2 -->
+                <div class="space-y-6">
+                    <h5 class="text-white font-black text-[10px] uppercase tracking-[0.3em]">Ressources</h5>
+                    <ul class="space-y-4 text-gray-500 text-xs font-bold uppercase tracking-widest">
+                        <li><a id="link-blog" href="#" class="hover:text-cyan-400 transition-all">Le Blog (Bloque)</a></li>
+                        <li><a id="link-community" href="#" class="hover:text-cyan-400 transition-all">Communautés</a></li>
+                    </ul>
+                </div>
+
+                <!-- Socials -->
+                <div class="space-y-6">
+                    <h5 class="text-white font-black text-[10px] uppercase tracking-[0.3em]">Suivez-nous</h5>
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="w-10 h-10 glass rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-cyan-500 transition-all"><i data-lucide="github" class="w-5 h-5"></i></a>
+                        <a href="#" class="w-10 h-10 glass rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-purple-500 transition-all"><i data-lucide="linkedin" class="w-5 h-5"></i></a>
+                        <a href="#" class="w-10 h-10 glass rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-blue-400 transition-all"><i data-lucide="twitter" class="w-5 h-5"></i></a>
+                    </div>
+                </div>
             </div>
-            <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest">© 2024 Together Tech Community. Tous droits réservés.</p>
-            <div class="flex items-center gap-8">
-                <a href="#" class="text-gray-500 hover:text-white transition-all"><i data-lucide="github" class="w-5 h-5"></i></a>
-                <a href="#" class="text-gray-500 hover:text-white transition-all"><i data-lucide="linkedin" class="w-5 h-5"></i></a>
-                <a href="#" class="text-gray-500 hover:text-white transition-all"><i data-lucide="twitter" class="w-5 h-5"></i></a>
+
+            <div class="pt-10 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                <p class="text-gray-600 text-[9px] font-black uppercase tracking-widest">© 2024 Together Tech Community. Tous droits réservés.</p>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="text-[8px] font-black text-gray-500 uppercase tracking-widest">Systèmes Opérationnels</span>
+                </div>
             </div>
         </div>
     </footer>
@@ -538,9 +580,23 @@
             if (!p) return;
             const logoImg = document.getElementById('site-logo');
             const logoFallback = document.getElementById('site-logo-fallback');
-            if (p.logo_url) { logoImg.src = getFullUrl(p.logo_url); logoImg.classList.remove('hidden'); logoFallback.classList.add('hidden'); }
+            const footerLogo = document.getElementById('footer-logo');
+            const footerFallback = document.getElementById('footer-logo-fallback');
+
+            if (p.logo_url) {
+                const url = getFullUrl(p.logo_url);
+                logoImg.src = url; logoImg.classList.remove('hidden'); logoFallback.classList.add('hidden');
+                footerLogo.src = url; footerLogo.classList.remove('hidden'); footerFallback.classList.add('hidden');
+            }
             if (p.about_photo_url) document.getElementById('about-photo').src = getFullUrl(p.about_photo_url);
             if (p.about_description) document.getElementById('about-text').innerText = p.about_description;
+
+            // Footer dynamic links & text
+            if (p.footer_policy) document.getElementById('link-policy').href = p.footer_policy;
+            if (p.footer_conditions) document.getElementById('link-conditions').href = p.footer_conditions;
+            if (p.footer_blog) document.getElementById('link-blog').href = p.footer_blog;
+            if (p.footer_community) document.getElementById('link-community').href = p.footer_community;
+            if (p.footer_contact) document.getElementById('footer-contact-info').innerText = p.footer_contact;
         }
 
         function getFullUrl(url) { if (!url) return null; if (url.startsWith('http')) return url; return url; }

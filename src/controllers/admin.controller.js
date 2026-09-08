@@ -539,6 +539,13 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_contract_archived BOOLEAN DEFAULT FALSE');
     await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS is_specs_archived BOOLEAN DEFAULT FALSE');
 
+    // Footer & Links for Portfolio
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_policy TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_conditions TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_blog TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_community TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS footer_contact TEXT');
+
     // Create Chat Message table for Portfolio
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_messages (

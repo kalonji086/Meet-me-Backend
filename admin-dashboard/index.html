@@ -402,10 +402,39 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-white p-10 rounded-[3.5rem] border border-gray-100 shadow-sm">
-                            <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter">Description Présentation</h3>
-                            <textarea id="port-about-desc" rows="12" class="w-full p-8 bg-gray-50 border border-gray-100 rounded-[2.5rem] outline-none font-medium text-gray-600 leading-relaxed focus:border-cyan-500 transition-all" placeholder="Présentez Together Tech Community ici..."></textarea>
-                            <button onclick="savePortfolioIdentity()" id="btn-save-identity" class="w-full mt-8 py-6 bg-cyan-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-100 hover:bg-cyan-600 transition-all">Mettre à jour l'identité</button>
+                        <div class="space-y-8">
+                            <div class="bg-white p-10 rounded-[3.5rem] border border-gray-100 shadow-sm">
+                                <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter">Description Présentation</h3>
+                                <textarea id="port-about-desc" rows="8" class="w-full p-8 bg-gray-50 border border-gray-100 rounded-[2.5rem] outline-none font-medium text-gray-600 leading-relaxed focus:border-cyan-500 transition-all" placeholder="Présentez Together Tech Community ici..."></textarea>
+                            </div>
+
+                            <div class="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                                <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter italic">Liens du Pied de page</h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Politique</label>
+                                        <input type="text" id="footer-policy" placeholder="URL ou texte..." class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Conditions</label>
+                                        <input type="text" id="footer-conditions" placeholder="URL ou texte..." class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Blog (Bloque)</label>
+                                        <input type="text" id="footer-blog" placeholder="Lien vers le blog..." class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Communautés</label>
+                                        <input type="text" id="footer-community" placeholder="Lien communauté..." class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
+                                    </div>
+                                    <div class="col-span-full">
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Contact (Texte Footer)</label>
+                                        <input type="text" id="footer-contact" placeholder="Email ou téléphone footer..." class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onclick="savePortfolioIdentity()" id="btn-save-identity" class="w-full py-6 bg-cyan-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-100 hover:bg-cyan-600 transition-all">Mettre à jour l'identité globale</button>
                         </div>
                     </div>
                 </div>
@@ -5538,6 +5567,11 @@
                     if (p.logo_url) document.getElementById('port-logo-preview').src = getFullUrl(p.logo_url);
                     if (p.about_photo_url) document.getElementById('port-about-preview').src = getFullUrl(p.about_photo_url);
                     document.getElementById('port-about-desc').value = p.about_description || "";
+                    document.getElementById('footer-policy').value = p.footer_policy || "";
+                    document.getElementById('footer-conditions').value = p.footer_conditions || "";
+                    document.getElementById('footer-blog').value = p.footer_blog || "";
+                    document.getElementById('footer-community').value = p.footer_community || "";
+                    document.getElementById('footer-contact').value = p.footer_contact || "";
                 }
             } catch (e) {}
         }
@@ -5547,6 +5581,12 @@
             const logoFile = document.getElementById('port-logo-input').files[0];
             const aboutFile = document.getElementById('port-about-input').files[0];
             const aboutDescription = document.getElementById('port-about-desc').value;
+
+            const footerPolicy = document.getElementById('footer-policy').value;
+            const footerConditions = document.getElementById('footer-conditions').value;
+            const footerBlog = document.getElementById('footer-blog').value;
+            const footerCommunity = document.getElementById('footer-community').value;
+            const footerContact = document.getElementById('footer-contact').value;
 
             try {
                 btn.disabled = true; btn.innerText = "Mise à jour...";
@@ -5561,9 +5601,12 @@
                     if (up.success) aboutPhotoUrl = up.data.fileUrl;
                 }
 
-                await axios.put(`${API_URL}/portfolio/admin/profile`, { logoUrl, aboutPhotoUrl, aboutDescription }, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.put(`${API_URL}/portfolio/admin/profile`, {
+                    logoUrl, aboutPhotoUrl, aboutDescription,
+                    footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact
+                }, { headers: { Authorization: `Bearer ${token}` } });
                 toast("Identité mise à jour", "success");
-            } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "Mettre à jour l'identité"; }
+            } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "Mettre à jour l'identité globale"; }
         }
 
         async function loadSkills() {

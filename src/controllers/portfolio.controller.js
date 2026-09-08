@@ -314,7 +314,8 @@ module.exports = {
   updateQuoteStatus,
   getCommunityGroups,
   getCommunityMessages,
-  sendCommunityMessage
+  sendCommunityMessage,
+  togglePinMessage
 };
 
 /**

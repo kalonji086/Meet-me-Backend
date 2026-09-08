@@ -314,17 +314,17 @@ module.exports = {
   manageTeam,
   getQuotes,
   updateQuoteStatus,
+  managePage,
   getCommunityGroups,
   getCommunityMessages,
   sendCommunityMessage,
-  togglePinMessage,
-  managePage
+  togglePinMessage
 };
 
 /**
  * @desc    Manage Portfolio Pages (Policy, Terms, etc.)
  */
-const managePage = asyncHandler(async (req, res) => {
+async function managePage(req, res) {
   const { action, id, slug, title, content, isActive } = req.body;
 
   if (action === 'update') {
@@ -352,7 +352,7 @@ const managePage = asyncHandler(async (req, res) => {
   }
 
   res.status(400).json({ success: false, error: 'Action invalide' });
-});
+}
 
 /**
  * @desc    Get public groups for community page

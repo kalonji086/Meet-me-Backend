@@ -19,11 +19,15 @@ router.get('/community/groups/:groupId/messages', portfolioController.getCommuni
 router.post('/community/groups/:groupId/messages', portfolioController.sendCommunityMessage);
 router.put('/community/messages/:messageId/pin', portfolioController.togglePinMessage);
 
-// Request a new portfolio (Public or Auth)
-router.post('/request', (req, res, next) => {
-    if (req.headers.authorization) return authenticate(req, res, next);
+// Request a new portfolio (Publicly accessible)
+const uploadController = require('../controllers/upload.controller');
+router.post('/upload-logo', uploadController.uploadMiddleware.singleFile, (req, res, next) => {
+    // Public upload for logo
+    req.userId = '00000000-0000-0000-0000-000000000000'; // System ID
     next();
-}, portfolioController.submitPortfolioRequest);
+}, asyncHandler(uploadController.uploadFile));
+
+router.post('/request', portfolioController.submitPortfolioRequest);
 
 // Admin restricted access
 router.use(authenticate);

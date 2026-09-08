@@ -913,7 +913,7 @@
                 if (logoFile) {
                     const formData = new FormData();
                     formData.append('file', logoFile);
-                    const upRes = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    const upRes = await axios.post(`${API_BASE}/upload-logo`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
                     logoUrl = upRes.data.data.fileUrl;
                 }
 

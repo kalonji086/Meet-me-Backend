@@ -369,6 +369,7 @@
 
                 <div class="flex gap-2 mb-8 bg-gray-100 p-1.5 rounded-2xl w-fit">
                     <button onclick="switchPortfolioTab('identity')" id="port-tab-identity" class="port-tab-btn active px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Identité & Logo</button>
+                    <button onclick="switchPortfolioTab('footer')" id="port-tab-footer" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Footer & Liens</button>
                     <button onclick="switchPortfolioTab('skills')" id="port-tab-skills" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Compétences</button>
                     <button onclick="switchPortfolioTab('experiences')" id="port-tab-experiences" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Parcours & Impact</button>
                     <button onclick="switchPortfolioTab('team')" id="port-tab-team" class="port-tab-btn px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Notre Équipe</button>
@@ -434,8 +435,50 @@
                                 </div>
                             </div>
 
-                            <button onclick="savePortfolioIdentity()" id="btn-save-identity" class="w-full py-6 bg-cyan-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-100 hover:bg-cyan-600 transition-all">Mettre à jour l'identité globale</button>
+                            <button onclick="savePortfolioIdentity()" id="btn-save-identity" class="w-full py-6 bg-cyan-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-100 hover:bg-cyan-600 transition-all">Mettre à jour l'identité</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Footer Management -->
+                <div id="port-section-footer" class="port-content hidden">
+                    <div class="max-w-4xl mx-auto bg-white p-12 rounded-[3.5rem] border border-gray-100 shadow-xl">
+                        <div class="flex items-center gap-4 mb-10">
+                            <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+                                <i data-lucide="layout-panel-top" class="w-8 h-8"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-gray-900 uppercase tracking-tighter">Gestion du Pied de page</h3>
+                                <p class="text-gray-500 text-sm font-medium">Configurez les liens légaux et de contact de votre site.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="space-y-2">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Politique de Confidentialité</label>
+                                <input type="text" id="footer-policy-new" placeholder="Ex: https://..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Conditions Générales</label>
+                                <input type="text" id="footer-conditions-new" placeholder="Ex: https://..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Blog (Bloque)</label>
+                                <input type="text" id="footer-blog-new" placeholder="URL de votre blog..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lien Espace Communautés</label>
+                                <input type="text" id="footer-community-new" placeholder="Lien Discord ou autre..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
+                            </div>
+                            <div class="col-span-full space-y-2">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Infos de Contact Footer (Texte libre)</label>
+                                <input type="text" id="footer-contact-new" placeholder="Ex: contact@togethertech.cd | +243 ..." class="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all">
+                            </div>
+                        </div>
+
+                        <button onclick="savePortfolioFooter()" id="btn-save-footer" class="w-full mt-12 py-6 bg-indigo-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                            ENREGISTRER LES MODIFICATIONS DU FOOTER
+                        </button>
                     </div>
                 </div>
 
@@ -5551,6 +5594,7 @@
             if (content) content.classList.remove('hidden');
 
             if (tab === 'identity') loadPortfolioIdentity();
+            if (tab === 'footer') loadPortfolioFooter();
             if (tab === 'skills') loadSkills();
             if (tab === 'experiences') loadExperiences();
             if (tab === 'team') loadTeam();
@@ -5567,13 +5611,39 @@
                     if (p.logo_url) document.getElementById('port-logo-preview').src = getFullUrl(p.logo_url);
                     if (p.about_photo_url) document.getElementById('port-about-preview').src = getFullUrl(p.about_photo_url);
                     document.getElementById('port-about-desc').value = p.about_description || "";
-                    document.getElementById('footer-policy').value = p.footer_policy || "";
-                    document.getElementById('footer-conditions').value = p.footer_conditions || "";
-                    document.getElementById('footer-blog').value = p.footer_blog || "";
-                    document.getElementById('footer-community').value = p.footer_community || "";
-                    document.getElementById('footer-contact').value = p.footer_contact || "";
                 }
             } catch (e) {}
+        }
+
+        async function loadPortfolioFooter() {
+            try {
+                const res = await axios.get(`${API_URL}/portfolio/public`);
+                const p = res.data.data.profile;
+                if (p) {
+                    document.getElementById('footer-policy-new').value = p.footer_policy || "";
+                    document.getElementById('footer-conditions-new').value = p.footer_conditions || "";
+                    document.getElementById('footer-blog-new').value = p.footer_blog || "";
+                    document.getElementById('footer-community-new').value = p.footer_community || "";
+                    document.getElementById('footer-contact-new').value = p.footer_contact || "";
+                }
+            } catch (e) {}
+        }
+
+        async function savePortfolioFooter() {
+            const btn = document.getElementById('btn-save-footer');
+            const footerPolicy = document.getElementById('footer-policy-new').value;
+            const footerConditions = document.getElementById('footer-conditions-new').value;
+            const footerBlog = document.getElementById('footer-blog-new').value;
+            const footerCommunity = document.getElementById('footer-community-new').value;
+            const footerContact = document.getElementById('footer-contact-new').value;
+
+            try {
+                btn.disabled = true; btn.innerText = "Enregistrement...";
+                await axios.put(`${API_URL}/portfolio/admin/profile`, {
+                    footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact
+                }, { headers: { Authorization: `Bearer ${token}` } });
+                toast("Pied de page mis à jour", "success");
+            } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "ENREGISTRER LES MODIFICATIONS DU FOOTER"; }
         }
 
         async function savePortfolioIdentity() {
@@ -5581,12 +5651,6 @@
             const logoFile = document.getElementById('port-logo-input').files[0];
             const aboutFile = document.getElementById('port-about-input').files[0];
             const aboutDescription = document.getElementById('port-about-desc').value;
-
-            const footerPolicy = document.getElementById('footer-policy').value;
-            const footerConditions = document.getElementById('footer-conditions').value;
-            const footerBlog = document.getElementById('footer-blog').value;
-            const footerCommunity = document.getElementById('footer-community').value;
-            const footerContact = document.getElementById('footer-contact').value;
 
             try {
                 btn.disabled = true; btn.innerText = "Mise à jour...";
@@ -5602,11 +5666,10 @@
                 }
 
                 await axios.put(`${API_URL}/portfolio/admin/profile`, {
-                    logoUrl, aboutPhotoUrl, aboutDescription,
-                    footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact
+                    logoUrl, aboutPhotoUrl, aboutDescription
                 }, { headers: { Authorization: `Bearer ${token}` } });
                 toast("Identité mise à jour", "success");
-            } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "Mettre à jour l'identité globale"; }
+            } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "Mettre à jour l'identité"; }
         }
 
         async function loadSkills() {

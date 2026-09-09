@@ -139,7 +139,15 @@ const approvePortfolioRequest = asyncHandler(async (req, res) => {
 
     await query('UPDATE public.web_portfolio_requests SET status = \'approved\' WHERE id = $1', [id]);
 
-    // 2. Send Email Notification
+    // 2. AUTOMATIC ATTRIBUTION: Give Dashboard access to 'portfolio' module
+    await query(
+        `INSERT INTO public.admin_delegations (user_id, modules, is_active)
+         VALUES ($1, $2, TRUE)
+         ON CONFLICT (user_id) DO UPDATE SET modules = EXCLUDED.modules, is_active = TRUE`,
+        [ownerId, ['portfolio']]
+    );
+
+    // 3. Send Email Notification
     await mailService.sendPortfolioApprovalEmail(
         request.email,
         request.full_name,

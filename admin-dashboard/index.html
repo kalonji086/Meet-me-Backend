@@ -1823,6 +1823,7 @@
                             // C'est un client SaaS ! On limite ses droits au portfolio
                             user.isSaasOwner = true;
                             user.allowedModules = ['portfolio'];
+                            user.portfolioConfig = myPortfolio;
                             localStorage.setItem('admin_user', JSON.stringify(user));
 
                             document.getElementById('login-container').classList.add('hidden');
@@ -1832,6 +1833,10 @@
 
                             initSocket();
                             initRichEditors();
+
+                            // Appliquer le branding client
+                            applySaasBranding(myPortfolio);
+
                             filterSidebar(['portfolio']); // Only show portfolio
                             return;
                         }
@@ -1848,6 +1853,27 @@
                     const myDelegation = res.data.data.find(d => d.user_id === user.id);
                     // ... (rest of the standard logic follows)
                 });
+        }
+
+        function applySaasBranding(config) {
+            if (!config) return;
+            // Changer le nom du dashboard
+            const brandText = document.querySelectorAll('.brand-name-text');
+            brandText.forEach(el => el.innerText = config.title.toUpperCase());
+
+            // Appliquer la couleur thématique
+            if (config.theme_color) {
+                document.documentElement.style.setProperty('--primary-color', config.theme_color);
+                // Forcer sur certains éléments clés
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar) sidebar.style.borderRightColor = config.theme_color + '40'; // 40 is alpha
+
+                const activeItems = document.querySelectorAll('.sidebar-item.active');
+                activeItems.forEach(item => {
+                    item.style.backgroundColor = config.theme_color;
+                    item.style.color = 'white';
+                });
+            }
         }
 
         function filterSidebar(allowed) {

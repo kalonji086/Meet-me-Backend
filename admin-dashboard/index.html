@@ -5335,118 +5335,95 @@
             } catch (e) { alert("Erreur."); }
         }
 
-        function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "", userRightsStr = "") {
+        function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "", userRightsStr = "", granularPermsStr = "", requiresApproval = true) {
             const allModules = [
-                { id: 'stats', label: 'Stats Globales' },
-                { id: 'users', label: 'Utilisateurs' },
-                { id: 'groups', label: 'Groupes' },
-                { id: 'support', label: 'Support & Appeals' },
-                { id: 'market-requests', label: 'Demandes Market' },
-                { id: 'employer-requests', label: 'Demandes Emploi' },
-                { id: 'accounts', label: 'Gestion des Comptes' },
-                { id: 'school-admin', label: 'Gestion School' },
-                { id: 'moderation', label: 'Boost & Modération' },
-                { id: 'verifications', label: 'Vérifications' },
-                { id: 'audit', label: 'Audit (Logs)' },
-                { id: 'campaigns', label: 'Campagnes Push' },
-                { id: 'legal', label: 'Légal (CGU/Privacy)' },
-                { id: 'config', label: 'Config App' },
-                { id: 'approvals', label: 'Approbations' },
-                { id: 'collaboration', label: 'Collaboration' },
-                { id: 'portfolio', label: 'Portfolio & Communauté' }
+                { id: 'stats', label: 'Stats Globales', perms: ['view'] },
+                { id: 'users', label: 'Utilisateurs', perms: ['view', 'lock', 'delete', 'verify', 'reset_pass'] },
+                { id: 'groups', label: 'Groupes', perms: ['read', 'moderate', 'settings', 'ban'] },
+                { id: 'support', label: 'Support & Appeals', perms: ['read', 'reply', 'resolve'] },
+                { id: 'market-requests', label: 'Market & Boutiques', perms: ['read', 'approve', 'boost', 'delete'] },
+                { id: 'employer-requests', label: 'Recrutement (Emploi)', perms: ['read', 'approve', 'settings'] },
+                { id: 'school-admin', label: 'Gestion School', perms: ['read', 'approve', 'settings', 'manage_accounts'] },
+                { id: 'collaboration', label: 'Collaboration Interne', perms: ['read', 'create_team', 'manage_members', 'manage_teams'] },
+                { id: 'portfolio', label: 'Portfolio Web', perms: ['read', 'edit_identity', 'manage_skills', 'manage_team', 'manage_services', 'manage_pages', 'manage_quotes'] },
+                { id: 'campaigns', label: 'Campagnes Push', perms: ['read', 'create', 'delete'] },
+                { id: 'legal', label: 'Légal (CGU/Privacy)', perms: ['read', 'update'] },
+                { id: 'config', label: 'Config App', perms: ['read', 'update'] },
+                { id: 'audit', label: 'Audit (Logs)', perms: ['read'] },
+                { id: 'approvals', label: 'Approbations', perms: ['read', 'process'] }
             ];
             const currentModules = modules ? modules.split(',') : [];
-            const collabRights = collabRightsStr ? JSON.parse(decodeURIComponent(collabRightsStr)) : {};
-            const userRights = userRightsStr ? JSON.parse(decodeURIComponent(userRightsStr)) : {};
+            const granularPerms = granularPermsStr ? JSON.parse(decodeURIComponent(granularPermsStr)) : {};
 
-            let html = `<p class="text-[10px] font-black text-purple-600 uppercase mb-4 tracking-widest text-center">Attribuer les accès : ${userName}</p><div class="grid grid-cols-2 gap-3 mb-8">` + allModules.map(m => `
-                <label class="flex items-center p-4 bg-gray-50 rounded-2xl cursor-pointer border border-gray-100 hover:border-purple-200 transition-all">
-                    <input type="checkbox" value="${m.id}" ${currentModules.includes(m.id) ? 'checked' : ''} class="mod-checkbox w-5 h-5 accent-purple-600 mr-3" onchange="toggleExtraRightsPanels(this)">
-                    <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">${m.label}</span>
-                </label>
-            `).join('') + `</div>`;
+            let html = `
+                <div class="space-y-6 text-left max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
+                    <div class="p-6 bg-indigo-600 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest opacity-80">Configuration Délégué</p>
+                            <h4 class="text-xl font-black uppercase italic">${userName}</h4>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-[9px] font-black uppercase">Approbation forcée</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="delegate-requires-approval" ${requiresApproval ? 'checked' : ''} class="sr-only peer">
+                                <div class="w-11 h-6 bg-indigo-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-white/20"></div>
+                            </label>
+                        </div>
+                    </div>
 
-            // Extra section for Collaboration Rights
-            html += `
-                <div id="collab-extra-rights" class="${currentModules.includes('collaboration') ? 'block' : 'hidden'} mt-6 pt-6 border-t border-gray-100 animate-fade-in">
-                    <p class="text-[10px] font-black text-cyan-600 uppercase mb-4 tracking-widest">Droits Spécifiques Collaboration</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <label class="flex items-center p-4 bg-cyan-50/30 rounded-2xl cursor-pointer border border-cyan-100 hover:border-cyan-300 transition-all">
-                            <input type="checkbox" id="collab-right-create" ${collabRights.create_team ? 'checked' : ''} class="w-5 h-5 accent-cyan-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Créer Équipes</span>
-                        </label>
-                        <label class="flex items-center p-4 bg-cyan-50/30 rounded-2xl cursor-pointer border border-cyan-100 hover:border-cyan-300 transition-all">
-                            <input type="checkbox" id="collab-right-see-all" ${collabRights.see_all_teams ? 'checked' : ''} class="w-5 h-5 accent-cyan-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Voir Tous Projets</span>
-                        </label>
-                        <label class="flex items-center p-4 bg-cyan-50/30 rounded-2xl cursor-pointer border border-cyan-100 hover:border-cyan-300 transition-all">
-                            <input type="checkbox" id="collab-right-manage-members" ${collabRights.manage_members ? 'checked' : ''} class="w-5 h-5 accent-cyan-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Gérer Collaborateurs</span>
-                        </label>
-                        <label class="flex items-center p-4 bg-cyan-50/30 rounded-2xl cursor-pointer border border-cyan-100 hover:border-cyan-300 transition-all">
-                            <input type="checkbox" id="collab-right-read-messages" ${collabRights.read_messages ? 'checked' : ''} class="w-5 h-5 accent-cyan-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Lire Tous Messages</span>
-                        </label>
-                        <label class="flex items-center p-4 bg-cyan-50/30 rounded-2xl cursor-pointer border border-cyan-100 hover:border-cyan-300 transition-all">
-                            <input type="checkbox" id="collab-right-manage-teams" ${collabRights.manage_teams ? 'checked' : ''} class="w-5 h-5 accent-cyan-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Gérer Équipes (Éditer/Suppr)</span>
-                        </label>
+                    <div class="grid grid-cols-1 gap-4">
+                        ${allModules.map(m => {
+                            const isChecked = currentModules.includes(m.id);
+                            const modulePerms = granularPerms[m.id] || [];
+                            return `
+                                <div class="p-5 bg-gray-50 rounded-[2rem] border border-gray-100 group">
+                                    <label class="flex items-center gap-3 cursor-pointer mb-4">
+                                        <input type="checkbox" value="${m.id}" ${isChecked ? 'checked' : ''} onchange="toggleModulePermsOverlay('${m.id}', this.checked)" class="mod-checkbox w-6 h-6 accent-indigo-600">
+                                        <span class="font-black text-sm uppercase tracking-tighter text-gray-900">${m.label}</span>
+                                    </label>
+
+                                    <div id="perms-overlay-${m.id}" class="${isChecked ? 'block' : 'hidden'} pl-8 space-y-3 border-l-2 border-indigo-100 ml-3 animate-fade-in">
+                                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Accès Spécifiques :</p>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            ${m.perms.map(p => `
+                                                <label class="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded-xl transition-all">
+                                                    <input type="checkbox" name="perm-${m.id}" value="${p}" ${modulePerms.includes(p) ? 'checked' : ''} class="w-4 h-4 accent-indigo-500">
+                                                    <span class="text-[10px] font-bold text-gray-600 uppercase">${p}</span>
+                                                </label>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             `;
 
-            // Extra section for User Management Rights
-            html += `
-                <div id="users-extra-rights" class="${currentModules.includes('users') ? 'block' : 'hidden'} mt-6 pt-6 border-t border-gray-100 animate-fade-in">
-                    <p class="text-[10px] font-black text-blue-600 uppercase mb-4 tracking-widest">Droits Spécifiques Utilisateurs</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
-                            <input type="checkbox" id="user-right-see-all" ${userRights.see_all_users ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Voir Tous Utilisateurs</span>
-                        </label>
-                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
-                            <input type="checkbox" id="user-right-lock" ${userRights.lock_user ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Bloquer/Débloquer</span>
-                        </label>
-                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
-                            <input type="checkbox" id="user-right-verify" ${userRights.verify_user ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Gérer Badges</span>
-                        </label>
-                        <label class="flex items-center p-4 bg-blue-50/30 rounded-2xl cursor-pointer border border-blue-100 hover:border-blue-300 transition-all">
-                            <input type="checkbox" id="user-right-delete" ${userRights.delete_user ? 'checked' : ''} class="w-5 h-5 accent-blue-600 mr-3">
-                            <span class="text-[9px] font-black text-gray-700 uppercase tracking-widest">Supprimer Utilisateur</span>
-                        </label>
-                    </div>
-                </div>
-            `;
-
-            Alert.show("Droits Admin", html, async () => {
-                const selected = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
-                const collabAdminRights = {
-                    create_team: document.getElementById('collab-right-create')?.checked || false,
-                    see_all_teams: document.getElementById('collab-right-see-all')?.checked || false,
-                    manage_members: document.getElementById('collab-right-manage-members')?.checked || false,
-                    read_messages: document.getElementById('collab-right-read-messages')?.checked || false,
-                    manage_teams: document.getElementById('collab-right-manage-teams')?.checked || false
-                };
-                const userAdminRights = {
-                    see_all_users: document.getElementById('user-right-see-all')?.checked || false,
-                    lock_user: document.getElementById('user-right-lock')?.checked || false,
-                    verify_user: document.getElementById('user-right-verify')?.checked || false,
-                    delete_user: document.getElementById('user-right-delete')?.checked || false
-                };
+            Alert.show("Droits Délégué", html, async () => {
+                const selectedModules = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
+                const reqApproval = document.getElementById('delegate-requires-approval').checked;
+                const permissions = {};
+                selectedModules.forEach(m => {
+                    permissions[m] = Array.from(document.querySelectorAll(`input[name="perm-${m}"]:checked`)).map(cb => cb.value);
+                });
 
                 try {
                     await axios.post(`${API_URL}/admin/delegations`, {
                         userId,
-                        modules: selected,
+                        modules: selectedModules,
                         isActive: active,
-                        collabAdminRights,
-                        userAdminRights
+                        granularPermissions: permissions,
+                        requiresApproval: reqApproval
                     }, { headers: { Authorization: `Bearer ${token}` } });
-                    alert("Délégation validée !"); closeImpactModal(); loadDelegations();
-                } catch (e) { alert("Erreur."); }
-            }, "Valider la Délégation", "purple");
+                    toast("Délégation mise à jour !", "success"); closeImpactModal(); loadDelegations();
+                } catch (e) { alert("Erreur de sauvegarde."); }
+            }, "Mettre à jour les privilèges", "indigo");
+        }
+
+        function toggleModulePermsOverlay(moduleId, isChecked) {
+            const el = document.getElementById(`perms-overlay-${moduleId}`);
+            if (isChecked) el.classList.remove('hidden'); else el.classList.add('hidden');
         }
 
         function toggleExtraRightsPanels(cb) {

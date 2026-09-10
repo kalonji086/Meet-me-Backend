@@ -7,6 +7,60 @@ const mailService = require('../services/mail.service');
 const logger = require('../utils/logger');
 
 /**
+ * Helper: Log admin action to Audit Logs
+ */
+const logAudit = async (adminId, action, entityType, entityId, details) => {
+  try {
+    await query(
+      'INSERT INTO public.admin_audit_logs (admin_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [adminId, action, entityType, entityId, JSON.stringify(details)]
+    );
+  } catch (err) { logger.error('Audit Log Error:', err); }
+};
+
+/**
+ * Helper: Check Granular Permission or Submit for Approval
+ */
+const checkPermOrRequest = async (req, res, moduleId, permission, actionData) => {
+  if (req.user.is_global_admin) return true; // Global admin bypasses everything
+
+  const { userId } = req;
+  const delRes = await query('SELECT granular_permissions, requires_approval FROM public.admin_delegations WHERE user_id = $1 AND is_active = TRUE', [userId]);
+
+  if (delRes.rows.length === 0) {
+    res.status(403).json({ success: false, error: 'Accès Admin révoqué ou inexistant.' });
+    return false;
+  }
+
+  const delegation = delRes.rows[0];
+  const perms = delegation.granular_permissions || {};
+  const modulePerms = perms[moduleId] || [];
+
+  if (!modulePerms.includes(permission)) {
+    res.status(403).json({ success: false, error: `Permission insuffisante : ${permission} dans ${moduleId}` });
+    return false;
+  }
+
+  // If requires approval, don't execute, but submit
+  if (delegation.requires_approval) {
+    await query(
+      `INSERT INTO public.admin_pending_actions (requested_by, action_type, target_id, target_name, details, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')`,
+      [userId, actionData.type, actionData.targetId || null, actionData.targetName || 'N/A', JSON.stringify(actionData.details || {})]
+    );
+
+    await logAudit(userId, 'REQUEST_APPROVAL', actionData.type, actionData.targetId, actionData.details);
+
+    res.json({ success: true, pendingApproval: true, message: 'Cette action sensible a été mise en attente pour approbation par l\'Administrateur Principal.' });
+    return false;
+  }
+
+  // Execute directly, but log it
+  await logAudit(userId, actionData.type, moduleId, actionData.targetId, actionData.details);
+  return true;
+};
+
+/**
  * @desc    Obtenir les statistiques globales
  */
 const getStats = asyncHandler(async (req, res) => {
@@ -173,15 +227,17 @@ const ensureAdminTables = async () => {
       is_active BOOLEAN DEFAULT TRUE,
       collab_admin_rights JSONB DEFAULT '{}',
       user_admin_rights JSONB DEFAULT '{}',
+      granular_permissions JSONB DEFAULT '{}',
+      requires_approval BOOLEAN DEFAULT TRUE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `);
 
   try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS user_admin_rights JSONB DEFAULT \'{}\''); } catch (e) {}
-
-
   try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS collab_admin_rights JSONB DEFAULT \'{}\''); } catch (e) {}
+  try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS granular_permissions JSONB DEFAULT \'{}\''); } catch (e) {}
+  try { await query('ALTER TABLE public.admin_delegations ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN DEFAULT TRUE'); } catch (e) {}
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.login_security (
@@ -769,28 +825,47 @@ const resolveReport = asyncHandler(async (req, res) => {
 /**
  * @desc    Helper to check and process sensitive actions
  */
-const processSensitiveAction = async (req, actionType, targetId, targetName, details = {}) => {
+const processSensitiveAction = async (req, actionType, targetId, targetName, details = {}, moduleId = null, permission = null) => {
   await ensureAdminTables();
-  if (req.user.is_global_admin) return true; // L'admin principal peut tout faire directement
-
-  // Créer une action en attente pour les délégués
-  await query(
-    `INSERT INTO public.admin_pending_actions (requested_by, action_type, target_id, target_name, details)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [req.userId, actionType, targetId ? targetId.toString() : null, targetName, JSON.stringify(details)]
-  );
-
-  // Notifier l'admin principal en temps réel
-  const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
-  if (mainAdmin.rows.length > 0) {
-    socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_pending_action', {
-      actionType,
-      targetName,
-      requestedBy: req.user.full_name
-    });
+  if (req.user.is_global_admin) {
+      await logAudit(req.userId, actionType, moduleId || 'global', targetId, details);
+      return true; // Principal admin bypasses everything
   }
 
-  return false; // Action différée (nécessite approbation)
+  // 1. Check Granular Permission first
+  const delRes = await query('SELECT granular_permissions, requires_approval FROM public.admin_delegations WHERE user_id = $1 AND is_active = TRUE', [req.userId]);
+  if (delRes.rows.length === 0) return false; // Revoked
+
+  const delegation = delRes.rows[0];
+  if (moduleId && permission) {
+      const perms = delegation.granular_permissions || {};
+      const modulePerms = perms[moduleId] || [];
+      if (!modulePerms.includes(permission)) return false; // Forbidden
+  }
+
+  // 2. If approval is required, create a request
+  if (delegation.requires_approval) {
+      await query(
+        `INSERT INTO public.admin_pending_actions (requested_by, action_type, target_id, target_name, details, status)
+         VALUES ($1, $2, $3, $4, $5, 'pending')`,
+        [req.userId, actionType, targetId ? targetId.toString() : null, targetName, JSON.stringify(details)]
+      );
+
+      // Notifier l'admin principal en temps réel
+      const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
+      if (mainAdmin.rows.length > 0) {
+        socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_pending_action', {
+          actionType,
+          targetName,
+          requestedBy: req.user.full_name
+        });
+      }
+      return false; // Deferred
+  }
+
+  // 3. Approval NOT required, execute directly and log
+  await logAudit(req.userId, actionType, moduleId || 'global', targetId, details);
+  return true;
 };
 
 /**
@@ -838,13 +913,7 @@ const handlePendingAction = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, error: 'Accès réservé' });
   }
 
-  // SÉCURITÉ : Un délégué peut seulement resoumettre SA PROPRE demande
-  if (decision === 'pending' && action.requested_by !== req.userId) {
-    return res.status(403).json({ success: false, error: 'Vous ne pouvez resoumettre que vos propres demandes' });
-  }
-
   if (decision === 'approved') {
-    // ... (Same switch logic)
     try {
       switch (action.action_type) {
         case 'delete_user':
@@ -860,22 +929,43 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           await query('UPDATE public.profiles SET is_verified = $1 WHERE id = $2', [action.details.isVerified, action.target_id]);
           socketService.broadcast('admin:user_verification_updated', { userId: action.target_id, isVerified: action.details.isVerified });
           break;
-        case 'create_team':
-          const teamRes = await query(
-            'INSERT INTO public.collab_teams (name, description, created_by, parent_id, is_confidential, color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-            [action.target_name, action.details.description, action.requested_by, action.details.parentId || null, action.details.isConfidential || false, action.details.color || '#06b6d4']
-          );
-          await query(
-            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, $3)',
-            [teamRes.rows[0].id, action.requested_by, 'admin']
-          );
+        case 'delete_group':
+          await query('DELETE FROM public.chats WHERE id = $1', [action.target_id]);
+          socketService.broadcast('group_deleted', { chatId: action.target_id });
           break;
-        case 'update_team':
-          await query(
-            'UPDATE public.collab_teams SET name = $1, description = $2, is_confidential = $3, color = $4, updated_at = NOW() WHERE id = $5',
-            [action.details.name, action.details.description, action.details.isConfidential, action.details.color, action.target_id]
-          );
+        case 'toggle_group_ban':
+          await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [action.details.isBanned, action.target_id]);
+          socketService.broadcast('group_status_changed', { chatId: action.target_id, isBanned: action.details.isBanned });
           break;
+        case 'delete_portfolio':
+          const portfolioController = require('./portfolio.controller');
+          // Re-use internal logic or manual cleanup
+          await query('DELETE FROM public.web_portfolio_profile WHERE portfolio_id = $1', [action.target_id]);
+          await query('DELETE FROM public.web_portfolio_skills WHERE portfolio_id = $1', [action.target_id]);
+          await query('DELETE FROM public.web_portfolio_experiences WHERE portfolio_id = $1', [action.target_id]);
+          await query('DELETE FROM public.web_portfolio_services WHERE portfolio_id = $1', [action.target_id]);
+          await query('DELETE FROM public.web_portfolio_team WHERE portfolio_id = $1', [action.target_id]);
+          await query('DELETE FROM public.web_portfolio_pages WHERE portfolio_id = $1', [action.target_id]);
+          await query('DELETE FROM public.web_portfolio_quotes WHERE portfolio_id = $1', [action.target_id]);
+          await query('DELETE FROM public.web_portfolios WHERE id = $1', [action.target_id]);
+          break;
+        case 'toggle_portfolio_status':
+          await query('UPDATE public.web_portfolios SET status = $1, updated_at = NOW() WHERE id = $2', [action.details.status, action.target_id]);
+          break;
+      }
+
+      await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1 WHERE id = $2', [req.userId, id]);
+      await logAudit(req.userId, 'APPROVE_ACTION', 'pending_action', id, { type: action.action_type, target: action.target_name });
+
+    } catch (err) {
+      return res.status(500).json({ success: false, error: 'Erreur lors de l\'exécution de l\'action approuvée: ' + err.message });
+    }
+  } else if (decision === 'rejected') {
+    await query('UPDATE public.admin_pending_actions SET status = \'rejected\', processed_at = NOW(), processed_by = $1, admin_notes = $2 WHERE id = $3', [req.userId, id, comment]);
+  }
+
+  res.json({ success: true, message: 'Action traitée' });
+});
         case 'delete_team':
           await query('DELETE FROM public.collab_teams WHERE id = $1', [action.target_id]);
           break;
@@ -1042,7 +1132,7 @@ const getDelegations = asyncHandler(async (req, res) => {
 const saveDelegation = asyncHandler(async (req, res) => {
   await ensureAdminTables();
   if (!req.user.is_global_admin) return res.status(403).json({ success: false, error: 'Accès réservé' });
-  const { userId, modules, isActive = true, collabAdminRights = {}, userAdminRights = {} } = req.body;
+  const { userId, modules, isActive = true, collabAdminRights = {}, userAdminRights = {}, granularPermissions = {}, requiresApproval = true } = req.body;
 
   const userRes = await query('SELECT id, full_name, email FROM public.profiles WHERE id = $1', [userId]);
   if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Meet Me non trouvé' });
@@ -1050,14 +1140,16 @@ const saveDelegation = asyncHandler(async (req, res) => {
   const user = userRes.rows[0];
 
   await query(
-    `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, user_admin_rights, updated_at)
-     VALUES ($1, $2, $3, $4, $5, NOW())
+    `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, user_admin_rights, granular_permissions, requires_approval, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
      ON CONFLICT (user_id) DO UPDATE
      SET modules = EXCLUDED.modules, is_active = EXCLUDED.is_active,
          collab_admin_rights = EXCLUDED.collab_admin_rights,
          user_admin_rights = EXCLUDED.user_admin_rights,
+         granular_permissions = EXCLUDED.granular_permissions,
+         requires_approval = EXCLUDED.requires_approval,
          updated_at = NOW()`,
-    [userId, modules, isActive, JSON.stringify(collabAdminRights), JSON.stringify(userAdminRights)]
+    [userId, modules, isActive, JSON.stringify(collabAdminRights), JSON.stringify(userAdminRights), JSON.stringify(granularPermissions), requiresApproval]
   );
 
   // Si révoqué, on retire aussi des équipes de collaboration
@@ -1085,12 +1177,8 @@ const deleteUser = asyncHandler(async (req, res) => {
   if (user.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
 
   // Security check for delegate
-  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.delete_user)) {
-    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de supprimer des utilisateurs.' });
-  }
-
-  const canExecute = await processSensitiveAction(req, 'delete_user', userId, user.rows[0].full_name);
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression envoyée à l\'admin principal.' });
+  const canExecute = await processSensitiveAction(req, 'delete_user', userId, user.rows[0].full_name, { deleted: true }, 'users', 'delete');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Cette action nécessite l\'approbation de l\'administrateur principal.' });
 
   await query('DELETE FROM public.messages WHERE sender_id = $1', [userId]);
   await query('DELETE FROM public.chat_participants WHERE user_id = $1', [userId]);
@@ -1111,12 +1199,8 @@ const toggleUserLock = asyncHandler(async (req, res) => {
   if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
 
   // Security check for delegate
-  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.lock_user)) {
-    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de bloquer des utilisateurs.' });
-  }
-
-  const canExecute = await processSensitiveAction(req, 'toggle_user_lock', userId, user.rows[0].full_name, { isLocked });
-  if (!canExecute) return res.json({ success: true, pending: true, message: `Demande de ${isLocked ? 'blocage' : 'déblocage'} envoyée.` });
+  const canExecute = await processSensitiveAction(req, 'toggle_user_lock', userId, user.rows[0].full_name, { isLocked }, 'users', 'lock');
+  if (!canExecute) return res.json({ success: true, pending: true, message: `Action de ${isLocked ? 'blocage' : 'déblocage'} mise en attente.` });
 
   await query('UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3', [isLocked, isLocked ? 3 : 0, userId]);
   await logAdminAction(req, isLocked ? 'lock_user' : 'unlock_user', 'user', userId, { isLocked });
@@ -1133,12 +1217,8 @@ const toggleUserBadge = asyncHandler(async (req, res) => {
   if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
 
   // Security check for delegate
-  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.verify_user)) {
-    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de gérer les badges.' });
-  }
-
-  const canExecute = await processSensitiveAction(req, 'toggle_user_badge', userId, user.rows[0].full_name, { isVerified });
-  if (!canExecute) return res.json({ success: true, pending: true, message: `Demande de ${isVerified ? 'certification' : 'retrait de badge'} envoyée.` });
+  const canExecute = await processSensitiveAction(req, 'toggle_user_badge', userId, user.rows[0].full_name, { isVerified }, 'users', 'verify');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de gestion de badge mise en attente.' });
 
   await query('UPDATE public.profiles SET is_verified = $1 WHERE id = $2', [isVerified, userId]);
   await logAdminAction(req, isVerified ? 'verify_user' : 'unverify_user', 'user', userId, { isVerified });
@@ -1245,8 +1325,8 @@ const toggleGroupBan = asyncHandler(async (req, res) => {
   const group = await query('SELECT name FROM public.chats WHERE id = $1', [chatId]);
   if (!group.rows[0]) return res.status(404).json({ success: false, error: 'Groupe non trouvé' });
 
-  const canExecute = await processSensitiveAction(req, 'toggle_group_ban', chatId, group.rows[0].name, { isBanned });
-  if (!canExecute) return res.json({ success: true, pending: true, message: `Demande de ${isBanned ? 'bannissement' : 'débannissement'} envoyée.` });
+  const canExecute = await processSensitiveAction(req, 'toggle_group_ban', chatId, group.rows[0].name, { isBanned }, 'groups', 'ban');
+  if (!canExecute) return res.json({ success: true, pending: true, message: `Action de ${isBanned ? 'bannissement' : 'débannissement'} mise en attente.` });
 
   await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [isBanned, chatId]);
 
@@ -1265,8 +1345,8 @@ const deleteGroup = asyncHandler(async (req, res) => {
   const group = await query('SELECT name FROM public.chats WHERE id = $1', [chatId]);
   if (!group.rows[0]) return res.status(404).json({ success: false, error: 'Groupe non trouvé' });
 
-  const canExecute = await processSensitiveAction(req, 'delete_group', chatId, group.rows[0].name);
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression envoyée à l\'admin principal.' });
+  const canExecute = await processSensitiveAction(req, 'delete_group', chatId, group.rows[0].name, { deleted: true }, 'groups', 'moderate');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression de groupe mise en attente.' });
 
   await query('DELETE FROM public.chats WHERE id = $1', [chatId]);
 

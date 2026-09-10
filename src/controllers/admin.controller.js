@@ -913,6 +913,11 @@ const handlePendingAction = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, error: 'Accès réservé' });
   }
 
+  // SÉCURITÉ : Un délégué peut seulement resoumettre SA PROPRE demande
+  if (decision === 'pending' && action.requested_by !== req.userId) {
+    return res.status(403).json({ success: false, error: 'Vous ne pouvez resoumettre que vos propres demandes' });
+  }
+
   if (decision === 'approved') {
     try {
       switch (action.action_type) {
@@ -938,8 +943,6 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           socketService.broadcast('group_status_changed', { chatId: action.target_id, isBanned: action.details.isBanned });
           break;
         case 'delete_portfolio':
-          const portfolioController = require('./portfolio.controller');
-          // Re-use internal logic or manual cleanup
           await query('DELETE FROM public.web_portfolio_profile WHERE portfolio_id = $1', [action.target_id]);
           await query('DELETE FROM public.web_portfolio_skills WHERE portfolio_id = $1', [action.target_id]);
           await query('DELETE FROM public.web_portfolio_experiences WHERE portfolio_id = $1', [action.target_id]);
@@ -952,28 +955,8 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'toggle_portfolio_status':
           await query('UPDATE public.web_portfolios SET status = $1, updated_at = NOW() WHERE id = $2', [action.details.status, action.target_id]);
           break;
-      }
-
-      await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1 WHERE id = $2', [req.userId, id]);
-      await logAudit(req.userId, 'APPROVE_ACTION', 'pending_action', id, { type: action.action_type, target: action.target_name });
-
-    } catch (err) {
-      return res.status(500).json({ success: false, error: 'Erreur lors de l\'exécution de l\'action approuvée: ' + err.message });
-    }
-  } else if (decision === 'rejected') {
-    await query('UPDATE public.admin_pending_actions SET status = \'rejected\', processed_at = NOW(), processed_by = $1, admin_notes = $2 WHERE id = $3', [req.userId, id, comment]);
-  }
-
-  res.json({ success: true, message: 'Action traitée' });
-});
         case 'delete_team':
           await query('DELETE FROM public.collab_teams WHERE id = $1', [action.target_id]);
-          break;
-        case 'delete_group':
-          await query('DELETE FROM public.chats WHERE id = $1', [action.target_id]);
-          break;
-        case 'toggle_group_ban':
-          await query('UPDATE public.chats SET is_banned = $1 WHERE id = $2', [action.details.isBanned, action.target_id]);
           break;
         case 'delete_market':
           await query('DELETE FROM public.market_businesses WHERE id = $1', [action.target_id]);
@@ -983,81 +966,44 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           break;
         case 'collab_application':
           let applyTeamId = action.details.teamId;
-
-          // Sécurité: Si teamId manquant, on cherche l'équipe par défaut
           if (!applyTeamId || applyTeamId === 'null') {
             const defTeam = await query("SELECT id FROM public.collab_teams WHERE name = 'Together Tech Community' LIMIT 1");
             applyTeamId = defTeam.rows[0]?.id;
-
             if (!applyTeamId) {
               const firstTeam = await query("SELECT id FROM public.collab_teams ORDER BY created_at ASC LIMIT 1");
               applyTeamId = firstTeam.rows[0]?.id;
             }
           }
-
-          if (!applyTeamId) throw new Error("Aucune équipe disponible pour l'assignation.");
-
-          // 1. Enregistrer dans collab_requests pour l'historique
+          if (!applyTeamId) throw new Error("Aucune équipe disponible.");
           await query(
-            'INSERT INTO public.collab_requests (user_id, team_id, motivation, objectives, skills, status, processed_at, processed_by) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)',
-            [action.requested_by, applyTeamId, action.details.motivation, action.details.objectives, action.details.skills, 'approved', req.userId]
+            'INSERT INTO public.collab_requests (user_id, team_id, motivation, objectives, skills, status, processed_at, processed_by) VALUES ($1, $2, $3, $4, $5, \'approved\', NOW(), $6)',
+            [action.requested_by, applyTeamId, action.details.motivation, action.details.objectives, action.details.skills, req.userId]
           );
-
-          // 2. Ajouter aux membres de l'équipe
-          await query(
-            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
-            [applyTeamId, action.requested_by]
-          );
-
-          // 3. Activer le module Collaboration dans sa délégation
+          await query('INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING', [applyTeamId, action.requested_by]);
           const existingCollabDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [action.requested_by]);
           if (existingCollabDel.rows.length === 0) {
             await query('INSERT INTO public.admin_delegations (user_id, modules, is_active) VALUES ($1, $2, TRUE)', [action.requested_by, ['collaboration']]);
           } else {
-            await query(
-              `UPDATE public.admin_delegations
-               SET modules = CASE WHEN NOT ('collaboration' = ANY(modules)) THEN array_append(modules, 'collaboration') ELSE modules END,
-                   is_active = TRUE,
-                   updated_at = NOW()
-               WHERE user_id = $1`,
-              [action.requested_by]
-            );
+            await query("UPDATE public.admin_delegations SET modules = CASE WHEN NOT ('collaboration' = ANY(modules)) THEN array_append(modules, 'collaboration') ELSE modules END, is_active = TRUE, updated_at = NOW() WHERE user_id = $1", [action.requested_by]);
           }
-
-          // 4. S'assurer que le profil est marqué comme collaborateur
           await query('UPDATE public.profiles SET is_collaborator = TRUE WHERE id = $1', [action.requested_by]);
-
-          socketService.emitToUser(action.requested_by, 'collab:request_processed', { status: 'approved', comment: comment || 'Bienvenue dans l\'équipe !' });
+          socketService.emitToUser(action.requested_by, 'collab:request_processed', { status: 'approved', comment: comment || 'Bienvenue !' });
           break;
         case 'add_member':
           await mailService.sendCollabInvitationEmail(action.details.email || '', action.target_name, action.details.teamName, action.details.teamId);
-          // Also add directly if it's an "add" rather than just "invite"
-          await query(
-            'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
-            [action.details.teamId, action.target_id]
-          );
-
-          // Activer automatiquement le module collaboration si pas déjà fait
+          await query('INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING', [action.details.teamId, action.target_id]);
           const addDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [action.target_id]);
           if (addDel.rows.length === 0) {
             await query('INSERT INTO public.admin_delegations (user_id, modules, is_active) VALUES ($1, $2, TRUE)', [action.target_id, ['collaboration']]);
           } else if (!addDel.rows[0].modules.includes('collaboration')) {
             await query('UPDATE public.admin_delegations SET modules = array_append(modules, \'collaboration\'), is_active = TRUE WHERE user_id = $1', [action.target_id]);
           }
-
           socketService.broadcast('collab:member_moved', { userId: action.target_id, toTeamId: action.details.teamId });
           break;
         case 'move_member':
-          // Retirer de toutes les équipes d'abord pour un déplacement propre
           await query('DELETE FROM public.collab_team_members WHERE user_id = $1', [action.target_id]);
-
-          if (action.details.toTeamId && action.details.toTeamId !== 'null' && action.details.toTeamId !== '') {
-            await query(
-              'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
-              [action.details.toTeamId, action.target_id]
-            );
-
-            // Activer automatiquement le module collaboration si pas déjà fait
+          if (action.details.toTeamId && action.details.toTeamId !== 'null') {
+            await query('INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING', [action.details.toTeamId, action.target_id]);
             const moveDel = await query('SELECT modules FROM public.admin_delegations WHERE user_id = $1', [action.target_id]);
             if (moveDel.rows.length === 0) {
               await query('INSERT INTO public.admin_delegations (user_id, modules, is_active) VALUES ($1, $2, TRUE)', [action.target_id, ['collaboration']]);
@@ -1069,35 +1015,23 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           break;
       }
       await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1, admin_notes = $2 WHERE id = $3', [req.userId, comment || null, id]);
+      await logAudit(req.userId, 'APPROVE_ACTION', 'pending_action', id, { type: action.action_type, target: action.target_name });
     } catch (err) {
-      return res.status(500).json({ success: false, error: 'Erreur lors de l\'exécution de l\'action approuvée' });
+      logger.error('Pending Action Approval Error:', err);
+      return res.status(500).json({ success: false, error: 'Erreur lors de l\'exécution: ' + err.message });
     }
   } else if (decision === 'pending') {
-    // Resoumission par le délégué
     await query('UPDATE public.admin_pending_actions SET status = \'pending\', processed_at = NULL, processed_by = NULL WHERE id = $1', [id]);
-
-    // Notifier l'admin principal
     const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
     if (mainAdmin.rows.length > 0) {
-      socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_pending_action', {
-        actionType: action.action_type,
-        targetName: action.target_name,
-        requestedBy: req.user.full_name
-      });
+      socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_pending_action', { actionType: action.action_type, targetName: action.target_name, requestedBy: req.user.full_name });
     }
   } else {
-    // rejected or sent_back
     await query('UPDATE public.admin_pending_actions SET status = $1, processed_at = NOW(), processed_by = $2, admin_notes = $3 WHERE id = $4', [decision, req.userId, comment || null, id]);
   }
 
-  socketService.sendToUser(action.requested_by, 'admin:action_processed', {
-    actionType: action.action_type,
-    decision,
-    comment: comment || null
-  });
-
+  socketService.sendToUser(action.requested_by, 'admin:action_processed', { actionType: action.action_type, decision, comment: comment || null });
   await logAdminAction(req, `handle_pending_${decision}`, 'pending_action', id, { decision, comment });
-
   res.json({ success: true, message: `Action ${decision}.` });
 });
 

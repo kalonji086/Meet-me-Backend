@@ -814,6 +814,10 @@ const resolveReport = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   await ensureAdminTables();
+
+  const canExecute = await processSensitiveAction(req, 'resolve_report', id, 'Report', { status: status || 'resolved' }, 'reports', 'resolve');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de résolution de signalement mise en attente.' });
+
   await query(
     'UPDATE public.reported_content SET status = $1, resolved_at = NOW() WHERE id = $2',
     [status || 'resolved', id]
@@ -964,6 +968,39 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'toggle_market_block':
           await query('UPDATE public.market_businesses SET status = $1 WHERE id = $2', [action.details.status, action.target_id]);
           break;
+        case 'handle_market':
+          // Re-trigger actual handle function logic
+          const { status, admin_notes } = action.details;
+          await query('UPDATE public.market_businesses SET status = $1, rejection_reason = $2, verified_at = CASE WHEN $1 = \'approved\' THEN NOW() ELSE NULL END WHERE id = $3', [status, admin_notes, action.target_id]);
+          break;
+        case 'resolve_report':
+          await query('UPDATE public.reported_content SET status = $1, resolved_at = NOW() WHERE id = $2', [action.details.status, action.target_id]);
+          break;
+        case 'reply_appeal':
+          await query('UPDATE public.appeals SET admin_reply = $1, status = $2, resolved_at = NOW() WHERE id = $3', [action.details.reply, action.details.action === 'resolved' ? 'resolved' : 'reviewed', action.target_id]);
+          break;
+        case 'approve_school':
+          await query("UPDATE public.school_schools SET status = 'approved', updated_at = NOW() WHERE id = $1", [action.target_id]);
+          break;
+        case 'block_school':
+          await query("UPDATE public.school_schools SET status = 'blocked', updated_at = NOW() WHERE id = $1", [action.target_id]);
+          break;
+        case 'delete_school':
+          await query('DELETE FROM public.school_schools WHERE id = $1', [action.target_id]);
+          break;
+        case 'handle_employer':
+          const { status: empStatus } = action.details;
+          await query("UPDATE public.employer_requests SET status = $1, updated_at = NOW() WHERE id = $2", [empStatus, action.target_id]);
+          if (empStatus === 'approved') {
+              await query(`INSERT INTO public.employer_profiles (user_id, request_id, company_name, company_email, industry)
+                           VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id) DO UPDATE SET is_active = true`,
+                           [action.details.userId, action.target_id, action.target_name, action.details.email, action.details.industry]);
+          }
+          break;
+        case 'delete_collaborator':
+          await query('UPDATE public.profiles SET collab_deleted_at = NOW(), is_collaborator = FALSE WHERE id = $1', [action.target_id]);
+          await query('UPDATE public.admin_delegations SET is_active = FALSE WHERE user_id = $1', [action.target_id]);
+          break;
         case 'collab_application':
           let applyTeamId = action.details.teamId;
           if (!applyTeamId || applyTeamId === 'null') {
@@ -1012,6 +1049,15 @@ const handlePendingAction = asyncHandler(async (req, res) => {
             }
           }
           socketService.broadcast('collab:member_moved', { userId: action.target_id, fromTeamId: action.details.fromTeamId, toTeamId: action.details.toTeamId });
+          break;
+        case 'delete_campaign':
+          await query('DELETE FROM public.notification_campaigns WHERE id = $1', [action.target_id]);
+          break;
+        case 'delete_config':
+          await query('DELETE FROM public.app_configs WHERE id = $1', [action.target_id]);
+          break;
+        case 'delete_legal':
+          await query('DELETE FROM public.app_legal_docs WHERE type = $1', [action.target_id]);
           break;
       }
       await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1, admin_notes = $2 WHERE id = $3', [req.userId, comment || null, id]);
@@ -1336,7 +1382,9 @@ const replyToAppeal = asyncHandler(async (req, res) => {
 
   const { user_id, contact_email } = appealRes.rows[0];
   let email = contact_email;
-  let fullName = 'Utilisateur';
+
+  const canExecute = await processSensitiveAction(req, 'reply_appeal', id, 'Appeal', { reply, action }, 'support', 'reply');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Votre réponse a été mise en attente d\'approbation.' });
 
   if (user_id) {
     const userRes = await query('SELECT email, full_name FROM public.profiles WHERE id = $1', [user_id]);
@@ -1469,6 +1517,10 @@ const updateCampaign = asyncHandler(async (req, res) => {
 
 const deleteCampaign = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  const canExecute = await processSensitiveAction(req, 'delete_campaign', id, 'Campaign', { deleted: true }, 'campaigns', 'delete');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression de campagne mise en attente.' });
+
   const result = await query('DELETE FROM public.notification_campaigns WHERE id = $1 AND status = \'scheduled\' RETURNING id');
 
   if (result.rows.length === 0) {
@@ -1631,6 +1683,10 @@ const updateAppConfig = asyncHandler(async (req, res) => {
  */
 const deleteAppConfig = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  const canExecute = await processSensitiveAction(req, 'delete_config', id, 'AppConfig', { deleted: true }, 'config', 'update');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression config mise en attente.' });
+
   await query('DELETE FROM public.app_configs WHERE id = $1', [id]);
   await logAdminAction(req, 'delete_app_config', 'config', id, { deleted: true });
   res.json({ success: true, message: 'Configuration de mise à jour supprimée.' });
@@ -1769,6 +1825,10 @@ const updateLegalDoc = asyncHandler(async (req, res) => {
  */
 const deleteLegalDoc = asyncHandler(async (req, res) => {
   const { type } = req.params;
+
+  const canExecute = await processSensitiveAction(req, 'delete_legal', type, 'LegalDoc', { deleted: true }, 'legal', 'update');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression doc légal mise en attente.' });
+
   await query('DELETE FROM public.app_legal_docs WHERE type = $1', [type]);
   await logAdminAction(req, 'delete_legal_doc', 'legal', null, { type });
 
@@ -1817,6 +1877,9 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
 
   const business = businessRes.rows[0];
   const userId = business.user_id;
+
+  const canExecute = await processSensitiveAction(req, 'handle_market', id, business.business_name, { status, admin_notes }, 'market-requests', 'approve');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de validation boutique mise en attente.' });
 
   if (status === 'approved') {
     // 1. Marquer comme approuvé
@@ -1897,16 +1960,16 @@ const toggleMarketBlock = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { block } = req.body; // true to block, false to unblock
 
-  const businessRes = await query('SELECT * FROM public.market_businesses WHERE id = $1', [id]);
+  const businessRes = await query('SELECT business_name, user_id FROM public.market_businesses WHERE id = $1', [id]);
   if (businessRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Business non trouvé' });
 
   const business = businessRes.rows[0];
   const newStatus = block ? 'blocked' : 'approved';
 
-  await query(
-    'UPDATE public.market_businesses SET status = $1, updated_at = NOW() WHERE id = $2',
-    [newStatus, id]
-  );
+  const canExecute = await processSensitiveAction(req, 'toggle_market_block', id, business.business_name, { status: newStatus }, 'market-requests', 'delete');
+  if (!canExecute) return res.json({ success: true, pending: true, message: `Action de ${block ? 'blocage' : 'déblocage'} boutique mise en attente.` });
+
+  await query('UPDATE public.market_businesses SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, id]);
 
   // Notifier l'utilisateur
   const socketService = require('../services/socket.service');
@@ -1925,10 +1988,13 @@ const toggleMarketBlock = asyncHandler(async (req, res) => {
 const deleteMarketBusiness = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const businessRes = await query('SELECT * FROM public.market_businesses WHERE id = $1', [id]);
+  const businessRes = await query('SELECT business_name, user_id FROM public.market_businesses WHERE id = $1', [id]);
   if (businessRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Business non trouvé' });
 
   const business = businessRes.rows[0];
+
+  const canExecute = await processSensitiveAction(req, 'delete_market', id, business.business_name, { deleted: true }, 'market-requests', 'delete');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression de boutique mise en attente.' });
 
   await query('DELETE FROM public.market_businesses WHERE id = $1', [id]);
 
@@ -2109,9 +2175,12 @@ const createCollaborator = asyncHandler(async (req, res) => {
 const deleteCollaborator = asyncHandler(async (req, res) => {
   const { userId } = req.params;
 
-  const user = await query('SELECT full_name, is_global_admin FROM public.profiles WHERE id = $1', [userId]);
-  if (user.rows.length === 0) return res.status(404).json({ success: false, error: 'Collaborateur non trouvé.' });
-  if (user.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Action interdite sur un admin global.' });
+  const userRes = await query('SELECT full_name, is_global_admin FROM public.profiles WHERE id = $1', [userId]);
+  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Collaborateur non trouvé.' });
+  if (userRes.rows[0].is_global_admin) return res.status(403).json({ success: false, error: 'Action interdite sur un admin global.' });
+
+  const canExecute = await processSensitiveAction(req, 'delete_collaborator', userId, userRes.rows[0].full_name, { terminated: true }, 'collaboration', 'manage_teams');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de fin de collaboration mise en attente.' });
 
   // On marque comme supprimé avec la date actuelle
   const now = new Date();
@@ -2247,12 +2316,16 @@ const getPendingSchools = asyncHandler(async (req, res) => {
 const approveSchool = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
+  const schoolCheck = await query('SELECT name, created_by FROM public.school_schools WHERE id = $1', [id]);
+  if (schoolCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
+
+  const canExecute = await processSensitiveAction(req, 'approve_school', id, schoolCheck.rows[0].name, { approved: true }, 'school-admin', 'approve');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande d\'approbation d\'école mise en attente.' });
+
   const result = await query(
     "UPDATE public.school_schools SET status = 'approved', updated_at = NOW() WHERE id = $1 RETURNING *",
     [id]
   );
-
-  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
 
   const school = result.rows[0];
 
@@ -2309,12 +2382,16 @@ const blockSchool = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
 
+  const schoolCheck = await query('SELECT name FROM public.school_schools WHERE id = $1', [id]);
+  if (schoolCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
+
+  const canExecute = await processSensitiveAction(req, 'block_school', id, schoolCheck.rows[0].name, { reason }, 'school-admin', 'approve');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de blocage d\'école mise en attente.' });
+
   const result = await query(
     "UPDATE public.school_schools SET status = 'blocked', updated_at = NOW() WHERE id = $1 RETURNING *",
     [id]
   );
-
-  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
 
   const school = result.rows[0];
 
@@ -2335,6 +2412,9 @@ const deleteSchool = asyncHandler(async (req, res) => {
   if (schoolRes.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
 
   const school = schoolRes.rows[0];
+
+  const canExecute = await processSensitiveAction(req, 'delete_school', id, school.name, { deleted: true }, 'school-admin', 'settings');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression d\'école mise en attente.' });
 
   await query('DELETE FROM public.school_schools WHERE id = $1', [id]);
 
@@ -2372,6 +2452,15 @@ const handleEmployerRequest = asyncHandler(async (req, res) => {
   if (requestRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
 
   const request = requestRes.rows[0];
+
+  const canExecute = await processSensitiveAction(req, 'handle_employer', id, request.company_name, {
+      status,
+      admin_notes,
+      userId: request.user_id,
+      email: request.company_email,
+      industry: request.industry
+  }, 'employer-requests', 'approve');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande employeur mise en attente.' });
 
   if (status === 'approved') {
     await query(

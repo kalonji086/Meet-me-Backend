@@ -5350,7 +5350,8 @@
                 { id: 'legal', label: 'Légal (CGU/Privacy)', perms: ['read', 'update'] },
                 { id: 'config', label: 'Config App', perms: ['read', 'update'] },
                 { id: 'audit', label: 'Audit (Logs)', perms: ['read'] },
-                { id: 'approvals', label: 'Approbations', perms: ['read', 'process'] }
+                { id: 'approvals', label: 'Approbations', perms: ['read', 'process'] },
+                { id: 'delegations', label: 'Délégations (Atribus)', perms: ['read', 'manage'] }
             ];
             const currentModules = modules ? modules.split(',') : [];
             const granularPerms = granularPermsStr ? JSON.parse(decodeURIComponent(granularPermsStr)) : {};

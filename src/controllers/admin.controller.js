@@ -1078,6 +1078,45 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'delete_legal':
           await query('DELETE FROM public.app_legal_docs WHERE type = $1', [action.target_id]);
           break;
+        case 'create_campaign':
+        case 'broadcast_message':
+          const isBroadcast = action.action_type === 'broadcast_message';
+          const { title, message: msgText, content: bcContent, target: bcTarget, targetValue, specificEmail, scheduledAt, theme, ctaText, ctaUrl } = action.details;
+          const finalContent = isBroadcast ? bcContent : msgText;
+          const finalTarget = isBroadcast ? bcTarget : bcTarget; // details use same field names usually
+
+          const now = new Date();
+          const sDate = scheduledAt ? new Date(scheduledAt) : now;
+          const isFut = sDate > now;
+
+          const camp = await query(
+            `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8) RETURNING id`,
+            [title, finalContent, bcTarget || 'all', targetValue || specificEmail || null, action.requested_by, isFut ? 'scheduled' : 'sent', sDate, JSON.stringify({ theme, ctaText, ctaUrl, isBroadcast })]
+          );
+
+          if (!isFut) {
+            const cta = ctaText ? { text: ctaText, url: ctaUrl } : null;
+            if (bcTarget === 'all') {
+              socketService.broadcast('push_notification', { title, body: finalContent, type: 'campaign' });
+              const usrs = await query('SELECT id, email, full_name FROM public.profiles WHERE is_global_admin = FALSE');
+              for (const u of usrs.rows) {
+                await mailService.sendSystemEmail(u.email, title, finalContent, theme, u.full_name || 'Utilisateur', cta);
+              }
+              await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [usrs.rows.length, camp.rows[0].id]);
+            } else {
+              const emails = (targetValue || specificEmail || "").split(',').map(e => e.trim()).filter(e => e);
+              let sCount = 0;
+              for (const email of emails) {
+                const uRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [email]);
+                if (uRes.rows.length > 0) socketService.sendToUser(uRes.rows[0].id, 'push_notification', { title, body: finalContent, type: 'campaign' });
+                const success = await mailService.sendSystemEmail(email, title, finalContent, theme, uRes.rows[0]?.full_name || 'Utilisateur', cta);
+                if (success) sCount++;
+              }
+              await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sCount, camp.rows[0].id]);
+            }
+          }
+          break;
       }
       await query('UPDATE public.admin_pending_actions SET status = \'approved\', processed_at = NOW(), processed_by = $1, admin_notes = $2 WHERE id = $3', [req.userId, comment || null, id]);
       await logAudit(req.userId, 'APPROVE_ACTION', 'pending_action', id, { type: action.action_type, target: action.target_name });
@@ -1465,6 +1504,9 @@ const createCampaign = asyncHandler(async (req, res) => {
 
   await ensureAdminTables();
 
+  const canExecute = await processSensitiveAction(req, 'create_campaign', null, title, req.body, 'campaigns', 'create');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Votre campagne a été mise en attente pour approbation par l\'Administrateur Principal.' });
+
   // Si scheduledAt est fourni et est dans le futur, on enregistre seulement
   const now = new Date();
   const scheduledDate = scheduledAt ? new Date(scheduledAt) : now;
@@ -1571,6 +1613,11 @@ const broadcastMessage = asyncHandler(async (req, res) => {
   const { content, title, target = 'all', specificEmail, scheduledAt, theme = 'amazon', ctaText, ctaUrl } = req.body;
   if (!content || !title) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
 
+  await ensureAdminTables();
+
+  const canExecute = await processSensitiveAction(req, 'broadcast_message', null, title, req.body, 'campaigns', 'create');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Votre diffusion a été mise en attente pour approbation par l\'Administrateur Principal.' });
+
   // Si scheduledAt est fourni et est dans le futur, on enregistre dans notification_campaigns avec le type 'broadcast'
   const now = new Date();
   const scheduledDate = scheduledAt ? new Date(scheduledAt) : now;
@@ -1610,7 +1657,7 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     let sentCount = 0;
 
     for (const email of emails) {
-      const userRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [email]);
+      const userRes = await query('SELECT id, full_name FROM public.profiles WHERE id = $1', [email]);
       const userName = userRes.rows[0]?.full_name || 'Utilisateur';
       if (userRes.rows.length > 0) {
         socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });

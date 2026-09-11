@@ -1672,6 +1672,7 @@
                     if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
                         user.allowedModules = myDelegation.modules;
                         user.collabRights = myDelegation.collab_admin_rights || {};
+                        user.granularPerms = myDelegation.granular_permissions || {}; // Persistence fix
                         localStorage.setItem('admin_user', JSON.stringify(user));
 
                         document.getElementById('main-container').classList.remove('hidden');
@@ -1868,6 +1869,7 @@
                     if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
                         user.allowedModules = myDelegation.modules;
                         user.collabRights = myDelegation.collab_admin_rights || {};
+                        user.granularPerms = myDelegation.granular_permissions || {}; // Persistence fix
                         localStorage.setItem('admin_user', JSON.stringify(user));
 
                         document.getElementById('main-container').classList.remove('hidden');
@@ -5223,12 +5225,24 @@
                 document.getElementById('delegations-list').innerHTML = res.data.data.map(d => {
                     const collabRightsStr = encodeURIComponent(JSON.stringify(d.collab_admin_rights || {}));
                     const userRightsStr = encodeURIComponent(JSON.stringify(d.user_admin_rights || {}));
+                    const granularPermsStr = encodeURIComponent(JSON.stringify(d.granular_permissions || {}));
+                    const reqApproval = d.requires_approval !== undefined ? d.requires_approval : true;
+
                     return `
                         <div class="bg-white p-6 rounded-[2rem] border border-gray-100 flex items-center justify-between shadow-sm animate-fade-in mb-2">
-                            <div class="flex items-center"><img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm"><div><p class="font-black text-gray-800">${d.full_name}</p><p class="text-xs text-gray-400 font-bold">${d.email}</p></div></div>
+                            <div class="flex items-center">
+                                <img src="${getFullUrl(d.avatar_url)}" class="w-12 h-12 rounded-2xl mr-4 shadow-sm">
+                                <div>
+                                    <p class="font-black text-gray-800">${d.full_name}</p>
+                                    <p class="text-xs text-gray-400 font-bold">${d.email}</p>
+                                    <div class="flex flex-wrap gap-1 mt-2">
+                                        ${d.modules.map(m => `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-lg text-[8px] font-black uppercase border border-indigo-100">${m}</span>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
                             <div class="flex items-center space-x-3">
                                 <span class="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">${d.is_active ? 'ACTIF' : 'RÉVOQUÉ'}</span>
-                                <button onclick="editDelegation('${d.user_id}', '${d.full_name}', '${d.modules.join(',')}', ${d.is_active}, '${collabRightsStr}', '${userRightsStr}')" class="p-3 bg-gray-50 text-gray-400 hover:text-purple-600 rounded-xl transition-all" title="Modifier les accès"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                                <button onclick="editDelegation('${d.user_id}', '${d.full_name}', '${d.modules.join(',')}', ${d.is_active}, '${collabRightsStr}', '${userRightsStr}', '${granularPermsStr}', ${reqApproval})" class="p-3 bg-gray-900 text-white rounded-xl shadow-lg hover:scale-105 transition-all" title="Gérer les accès réels"><i data-lucide="settings-2" class="w-4 h-4"></i></button>
                                 <button onclick="revokeDelegation('${d.user_id}', '${d.full_name}', ${d.is_active})" class="p-3 ${d.is_active ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'} rounded-xl hover:shadow-lg transition-all" title="${d.is_active ? 'Révoquer' : 'Rétablir'}"><i data-lucide="${d.is_active ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                             </div>
                         </div>
@@ -5510,29 +5524,29 @@
 
         function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "", userRightsStr = "", granularPermsStr = "", requiresApproval = true) {
             const allModules = [
-                { id: 'stats', label: 'Stats Globales', perms: [{id:'view', label:'Voir Stats'}] },
-                { id: 'users', label: 'Utilisateurs', perms: [{id:'view', label:'👁️ Voir'}, {id:'lock', label:'🚫 Bloquer'}, {id:'delete', label:'🗑️ Supprimer'}, {id:'verify', label:'✅ Vérifier'}, {id:'reset_pass', label:'🔑 Reset Pass'}] },
-                { id: 'groups', label: 'Groupes', perms: [{id:'read', label:'👁️ Voir'}, {id:'moderate', label:'🗑️ Supprimer Mess.'}, {id:'settings', label:'⚙️ Gérer'}, {id:'ban', label:'🔒 Bannir'}] },
-                { id: 'support', label: 'Support & Appeals', perms: [{id:'read', label:'👁️ Voir'}, {id:'reply', label:'💬 Répondre'}, {id:'resolve', label:'✅ Résoudre'}] },
-                { id: 'market-requests', label: 'Market & Boutiques', perms: [{id:'read', label:'👁️ Voir'}, {id:'approve', label:'🔍 Approuver'}, {id:'boost', label:'📈 Boost'}, {id:'delete', label:'🛑 Supprimer'}] },
-                { id: 'employer-requests', label: 'Recrutement (Emploi)', perms: [{id:'read', label:'👁️ Voir'}, {id:'approve', label:'🔍 Approuver'}, {id:'settings', label:'⚙️ Gérer'}] },
-                { id: 'school-admin', label: 'Gestion School', perms: [{id:'read', label:'👁️ Voir'}, {id:'approve', label:'🔍 Approuver'}, {id:'settings', label:'⚙️ Gérer'}, {id:'manage_accounts', label:'👥 Comptes'}] },
-                { id: 'accounts', label: 'Gestion des Comptes', perms: [{id:'read', label:'👁️ Voir'}, {id:'create', label:'➕ Créer'}, {id:'update', label:'📝 Éditer'}, {id:'delete', label:'🗑️ Supprimer'}, {id:'toggle_active', label:'🔘 Toggle Active'}] },
-                { id: 'collaboration', label: 'Collaboration Interne', perms: [{id:'read', label:'👁️ Voir'}, {id:'create_team', label:'➕ Créer Projets'}, {id:'manage_members', label:'👥 Gérer Membres'}, {id:'manage_teams', label:'⚙️ Gérer Projets'}] },
-                { id: 'portfolio', label: 'Portfolio Web', perms: [{id:'read', label:'👁️ Voir'}, {id:'edit_identity', label:'🆔 Identité'}, {id:'manage_skills', label:'🛠️ Skills'}, {id:'manage_team', label:'👥 Équipe'}, {id:'manage_services', label:'💼 Services'}, {id:'manage_pages', label:'📝 Pages'}, {id:'manage_quotes', label:'📋 Devis'}] },
-                { id: 'campaigns', label: 'Campagnes Push', perms: [{id:'read', label:'👁️ Voir'}, {id:'create', label:'➕ Créer'}, {id:'delete', label:'🗑️ Supprimer'}] },
-                { id: 'legal', label: 'Légal (CGU/Privacy)', perms: [{id:'read', label:'👁️ Voir'}, {id:'update', label:'📝 Mettre à jour'}] },
-                { id: 'config', label: 'Config App', perms: [{id:'read', label:'👁️ Voir'}, {id:'update', label:'📝 Mettre à jour'}] },
-                { id: 'audit', label: 'Audit (Logs)', perms: [{id:'read', label:'👁️ Voir'}] },
-                { id: 'approvals', label: 'Approbations', perms: [{id:'read', label:'👁️ Voir'}, {id:'process', label:'⚡ Traiter'}] },
-                { id: 'delegations', label: 'Délégations (Atribus)', perms: [{id:'read', label:'👁️ Voir'}, {id:'manage', label:'⚙️ Gérer'}] }
+                { id: 'stats', label: 'Stats Globales', icon: 'bar-chart-3', perms: [{id:'view', label:'Consulter', icon:'eye'}] },
+                { id: 'users', label: 'Utilisateurs', icon: 'users', perms: [{id:'view', label:'Consulter', icon:'eye'}, {id:'lock', label:'Bloquer', icon:'lock'}, {id:'delete', label:'Supprimer', icon:'trash-2'}, {id:'verify', label:'Vérifier', icon:'check-circle'}, {id:'reset_pass', label:'Reset MDP', icon:'key'}] },
+                { id: 'groups', label: 'Groupes', icon: 'message-square', perms: [{id:'read', label:'Lire', icon:'book-open'}, {id:'moderate', label:'Modérer', icon:'shield-alert'}, {id:'settings', label:'Gérer', icon:'settings'}, {id:'ban', label:'Bannir', icon:'user-x'}] },
+                { id: 'support', label: 'Support & Appeals', icon: 'help-circle', perms: [{id:'read', label:'Lire', icon:'eye'}, {id:'reply', label:'Répondre', icon:'message-circle'}, {id:'resolve', label:'Résoudre', icon:'check-square'}] },
+                { id: 'market-requests', label: 'Market & Boutiques', icon: 'shopping-bag', perms: [{id:'read', label:'Consulter', icon:'search'}, {id:'approve', label:'Approuver', icon:'check'}, {id:'boost', label:'Mettre en avant', icon:'zap'}, {id:'delete', label:'Supprimer', icon:'x-circle'}] },
+                { id: 'employer-requests', label: 'Recrutement', icon: 'briefcase', perms: [{id:'read', label:'Consulter', icon:'file-text'}, {id:'approve', label:'Approuver', icon:'check-square'}, {id:'settings', label:'Gérer', icon:'sliders'}] },
+                { id: 'school-admin', label: 'Gestion School', icon: 'graduation-cap', perms: [{id:'read', label:'Consulter', icon:'eye'}, {id:'approve', label:'Approuver', icon:'check-circle'}, {id:'settings', label:'Gérer', icon:'settings'}, {id:'manage_accounts', label:'Comptes', icon:'users'}] },
+                { id: 'accounts', label: 'Gestion des Comptes', icon: 'user-cog', perms: [{id:'read', label:'Consulter', icon:'list'}, {id:'create', label:'Créer', icon:'plus-circle'}, {id:'update', label:'Éditer', icon:'edit'}, {id:'delete', label:'Supprimer', icon:'trash'}, {id:'toggle_active', label:'Activer/Désact.', icon:'power'}] },
+                { id: 'collaboration', label: 'Collaboration Interne', icon: 'layers', perms: [{id:'read', label:'Voir Projets', icon:'folder'}, {id:'create_team', label:'Créer Projet', icon:'plus-square'}, {id:'manage_members', label:'Gérer Membres', icon:'user-plus'}, {id:'manage_teams', label:'Gérer Projets', icon:'tool'}] },
+                { id: 'portfolio', label: 'Portfolio Web', icon: 'globe', perms: [{id:'read', label:'Voir', icon:'layout'}, {id:'edit_identity', label:'Identité', icon:'fingerprint'}, {id:'manage_skills', label:'Skills', icon:'cpu'}, {id:'manage_team', label:'Équipe', icon:'users-2'}, {id:'manage_services', label:'Services', icon:'package'}, {id:'manage_pages', label:'Pages', icon:'file-code'}, {id:'manage_quotes', label:'Devis', icon:'clipboard-list'}] },
+                { id: 'campaigns', label: 'Campagnes Push', icon: 'send', perms: [{id:'read', label:'Voir', icon:'mail'}, {id:'create', label:'Créer', icon:'plus'}, {id:'delete', label:'Supprimer', icon:'trash-2'}] },
+                { id: 'legal', label: 'Légal', icon: 'scale', perms: [{id:'read', label:'Lire', icon:'eye'}, {id:'update', label:'Mise à jour', icon:'refresh-cw'}] },
+                { id: 'config', label: 'Config App', icon: 'cpu', perms: [{id:'read', label:'Lire', icon:'database'}, {id:'update', label:'Mise à jour', icon:'save'}] },
+                { id: 'audit', label: 'Audit (Logs)', icon: 'activity', perms: [{id:'read', label:'Consulter', icon:'history'}] },
+                { id: 'approvals', label: 'Approbations', icon: 'user-check', perms: [{id:'read', label:'Voir', icon:'clipboard-check'}, {id:'process', label:'Traiter', icon:'play-circle'}] },
+                { id: 'delegations', label: 'Délégations', icon: 'shield-check', perms: [{id:'read', label:'Voir', icon:'users'}, {id:'manage', label:'Gérer', icon:'key'}] }
             ];
             const currentModules = modules ? modules.split(',') : [];
             const granularPerms = granularPermsStr ? JSON.parse(decodeURIComponent(granularPermsStr)) : {};
 
             let html = `
                 <div class="space-y-6 text-left max-h-[75vh] overflow-y-auto pr-4 custom-scrollbar">
-                    <div class="p-8 bg-indigo-600 rounded-[3rem] text-white shadow-2xl shadow-indigo-100 flex items-center justify-between">
+                    <div class="p-8 bg-indigo-600 rounded-[3rem] text-white shadow-2xl shadow-indigo-200 flex items-center justify-between">
                         <div>
                             <p class="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Configuration des Accès</p>
                             <h4 class="text-2xl font-black uppercase italic tracking-tighter">${userName}</h4>
@@ -5556,7 +5570,7 @@
                                     <div class="flex items-center justify-between mb-6">
                                         <div class="flex items-center gap-4">
                                             <div class="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-indigo-600 shadow-sm group-hover:scale-110 transition-all">
-                                                <i data-lucide="shield" class="w-6 h-6"></i>
+                                                <i data-lucide="${m.icon}" class="w-6 h-6"></i>
                                             </div>
                                             <h5 class="font-black text-sm uppercase tracking-tight text-gray-900">${m.label}</h5>
                                         </div>
@@ -5568,8 +5582,11 @@
 
                                     <div id="perms-overlay-${m.id}" class="${isChecked ? 'grid' : 'hidden'} grid-cols-2 sm:grid-cols-3 gap-3 pl-4 border-l-2 border-indigo-100 animate-fade-in">
                                         ${m.perms.map(p => `
-                                            <div class="p-3 bg-white rounded-2xl border border-gray-100 flex items-center justify-between">
-                                                <span class="text-[9px] font-black text-gray-500 uppercase truncate pr-2">${p.label}</span>
+                                            <div class="p-3 bg-white rounded-2xl border border-gray-100 flex items-center justify-between hover:border-indigo-200 transition-all">
+                                                <div class="flex items-center gap-2 overflow-hidden">
+                                                    <i data-lucide="${p.icon}" class="w-3 h-3 text-gray-400 shrink-0"></i>
+                                                    <span class="text-[9px] font-black text-gray-500 uppercase truncate">${p.label}</span>
+                                                </div>
                                                 <label class="relative inline-flex items-center cursor-pointer scale-75">
                                                     <input type="checkbox" name="perm-${m.id}" value="${p.id}" ${modulePerms.includes(p.id) ? 'checked' : ''} class="sr-only peer">
                                                     <div class="w-10 h-5 bg-gray-100 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>

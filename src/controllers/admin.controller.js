@@ -2945,6 +2945,7 @@ module.exports = {
   getManagedAccounts,
   updateManagedAccount,
   deleteManagedAccount,
+  resetUserPassword,
   ensureAdminTables,
   processSensitiveAction
 };

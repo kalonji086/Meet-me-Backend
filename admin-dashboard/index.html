@@ -1851,7 +1851,75 @@
             axios.get(`${API_URL}/admin/delegations`, { headers: { Authorization: `Bearer ${token}` } })
                 .then(res => {
                     const myDelegation = res.data.data.find(d => d.user_id === user.id);
-                    // ... (rest of the standard logic follows)
+
+                    document.getElementById('login-container').classList.add('hidden');
+
+                    if (myDelegation && myDelegation.is_active && myDelegation.modules.length > 0) {
+                        user.allowedModules = myDelegation.modules;
+                        user.collabRights = myDelegation.collab_admin_rights || {};
+                        localStorage.setItem('admin_user', JSON.stringify(user));
+
+                        document.getElementById('main-container').classList.remove('hidden');
+                        document.getElementById('blocked-container').classList.add('hidden');
+                        document.getElementById('pending-collab-container').classList.add('hidden');
+                        initSocket();
+                        initRichEditors();
+                        filterSidebar(myDelegation.modules);
+                    } else {
+                        // No active delegation found, check for pending collaboration request
+                        axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
+                            .then(reqRes => {
+                                const myRequest = reqRes.data.data;
+                                const applyBtn = document.getElementById('apply-collab-btn');
+
+                                if (myRequest && myRequest.status === 'pending') {
+                                    if (applyBtn) {
+                                        applyBtn.innerText = "DEMANDE EN COURS D'EXAMEN";
+                                        applyBtn.disabled = true;
+                                        applyBtn.className = "w-full bg-gray-100 text-gray-400 py-5 rounded-2xl font-black uppercase text-xs tracking-widest cursor-not-allowed";
+                                    }
+
+                                    document.getElementById('main-container').classList.add('hidden');
+                                    document.getElementById('blocked-container').classList.add('hidden');
+                                    document.getElementById('pending-collab-container').classList.remove('hidden');
+                                    initSocket();
+                                } else {
+                                    if (applyBtn) {
+                                        applyBtn.innerText = "Demander une Collaboration";
+                                        applyBtn.disabled = false;
+                                        applyBtn.className = "w-full bg-cyan-50 text-white py-5 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest hover:bg-cyan-600 transition-all";
+                                    }
+
+                                    document.getElementById('main-container').classList.add('hidden');
+                                    document.getElementById('blocked-container').classList.remove('hidden');
+                                    document.getElementById('pending-collab-container').classList.add('hidden');
+                                    initSocket();
+                                }
+                            }).catch(() => {
+                                document.getElementById('blocked-container').classList.remove('hidden');
+                                initSocket();
+                            });
+                    }
+                }).catch(() => {
+                    // If delegation check fails (403), it means not an admin/delegate yet, check collab status
+                    axios.get(`${API_URL}/collab/my-status`, { headers: { Authorization: `Bearer ${token}` } })
+                        .then(reqRes => {
+                            const myRequest = reqRes.data.data;
+                            document.getElementById('login-container').classList.add('hidden');
+                            if (myRequest && myRequest.status === 'pending') {
+                                document.getElementById('main-container').classList.add('hidden');
+                                document.getElementById('blocked-container').classList.add('hidden');
+                                document.getElementById('pending-collab-container').classList.remove('hidden');
+                                initSocket();
+                            } else {
+                                document.getElementById('blocked-container').classList.remove('hidden');
+                                initSocket();
+                            }
+                        }).catch(() => {
+                            document.getElementById('login-container').classList.add('hidden');
+                            document.getElementById('blocked-container').classList.remove('hidden');
+                            initSocket();
+                        });
                 });
         }
 

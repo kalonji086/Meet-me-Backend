@@ -400,6 +400,32 @@ class MailService {
   }
 
   /**
+   * Envoyer un mot de passe temporaire suite à un reset admin
+   */
+  async sendPasswordResetEmail(email, name, tempPassword) {
+    const title = `Réinitialisation de votre mot de passe Meet Me`;
+    const content = `
+      <p>Bonjour <strong>${name}</strong>,</p>
+      <p>Un administrateur a réinitialisé votre mot de passe pour des raisons de sécurité ou suite à votre demande.</p>
+
+      <div style="background-color: #f7f7f7; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #eee; text-align: center;">
+        <p style="margin: 0; color: #666; font-size: 12px; text-transform: uppercase; font-weight: 900;">Nouveau Mot de Passe Temporaire</p>
+        <div style="background-color: #fff; padding: 15px; border-radius: 10px; display: inline-block; border: 1px dashed #673AB7; margin-top: 15px;">
+          <p style="margin: 0; font-size: 24px; font-weight: 900; color: #673AB7; letter-spacing: 2px;">${tempPassword}</p>
+        </div>
+      </div>
+
+      <p><strong>⚠️ IMPORTANT :</strong> Pour votre sécurité, vous devrez changer ce mot de passe immédiatement après votre connexion.</p>
+
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="https://meetme.cd/login" class="btn">SE CONNECTER MAINTENANT</a>
+      </div>
+    `;
+
+    return this.sendSystemEmail(email, "Votre nouveau mot de passe temporaire", content, 'amazon', name);
+  }
+
+  /**
    * Envoyer un email d'approbation Employeur
    */
   async sendEmployerApprovalEmail(email, name, companyName) {

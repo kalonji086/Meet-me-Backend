@@ -4286,11 +4286,12 @@
 
                     if (visibleColumns.includes('actions')) {
                         cols.push(`
-                            <td class="px-8 py-5 text-right space-x-2">
-                                <button onclick="toggleUserBadge('${u.id}', ${!u.is_verified})" class="p-3 ${u.is_verified ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'} rounded-xl hover:shadow-lg transition-all" title="${u.is_verified ? 'Retirer Badge' : 'Accorder Badge'}"><i data-lucide="${u.is_verified ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
-                                <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
-                                <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
-                                <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            <td class="px-8 py-5 text-right flex items-center justify-end gap-2">
+                                <button onclick="resetUserPasswordAction('${u.id}', '${u.full_name.replace(/'/g, "\\'")}')" class="p-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all ${hasPerm('users', 'reset_pass') ? '' : 'hidden'}" title="Réinitialiser MDP"><i data-lucide="key-round" class="w-4 h-4"></i></button>
+                                <button onclick="toggleUserBadge('${u.id}', ${!u.is_verified})" class="p-3 ${u.is_verified ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'} rounded-xl hover:shadow-lg transition-all ${hasPerm('users', 'verify') ? '' : 'hidden'}" title="${u.is_verified ? 'Retirer Badge' : 'Accorder Badge'}"><i data-lucide="${u.is_verified ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
+                                <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all ${hasPerm('collaboration', 'manage_members') ? '' : 'hidden'}" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
+                                <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all ${hasPerm('users', 'lock') ? '' : 'hidden'}"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
+                                <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all ${hasPerm('users', 'delete') ? '' : 'hidden'}" title="Supprimer définitivement"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </td>
                         `);
                     }
@@ -4323,6 +4324,19 @@
                     alert(e.response?.data?.error || "Erreur lors de la suppression.");
                 }
             }, "Supprimer", "red");
+        }
+
+        function resetUserPasswordAction(id, name) {
+            Alert.show("Sécurité", `Réinitialiser le mot de passe de <b>${name}</b> ? Un nouveau code temporaire lui sera envoyé.`, async () => {
+                try {
+                    const res = await axios.post(`${API_URL}/admin/users/${id}/reset-password`, {}, { headers: { Authorization: `Bearer ${token}` } });
+                    if (res.data.pending) alert(res.data.message);
+                    else toast("Mot de passe réinitialisé !", "success");
+                    closeImpactModal();
+                } catch (e) {
+                    alert(e.response?.data?.error || "Erreur lors de la réinitialisation.");
+                }
+            }, "Réinitialiser", "purple");
         }
 
         async function loadMarket() {

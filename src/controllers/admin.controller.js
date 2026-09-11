@@ -938,6 +938,16 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           await query('UPDATE public.profiles SET is_verified = $1 WHERE id = $2', [action.details.isVerified, action.target_id]);
           socketService.broadcast('admin:user_verification_updated', { userId: action.target_id, isVerified: action.details.isVerified });
           break;
+        case 'reset_password':
+          const tPass = crypto.randomBytes(4).toString('hex').toUpperCase();
+          const hPassReset = await bcrypt.hash(tPass, 10);
+          await query('UPDATE public.profiles SET password = $1, must_change_password = TRUE WHERE id = $2', [hPassReset, action.target_id]);
+          // On récupère le mail de la cible
+          const targetU = await query('SELECT email, full_name FROM public.profiles WHERE id = $1', [action.target_id]);
+          if (targetU.rows.length > 0) {
+              await mailService.sendPasswordResetEmail(targetU.rows[0].email, targetU.rows[0].full_name, tPass);
+          }
+          break;
         case 'delete_group':
           await query('DELETE FROM public.chats WHERE id = $1', [action.target_id]);
           socketService.broadcast('group_deleted', { chatId: action.target_id });
@@ -1265,6 +1275,35 @@ const toggleUserBadge = asyncHandler(async (req, res) => {
   socketService.broadcast('admin:user_verification_updated', { userId, isVerified });
 
   res.json({ success: true });
+});
+
+/**
+ * @desc    Réinitialiser le mot de passe d'un utilisateur
+ */
+const resetUserPassword = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const userRes = await query('SELECT full_name, email FROM public.profiles WHERE id = $1', [userId]);
+  if (!userRes.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  const user = userRes.rows[0];
+
+  const canExecute = await processSensitiveAction(req, 'reset_password', userId, user.full_name, {}, 'users', 'reset_pass');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de réinitialisation mise en attente.' });
+
+  // 1. Générer MDP
+  const tempPassword = crypto.randomBytes(4).toString('hex').toUpperCase();
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+  // 2. Maj DB
+  await query(
+    'UPDATE public.profiles SET password = $1, must_change_password = TRUE WHERE id = $2',
+    [hashedPassword, userId]
+  );
+
+  // 3. Envoyer Email
+  await mailService.sendPasswordResetEmail(user.email, user.full_name, tempPassword);
+
+  await logAdminAction(req, 'reset_password', 'user', userId, { email: user.email });
+  res.json({ success: true, message: 'Le mot de passe a été réinitialisé et envoyé par e-mail.' });
 });
 
 /**

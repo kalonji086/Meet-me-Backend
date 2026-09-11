@@ -5484,41 +5484,52 @@
             } catch (e) { alert("Erreur."); }
         }
 
+        function hasPerm(moduleId, permission) {
+            const user = JSON.parse(localStorage.getItem('admin_user'));
+            if (!user) return false;
+            if (user.isGlobalAdmin) return true; // L'Admin Global a tous les droits
+
+            const perms = user.granularPerms || {};
+            const modulePerms = perms[moduleId] || [];
+            return modulePerms.includes(permission);
+        }
+
         function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "", userRightsStr = "", granularPermsStr = "", requiresApproval = true) {
             const allModules = [
-                { id: 'stats', label: 'Stats Globales', perms: ['view'] },
-                { id: 'users', label: 'Utilisateurs', perms: ['view', 'lock', 'delete', 'verify', 'reset_pass'] },
-                { id: 'groups', label: 'Groupes', perms: ['read', 'moderate', 'settings', 'ban'] },
-                { id: 'support', label: 'Support & Appeals', perms: ['read', 'reply', 'resolve'] },
-                { id: 'market-requests', label: 'Market & Boutiques', perms: ['read', 'approve', 'boost', 'delete'] },
-                { id: 'employer-requests', label: 'Recrutement (Emploi)', perms: ['read', 'approve', 'settings'] },
-                { id: 'school-admin', label: 'Gestion School', perms: ['read', 'approve', 'settings', 'manage_accounts'] },
-                { id: 'accounts', label: 'Gestion des Comptes', perms: ['read', 'create', 'update', 'delete', 'toggle_active'] },
-                { id: 'collaboration', label: 'Collaboration Interne', perms: ['read', 'create_team', 'manage_members', 'manage_teams'] },
-                { id: 'portfolio', label: 'Portfolio Web', perms: ['read', 'edit_identity', 'manage_skills', 'manage_team', 'manage_services', 'manage_pages', 'manage_quotes'] },
-                { id: 'campaigns', label: 'Campagnes Push', perms: ['read', 'create', 'delete'] },
-                { id: 'legal', label: 'Légal (CGU/Privacy)', perms: ['read', 'update'] },
-                { id: 'config', label: 'Config App', perms: ['read', 'update'] },
-                { id: 'audit', label: 'Audit (Logs)', perms: ['read'] },
-                { id: 'approvals', label: 'Approbations', perms: ['read', 'process'] },
-                { id: 'delegations', label: 'Délégations (Atribus)', perms: ['read', 'manage'] }
+                { id: 'stats', label: 'Stats Globales', perms: [{id:'view', label:'Voir Stats'}] },
+                { id: 'users', label: 'Utilisateurs', perms: [{id:'view', label:'👁️ Voir'}, {id:'lock', label:'🚫 Bloquer'}, {id:'delete', label:'🗑️ Supprimer'}, {id:'verify', label:'✅ Vérifier'}, {id:'reset_pass', label:'🔑 Reset Pass'}] },
+                { id: 'groups', label: 'Groupes', perms: [{id:'read', label:'👁️ Voir'}, {id:'moderate', label:'🗑️ Supprimer Mess.'}, {id:'settings', label:'⚙️ Gérer'}, {id:'ban', label:'🔒 Bannir'}] },
+                { id: 'support', label: 'Support & Appeals', perms: [{id:'read', label:'👁️ Voir'}, {id:'reply', label:'💬 Répondre'}, {id:'resolve', label:'✅ Résoudre'}] },
+                { id: 'market-requests', label: 'Market & Boutiques', perms: [{id:'read', label:'👁️ Voir'}, {id:'approve', label:'🔍 Approuver'}, {id:'boost', label:'📈 Boost'}, {id:'delete', label:'🛑 Supprimer'}] },
+                { id: 'employer-requests', label: 'Recrutement (Emploi)', perms: [{id:'read', label:'👁️ Voir'}, {id:'approve', label:'🔍 Approuver'}, {id:'settings', label:'⚙️ Gérer'}] },
+                { id: 'school-admin', label: 'Gestion School', perms: [{id:'read', label:'👁️ Voir'}, {id:'approve', label:'🔍 Approuver'}, {id:'settings', label:'⚙️ Gérer'}, {id:'manage_accounts', label:'👥 Comptes'}] },
+                { id: 'accounts', label: 'Gestion des Comptes', perms: [{id:'read', label:'👁️ Voir'}, {id:'create', label:'➕ Créer'}, {id:'update', label:'📝 Éditer'}, {id:'delete', label:'🗑️ Supprimer'}, {id:'toggle_active', label:'🔘 Toggle Active'}] },
+                { id: 'collaboration', label: 'Collaboration Interne', perms: [{id:'read', label:'👁️ Voir'}, {id:'create_team', label:'➕ Créer Projets'}, {id:'manage_members', label:'👥 Gérer Membres'}, {id:'manage_teams', label:'⚙️ Gérer Projets'}] },
+                { id: 'portfolio', label: 'Portfolio Web', perms: [{id:'read', label:'👁️ Voir'}, {id:'edit_identity', label:'🆔 Identité'}, {id:'manage_skills', label:'🛠️ Skills'}, {id:'manage_team', label:'👥 Équipe'}, {id:'manage_services', label:'💼 Services'}, {id:'manage_pages', label:'📝 Pages'}, {id:'manage_quotes', label:'📋 Devis'}] },
+                { id: 'campaigns', label: 'Campagnes Push', perms: [{id:'read', label:'👁️ Voir'}, {id:'create', label:'➕ Créer'}, {id:'delete', label:'🗑️ Supprimer'}] },
+                { id: 'legal', label: 'Légal (CGU/Privacy)', perms: [{id:'read', label:'👁️ Voir'}, {id:'update', label:'📝 Mettre à jour'}] },
+                { id: 'config', label: 'Config App', perms: [{id:'read', label:'👁️ Voir'}, {id:'update', label:'📝 Mettre à jour'}] },
+                { id: 'audit', label: 'Audit (Logs)', perms: [{id:'read', label:'👁️ Voir'}] },
+                { id: 'approvals', label: 'Approbations', perms: [{id:'read', label:'👁️ Voir'}, {id:'process', label:'⚡ Traiter'}] },
+                { id: 'delegations', label: 'Délégations (Atribus)', perms: [{id:'read', label:'👁️ Voir'}, {id:'manage', label:'⚙️ Gérer'}] }
             ];
             const currentModules = modules ? modules.split(',') : [];
             const granularPerms = granularPermsStr ? JSON.parse(decodeURIComponent(granularPermsStr)) : {};
 
             let html = `
-                <div class="space-y-6 text-left max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
-                    <div class="p-6 bg-indigo-600 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 flex items-center justify-between">
+                <div class="space-y-6 text-left max-h-[75vh] overflow-y-auto pr-4 custom-scrollbar">
+                    <div class="p-8 bg-indigo-600 rounded-[3rem] text-white shadow-2xl shadow-indigo-100 flex items-center justify-between">
                         <div>
-                            <p class="text-[10px] font-black uppercase tracking-widest opacity-80">Configuration Délégué</p>
-                            <h4 class="text-xl font-black uppercase italic">${userName}</h4>
+                            <p class="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Configuration des Accès</p>
+                            <h4 class="text-2xl font-black uppercase italic tracking-tighter">${userName}</h4>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-[9px] font-black uppercase">Approbation forcée</span>
+                        <div class="flex flex-col items-end gap-2">
+                            <span class="text-[9px] font-black uppercase opacity-80">Contrôle de Sécurité</span>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="delegate-requires-approval" ${requiresApproval ? 'checked' : ''} class="sr-only peer">
-                                <div class="w-11 h-6 bg-indigo-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-white/20"></div>
+                                <div class="w-14 h-7 bg-indigo-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-white/30 border-2 border-transparent"></div>
                             </label>
+                            <span class="text-[8px] font-bold uppercase ${requiresApproval ? 'text-white' : 'text-indigo-200'}">${requiresApproval ? 'Approbation Forcée' : 'Exécution Directe'}</span>
                         </div>
                     </div>
 
@@ -5527,22 +5538,30 @@
                             const isChecked = currentModules.includes(m.id);
                             const modulePerms = granularPerms[m.id] || [];
                             return `
-                                <div class="p-5 bg-gray-50 rounded-[2rem] border border-gray-100 group">
-                                    <label class="flex items-center gap-3 cursor-pointer mb-4">
-                                        <input type="checkbox" value="${m.id}" ${isChecked ? 'checked' : ''} onchange="toggleModulePermsOverlay('${m.id}', this.checked)" class="mod-checkbox w-6 h-6 accent-indigo-600">
-                                        <span class="font-black text-sm uppercase tracking-tighter text-gray-900">${m.label}</span>
-                                    </label>
-
-                                    <div id="perms-overlay-${m.id}" class="${isChecked ? 'block' : 'hidden'} pl-8 space-y-3 border-l-2 border-indigo-100 ml-3 animate-fade-in">
-                                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Accès Spécifiques :</p>
-                                        <div class="grid grid-cols-2 gap-2">
-                                            ${m.perms.map(p => `
-                                                <label class="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded-xl transition-all">
-                                                    <input type="checkbox" name="perm-${m.id}" value="${p}" ${modulePerms.includes(p) ? 'checked' : ''} class="w-4 h-4 accent-indigo-500">
-                                                    <span class="text-[10px] font-bold text-gray-600 uppercase">${p}</span>
-                                                </label>
-                                            `).join('')}
+                                <div class="p-6 bg-gray-50 rounded-[2.5rem] border border-gray-100 transition-all hover:bg-white hover:shadow-xl group">
+                                    <div class="flex items-center justify-between mb-6">
+                                        <div class="flex items-center gap-4">
+                                            <div class="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-indigo-600 shadow-sm group-hover:scale-110 transition-all">
+                                                <i data-lucide="shield" class="w-6 h-6"></i>
+                                            </div>
+                                            <h5 class="font-black text-sm uppercase tracking-tight text-gray-900">${m.label}</h5>
                                         </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" value="${m.id}" ${isChecked ? 'checked' : ''} onchange="toggleModulePermsOverlay('${m.id}', this.checked)" class="mod-checkbox sr-only peer">
+                                            <div class="w-12 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                        </label>
+                                    </div>
+
+                                    <div id="perms-overlay-${m.id}" class="${isChecked ? 'grid' : 'hidden'} grid-cols-2 sm:grid-cols-3 gap-3 pl-4 border-l-2 border-indigo-100 animate-fade-in">
+                                        ${m.perms.map(p => `
+                                            <div class="p-3 bg-white rounded-2xl border border-gray-100 flex items-center justify-between">
+                                                <span class="text-[9px] font-black text-gray-500 uppercase truncate pr-2">${p.label}</span>
+                                                <label class="relative inline-flex items-center cursor-pointer scale-75">
+                                                    <input type="checkbox" name="perm-${m.id}" value="${p.id}" ${modulePerms.includes(p.id) ? 'checked' : ''} class="sr-only peer">
+                                                    <div class="w-10 h-5 bg-gray-100 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                </label>
+                                            </div>
+                                        `).join('')}
                                     </div>
                                 </div>
                             `;
@@ -5551,7 +5570,7 @@
                 </div>
             `;
 
-            Alert.show("Droits Délégué", html, async () => {
+            Alert.show("Configuration Délégué", html, async () => {
                 const selectedModules = Array.from(document.querySelectorAll('.mod-checkbox:checked')).map(cb => cb.value);
                 const reqApproval = document.getElementById('delegate-requires-approval').checked;
                 const permissions = {};
@@ -5567,9 +5586,10 @@
                         granularPermissions: permissions,
                         requiresApproval: reqApproval
                     }, { headers: { Authorization: `Bearer ${token}` } });
-                    toast("Délégation mise à jour !", "success"); closeImpactModal(); loadDelegations();
-                } catch (e) { alert("Erreur de sauvegarde."); }
-            }, "Mettre à jour les privilèges", "indigo");
+                    toast("Accès configurés avec succès !", "success"); closeImpactModal(); loadDelegations();
+                } catch (e) { alert("Erreur lors de la sauvegarde."); }
+            }, "Activer les Privilèges", "indigo");
+            lucide.createIcons();
         }
 
         function toggleModulePermsOverlay(moduleId, isChecked) {

@@ -1341,6 +1341,17 @@
                             </label>
                         </div>
                     </div>
+
+                    <div class="p-6 bg-gray-50 rounded-3xl border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Statut du compte</p>
+                            <p class="text-xs font-bold text-gray-700 mt-1">Accès au système</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="edit-acc-active" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="flex gap-4 mt-10">
@@ -1957,7 +1968,8 @@
                 'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration',
                 'moderation': 'nav-moderation', 'school-admin': 'nav-school-admin',
-                'portfolio': 'nav-portfolio', 'portfolios-saas': 'nav-portfolios-saas'
+                'portfolio': 'nav-portfolio', 'portfolios-saas': 'nav-portfolios-saas',
+                'accounts': 'nav-accounts'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
 
@@ -4546,6 +4558,9 @@
                             <span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest">${a.role}</span>
                         </td>
                         <td class="px-8 py-5 text-sm text-gray-500 font-bold">${a.school_name || '--'}</td>
+                        <td class="px-8 py-5 text-center text-[10px] font-black uppercase tracking-widest">
+                            <span class="${a.is_active ? 'text-emerald-500' : 'text-red-500'}">${a.is_active ? 'Actif' : 'Désactivé'}</span>
+                        </td>
                         <td class="px-8 py-5 text-center">
                             <div class="flex justify-center flex-wrap gap-1 max-w-[150px] mx-auto">
                                 ${a.allowed_modules && a.allowed_modules.length > 0 ? a.allowed_modules.map(m => `
@@ -4573,6 +4588,7 @@
                 document.getElementById('edit-acc-id').value = memberId;
                 document.getElementById('edit-acc-name').innerText = a.full_name;
                 document.getElementById('edit-acc-role').value = a.role;
+                document.getElementById('edit-acc-active').checked = !!a.is_active;
 
                 // Reset and set checkboxes
                 const checks = document.querySelectorAll('.acc-mod-check');
@@ -4592,6 +4608,7 @@
         async function saveAccountChanges() {
             const id = document.getElementById('edit-acc-id').value;
             const role = document.getElementById('edit-acc-role').value;
+            const is_active = document.getElementById('edit-acc-active').checked;
             const allowedModules = Array.from(document.querySelectorAll('.acc-mod-check:checked')).map(c => c.value);
 
             const btn = document.getElementById('btn-save-acc');
@@ -4601,7 +4618,7 @@
             lucide.createIcons();
 
             try {
-                await axios.put(`${API_URL}/admin/accounts/${id}`, { role, allowedModules }, { headers: { Authorization: `Bearer ${token}` } });
+                await axios.put(`${API_URL}/admin/accounts/${id}`, { role, allowedModules, is_active }, { headers: { Authorization: `Bearer ${token}` } });
                 toast("Compte mis à jour avec succès !", "success");
                 closeEditAccountModal();
                 loadAccounts();
@@ -5412,6 +5429,7 @@
                 { id: 'market-requests', label: 'Market & Boutiques', perms: ['read', 'approve', 'boost', 'delete'] },
                 { id: 'employer-requests', label: 'Recrutement (Emploi)', perms: ['read', 'approve', 'settings'] },
                 { id: 'school-admin', label: 'Gestion School', perms: ['read', 'approve', 'settings', 'manage_accounts'] },
+                { id: 'accounts', label: 'Gestion des Comptes', perms: ['read', 'create', 'update', 'delete', 'toggle_active'] },
                 { id: 'collaboration', label: 'Collaboration Interne', perms: ['read', 'create_team', 'manage_members', 'manage_teams'] },
                 { id: 'portfolio', label: 'Portfolio Web', perms: ['read', 'edit_identity', 'manage_skills', 'manage_team', 'manage_services', 'manage_pages', 'manage_quotes'] },
                 { id: 'campaigns', label: 'Campagnes Push', perms: ['read', 'create', 'delete'] },

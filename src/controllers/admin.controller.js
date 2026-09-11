@@ -1001,6 +1001,25 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           await query('UPDATE public.profiles SET collab_deleted_at = NOW(), is_collaborator = FALSE WHERE id = $1', [action.target_id]);
           await query('UPDATE public.admin_delegations SET is_active = FALSE WHERE user_id = $1', [action.target_id]);
           break;
+        case 'create_account':
+          // Re-use logic or manual
+          const { fullName: fName, email: fEmail, password: fPass, role: fRole, schoolId: fSchoolId, allowedModules: fModules, enrollmentDate: fDate, gender: fGender, country: fCountry } = action.details;
+          let uId;
+          const uRes = await query('SELECT id FROM public.profiles WHERE email = $1', [fEmail]);
+          if (uRes.rows.length === 0) {
+            const bc = require('bcryptjs');
+            const hPass = await bc.hash(fPass || 'MeetMe2024', 10);
+            const nP = await query('INSERT INTO public.profiles (full_name, email, password, gender, country, created_at, must_change_password) VALUES ($1, $2, $3, $4, $5, $6, TRUE) RETURNING id', [fName, fEmail, hPass, fGender || 'M', fCountry || 'RDC', fDate || new Date()]);
+            uId = nP.rows[0].id;
+          } else { uId = uRes.rows[0].id; }
+          if (fSchoolId) { await query('INSERT INTO public.school_members (school_id, user_id, role, is_active, allowed_modules, enrollment_date) VALUES ($1, $2, $3, TRUE, $4, $5) ON CONFLICT (school_id, user_id) DO UPDATE SET role = $3, allowed_modules = $4, enrollment_date = $5, is_active = TRUE', [fSchoolId, uId, fRole, fModules || [], fDate || new Date()]); }
+          break;
+        case 'update_account':
+          await query('UPDATE public.school_members SET role = COALESCE($1, role), allowed_modules = COALESCE($2, allowed_modules), is_active = COALESCE($3, is_active) WHERE id = $4', [action.details.role, action.details.allowedModules, action.details.is_active, action.target_id]);
+          break;
+        case 'delete_account':
+          await query('DELETE FROM public.school_members WHERE id = $1', [action.target_id]);
+          break;
         case 'collab_application':
           let applyTeamId = action.details.teamId;
           if (!applyTeamId || applyTeamId === 'null') {
@@ -2631,6 +2650,9 @@ const createManagedAccount = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Nom, Email et Rôle sont requis.' });
   }
 
+  const canExecute = await processSensitiveAction(req, 'create_account', null, fullName, req.body, 'accounts', 'create');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de création de compte mise en attente.' });
+
   try {
     // 1. Check or Create Profile
     let userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
@@ -2719,6 +2741,13 @@ const updateManagedAccount = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { role, allowedModules, is_active } = req.body;
 
+  const memberRes = await query('SELECT p.full_name FROM public.school_members sm JOIN public.profiles p ON sm.user_id = p.id WHERE sm.id = $1', [id]);
+  if (memberRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Compte non trouvé' });
+
+  const perm = is_active !== undefined ? 'toggle_active' : 'update';
+  const canExecute = await processSensitiveAction(req, 'update_account', id, memberRes.rows[0].full_name, req.body, 'accounts', perm);
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Mise à jour du compte mise en attente.' });
+
   const result = await query(
     `UPDATE public.school_members
      SET role = COALESCE($1, role),
@@ -2727,8 +2756,6 @@ const updateManagedAccount = asyncHandler(async (req, res) => {
      WHERE id = $4 RETURNING *`,
     [role, allowedModules, is_active, id]
   );
-
-  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Compte non trouvé' });
 
   const updated = result.rows[0];
 
@@ -2749,10 +2776,13 @@ const updateManagedAccount = asyncHandler(async (req, res) => {
 const deleteManagedAccount = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const check = await query('SELECT user_id, school_id FROM public.school_members WHERE id = $1', [id]);
+  const check = await query('SELECT sm.user_id, p.full_name FROM public.school_members sm JOIN public.profiles p ON sm.user_id = p.id WHERE sm.id = $1', [id]);
   if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Compte non trouvé' });
 
-  const { user_id } = check.rows[0];
+  const { user_id, full_name } = check.rows[0];
+
+  const canExecute = await processSensitiveAction(req, 'delete_account', id, full_name, { deleted: true }, 'accounts', 'delete');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression de compte mise en attente.' });
 
   await query('DELETE FROM public.school_members WHERE id = $1', [id]);
 

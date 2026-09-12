@@ -5519,6 +5519,12 @@
 
             const perms = user.granularPerms || {};
             const modulePerms = perms[moduleId] || [];
+
+            // Fix: Fallback for some modules
+            if (moduleId === 'support' || moduleId === 'appeals') {
+                return (perms['support'] || perms['appeals'] || []).includes(permission);
+            }
+
             return modulePerms.includes(permission);
         }
 

@@ -70,7 +70,7 @@ class MailService {
         <div style="display:none;font-size:1px;color:#333;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${preheader}</div>
         <div class="container">
           <div class="header">
-            <a href="#" class="logo">Meet Me</a>
+            <a href="#" class="logo">Together Tech Community</a>
           </div>
           <div class="content">
             <div class="title">${title}</div>
@@ -90,7 +90,7 @@ class MailService {
               <a href="https://meet-me-backend-sg5c.onrender.com/support/helpdesk">Support</a>
             </div>
             <div class="address">
-              © 2026 Meet Me Team. TOGETHE Tech Solutions.<br>
+              © 2026 Together Tech Community. TOGETHE Tech Solutions.<br>
               Kinshasa, République Démocratique du Congo.
             </div>
           </div>
@@ -124,7 +124,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = "Bienvenue sur Meet Me !";
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre aventure Meet Me commence ici.");
-    sendSmtpEmail.sender = { name: "Meet Me Team", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
     try {
@@ -155,7 +155,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = `${otp} est votre code Meet Me`;
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre code de sécurité Meet Me.");
-    sendSmtpEmail.sender = { name: "Meet Me Security", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email }];
 
     try {
@@ -269,7 +269,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = personalizedBody.includes(title) ? title : title; // title is usually plain text
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, title, theme);
-    sendSmtpEmail.sender = { name: "Meet Me Official", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
     try {
@@ -404,6 +404,8 @@ class MailService {
    */
   async sendPasswordResetEmail(email, name, tempPassword) {
     const title = `Réinitialisation de votre mot de passe Meet Me`;
+    const dashboardUrl = `https://meet-me-backend-sg5c.onrender.com/admin-portal`;
+
     const content = `
       <p>Bonjour <strong>${name}</strong>,</p>
       <p>Un administrateur a réinitialisé votre mot de passe pour des raisons de sécurité ou suite à votre demande.</p>
@@ -415,11 +417,13 @@ class MailService {
         </div>
       </div>
 
-      <p><strong>⚠️ IMPORTANT :</strong> Pour votre sécurité, vous devrez changer ce mot de passe immédiatement après votre connexion.</p>
+      <p><strong>⚠️ IMPORTANT :</strong> Pour votre sécurité, vous devez obligatoirement changer ce mot de passe dès votre connexion en utilisant le formulaire officiel ci-dessous.</p>
 
       <div style="text-align: center; margin-top: 30px;">
-        <a href="https://meetme.cd/login" class="btn">SE CONNECTER MAINTENANT</a>
+        <a href="${dashboardUrl}" class="btn" style="background-color: #673AB7; color: #ffffff !important;">ACCÉDER AU FORMULAIRE DE CHANGEMENT</a>
       </div>
+
+      <p style="margin-top: 20px; font-size: 13px; color: #666;">Si vous utilisez l'application mobile, vous serez également invité à changer votre mot de passe lors de l'ouverture.</p>
     `;
 
     return this.sendSystemEmail(email, "Votre nouveau mot de passe temporaire", content, 'amazon', name);

@@ -781,7 +781,9 @@ const logAdminAction = async (req, action, entityType, entityId, details = {}) =
 const getUsers = asyncHandler(async (req, res) => {
   await ensureAdminTables();
   // Security check: only global admin or authorized delegate can see users
-  if (!req.user.is_global_admin && !(req.user.user_rights && req.user.user_rights.see_all_users)) {
+  const hasViewPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions.users && req.user.granular_permissions.users.includes('view'));
+
+  if (!hasViewPerm) {
     return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir la liste des utilisateurs.' });
   }
 
@@ -800,6 +802,12 @@ const getUsers = asyncHandler(async (req, res) => {
 
 const getReports = asyncHandler(async (req, res) => {
   await ensureAdminTables();
+
+  const hasReadPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions.support && req.user.granular_permissions.support.includes('read'));
+  if (!hasReadPerm) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir les signalements.' });
+  }
+
   const result = await query(`
     SELECT r.*, p.full_name AS reporter_name, p.email AS reporter_email
     FROM public.reported_content r
@@ -1311,6 +1319,12 @@ const resetUserPassword = asyncHandler(async (req, res) => {
  */
 const getGroups = asyncHandler(async (req, res) => {
   await ensureAdminTables();
+
+  const hasReadPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions.groups && req.user.granular_permissions.groups.includes('read'));
+  if (!hasReadPerm) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir la liste des groupes.' });
+  }
+
   const result = await query(`
     SELECT c.*, p.full_name as creator_name,
     (SELECT COUNT(*) FROM public.chat_participants WHERE chat_id = c.id) as members_count
@@ -1458,6 +1472,11 @@ const removeGroupMember = asyncHandler(async (req, res) => {
  * @desc    Lister les contestations
  */
 const getAppeals = asyncHandler(async (req, res) => {
+  const hasReadPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions.support && req.user.granular_permissions.support.includes('read'));
+  if (!hasReadPerm) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir les contestations.' });
+  }
+
   const result = await query(`
     SELECT a.*, p.full_name, p.email, p.username, p.avatar_url
     FROM public.appeals a
@@ -1961,6 +1980,11 @@ const getVerificationRequests = asyncHandler(async (req, res) => {
  * @desc    Get all pending market business requests
  */
 const getMarketRequests = asyncHandler(async (req, res) => {
+  const hasReadPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions['market-requests'] && req.user.granular_permissions['market-requests'].includes('read'));
+  if (!hasReadPerm) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir les demandes Market.' });
+  }
+
   const result = await query(`
     SELECT mb.*, p.full_name as owner_name, p.email as owner_email
     FROM public.market_businesses mb
@@ -2536,6 +2560,11 @@ const deleteSchool = asyncHandler(async (req, res) => {
  * @route   GET /api/admin/employer-requests
  */
 const getEmployerRequests = asyncHandler(async (req, res) => {
+  const hasReadPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions['employer-requests'] && req.user.granular_permissions['employer-requests'].includes('read'));
+  if (!hasReadPerm) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir les demandes Employeur.' });
+  }
+
   const result = await query(`
     SELECT er.*, p.full_name as user_name, p.email as user_email
     FROM public.employer_requests er
@@ -2805,8 +2834,13 @@ const createManagedAccount = asyncHandler(async (req, res) => {
  * @route   GET /api/admin/accounts
  */
 const getManagedAccounts = asyncHandler(async (req, res) => {
+  const hasReadPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions.accounts && req.user.granular_permissions.accounts.includes('read'));
+  if (!hasReadPerm) {
+    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir les comptes gérés.' });
+  }
+
   const result = await query(`
-    SELECT sm.id as member_id, sm.role, sm.allowed_modules, sm.enrollment_date,
+    SELECT sm.id as member_id, sm.role, sm.allowed_modules, sm.enrollment_date, sm.is_active,
            p.id as user_id, p.full_name, p.email, p.avatar_url,
            s.name as school_name
     FROM public.school_members sm

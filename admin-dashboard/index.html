@@ -478,25 +478,55 @@
                             <div class="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
                                 <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter italic">Réseaux Sociaux (Suivez-nous)</h3>
                                 <div class="space-y-4">
+                                    <!-- Facebook -->
                                     <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <i data-lucide="facebook" class="w-5 h-5 text-blue-600"></i>
+                                        <div class="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                                            <img id="social-fb-icon-preview" src="" class="w-full h-full object-cover hidden">
+                                            <i id="social-fb-icon-fallback" data-lucide="facebook" class="w-5 h-5 text-blue-600"></i>
+                                        </div>
                                         <input type="text" id="social-facebook" placeholder="Lien Facebook..." class="flex-1 bg-transparent border-none outline-none font-bold text-xs">
+                                        <input type="file" id="social-fb-icon-input" class="hidden" onchange="previewPortfolioImg(this, 'social-fb-icon-preview')">
+                                        <button onclick="document.getElementById('social-fb-icon-input').click()" class="p-2 bg-white text-gray-400 rounded-lg hover:text-blue-600 transition-all"><i data-lucide="image" class="w-4 h-4"></i></button>
                                     </div>
+                                    <!-- Github -->
                                     <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <i data-lucide="github" class="w-5 h-5 text-gray-900"></i>
+                                        <div class="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                                            <img id="social-gh-icon-preview" src="" class="w-full h-full object-cover hidden">
+                                            <i id="social-gh-icon-fallback" data-lucide="github" class="w-5 h-5 text-gray-900"></i>
+                                        </div>
                                         <input type="text" id="social-github" placeholder="Lien GitHub..." class="flex-1 bg-transparent border-none outline-none font-bold text-xs">
+                                        <input type="file" id="social-gh-icon-input" class="hidden" onchange="previewPortfolioImg(this, 'social-gh-icon-preview')">
+                                        <button onclick="document.getElementById('social-gh-icon-input').click()" class="p-2 bg-white text-gray-400 rounded-lg hover:text-gray-900 transition-all"><i data-lucide="image" class="w-4 h-4"></i></button>
                                     </div>
+                                    <!-- WhatsApp -->
                                     <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <i data-lucide="message-circle" class="w-5 h-5 text-green-500"></i>
-                                        <input type="text" id="social-whatsapp" placeholder="Lien WhatsApp (wa.me/...)" class="flex-1 bg-transparent border-none outline-none font-bold text-xs">
+                                        <div class="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                                            <img id="social-wa-icon-preview" src="" class="w-full h-full object-cover hidden">
+                                            <i id="social-wa-icon-fallback" data-lucide="message-circle" class="w-5 h-5 text-green-500"></i>
+                                        </div>
+                                        <input type="text" id="social-whatsapp" placeholder="Lien WhatsApp..." class="flex-1 bg-transparent border-none outline-none font-bold text-xs">
+                                        <input type="file" id="social-wa-icon-input" class="hidden" onchange="previewPortfolioImg(this, 'social-wa-icon-preview')">
+                                        <button onclick="document.getElementById('social-wa-icon-input').click()" class="p-2 bg-white text-gray-400 rounded-lg hover:text-green-500 transition-all"><i data-lucide="image" class="w-4 h-4"></i></button>
                                     </div>
+                                    <!-- Instagram -->
                                     <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <i data-lucide="instagram" class="w-5 h-5 text-pink-600"></i>
+                                        <div class="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                                            <img id="social-ig-icon-preview" src="" class="w-full h-full object-cover hidden">
+                                            <i id="social-ig-icon-fallback" data-lucide="instagram" class="w-5 h-5 text-pink-600"></i>
+                                        </div>
                                         <input type="text" id="social-instagram" placeholder="Lien Instagram..." class="flex-1 bg-transparent border-none outline-none font-bold text-xs">
+                                        <input type="file" id="social-ig-icon-input" class="hidden" onchange="previewPortfolioImg(this, 'social-ig-icon-preview')">
+                                        <button onclick="document.getElementById('social-ig-icon-input').click()" class="p-2 bg-white text-gray-400 rounded-lg hover:text-pink-600 transition-all"><i data-lucide="image" class="w-4 h-4"></i></button>
                                     </div>
+                                    <!-- Twitter -->
                                     <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <i data-lucide="twitter" class="w-5 h-5 text-blue-400"></i>
+                                        <div class="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                                            <img id="social-tw-icon-preview" src="" class="w-full h-full object-cover hidden">
+                                            <i id="social-tw-icon-fallback" data-lucide="twitter" class="w-5 h-5 text-blue-400"></i>
+                                        </div>
                                         <input type="text" id="social-twitter" placeholder="Lien Twitter (X)..." class="flex-1 bg-transparent border-none outline-none font-bold text-xs">
+                                        <input type="file" id="social-tw-icon-input" class="hidden" onchange="previewPortfolioImg(this, 'social-tw-icon-preview')">
+                                        <button onclick="document.getElementById('social-tw-icon-input').click()" class="p-2 bg-white text-gray-400 rounded-lg hover:text-blue-400 transition-all"><i data-lucide="image" class="w-4 h-4"></i></button>
                                     </div>
                                 </div>
                             </div>
@@ -6112,6 +6142,12 @@
                     if (p.background_url) document.getElementById('port-bg-preview').src = getFullUrl(p.background_url);
                     if (p.hero_image_url) document.getElementById('port-hero-preview').src = getFullUrl(p.hero_image_url);
 
+                    if (p.social_facebook_icon) { document.getElementById('social-fb-icon-preview').src = getFullUrl(p.social_facebook_icon); document.getElementById('social-fb-icon-preview').classList.remove('hidden'); document.getElementById('social-fb-icon-fallback').classList.add('hidden'); }
+                    if (p.social_github_icon) { document.getElementById('social-gh-icon-preview').src = getFullUrl(p.social_github_icon); document.getElementById('social-gh-icon-preview').classList.remove('hidden'); document.getElementById('social-gh-icon-fallback').classList.add('hidden'); }
+                    if (p.social_whatsapp_icon) { document.getElementById('social-wa-icon-preview').src = getFullUrl(p.social_whatsapp_icon); document.getElementById('social-wa-icon-preview').classList.remove('hidden'); document.getElementById('social-wa-icon-fallback').classList.add('hidden'); }
+                    if (p.social_instagram_icon) { document.getElementById('social-ig-icon-preview').src = getFullUrl(p.social_instagram_icon); document.getElementById('social-ig-icon-preview').classList.remove('hidden'); document.getElementById('social-ig-icon-fallback').classList.add('hidden'); }
+                    if (p.social_twitter_icon) { document.getElementById('social-tw-icon-preview').src = getFullUrl(p.social_twitter_icon); document.getElementById('social-tw-icon-preview').classList.remove('hidden'); document.getElementById('social-tw-icon-fallback').classList.add('hidden'); }
+
                     document.getElementById('port-about-desc').value = p.about_description || "";
                     document.getElementById('port-bg-animation').value = p.background_animation || "none";
 
@@ -6229,6 +6265,12 @@
             const bgFile = document.getElementById('port-bg-input').files[0];
             const heroFile = document.getElementById('port-hero-input').files[0];
 
+            const fbIconFile = document.getElementById('social-fb-icon-input').files[0];
+            const ghIconFile = document.getElementById('social-gh-icon-input').files[0];
+            const waIconFile = document.getElementById('social-wa-icon-input').files[0];
+            const igIconFile = document.getElementById('social-ig-icon-input').files[0];
+            const twIconFile = document.getElementById('social-tw-icon-input').files[0];
+
             const aboutDescription = document.getElementById('port-about-desc').value;
             const backgroundAnimation = document.getElementById('port-bg-animation').value;
 
@@ -6241,27 +6283,23 @@
             try {
                 btn.disabled = true; btn.innerText = "Mise à jour...";
                 let logoUrl = null, aboutPhotoUrl = null, backgroundUrl = null, heroImageUrl = null;
+                let socialFacebookIcon = null, socialGithubIcon = null, socialWhatsappIcon = null, socialInstagramIcon = null, socialTwitterIcon = null;
 
-                if (logoFile) {
-                    const up = await apiService_upload(logoFile);
-                    if (up.success) logoUrl = up.data.fileUrl;
-                }
-                if (aboutFile) {
-                    const up = await apiService_upload(aboutFile);
-                    if (up.success) aboutPhotoUrl = up.data.fileUrl;
-                }
-                if (bgFile) {
-                    const up = await apiService_upload(bgFile);
-                    if (up.success) backgroundUrl = up.data.fileUrl;
-                }
-                if (heroFile) {
-                    const up = await apiService_upload(heroFile);
-                    if (up.success) heroImageUrl = up.data.fileUrl;
-                }
+                if (logoFile) { const up = await apiService_upload(logoFile); if (up.success) logoUrl = up.data.fileUrl; }
+                if (aboutFile) { const up = await apiService_upload(aboutFile); if (up.success) aboutPhotoUrl = up.data.fileUrl; }
+                if (bgFile) { const up = await apiService_upload(bgFile); if (up.success) backgroundUrl = up.data.fileUrl; }
+                if (heroFile) { const up = await apiService_upload(heroFile); if (up.success) heroImageUrl = up.data.fileUrl; }
+
+                if (fbIconFile) { const up = await apiService_upload(fbIconFile); if (up.success) socialFacebookIcon = up.data.fileUrl; }
+                if (ghIconFile) { const up = await apiService_upload(ghIconFile); if (up.success) socialGithubIcon = up.data.fileUrl; }
+                if (waIconFile) { const up = await apiService_upload(waIconFile); if (up.success) socialWhatsappIcon = up.data.fileUrl; }
+                if (igIconFile) { const up = await apiService_upload(igIconFile); if (up.success) socialInstagramIcon = up.data.fileUrl; }
+                if (twIconFile) { const up = await apiService_upload(twIconFile); if (up.success) socialTwitterIcon = up.data.fileUrl; }
 
                 await axios.put(`${API_URL}/portfolio/admin/profile`, {
                     logoUrl, aboutPhotoUrl, aboutDescription, backgroundUrl, backgroundAnimation, heroImageUrl,
-                    socialFacebook, socialGithub, socialWhatsapp, socialInstagram, socialTwitter
+                    socialFacebook, socialGithub, socialWhatsapp, socialInstagram, socialTwitter,
+                    socialFacebookIcon, socialGithubIcon, socialWhatsappIcon, socialInstagramIcon, socialTwitterIcon
                 }, { headers: { Authorization: `Bearer ${token}` } });
                 toast("Identité mise à jour", "success");
             } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "Mettre à jour l'identité"; }
@@ -6292,7 +6330,16 @@
         function previewPortfolioImg(input, previewId) {
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
-                reader.onload = (e) => document.getElementById(previewId).src = e.target.result;
+                reader.onload = (e) => {
+                    const preview = document.getElementById(previewId);
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+
+                    // Hide fallback if exists
+                    const fallbackId = previewId.replace('-preview', '-fallback');
+                    const fallback = document.getElementById(fallbackId);
+                    if (fallback) fallback.classList.add('hidden');
+                };
                 reader.readAsDataURL(input.files[0]);
             }
         }

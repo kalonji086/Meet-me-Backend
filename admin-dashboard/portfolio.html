@@ -686,15 +686,15 @@
             const socialContainer = document.getElementById('footer-social-links');
             if (socialContainer) {
                 const socials = [
-                    { id: 'facebook', url: p.social_facebook, icon: 'facebook', color: 'hover:bg-blue-600' },
-                    { id: 'github', url: p.social_github, icon: 'github', color: 'hover:bg-gray-800' },
-                    { id: 'whatsapp', url: p.social_whatsapp, icon: 'message-circle', color: 'hover:bg-green-500' },
-                    { id: 'instagram', url: p.social_instagram, icon: 'instagram', color: 'hover:bg-pink-600' },
-                    { id: 'twitter', url: p.social_twitter, icon: 'twitter', color: 'hover:bg-blue-400' }
+                    { id: 'facebook', url: p.social_facebook, icon: 'facebook', customIcon: p.social_facebook_icon, color: 'hover:bg-blue-600' },
+                    { id: 'github', url: p.social_github, icon: 'github', customIcon: p.social_github_icon, color: 'hover:bg-gray-800' },
+                    { id: 'whatsapp', url: p.social_whatsapp, icon: 'message-circle', customIcon: p.social_whatsapp_icon, color: 'hover:bg-green-500' },
+                    { id: 'instagram', url: p.social_instagram, icon: 'instagram', customIcon: p.social_instagram_icon, color: 'hover:bg-pink-600' },
+                    { id: 'twitter', url: p.social_twitter, icon: 'twitter', customIcon: p.social_twitter_icon, color: 'hover:bg-blue-400' }
                 ];
                 socialContainer.innerHTML = socials.filter(s => s.url).map(s => `
-                    <a href="${s.url}" target="_blank" class="w-10 h-10 md:w-12 md:h-12 glass rounded-2xl flex items-center justify-center text-gray-500 hover:text-white ${s.color} transition-all">
-                        <i data-lucide="${s.icon}" class="w-5 h-5"></i>
+                    <a href="${s.url}" target="_blank" class="w-10 h-10 md:w-12 md:h-12 glass rounded-2xl flex items-center justify-center text-gray-500 hover:text-white ${s.color} transition-all overflow-hidden p-2">
+                        ${s.customIcon ? `<img src="${getFullUrl(s.customIcon)}" class="w-full h-full object-contain">` : `<i data-lucide="${s.icon}" class="w-5 h-5"></i>`}
                     </a>
                 `).join('');
                 lucide.createIcons();

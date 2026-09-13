@@ -619,6 +619,12 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS social_instagram TEXT');
     await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS social_twitter TEXT');
 
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS social_facebook_icon TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS social_github_icon TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS social_whatsapp_icon TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS social_instagram_icon TEXT');
+    await query('ALTER TABLE public.web_portfolio_profile ADD COLUMN IF NOT EXISTS social_twitter_icon TEXT');
+
     // Portfolio Pages (Policy, Terms, etc.)
     await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_pages (

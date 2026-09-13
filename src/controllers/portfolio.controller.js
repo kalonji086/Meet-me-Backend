@@ -419,7 +419,9 @@ const updateProfileAdmin = asyncHandler(async (req, res) => {
     footerCommunity, footerContact, backgroundUrl,
     backgroundAnimation, heroImageUrl,
     socialFacebook, socialGithub, socialWhatsapp,
-    socialInstagram, socialTwitter
+    socialInstagram, socialTwitter,
+    socialFacebookIcon, socialGithubIcon, socialWhatsappIcon,
+    socialInstagramIcon, socialTwitterIcon
   } = req.body;
 
   const portfolioId = await getManagedPortfolioId(req);
@@ -443,8 +445,13 @@ const updateProfileAdmin = asyncHandler(async (req, res) => {
          social_whatsapp = COALESCE($14, social_whatsapp),
          social_instagram = COALESCE($15, social_instagram),
          social_twitter = COALESCE($16, social_twitter),
+         social_facebook_icon = COALESCE($17, social_facebook_icon),
+         social_github_icon = COALESCE($18, social_github_icon),
+         social_whatsapp_icon = COALESCE($19, social_whatsapp_icon),
+         social_instagram_icon = COALESCE($20, social_instagram_icon),
+         social_twitter_icon = COALESCE($21, social_twitter_icon),
          updated_at = NOW()
-     WHERE portfolio_id = $17 RETURNING *`,
+     WHERE portfolio_id = $22 RETURNING *`,
     [
       logoUrl, aboutPhotoUrl, aboutDescription,
       footerPolicy, footerConditions, footerBlog,
@@ -452,6 +459,8 @@ const updateProfileAdmin = asyncHandler(async (req, res) => {
       backgroundAnimation, heroImageUrl,
       socialFacebook, socialGithub, socialWhatsapp,
       socialInstagram, socialTwitter,
+      socialFacebookIcon, socialGithubIcon, socialWhatsappIcon,
+      socialInstagramIcon, socialTwitterIcon,
       portfolioId
     ]
   );

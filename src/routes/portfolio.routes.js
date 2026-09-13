@@ -44,15 +44,15 @@ router.put('/admin/:id/status', isAdmin, portfolioController.togglePortfolioStat
 router.delete('/admin/:id', isAdmin, portfolioController.deletePortfolio);
 
 // Portfolio Management (Any authorized admin/owner)
-router.post('/admin/skills', portfolioController.manageSkill);
-router.post('/admin/experiences', portfolioController.manageExperience);
-router.post('/admin/services', portfolioController.manageService);
-router.post('/admin/team', portfolioController.manageTeam);
-router.post('/admin/pages', portfolioController.managePage);
-router.put('/admin/profile', portfolioController.updateProfileAdmin);
-router.get('/admin/quotes', portfolioController.getQuotes);
-router.put('/admin/quotes/:id', portfolioController.updateQuoteStatusAdmin);
-router.post('/admin/quotes/:id/reply', portfolioController.replyToQuote);
-router.put('/admin/quotes/:id/contract', portfolioController.updateContract);
+router.post('/admin/skills', isAdmin, portfolioController.manageSkill);
+router.post('/admin/experiences', isAdmin, portfolioController.manageExperience);
+router.post('/admin/services', isAdmin, portfolioController.manageService);
+router.post('/admin/team', isAdmin, portfolioController.manageTeam);
+router.post('/admin/pages', isAdmin, portfolioController.managePage);
+router.put('/admin/profile', isAdmin, portfolioController.updateProfileAdmin);
+router.get('/admin/quotes', isAdmin, portfolioController.getQuotes);
+router.put('/admin/quotes/:id', isAdmin, portfolioController.updateQuoteStatusAdmin);
+router.post('/admin/quotes/:id/reply', isAdmin, portfolioController.replyToQuote);
+router.put('/admin/quotes/:id/contract', isAdmin, portfolioController.updateContract);
 
 module.exports = router;

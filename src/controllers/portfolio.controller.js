@@ -9,7 +9,7 @@ const mailService = require('../services/mail.service');
  * Helper: Get the portfolio ID managed by the current user
  */
 const getManagedPortfolioId = async (req) => {
-  if (req.user.is_global_admin) {
+  if (req.user.is_global_admin || (req.user.is_delegated && req.user.allowed_modules && req.user.allowed_modules.includes('portfolio'))) {
     return '00000000-0000-0000-0000-000000000000';
   }
   const res = await query('SELECT id FROM public.web_portfolios WHERE user_id = $1 LIMIT 1', [req.userId]);
@@ -426,6 +426,11 @@ const updateProfileAdmin = asyncHandler(async (req, res) => {
 
   const portfolioId = await getManagedPortfolioId(req);
   if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
+
+  // Security: Check if delegated admin needs approval
+  const adminController = require('./admin.controller');
+  const canExecute = await adminController.processSensitiveAction(req, 'update_portfolio_identity', portfolioId, 'Portfolio Identity', req.body, 'portfolio', 'edit_identity');
+  if (!canExecute) return res.json({ success: true, pending: true, message: 'Votre mise à jour d\'identité a été envoyée pour approbation à l\'Administrateur Principal.' });
 
   const result = await query(
     `UPDATE public.web_portfolio_profile

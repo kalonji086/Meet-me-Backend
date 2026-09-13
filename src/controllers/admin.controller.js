@@ -741,6 +741,40 @@ const ensureAdminTables = async () => {
       );
     `);
 
+    // --- COMMUNITY SOCIAL SYSTEM ---
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.community_posts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        portfolio_id UUID REFERENCES public.web_portfolios(id) ON DELETE CASCADE,
+        author_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        author_name TEXT,
+        content TEXT NOT NULL,
+        image_url TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS public.community_post_likes (
+        post_id UUID REFERENCES public.community_posts(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        PRIMARY KEY (post_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS public.community_post_comments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id UUID REFERENCES public.community_posts(id) ON DELETE CASCADE,
+        author_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        author_name TEXT,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS public.community_subscriptions (
+        subscriber_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        target_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        PRIMARY KEY (subscriber_id, target_id)
+      );
+    `);
+
     // Ensure columns exist if table was already created
     try {
       await query('ALTER TABLE public.web_portfolio_requests ADD COLUMN IF NOT EXISTS logo_url TEXT');

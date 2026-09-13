@@ -23,6 +23,14 @@ router.get('/community/members', portfolioController.getCommunityMembers);
 
 // Request a new portfolio (Publicly accessible)
 const uploadController = require('../controllers/upload.controller');
+
+// Community Social Routes
+router.get('/:slug/posts', portfolioController.getCommunityPosts);
+router.post('/community/posts', portfolioController.createCommunityPost);
+router.post('/community/posts/:postId/like', portfolioController.likeCommunityPost);
+router.post('/community/posts/:postId/comment', portfolioController.commentCommunityPost);
+router.post('/community/support', portfolioController.submitCommunitySupport);
+
 router.post('/upload-logo', uploadController.uploadMiddleware.singleFile, (req, res, next) => {
     // Public upload for logo
     req.userId = '00000000-0000-0000-0000-000000000000'; // System ID

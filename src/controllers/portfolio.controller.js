@@ -308,14 +308,95 @@ const updateSpecs = asyncHandler(async (req, res) => {
 });
 
 const submitQuote = asyncHandler(async (req, res) => {
-  const { clientName, clientEmail, projectDescription, budget, specifications } = req.body;
+  const { clientName, clientEmail, projectDescription, budget, specifications, portfolioId } = req.body;
   if (!clientName || !clientEmail) return res.status(400).json({ error: 'Nom et Email requis' });
   const result = await query(
-    `INSERT INTO public.web_portfolio_quotes (client_name, client_email, project_description, budget, specifications)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [clientName, clientEmail, projectDescription, budget, specifications]
+    `INSERT INTO public.web_portfolio_quotes (client_name, client_email, project_description, budget, specifications, portfolio_id)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [clientName, clientEmail, projectDescription, budget, specifications, portfolioId || '00000000-0000-0000-0000-000000000000']
   );
+
+  const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
+  if (mainAdmin.rows.length > 0) {
+      socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_web_quote', result.rows[0]);
+  }
+
   res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+// --- NEW COMMUNITY SOCIAL LOGIC ---
+
+const getCommunityPosts = asyncHandler(async (req, res) => {
+    const { slug } = req.params;
+    const portfolio = await query('SELECT id FROM public.web_portfolios WHERE slug = $1', [slug || 'together']);
+    if (portfolio.rows.length === 0) return res.status(404).json({ error: 'Portfolio non trouvé' });
+    const pId = portfolio.rows[0].id;
+
+    const result = await query(`
+        SELECT p.*,
+        (SELECT count(*) FROM public.community_post_likes WHERE post_id = p.id) as likes_count,
+        (SELECT count(*) FROM public.community_post_comments WHERE post_id = p.id) as comments_count
+        FROM public.community_posts p
+        WHERE p.portfolio_id = $1
+        ORDER BY p.created_at DESC`, [pId]);
+    res.json({ success: true, data: result.rows });
+});
+
+const createCommunityPost = asyncHandler(async (req, res) => {
+    const { slug, content, imageUrl, authorName } = req.body;
+    const portfolio = await query('SELECT id FROM public.web_portfolios WHERE slug = $1', [slug || 'together']);
+    if (portfolio.rows.length === 0) return res.status(404).json({ error: 'Portfolio non trouvé' });
+    const pId = portfolio.rows[0].id;
+
+    const result = await query(
+        `INSERT INTO public.community_posts (portfolio_id, author_name, content, image_url)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [pId, authorName || 'Visiteur', content, imageUrl]
+    );
+
+    socketService.broadcast('community:new_post', { ...result.rows[0], slug });
+    res.json({ success: true, data: result.rows[0] });
+});
+
+const likeCommunityPost = asyncHandler(async (req, res) => {
+    const { postId } = req.params;
+    const userId = req.userId || '00000000-0000-0000-0000-000000000000'; // Fallback for public likes if needed, but best with auth
+
+    await query('INSERT INTO public.community_post_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [postId, userId]);
+    const count = await query('SELECT count(*) FROM public.community_post_likes WHERE post_id = $1', [postId]);
+
+    socketService.broadcast('community:post_liked', { postId, likes: count.rows[0].count });
+    res.json({ success: true, likes: count.rows[0].count });
+});
+
+const commentCommunityPost = asyncHandler(async (req, res) => {
+    const { postId } = req.params;
+    const { content, authorName } = req.body;
+
+    const result = await query(
+        'INSERT INTO public.community_post_comments (post_id, author_name, content) VALUES ($1, $2, $3) RETURNING *',
+        [postId, authorName || 'Anonyme', content]
+    );
+
+    socketService.broadcast('community:new_comment', { postId, comment: result.rows[0] });
+    res.json({ success: true, data: result.rows[0] });
+});
+
+const submitCommunitySupport = asyncHandler(async (req, res) => {
+    const { email, name, subject, message } = req.body;
+    // Create an appeal record for admin
+    const result = await query(
+        `INSERT INTO public.appeals (contact_email, type, category, reason, status)
+         VALUES ($1, 'helpdesk', 'support_community', $2, 'pending') RETURNING *`,
+        [email, `[${subject}] ${message}`]
+    );
+
+    const mainAdmin = await query('SELECT id FROM public.profiles WHERE email = $1', ['wecanconcept@gmail.com']);
+    if (mainAdmin.rows.length > 0) {
+        socketService.sendToUser(mainAdmin.rows[0].id, 'admin:new_appeal', result.rows[0]);
+    }
+
+    res.json({ success: true, message: 'Votre ticket de support a été créé. Un administrateur vous répondra par mail.' });
 });
 
 // --- ADMIN CRUD ---

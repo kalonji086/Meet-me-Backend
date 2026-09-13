@@ -327,8 +327,30 @@
                     <div id="pinned-messages-list" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"></div>
                 </div>
 
-                <div id="discord-messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar">
-                    <div id="discord-messages-list" class="space-y-6"></div>
+                <!-- Chat Messages -->
+                <div id="chat-messages-view" class="flex-1 flex flex-col min-h-0">
+                    <div id="discord-messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar">
+                        <div id="discord-messages-list" class="space-y-6"></div>
+                    </div>
+                </div>
+
+                <!-- Social Feed View -->
+                <div id="social-feed-view" class="hidden flex-1 flex flex-col min-h-0">
+                    <div class="p-6 border-b border-white/5 shrink-0">
+                        <div class="bg-[#383a40] rounded-2xl p-4 flex flex-col gap-4 shadow-lg border border-white/5">
+                            <textarea id="new-post-content" placeholder="Partagez quelque chose avec la communauté..." class="bg-transparent border-none outline-none text-white text-sm font-medium resize-none" rows="2"></textarea>
+                            <div class="flex justify-between items-center">
+                                <div class="flex gap-4 text-gray-400">
+                                    <button class="hover:text-white transition-all"><i data-lucide="image" class="w-5 h-5"></i></button>
+                                    <button class="hover:text-white transition-all"><i data-lucide="video" class="w-5 h-5"></i></button>
+                                </div>
+                                <button onclick="createPost()" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all">Publier</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="social-posts-container" class="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                        <div id="social-posts-list" class="max-w-2xl mx-auto space-y-8"></div>
+                    </div>
                 </div>
 
                 <div class="px-2 md:px-4 pb-4 md:pb-6 shrink-0 space-y-2">
@@ -547,7 +569,98 @@
             } catch (e) {}
         }
 
-        async function selectDiscordGroup(id, name) { activeDiscordGroupId = id; document.querySelectorAll('.discord-server-icon').forEach(el => el.classList.remove('active')); document.getElementById('discord-group-' + id)?.classList.add('active'); document.getElementById('active-group-title').innerText = name.toLowerCase(); loadDiscordMessages(id); if (window.innerWidth < 768) toggleDiscordChannels(); }
+        async function selectDiscordGroup(id, name) {
+            activeDiscordGroupId = id;
+            document.querySelectorAll('.discord-server-icon').forEach(el => el.classList.remove('active'));
+            document.getElementById('discord-group-' + id)?.classList.add('active');
+            document.getElementById('active-group-title').innerText = name.toLowerCase();
+
+            // Switch view based on group name (Social vs Chat)
+            if (name.toLowerCase().includes('actualité') || name.toLowerCase().includes('feed')) {
+                document.getElementById('social-feed-view').classList.remove('hidden');
+                document.getElementById('chat-messages-view').classList.add('hidden');
+                loadSocialPosts();
+            } else {
+                document.getElementById('social-feed-view').classList.add('hidden');
+                document.getElementById('chat-messages-view').classList.remove('hidden');
+                loadDiscordMessages(id);
+            }
+
+            if (window.innerWidth < 768) toggleDiscordChannels();
+        }
+
+        async function loadSocialPosts() {
+            try {
+                const res = await axios.get(`${API_BASE}/${portfolioSlug}/posts`);
+                const posts = res.data.data;
+                document.getElementById('social-posts-list').innerHTML = posts.map(p => `
+                    <div class="bg-[#2b2d31] rounded-2xl border border-white/5 overflow-hidden shadow-xl animate-fade-in">
+                        <div class="p-4 flex items-center gap-3 border-b border-white/5">
+                            <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center font-black text-xs text-white">${p.author_name.charAt(0)}</div>
+                            <div>
+                                <p class="text-sm font-black text-white">${p.author_name}</p>
+                                <p class="text-[9px] text-gray-500 uppercase font-bold">${timeAgo(p.created_at)}</p>
+                            </div>
+                        </div>
+                        <div class="p-5">
+                            <p class="text-gray-300 text-sm leading-relaxed mb-4">${p.content}</p>
+                            ${p.image_url ? `<img src="${getFullUrl(p.image_url)}" class="w-full rounded-xl mb-4 border border-white/5 shadow-lg">` : ''}
+                        </div>
+                        <div class="px-5 py-3 bg-black/10 flex items-center gap-6 border-t border-white/5">
+                            <button onclick="likePost('${p.id}')" class="flex items-center gap-2 text-gray-400 hover:text-red-500 transition-all group">
+                                <i data-lucide="heart" class="w-4 h-4 group-hover:fill-current"></i>
+                                <span class="text-[10px] font-black">${p.likes_count}</span>
+                            </button>
+                            <button onclick="focusComment('${p.id}')" class="flex items-center gap-2 text-gray-400 hover:text-indigo-400 transition-all">
+                                <i data-lucide="message-square" class="w-4 h-4"></i>
+                                <span class="text-[10px] font-black">${p.comments_count}</span>
+                            </button>
+                        </div>
+                    </div>
+                `).join('') || '<div class="text-center py-20 opacity-30 uppercase font-black text-xs">Aucun poste pour le moment</div>';
+                lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function createPost() {
+            const content = document.getElementById('new-post-content').value.trim();
+            if (!content) return;
+            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+            try {
+                await axios.post(`${API_BASE}/community/posts`, { slug: portfolioSlug, content, authorName: visitorName });
+                document.getElementById('new-post-content').value = "";
+                loadSocialPosts();
+            } catch (e) { alert("Erreur envoi poste"); }
+        }
+
+        async function likePost(postId) {
+            try { await axios.post(`${API_BASE}/community/posts/${postId}/like`); loadSocialPosts(); } catch (e) {}
+        }
+
+        async function requestLiveSupport() {
+            const name = prompt("Votre Nom complet :");
+            if (!name) return;
+            const email = prompt("Votre Email :");
+            if (!email) return;
+            const msg = prompt("Décrivez votre problème :");
+            if (!msg) return;
+
+            try {
+                await axios.post(`${API_BASE}/community/support`, { name, email, subject: "Support Communauté", message: msg });
+                alert("Votre ticket a été créé ! Un admin vous contactera sur " + email);
+            } catch (e) { alert("Erreur création ticket"); }
+        }
+
+        function timeAgo(date) {
+            const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+            if (seconds < 60) return "À l'instant";
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + "m";
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + "h";
+            return Math.floor(hours / 24) + "j";
+        }
+
         async function loadDiscordMessages(groupId) { try { const res = await axios.get(`${API_BASE}/community/groups/${groupId}/messages`); renderDiscordMessages(res.data.data); } catch (e) {} }
 
         function renderDiscordMessages(messages) {
@@ -629,6 +742,10 @@
             if (typeof io === 'undefined') return;
             socket = io();
             socket.on('community:new_message', (msg) => { if (activeDiscordGroupId === msg.chat_id) loadDiscordMessages(activeDiscordGroupId); });
+            socket.on('community:new_post', (post) => { if (activePage === 'community') loadSocialPosts(); });
+            socket.on('community:post_liked', (data) => { if (activePage === 'community') loadSocialPosts(); });
+            socket.on('community:new_comment', (data) => { if (activePage === 'community') loadSocialPosts(); });
+            socket.on('portfolio:data_updated', (data) => { if (data.portfolioId === '00000000-0000-0000-0000-000000000000' || portfolioSlug === 'together') loadData(); });
             socket.on('admin_user_login', () => loadDiscordMembersList());
             socket.on('admin_user_logout', () => loadDiscordMembersList());
         }
@@ -663,7 +780,27 @@
         function renderTeam(team) { document.getElementById('team-grid').innerHTML = team.map(m => `<div class="group flex flex-col items-center"><div class="relative w-full aspect-[3/4] rounded-[2rem] md:rounded-[3.5rem] overflow-hidden glass mb-4 sm:mb-8"><img src="${getFullUrl(m.image_url)}" class="w-full h-full object-cover transition-all group-hover:scale-110"><div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] to-transparent opacity-80"></div><div class="absolute bottom-4 left-4 md:bottom-8 md:left-8 right-4 md:right-8"><p class="text-[8px] md:text-[10px] font-black text-cyan-400 uppercase tracking-widest">${m.role}</p><h4 class="text-xl md:text-3xl font-black text-white uppercase truncate">${m.name}</h4></div></div><p class="text-gray-500 text-xs text-center line-clamp-2">${m.bio || ''}</p></div>`).join(''); }
         function renderSkills(skills) { document.getElementById('skills-grid').innerHTML = skills.map(s => `<div class="glass p-6 md:p-12 rounded-[2rem] md:rounded-[3.5rem] border-white/5 hover:border-cyan-500/40 transition-all hover:scale-105 group relative overflow-hidden"><div class="flex justify-between items-start mb-6 md:mb-10"><div class="w-12 h-12 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-white/10 shadow-2xl">${s.image_url ? `<img src="${getFullUrl(s.image_url)}" class="w-full h-full object-cover">` : `<i data-lucide="terminal" class="w-6 h-6 md:w-10 md:h-10 text-cyan-400"></i>`}</div><span class="text-[10px] md:text-xs font-black text-gray-600">${s.level}%</span></div><p class="font-black text-sm md:text-xl uppercase text-white truncate">${s.name}</p><div class="w-full h-1 md:h-1.5 bg-white/5 rounded-full mt-4 md:mt-6 overflow-hidden"><div class="h-full bg-gradient-to-r from-cyan-500 to-purple-500" style="width: ${s.level}%"></div></div></div>`).join(''); }
         function renderExperiences(exps) { document.getElementById('experience-timeline').innerHTML = exps.map((e) => `<div class="flex flex-col md:flex-row gap-8 md:gap-20 group"><div class="md:w-56 pt-2 md:pt-8 flex flex-col items-center md:items-end text-center md:text-right"><span class="text-sm md:text-lg font-black uppercase text-gradient mb-2">${e.period}</span><div class="w-12 md:w-20 h-0.5 md:h-1 bg-white/5 rounded-full group-hover:bg-cyan-500 transition-all"></div></div><div class="flex-1 pb-16 md:pb-32 border-l border-white/5 pl-8 md:pl-20 relative"><div class="absolute -left-[9px] top-4 md:top-8 w-4 h-4 bg-[#0a0a0c] border-2 border-cyan-500 rounded-full group-hover:scale-150 transition-all"></div><div class="flex flex-col sm:flex-row gap-6 md:gap-12 items-start mb-8 md:mb-12">${e.logo_url ? `<div class="w-20 h-20 md:w-40 md:h-40 rounded-3xl overflow-hidden bg-white p-2 md:p-3 shadow-2xl"><img src="${getFullUrl(e.logo_url)}" class="w-full h-full object-contain"></div>` : ''}<div><h4 class="text-3xl md:text-6xl font-black uppercase text-white group-hover:text-cyan-400 transition-all leading-none">${e.title}</h4><p class="text-[10px] md:text-sm font-black text-purple-400 uppercase tracking-widest mt-2 md:mt-4">${e.company}</p></div></div><div class="glass p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] border-white/10 bg-white/[0.01] shadow-2xl relative"><p class="text-gray-400 font-medium leading-relaxed text-base md:text-xl italic">"${e.description}"</p></div></div></div>`).join(''); }
-        function renderServices(services) { document.getElementById('services-grid').innerHTML = services.map(s => `<div class="glass p-8 md:p-20 rounded-[3rem] md:rounded-[5rem] border-white/10 flex flex-col h-full hover:border-cyan-500/30 transition-all group relative overflow-hidden text-left"><div class="w-16 h-16 md:w-28 md:h-28 bg-cyan-500/10 text-cyan-400 rounded-3xl md:rounded-[2.5rem] flex items-center justify-center mb-8 md:mb-16 group-hover:bg-cyan-500 group-hover:text-white transition-all shadow-2xl border border-white/5"><i data-lucide="layout" class="w-8 h-8 md:w-14 md:h-14"></i></div><h4 class="text-3xl md:text-5xl font-black uppercase text-white mb-4 md:mb-8 tracking-tighter">${s.title}</h4><p class="text-gray-400 font-medium text-base md:text-xl leading-relaxed mb-8 md:mb-16 flex-1">${s.description}</p><div class="pt-6 md:pt-10 border-t border-white/5 mt-auto flex items-center justify-between flex-wrap gap-4"><p class="text-sm md:text-lg font-black text-cyan-400 uppercase tracking-widest">Dès ${s.price_range || 'N/C'}</p><button onclick="requestService('${s.title.replace(/'/g, "\\'")}')" class="px-6 md:px-10 py-3 md:py-5 bg-white text-black rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase hover:bg-cyan-500 hover:text-white transition-all">Devis</button></div></div>`).join(''); }
+        function renderServices(services) {
+            document.getElementById('services-grid').innerHTML = services.map(s => `
+                <div class="glass p-8 md:p-20 rounded-[3rem] md:rounded-[5rem] border-white/10 flex flex-col h-full hover:border-cyan-500/30 transition-all group relative overflow-hidden text-left">
+                    <div class="w-16 h-16 md:w-28 md:h-28 bg-cyan-500/10 text-cyan-400 rounded-3xl md:rounded-[2.5rem] flex items-center justify-center mb-8 md:mb-16 group-hover:bg-cyan-500 group-hover:text-white transition-all shadow-2xl border border-white/5"><i data-lucide="layout" class="w-8 h-8 md:w-14 md:h-14"></i></div>
+                    <h4 class="text-3xl md:text-5xl font-black uppercase text-white mb-4 md:mb-8 tracking-tighter">${s.title}</h4>
+                    <p class="text-gray-400 font-medium text-base md:text-xl leading-relaxed mb-8 md:mb-16 flex-1">${s.description}</p>
+                    <div class="pt-6 md:pt-10 border-t border-white/5 mt-auto flex items-center justify-between flex-wrap gap-4">
+                        <p class="text-sm md:text-lg font-black text-cyan-400 uppercase tracking-widest">Dès ${s.price_range || 'N/C'}</p>
+                        <button onclick="requestService('${s.title.replace(/'/g, "\\'")}')" class="px-6 md:px-10 py-3 md:py-5 bg-white text-black rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase hover:bg-cyan-500 hover:text-white transition-all">Devis</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function requestService(title) {
+            const budget = prompt("Quel est votre budget estimé pour ce service (" + title + ") ?", "500$");
+            if (!budget) return;
+            document.getElementById('budget').value = budget;
+            document.getElementById('projectDesc').value = "Demande pour le service : " + title;
+            document.getElementById('specifications').placeholder = "Détaillez vos besoins pour : " + title;
+            scrollToContact();
+        }
         function renderProfile(p) {
             const logoImg = document.getElementById('site-logo');
             const footerLogo = document.getElementById('footer-logo');

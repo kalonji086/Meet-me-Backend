@@ -258,8 +258,9 @@
                     <span class="discord-tooltip">Retour au Site</span>
                 </button>
                 <div class="w-8 h-[2px] bg-white/10 rounded-full mx-auto mb-2"></div>
-                <div class="discord-server-icon active flex items-center justify-center bg-[#5865f2] text-white group">
-                    <i data-lucide="zap" class="w-6 h-6"></i>
+                <div id="discord-main-server" class="discord-server-icon active flex items-center justify-center bg-[#5865f2] text-white group overflow-hidden">
+                    <img id="discord-main-logo" src="" class="w-full h-full object-cover hidden">
+                    <i id="discord-main-fallback" data-lucide="zap" class="w-6 h-6"></i>
                     <span class="discord-tooltip">Together Tech</span>
                 </div>
                 <div id="discord-groups-list" class="flex flex-col space-y-2"></div>
@@ -354,11 +355,34 @@
                 </div>
 
                 <div class="px-2 md:px-4 pb-4 md:pb-6 shrink-0 space-y-2">
-                    <div id="sticker-picker" class="hidden bg-[#2b2d31] p-3 rounded-xl border border-black/20 grid grid-cols-4 gap-2 mb-2">
-                        <button onclick="sendSticker('🔥')" class="text-xl hover:bg-white/5 p-2 rounded">🔥</button>
-                        <button onclick="sendSticker('🚀')" class="text-xl hover:bg-white/5 p-2 rounded">🚀</button>
-                        <button onclick="sendSticker('💎')" class="text-xl hover:bg-white/5 p-2 rounded">💎</button>
-                        <button onclick="sendSticker('👑')" class="text-xl hover:bg-white/5 p-2 rounded">👑</button>
+                    <div id="sticker-picker" class="hidden bg-[#2b2d31] p-4 rounded-xl border border-black/20 max-h-48 overflow-y-auto custom-scrollbar">
+                        <div class="grid grid-cols-8 gap-2">
+                            <!-- Popular -->
+                            <button onclick="sendSticker('😀')" class="text-xl hover:bg-white/5 p-1 rounded">😀</button>
+                            <button onclick="sendSticker('😂')" class="text-xl hover:bg-white/5 p-1 rounded">😂</button>
+                            <button onclick="sendSticker('🥰')" class="text-xl hover:bg-white/5 p-1 rounded">🥰</button>
+                            <button onclick="sendSticker('😎')" class="text-xl hover:bg-white/5 p-1 rounded">😎</button>
+                            <button onclick="sendSticker('🤔')" class="text-xl hover:bg-white/5 p-1 rounded">🤔</button>
+                            <button onclick="sendSticker('🔥')" class="text-xl hover:bg-white/5 p-1 rounded">🔥</button>
+                            <button onclick="sendSticker('🚀')" class="text-xl hover:bg-white/5 p-1 rounded">🚀</button>
+                            <button onclick="sendSticker('💯')" class="text-xl hover:bg-white/5 p-1 rounded">💯</button>
+                            <button onclick="sendSticker('🙏')" class="text-xl hover:bg-white/5 p-1 rounded">🙏</button>
+                            <button onclick="sendSticker('👍')" class="text-xl hover:bg-white/5 p-1 rounded">👍</button>
+                            <button onclick="sendSticker('❤️')" class="text-xl hover:bg-white/5 p-1 rounded">❤️</button>
+                            <button onclick="sendSticker('✨')" class="text-xl hover:bg-white/5 p-1 rounded">✨</button>
+                            <button onclick="sendSticker('🎉')" class="text-xl hover:bg-white/5 p-1 rounded">🎉</button>
+                            <button onclick="sendSticker('💎')" class="text-xl hover:bg-white/5 p-1 rounded">💎</button>
+                            <button onclick="sendSticker('👑')" class="text-xl hover:bg-white/5 p-1 rounded">👑</button>
+                            <button onclick="sendSticker('💪')" class="text-xl hover:bg-white/5 p-1 rounded">💪</button>
+                            <button onclick="sendSticker('🤝')" class="text-xl hover:bg-white/5 p-1 rounded">🤝</button>
+                            <button onclick="sendSticker('📱')" class="text-xl hover:bg-white/5 p-1 rounded">📱</button>
+                            <button onclick="sendSticker('💻')" class="text-xl hover:bg-white/5 p-1 rounded">💻</button>
+                            <button onclick="sendSticker('⚡')" class="text-xl hover:bg-white/5 p-1 rounded">⚡</button>
+                            <button onclick="sendSticker('🌟')" class="text-xl hover:bg-white/5 p-1 rounded">🌟</button>
+                            <button onclick="sendSticker('🌍')" class="text-xl hover:bg-white/5 p-1 rounded">🌍</button>
+                            <button onclick="sendSticker('🎯')" class="text-xl hover:bg-white/5 p-1 rounded">🎯</button>
+                            <button onclick="sendSticker('💰')" class="text-xl hover:bg-white/5 p-1 rounded">💰</button>
+                        </div>
                     </div>
                     <div class="bg-[#383a40] rounded-lg p-2 md:p-3 flex flex-col gap-2 shadow-lg">
                         <div class="flex items-center gap-2 md:gap-4">
@@ -637,6 +661,16 @@
             try { await axios.post(`${API_BASE}/community/posts/${postId}/like`); loadSocialPosts(); } catch (e) {}
         }
 
+        async function focusComment(postId) {
+            const content = prompt("Votre commentaire :");
+            if (!content) return;
+            const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
+            try {
+                await axios.post(`${API_BASE}/community/posts/${postId}/comment`, { content, authorName: visitorName });
+                loadSocialPosts();
+            } catch (e) { alert("Erreur envoi commentaire"); }
+        }
+
         async function requestLiveSupport() {
             const name = prompt("Votre Nom complet :");
             if (!name) return;
@@ -804,14 +838,24 @@
         function renderProfile(p) {
             const logoImg = document.getElementById('site-logo');
             const footerLogo = document.getElementById('footer-logo');
+            const discordLogo = document.getElementById('discord-main-logo');
+            const discordFallback = document.getElementById('discord-main-fallback');
+
             if (p.logo_url) {
                 const url = getFullUrl(p.logo_url);
                 logoImg.src = url;
                 logoImg.classList.remove('hidden');
                 document.getElementById('site-logo-fallback').classList.add('hidden');
+
                 footerLogo.src = url;
                 footerLogo.classList.remove('hidden');
                 document.getElementById('footer-logo-fallback').classList.add('hidden');
+
+                if (discordLogo) {
+                    discordLogo.src = url;
+                    discordLogo.classList.remove('hidden');
+                    discordFallback.classList.add('hidden');
+                }
             }
             if (p.about_photo_url) document.getElementById('about-photo').src = getFullUrl(p.about_photo_url);
             if (p.hero_image_url) document.getElementById('hero-image').src = getFullUrl(p.hero_image_url);

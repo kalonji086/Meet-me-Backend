@@ -631,5 +631,6 @@ module.exports = {
   getClientQuotes, handleChat, replyToQuote, updateContract, signContract, updateSpecs, submitQuote,
   manageSkill, manageExperience, manageService, manageTeam, getQuotes, updateQuoteStatusAdmin, updateProfileAdmin, managePage,
   getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage, getCommunityMembers,
-  getPortfolioRequestDetail, deletePortfolioRequest, deletePortfolio
+  getPortfolioRequestDetail, deletePortfolioRequest, deletePortfolio,
+  getCommunityPosts, createCommunityPost, likeCommunityPost, commentCommunityPost, submitCommunitySupport
 };

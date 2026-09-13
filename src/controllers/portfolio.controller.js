@@ -413,18 +413,47 @@ const updateQuoteStatusAdmin = asyncHandler(async (req, res) => {
 });
 
 const updateProfileAdmin = asyncHandler(async (req, res) => {
-  const { logoUrl, aboutPhotoUrl, aboutDescription, footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact, backgroundUrl, backgroundAnimation } = req.body;
+  const {
+    logoUrl, aboutPhotoUrl, aboutDescription,
+    footerPolicy, footerConditions, footerBlog,
+    footerCommunity, footerContact, backgroundUrl,
+    backgroundAnimation, heroImageUrl,
+    socialFacebook, socialGithub, socialWhatsapp,
+    socialInstagram, socialTwitter
+  } = req.body;
+
   const portfolioId = await getManagedPortfolioId(req);
   if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
+
   const result = await query(
     `UPDATE public.web_portfolio_profile
-     SET logo_url = COALESCE($1, logo_url), about_photo_url = COALESCE($2, about_photo_url), about_description = COALESCE($3, about_description),
-         footer_policy = COALESCE($4, footer_policy), footer_conditions = COALESCE($5, footer_conditions), footer_blog = COALESCE($6, footer_blog),
-         footer_community = COALESCE($7, footer_community), footer_contact = COALESCE($8, footer_contact),
-         background_url = COALESCE($9, background_url), background_animation = COALESCE($10, background_animation),
+     SET logo_url = COALESCE($1, logo_url),
+         about_photo_url = COALESCE($2, about_photo_url),
+         about_description = COALESCE($3, about_description),
+         footer_policy = COALESCE($4, footer_policy),
+         footer_conditions = COALESCE($5, footer_conditions),
+         footer_blog = COALESCE($6, footer_blog),
+         footer_community = COALESCE($7, footer_community),
+         footer_contact = COALESCE($8, footer_contact),
+         background_url = COALESCE($9, background_url),
+         background_animation = COALESCE($10, background_animation),
+         hero_image_url = COALESCE($11, hero_image_url),
+         social_facebook = COALESCE($12, social_facebook),
+         social_github = COALESCE($13, social_github),
+         social_whatsapp = COALESCE($14, social_whatsapp),
+         social_instagram = COALESCE($15, social_instagram),
+         social_twitter = COALESCE($16, social_twitter),
          updated_at = NOW()
-     WHERE portfolio_id = $11 RETURNING *`,
-    [logoUrl, aboutPhotoUrl, aboutDescription, footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact, backgroundUrl, backgroundAnimation, portfolioId]
+     WHERE portfolio_id = $17 RETURNING *`,
+    [
+      logoUrl, aboutPhotoUrl, aboutDescription,
+      footerPolicy, footerConditions, footerBlog,
+      footerCommunity, footerContact, backgroundUrl,
+      backgroundAnimation, heroImageUrl,
+      socialFacebook, socialGithub, socialWhatsapp,
+      socialInstagram, socialTwitter,
+      portfolioId
+    ]
   );
 
   socketService.broadcast('portfolio:data_updated', { portfolioId });

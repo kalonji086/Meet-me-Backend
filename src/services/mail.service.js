@@ -346,7 +346,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = "OFFICIEL : Invitation à rejoindre Together Tech community";
     sendSmtpEmail.htmlContent = this._getBaseTemplate("Invitation Collaboration", content, "Rejoignez l'élite technologique de Meet Me.", "minimal");
-    sendSmtpEmail.sender = { name: "Together Tech Official", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
     try {

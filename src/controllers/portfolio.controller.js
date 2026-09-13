@@ -413,17 +413,21 @@ const updateQuoteStatusAdmin = asyncHandler(async (req, res) => {
 });
 
 const updateProfileAdmin = asyncHandler(async (req, res) => {
-  const { logoUrl, aboutPhotoUrl, aboutDescription, footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact } = req.body;
+  const { logoUrl, aboutPhotoUrl, aboutDescription, footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact, backgroundUrl, backgroundAnimation } = req.body;
   const portfolioId = await getManagedPortfolioId(req);
   if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
   const result = await query(
     `UPDATE public.web_portfolio_profile
      SET logo_url = COALESCE($1, logo_url), about_photo_url = COALESCE($2, about_photo_url), about_description = COALESCE($3, about_description),
          footer_policy = COALESCE($4, footer_policy), footer_conditions = COALESCE($5, footer_conditions), footer_blog = COALESCE($6, footer_blog),
-         footer_community = COALESCE($7, footer_community), footer_contact = COALESCE($8, footer_contact), updated_at = NOW()
-     WHERE portfolio_id = $9 RETURNING *`,
-    [logoUrl, aboutPhotoUrl, aboutDescription, footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact, portfolioId]
+         footer_community = COALESCE($7, footer_community), footer_contact = COALESCE($8, footer_contact),
+         background_url = COALESCE($9, background_url), background_animation = COALESCE($10, background_animation),
+         updated_at = NOW()
+     WHERE portfolio_id = $11 RETURNING *`,
+    [logoUrl, aboutPhotoUrl, aboutDescription, footerPolicy, footerConditions, footerBlog, footerCommunity, footerContact, backgroundUrl, backgroundAnimation, portfolioId]
   );
+
+  socketService.broadcast('portfolio:data_updated', { portfolioId });
   res.json({ success: true, data: result.rows[0] });
 });
 

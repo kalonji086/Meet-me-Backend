@@ -438,6 +438,29 @@
                                 </div>
                             </div>
 
+                            <div class="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                                <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter italic">Arrière-plan du Site</h3>
+                                <div class="space-y-4">
+                                    <div class="relative group w-full h-40 rounded-[2rem] overflow-hidden bg-gray-100 border border-gray-100">
+                                        <img id="port-bg-preview" src="https://ui-avatars.com/api/?name=Background" class="w-full h-full object-cover">
+                                        <button onclick="document.getElementById('port-bg-input').click()" class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                            <i data-lucide="image" class="w-8 h-8 text-white"></i>
+                                        </button>
+                                        <input type="file" id="port-bg-input" class="hidden" onchange="previewPortfolioImg(this, 'port-bg-preview')">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Animation de l'arrière-plan</label>
+                                        <select id="port-bg-animation" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
+                                            <option value="none">Aucune (Statique)</option>
+                                            <option value="zoom">Zoom infini (Subtile)</option>
+                                            <option value="pan">Défilement Horizontal</option>
+                                            <option value="float">Flottement vertical</option>
+                                            <option value="pulse">Impulsion lumineuse</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
                             <button onclick="savePortfolioIdentity()" id="btn-save-identity" class="w-full py-6 bg-cyan-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-100 hover:bg-cyan-600 transition-all">Mettre à jour l'identité</button>
                         </div>
                     </div>
@@ -6046,7 +6069,9 @@
                 if (p) {
                     if (p.logo_url) document.getElementById('port-logo-preview').src = getFullUrl(p.logo_url);
                     if (p.about_photo_url) document.getElementById('port-about-preview').src = getFullUrl(p.about_photo_url);
+                    if (p.background_url) document.getElementById('port-bg-preview').src = getFullUrl(p.background_url);
                     document.getElementById('port-about-desc').value = p.about_description || "";
+                    document.getElementById('port-bg-animation').value = p.background_animation || "none";
                 }
             } catch (e) {}
         }
@@ -6153,11 +6178,13 @@
             const btn = document.getElementById('btn-save-identity');
             const logoFile = document.getElementById('port-logo-input').files[0];
             const aboutFile = document.getElementById('port-about-input').files[0];
+            const bgFile = document.getElementById('port-bg-input').files[0];
             const aboutDescription = document.getElementById('port-about-desc').value;
+            const backgroundAnimation = document.getElementById('port-bg-animation').value;
 
             try {
                 btn.disabled = true; btn.innerText = "Mise à jour...";
-                let logoUrl = null, aboutPhotoUrl = null;
+                let logoUrl = null, aboutPhotoUrl = null, backgroundUrl = null;
 
                 if (logoFile) {
                     const up = await apiService_upload(logoFile);
@@ -6167,9 +6194,13 @@
                     const up = await apiService_upload(aboutFile);
                     if (up.success) aboutPhotoUrl = up.data.fileUrl;
                 }
+                if (bgFile) {
+                    const up = await apiService_upload(bgFile);
+                    if (up.success) backgroundUrl = up.data.fileUrl;
+                }
 
                 await axios.put(`${API_URL}/portfolio/admin/profile`, {
-                    logoUrl, aboutPhotoUrl, aboutDescription
+                    logoUrl, aboutPhotoUrl, aboutDescription, backgroundUrl, backgroundAnimation
                 }, { headers: { Authorization: `Bearer ${token}` } });
                 toast("Identité mise à jour", "success");
             } catch (e) { alert("Erreur"); } finally { btn.disabled = false; btn.innerText = "Mettre à jour l'identité"; }

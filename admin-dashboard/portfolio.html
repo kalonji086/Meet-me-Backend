@@ -96,6 +96,7 @@
                 <button data-module="skills" onclick="navigateTo('skills')" class="hover:text-cyan-400 transition-all">Expertise</button>
                 <button data-module="experience" onclick="navigateTo('experience')" class="hover:text-cyan-400 transition-all">Impact</button>
                 <button data-module="services" onclick="navigateTo('services')" class="hover:text-cyan-400 transition-all">Services</button>
+                <button onclick="navigateTo('blog')" class="hover:text-amber-400 transition-all">Blog</button>
                 <button id="btn-create-saas" onclick="showPortfolioRequestModal()" class="px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-xl hover:bg-purple-600 hover:text-white transition-all font-black text-[9px] uppercase tracking-widest hidden">Créer mon Portfolio</button>
                 <button onclick="openTrackingModal()" class="text-white bg-white/5 px-4 py-2 rounded-xl hover:bg-cyan-500 transition-all font-black text-[9px] uppercase tracking-widest border border-white/10">Suivi</button>
             </div>
@@ -118,6 +119,7 @@
             <button data-module="team" onclick="navigateTo('team'); toggleMobileNav()" class="text-3xl font-black uppercase text-left">L'Équipe</button>
             <button data-module="skills" onclick="navigateTo('skills'); toggleMobileNav()" class="text-3xl font-black uppercase text-left">Expertise</button>
             <button data-module="services" onclick="navigateTo('services'); toggleMobileNav()" class="text-3xl font-black uppercase text-left">Services</button>
+            <button onclick="navigateTo('blog'); toggleMobileNav()" class="text-3xl font-black uppercase text-left text-amber-400">Le Blog</button>
             <button onclick="openTrackingModal(); toggleMobileNav()" class="text-xl font-bold uppercase text-gray-400 text-left">Suivi de Devis</button>
             <button onclick="scrollToContact(); toggleMobileNav()" class="w-full py-6 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl">Démarrer un projet</button>
         </div>
@@ -234,6 +236,26 @@
                     <p class="text-gray-500 font-bold text-[10px] md:text-xs uppercase tracking-[0.4em]">Tout pour propulser votre business au sommet</p>
                 </div>
                 <div id="services-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12"></div>
+            </div>
+        </div>
+
+        <!-- PAGE: BLOG -->
+        <div id="page-blog" class="page pt-32 md:pt-48 pb-20 md:pb-48 px-4 md:px-6 bg-dot">
+            <div class="max-w-7xl mx-auto">
+                <div class="text-center mb-20 md:mb-32">
+                    <h3 class="text-5xl sm:text-6xl md:text-7xl font-black tracking-tighter uppercase italic mb-6">Inside <span class="text-amber-400">Together Tech</span></h3>
+                    <p class="text-gray-500 font-bold text-[10px] md:text-xs uppercase tracking-[0.4em]">Chroniques, tutoriels et visions du futur</p>
+                </div>
+                <div id="blog-posts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
+                    <!-- Posts injected by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: BLOG ARTICLE (READ) -->
+        <div id="page-blog-read" class="page pt-32 md:pt-48 pb-20 md:pb-48 px-4 md:px-6">
+            <div id="blog-article-container" class="max-w-4xl mx-auto">
+                <!-- Content injected by JS -->
             </div>
         </div>
 
@@ -797,6 +819,7 @@
                     if (config.enabled_modules) document.querySelectorAll('[data-module]').forEach(btn => btn.classList.toggle('hidden', !config.enabled_modules.includes(btn.getAttribute('data-module'))));
                 }
                 renderSkills(skills); renderExperiences(experiences); renderServices(services); renderTeam(team); renderProfile(profile); renderFooterPages(pages, profile);
+                loadBlogData();
                 lucide.createIcons();
             } catch (e) {
                 if (e.response?.status === 404) document.body.innerHTML = '<div class="h-screen flex items-center justify-center flex-col space-y-4"><h1>404 - Portfolio Non Trouvé</h1><button onclick="location.href=\'/portfolio\'">Retour</button></div>';
@@ -812,7 +835,135 @@
 
         async function viewGenericPage(slug) { try { const res = await axios.get(`${API_BASE}/public`); const page = res.data.data.pages.find(p => p.slug === slug); if (page) { document.getElementById('generic-page-title').innerText = page.title; document.getElementById('generic-page-body').innerHTML = page.content; navigateTo('content'); } } catch (e) {} }
         function renderTeam(team) { document.getElementById('team-grid').innerHTML = team.map(m => `<div class="group flex flex-col items-center"><div class="relative w-full aspect-[3/4] rounded-[2rem] md:rounded-[3.5rem] overflow-hidden glass mb-4 sm:mb-8"><img src="${getFullUrl(m.image_url)}" class="w-full h-full object-cover transition-all group-hover:scale-110"><div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] to-transparent opacity-80"></div><div class="absolute bottom-4 left-4 md:bottom-8 md:left-8 right-4 md:right-8"><p class="text-[8px] md:text-[10px] font-black text-cyan-400 uppercase tracking-widest">${m.role}</p><h4 class="text-xl md:text-3xl font-black text-white uppercase truncate">${m.name}</h4></div></div><p class="text-gray-500 text-xs text-center line-clamp-2">${m.bio || ''}</p></div>`).join(''); }
-        function renderSkills(skills) { document.getElementById('skills-grid').innerHTML = skills.map(s => `<div class="glass p-6 md:p-12 rounded-[2rem] md:rounded-[3.5rem] border-white/5 hover:border-cyan-500/40 transition-all hover:scale-105 group relative overflow-hidden"><div class="flex justify-between items-start mb-6 md:mb-10"><div class="w-12 h-12 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-white/10 shadow-2xl">${s.image_url ? `<img src="${getFullUrl(s.image_url)}" class="w-full h-full object-cover">` : `<i data-lucide="terminal" class="w-6 h-6 md:w-10 md:h-10 text-cyan-400"></i>`}</div><span class="text-[10px] md:text-xs font-black text-gray-600">${s.level}%</span></div><p class="font-black text-sm md:text-xl uppercase text-white truncate">${s.name}</p><div class="w-full h-1 md:h-1.5 bg-white/5 rounded-full mt-4 md:mt-6 overflow-hidden"><div class="h-full bg-gradient-to-r from-cyan-500 to-purple-500" style="width: ${s.level}%"></div></div></div>`).join(''); }
+        function renderSkills(skills) {
+            document.getElementById('skills-grid').innerHTML = skills.map(s => `
+                <div class="glass p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border-white/5 hover:border-cyan-500/40 transition-all hover:scale-[1.02] group relative overflow-hidden text-left flex flex-col h-full">
+                    <div class="flex justify-between items-start mb-8">
+                        <div class="w-16 h-16 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-white/10 shadow-2xl shrink-0">
+                            ${s.image_url ? `<img src="${getFullUrl(s.image_url)}" class="w-full h-full object-cover">` : `<i data-lucide="zap" class="w-8 h-8 text-cyan-400"></i>`}
+                        </div>
+                        <div class="text-right">
+                            <span class="block text-[10px] md:text-xs font-black text-gray-600 uppercase tracking-widest">${s.level}% Maîtrise</span>
+                            <span class="block text-[8px] font-black text-cyan-500 uppercase mt-1 tracking-tighter">${s.years_experience || 1} ans d'XP</span>
+                        </div>
+                    </div>
+                    <h4 class="font-black text-lg md:text-2xl uppercase text-white mb-4 tracking-tighter italic">${s.name}</h4>
+                    <p class="text-gray-400 text-sm md:text-base font-medium leading-relaxed italic mb-8 flex-1">"${s.description || 'Expertise confirmée dans le développement et l\'optimisation...'}"</p>
+                    <div class="w-full h-1 md:h-1.5 bg-white/5 rounded-full mt-auto overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-cyan-500 to-indigo-500" style="width: ${s.level}%"></div>
+                    </div>
+                </div>`).join('');
+        }
+
+        async function loadBlogData() {
+            try {
+                const res = await axios.get(`${API_BASE}/${portfolioSlug}/blog`);
+                const posts = res.data.data;
+                renderBlogPosts(posts);
+            } catch (e) {}
+        }
+
+        function renderBlogPosts(posts) {
+            const grid = document.getElementById('blog-posts-grid');
+            if (!grid) return;
+            grid.innerHTML = posts.map(p => `
+                <div class="glass rounded-[2.5rem] overflow-hidden group hover:scale-[1.02] transition-all flex flex-col h-full border-white/5">
+                    <div class="relative h-64 overflow-hidden">
+                        <img src="${getFullUrl(p.image_url)}" class="w-full h-full object-cover transition-all group-hover:scale-110">
+                        <div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] to-transparent"></div>
+                        <span class="absolute top-6 left-6 px-4 py-1 bg-white/10 backdrop-blur-md text-white text-[8px] font-black uppercase tracking-[0.2em] rounded-lg border border-white/10">${p.theme}</span>
+                    </div>
+                    <div class="p-8 flex flex-col flex-1 text-left">
+                        <h4 class="text-2xl font-black text-white uppercase tracking-tighter leading-tight mb-4">${p.title}</h4>
+                        <p class="text-gray-500 text-xs font-bold uppercase mb-8">${new Date(p.created_at).toLocaleDateString()}</p>
+
+                        <div class="flex items-center justify-between mt-auto">
+                            <div class="flex items-center gap-4 text-gray-400">
+                                <span class="flex items-center gap-1.5 text-[10px] font-black"><i data-lucide="heart" class="w-3.5 h-3.5"></i> ${p.likes_count}</span>
+                                <span class="flex items-center gap-1.5 text-[10px] font-black"><i data-lucide="message-square" class="w-3.5 h-3.5"></i> ${p.comments_count}</span>
+                            </div>
+                            <button onclick="readBlogPost('${p.slug}')" class="px-6 py-2.5 bg-white text-black rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all">Lire l'article</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        async function readBlogPost(slug) {
+            try {
+                const res = await axios.get(`${API_BASE}/${portfolioSlug}/blog`);
+                const post = res.data.data.find(p => p.slug === slug);
+                if (!post) return;
+
+                if (post.is_external) {
+                    window.open(post.external_url, '_blank');
+                    return;
+                }
+
+                // Render Article
+                const container = document.getElementById('blog-article-container');
+                container.innerHTML = `
+                    <button onclick="navigateTo('blog')" class="flex items-center gap-3 text-gray-500 font-black text-[10px] uppercase tracking-widest hover:text-white transition-all mb-12"><i data-lucide="arrow-left" class="w-4 h-4"></i> Retour au blog</button>
+                    <img src="${getFullUrl(post.image_url)}" class="w-full h-[400px] object-cover rounded-[3rem] shadow-2xl mb-12 border border-white/5">
+                    <h1 class="text-4xl md:text-7xl font-black text-white uppercase tracking-tighter leading-[0.9] mb-8">${post.title}</h1>
+                    <div class="flex items-center gap-4 mb-16 pb-8 border-b border-white/5">
+                        <span class="px-4 py-1 bg-cyan-500/10 text-cyan-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-cyan-500/20">${post.theme}</span>
+                        <p class="text-gray-500 text-xs font-bold uppercase">${new Date(post.created_at).toLocaleDateString()}</p>
+                    </div>
+
+                    <div class="prose prose-invert prose-lg max-w-none text-gray-300 leading-relaxed font-medium">
+                        ${post.content}
+                    </div>
+
+                    ${post.cta_text ? `
+                        <div class="mt-16 p-12 glass rounded-[3rem] border border-white/10 text-center">
+                            <h4 class="text-xl font-black text-white uppercase mb-8">Aller plus loin</h4>
+                            <a href="${post.cta_url}" target="_blank" class="px-12 py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all shadow-2xl">${post.cta_text}</a>
+                        </div>
+                    ` : ''}
+
+                    <div class="mt-24 space-y-12">
+                        <div class="flex items-center justify-between border-b border-white/5 pb-6">
+                            <h3 class="text-2xl font-black text-white uppercase">Discussion</h3>
+                            <button onclick="likeArticle('${post.id}')" class="flex items-center gap-2 px-6 py-2 glass rounded-full font-black text-[10px] uppercase hover:bg-red-500/20 hover:text-red-500 transition-all"><i data-lucide="heart" class="w-4 h-4"></i> <span id="article-likes">${post.likes_count}</span></button>
+                        </div>
+
+                        <div class="space-y-8" id="article-comments">
+                            <!-- Loading comments... -->
+                        </div>
+
+                        <div class="pt-8">
+                            <textarea id="comment-input" rows="4" placeholder="Votre commentaire..." class="w-full bg-white/5 border border-white/10 p-8 rounded-[2.5rem] outline-none focus:border-cyan-500 text-white font-medium mb-6"></textarea>
+                            <button onclick="postComment('${post.id}')" class="px-12 py-5 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 transition-all">Envoyer</button>
+                        </div>
+                    </div>
+                `;
+
+                navigateTo('blog-read');
+                lucide.createIcons();
+                // We would load comments here if implemented as sub-route
+            } catch (e) {}
+        }
+
+        async function likeArticle(postId) {
+            try {
+                await axios.post(`${API_BASE}/blog/posts/${postId}/like`);
+                const likesEl = document.getElementById('article-likes');
+                if (likesEl) likesEl.innerText = parseInt(likesEl.innerText) + 1;
+            } catch (e) {}
+        }
+
+        async function postComment(postId) {
+            const content = document.getElementById('comment-input').value.trim();
+            if (!content) return;
+            const visitorName = localStorage.getItem('visitor_name') || 'Anonyme';
+            try {
+                await axios.post(`${API_BASE}/blog/posts/${postId}/comment`, { content, authorName: visitorName });
+                document.getElementById('comment-input').value = "";
+                alert("Commentaire envoyé !");
+            } catch (e) {}
+        }
         function renderExperiences(exps) {
             document.getElementById('experience-timeline').innerHTML = exps.map((e) => {
                 let statusBadge = "";

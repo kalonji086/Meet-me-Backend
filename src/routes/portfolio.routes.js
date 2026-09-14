@@ -31,6 +31,11 @@ router.post('/community/posts/:postId/like', portfolioController.likeCommunityPo
 router.post('/community/posts/:postId/comment', portfolioController.commentCommunityPost);
 router.post('/community/support', portfolioController.submitCommunitySupport);
 
+// Blog Social Routes
+router.get('/:slug/blog', portfolioController.getBlogPosts);
+router.post('/blog/posts/:postId/like', portfolioController.likeBlogPost);
+router.post('/blog/posts/:postId/comment', portfolioController.commentBlogPost);
+
 router.post('/upload-logo', uploadController.uploadMiddleware.singleFile, (req, res, next) => {
     // Public upload for logo
     req.userId = '00000000-0000-0000-0000-000000000000'; // System ID
@@ -57,6 +62,7 @@ router.post('/admin/experiences', isAdmin, portfolioController.manageExperience)
 router.post('/admin/services', isAdmin, portfolioController.manageService);
 router.post('/admin/team', isAdmin, portfolioController.manageTeam);
 router.post('/admin/pages', isAdmin, portfolioController.managePage);
+router.post('/admin/blog', isAdmin, portfolioController.manageBlogPost);
 router.put('/admin/profile', isAdmin, portfolioController.updateProfileAdmin);
 router.get('/admin/quotes', isAdmin, portfolioController.getQuotes);
 router.put('/admin/quotes/:id', isAdmin, portfolioController.updateQuoteStatusAdmin);

@@ -402,16 +402,27 @@ const submitCommunitySupport = asyncHandler(async (req, res) => {
 // --- ADMIN CRUD ---
 
 const manageSkill = asyncHandler(async (req, res) => {
-  const { action, id, name, level, icon, imageUrl, category } = req.body;
+  const { action, id, name, level, icon, imageUrl, category, description, yearsExperience } = req.body;
   const portfolioId = await getManagedPortfolioId(req);
   if (!portfolioId) return res.status(403).json({ error: 'Aucun portfolio associé à ce compte.' });
 
   if (action === 'add') {
     const resAdd = await query(
-      'INSERT INTO public.web_portfolio_skills (name, level, icon, image_url, category, portfolio_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, level || 50, icon || null, imageUrl || null, category || 'technical', portfolioId]
+      'INSERT INTO public.web_portfolio_skills (name, level, icon, image_url, category, description, years_experience, portfolio_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [name, level || 50, icon || null, imageUrl || null, category || 'technical', description || null, yearsExperience || 1, portfolioId]
     );
     return res.json({ success: true, data: resAdd.rows[0] });
+  }
+  if (action === 'update') {
+    const resUp = await query(
+      `UPDATE public.web_portfolio_skills
+       SET name = COALESCE($1, name), level = COALESCE($2, level), icon = COALESCE($3, icon),
+           image_url = COALESCE($4, image_url), category = COALESCE($5, category),
+           description = COALESCE($6, description), years_experience = COALESCE($7, years_experience)
+       WHERE id = $8 AND portfolio_id = $9 RETURNING *`,
+      [name, level, icon, imageUrl, category, description, yearsExperience, id, portfolioId]
+    );
+    return res.json({ success: true, data: resUp.rows[0] });
   }
   if (action === 'delete') {
     await query('DELETE FROM public.web_portfolio_skills WHERE id = $1 AND portfolio_id = $2', [id, portfolioId]);
@@ -639,11 +650,79 @@ const getCommunityMembers = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+const manageBlogPost = asyncHandler(async (req, res) => {
+    const { action, id, title, slug, content, theme, imageUrl, isExternal, externalUrl, ctaText, ctaUrl, status } = req.body;
+    const portfolioId = await getManagedPortfolioId(req);
+    if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
+
+    if (action === 'add') {
+        const result = await query(
+            `INSERT INTO public.web_portfolio_blog_posts (portfolio_id, title, slug, content, theme, image_url, is_external, external_url, cta_text, cta_url, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+            [portfolioId, title, slug, content, theme || 'futuristic', imageUrl, isExternal || false, externalUrl, ctaText, ctaUrl, status || 'published']
+        );
+        return res.json({ success: true, data: result.rows[0] });
+    }
+    if (action === 'update') {
+        const result = await query(
+            `UPDATE public.web_portfolio_blog_posts
+             SET title = COALESCE($1, title), slug = COALESCE($2, slug), content = COALESCE($3, content),
+                 theme = COALESCE($4, theme), image_url = COALESCE($5, image_url), is_external = COALESCE($6, is_external),
+                 external_url = COALESCE($7, external_url), cta_text = COALESCE($8, cta_text), cta_url = COALESCE($9, cta_url),
+                 status = COALESCE($10, status), updated_at = NOW()
+             WHERE id = $11 AND portfolio_id = $12 RETURNING *`,
+            [title, slug, content, theme, imageUrl, isExternal, externalUrl, ctaText, ctaUrl, status, id, portfolioId]
+        );
+        return res.json({ success: true, data: result.rows[0] });
+    }
+    if (action === 'delete') {
+        await query('DELETE FROM public.web_portfolio_blog_posts WHERE id = $1 AND portfolio_id = $2', [id, portfolioId]);
+        return res.json({ success: true });
+    }
+    res.status(400).json({ error: 'Action invalide' });
+});
+
+const getBlogPosts = asyncHandler(async (req, res) => {
+    const { slug } = req.params;
+    const portfolio = await query('SELECT id FROM public.web_portfolios WHERE slug = $1', [slug || 'together']);
+    if (portfolio.rows.length === 0) return res.status(404).json({ error: 'Portfolio non trouvé' });
+    const pId = portfolio.rows[0].id;
+
+    const result = await query(`
+        SELECT p.*,
+        (SELECT count(*) FROM public.web_portfolio_blog_likes WHERE post_id = p.id) as likes_count,
+        (SELECT count(*) FROM public.web_portfolio_blog_comments WHERE post_id = p.id) as comments_count
+        FROM public.web_portfolio_blog_posts p
+        WHERE p.portfolio_id = $1 AND p.status = 'published'
+        ORDER BY p.created_at DESC`, [pId]);
+    res.json({ success: true, data: result.rows });
+});
+
+const likeBlogPost = asyncHandler(async (req, res) => {
+    const { postId } = req.params;
+    const userId = req.userId || '00000000-0000-0000-0000-000000000000';
+    await query('INSERT INTO public.web_portfolio_blog_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [postId, userId]);
+    res.json({ success: true });
+});
+
+const commentBlogPost = asyncHandler(async (req, res) => {
+    const { postId } = req.params;
+    const { content, authorName, parentId } = req.body;
+    const userId = req.userId || null;
+    const result = await query(
+        `INSERT INTO public.web_portfolio_blog_comments (post_id, author_id, author_name, content, parent_id)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [postId, userId, authorName || 'Visiteur', content, parentId || null]
+    );
+    res.json({ success: true, data: result.rows[0] });
+});
+
 module.exports = {
   getPublicData, submitPortfolioRequest, approvePortfolioRequest, getPortfolioRequests, getAllPortfolios, togglePortfolioStatus,
   getClientQuotes, handleChat, replyToQuote, updateContract, signContract, updateSpecs, submitQuote,
   manageSkill, manageExperience, manageService, manageTeam, getQuotes, updateQuoteStatusAdmin, updateProfileAdmin, managePage,
   getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage, getCommunityMembers,
   getPortfolioRequestDetail, deletePortfolioRequest, deletePortfolio,
-  getCommunityPosts, createCommunityPost, likeCommunityPost, commentCommunityPost, submitCommunitySupport
+  getCommunityPosts, createCommunityPost, likeCommunityPost, commentCommunityPost, submitCommunitySupport,
+  manageBlogPost, getBlogPosts, likeBlogPost, commentBlogPost
 };

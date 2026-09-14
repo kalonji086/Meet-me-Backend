@@ -592,6 +592,45 @@ const ensureAdminTables = async () => {
     // Ensure all columns exist for existing tables
     await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS image_url TEXT');
     await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'technical\'');
+    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS description TEXT');
+    await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS years_experience INTEGER DEFAULT 1');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_posts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        portfolio_id UUID REFERENCES public.web_portfolios(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        content TEXT,
+        theme TEXT DEFAULT 'futuristic',
+        image_url TEXT,
+        is_external BOOLEAN DEFAULT FALSE,
+        external_url TEXT,
+        cta_text TEXT,
+        cta_url TEXT,
+        status TEXT DEFAULT 'published',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(portfolio_id, slug)
+      );
+
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_likes (
+        post_id UUID REFERENCES public.web_portfolio_blog_posts(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        PRIMARY KEY (post_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_comments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id UUID REFERENCES public.web_portfolio_blog_posts(id) ON DELETE CASCADE,
+        author_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        parent_id UUID REFERENCES public.web_portfolio_blog_comments(id) ON DELETE CASCADE,
+        author_name TEXT,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS logo_url TEXT');
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS project_url TEXT');
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS is_in_progress BOOLEAN DEFAULT FALSE');

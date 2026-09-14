@@ -421,16 +421,29 @@ const manageSkill = asyncHandler(async (req, res) => {
 });
 
 const manageExperience = asyncHandler(async (req, res) => {
-  const { action, id, title, company, period, description, logoUrl, orderIndex } = req.body;
+  const { action, id, title, company, period, description, logoUrl, orderIndex, projectUrl, isInProgress, projectStatus, downloadsCount, starsCount } = req.body;
   const portfolioId = await getManagedPortfolioId(req);
   if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
 
   if (action === 'add') {
     const resAdd = await query(
-      'INSERT INTO public.web_portfolio_experiences (title, company, period, description, logo_url, order_index, portfolio_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [title, company, period, description, logoUrl, orderIndex || 0, portfolioId]
+      `INSERT INTO public.web_portfolio_experiences (title, company, period, description, logo_url, order_index, portfolio_id, project_url, is_in_progress, project_status, downloads_count, stars_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [title, company, period, description, logoUrl, orderIndex || 0, portfolioId, projectUrl, isInProgress || false, projectStatus || 'published', downloadsCount || '0', starsCount || '5.0']
     );
     return res.json({ success: true, data: resAdd.rows[0] });
+  }
+  if (action === 'update') {
+    const resUp = await query(
+      `UPDATE public.web_portfolio_experiences
+       SET title = COALESCE($1, title), company = COALESCE($2, company), period = COALESCE($3, period),
+           description = COALESCE($4, description), logo_url = COALESCE($5, logo_url), order_index = COALESCE($6, order_index),
+           project_url = COALESCE($7, project_url), is_in_progress = COALESCE($8, is_in_progress),
+           project_status = COALESCE($9, project_status), downloads_count = COALESCE($10, downloads_count), stars_count = COALESCE($11, stars_count)
+       WHERE id = $12 AND portfolio_id = $13 RETURNING *`,
+      [title, company, period, description, logoUrl, orderIndex, projectUrl, isInProgress, projectStatus, downloadsCount, starsCount, id, portfolioId]
+    );
+    return res.json({ success: true, data: resUp.rows[0] });
   }
   if (action === 'delete') {
     await query('DELETE FROM public.web_portfolio_experiences WHERE id = $1 AND portfolio_id = $2', [id, portfolioId]);

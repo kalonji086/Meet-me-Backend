@@ -593,6 +593,11 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS image_url TEXT');
     await query('ALTER TABLE public.web_portfolio_skills ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'technical\'');
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS logo_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS project_url TEXT');
+    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS is_in_progress BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS project_status TEXT DEFAULT \'published\'');
+    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS downloads_count TEXT DEFAULT \'0\'');
+    await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS stars_count TEXT DEFAULT \'5.0\'');
     await query('ALTER TABLE public.web_portfolio_services ADD COLUMN IF NOT EXISTS image_url TEXT');
     await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS specifications TEXT');
     await query('ALTER TABLE public.web_portfolio_quotes ADD COLUMN IF NOT EXISTS admin_reply_message TEXT');

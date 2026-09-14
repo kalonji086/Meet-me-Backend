@@ -815,12 +815,22 @@
         function renderSkills(skills) { document.getElementById('skills-grid').innerHTML = skills.map(s => `<div class="glass p-6 md:p-12 rounded-[2rem] md:rounded-[3.5rem] border-white/5 hover:border-cyan-500/40 transition-all hover:scale-105 group relative overflow-hidden"><div class="flex justify-between items-start mb-6 md:mb-10"><div class="w-12 h-12 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-white/10 shadow-2xl">${s.image_url ? `<img src="${getFullUrl(s.image_url)}" class="w-full h-full object-cover">` : `<i data-lucide="terminal" class="w-6 h-6 md:w-10 md:h-10 text-cyan-400"></i>`}</div><span class="text-[10px] md:text-xs font-black text-gray-600">${s.level}%</span></div><p class="font-black text-sm md:text-xl uppercase text-white truncate">${s.name}</p><div class="w-full h-1 md:h-1.5 bg-white/5 rounded-full mt-4 md:mt-6 overflow-hidden"><div class="h-full bg-gradient-to-r from-cyan-500 to-purple-500" style="width: ${s.level}%"></div></div></div>`).join(''); }
         function renderExperiences(exps) {
             document.getElementById('experience-timeline').innerHTML = exps.map((e) => {
-                const statusBadge = e.is_in_progress ?
-                    `<span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-[8px] font-black uppercase tracking-widest border border-amber-500/20">En cours</span>` :
-                    (e.project_status === 'beta' ?
-                        `<span class="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[8px] font-black uppercase tracking-widest border border-purple-500/20">Bêta Test</span>` :
-                        `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-[8px] font-black uppercase tracking-widest border border-emerald-500/20">Publié</span>`
-                    );
+                let statusBadge = "";
+                if (e.is_in_progress) {
+                    statusBadge = `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 text-amber-400 rounded-lg text-[8px] font-black uppercase tracking-widest border border-amber-500/20"><i data-lucide="clock" class="w-2.5 h-2.5"></i> En cours</span>`;
+                } else {
+                    if (e.project_status === 'beta') {
+                        statusBadge = `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-[8px] font-black uppercase tracking-widest border border-purple-500/20"><i data-lucide="beaker" class="w-2.5 h-2.5"></i> Bêta Test</span>`;
+                    } else if (e.project_status === 'concept') {
+                        statusBadge = `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/20 text-blue-400 rounded-lg text-[8px] font-black uppercase tracking-widest border border-blue-500/20"><i data-lucide="lightbulb" class="w-2.5 h-2.5"></i> Concept</span>`;
+                    } else {
+                        statusBadge = `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-[8px] font-black uppercase tracking-widest border border-emerald-500/20"><i data-lucide="check-circle-2" class="w-2.5 h-2.5"></i> Publié</span>`;
+                    }
+                }
+
+                // Play Store Detection
+                const isPlayStore = e.project_url && e.project_url.includes('play.google.com');
+                const playBadge = isPlayStore ? `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white rounded-lg text-[8px] font-black uppercase tracking-widest border border-white/10"><i data-lucide="play" class="w-2.5 h-2.5 fill-current"></i> Google Play</span>` : "";
 
                 return `
                     <div class="flex flex-col md:flex-row gap-8 md:gap-20 group">
@@ -835,6 +845,7 @@
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-3 mb-3 flex-wrap">
                                         ${statusBadge}
+                                        ${playBadge}
                                         <div class="flex gap-3">
                                             <span class="flex items-center gap-1 text-[9px] font-black text-gray-500 uppercase"><i data-lucide="download" class="w-2.5 h-2.5"></i> ${e.downloads_count || '0'}</span>
                                             <span class="flex items-center gap-1 text-[9px] font-black text-gray-500 uppercase"><i data-lucide="star" class="w-2.5 h-2.5 text-amber-400 fill-current"></i> ${e.stars_count || '5.0'}</span>

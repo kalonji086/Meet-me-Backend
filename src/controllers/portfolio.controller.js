@@ -698,23 +698,56 @@ const getBlogPosts = asyncHandler(async (req, res) => {
     res.json({ success: true, data: result.rows });
 });
 
+const getBlogPostsAdmin = asyncHandler(async (req, res) => {
+    const portfolioId = await getManagedPortfolioId(req);
+    if (!portfolioId) return res.status(403).json({ error: 'Accès refusé.' });
+
+    const result = await query(`
+        SELECT p.*,
+        (SELECT count(*) FROM public.web_portfolio_blog_likes WHERE post_id = p.id) as likes_count,
+        (SELECT count(*) FROM public.web_portfolio_blog_comments WHERE post_id = p.id) as comments_count
+        FROM public.web_portfolio_blog_posts p
+        WHERE p.portfolio_id = $1
+        ORDER BY p.created_at DESC`, [portfolioId]);
+    res.json({ success: true, data: result.rows });
+});
+
+const getPostComments = asyncHandler(async (req, res) => {
+    const { postId } = req.params;
+    const result = await query(`
+        SELECT c.*, p.avatar_url as author_avatar
+        FROM public.web_portfolio_blog_comments c
+        LEFT JOIN public.profiles p ON c.author_id = p.id
+        WHERE c.post_id = $1
+        ORDER BY c.created_at ASC`, [postId]);
+    res.json({ success: true, data: result.rows });
+});
+
 const likeBlogPost = asyncHandler(async (req, res) => {
     const { postId } = req.params;
     const userId = req.userId || '00000000-0000-0000-0000-000000000000';
     await query('INSERT INTO public.web_portfolio_blog_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [postId, userId]);
-    res.json({ success: true });
+
+    const count = await query('SELECT count(*) FROM public.web_portfolio_blog_likes WHERE post_id = $1', [postId]);
+    socketService.broadcast('blog:post_liked', { postId, likes: count.rows[0].count });
+
+    res.json({ success: true, likes: count.rows[0].count });
 });
 
 const commentBlogPost = asyncHandler(async (req, res) => {
     const { postId } = req.params;
     const { content, authorName, parentId } = req.body;
-    const userId = req.userId || null;
+    const userId = req.user ? req.user.id : null;
+
     const result = await query(
         `INSERT INTO public.web_portfolio_blog_comments (post_id, author_id, author_name, content, parent_id)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
         [postId, userId, authorName || 'Visiteur', content, parentId || null]
     );
-    res.json({ success: true, data: result.rows[0] });
+
+    const comment = { ...result.rows[0], author_avatar: req.user?.avatar_url || null };
+    socketService.broadcast('blog:new_comment', { postId, comment });
+    res.json({ success: true, data: comment });
 });
 
 module.exports = {

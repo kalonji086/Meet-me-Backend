@@ -6530,7 +6530,7 @@
 
         async function loadBlogPosts() {
             try {
-                const res = await axios.get(`${API_URL}/portfolio/together/blog`);
+                const res = await axios.get(`${API_URL}/portfolio/admin/blog`, { headers: { Authorization: `Bearer ${token}` } });
                 const posts = res.data.data;
                 document.getElementById('blog-list').innerHTML = posts.map(p => `
                     <div class="bg-white p-8 rounded-[3rem] border border-gray-100 flex gap-8 items-center group shadow-sm hover:shadow-xl transition-all">
@@ -6560,7 +6560,7 @@
         }
 
         function prepareEditBlog(id) {
-            axios.get(`${API_URL}/portfolio/together/blog`).then(res => {
+            axios.get(`${API_URL}/portfolio/admin/blog`, { headers: { Authorization: `Bearer ${token}` } }).then(res => {
                 const p = res.data.data.find(x => x.id === id);
                 if (!p) return;
                 document.getElementById('blog-id').value = p.id;

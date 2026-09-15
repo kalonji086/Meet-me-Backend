@@ -33,6 +33,7 @@ router.post('/community/support', portfolioController.submitCommunitySupport);
 
 // Blog Social Routes
 router.get('/:slug/blog', portfolioController.getBlogPosts);
+router.get('/blog/posts/:postId/comments', portfolioController.getPostComments);
 router.post('/blog/posts/:postId/like', portfolioController.likeBlogPost);
 router.post('/blog/posts/:postId/comment', portfolioController.commentBlogPost);
 
@@ -57,6 +58,7 @@ router.put('/admin/:id/status', isAdmin, portfolioController.togglePortfolioStat
 router.delete('/admin/:id', isAdmin, portfolioController.deletePortfolio);
 
 // Portfolio Management (Any authorized admin/owner)
+router.get('/admin/blog', isAdmin, portfolioController.getBlogPostsAdmin);
 router.post('/admin/skills', isAdmin, portfolioController.manageSkill);
 router.post('/admin/experiences', isAdmin, portfolioController.manageExperience);
 router.post('/admin/services', isAdmin, portfolioController.manageService);

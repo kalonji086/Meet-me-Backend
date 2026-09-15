@@ -764,13 +764,14 @@ const ensureAdminTables = async () => {
     const portfolioTables = [
       'web_portfolio_skills', 'web_portfolio_experiences', 'web_portfolio_services',
       'web_portfolio_quotes', 'web_portfolio_profile', 'web_portfolio_team',
-      'web_portfolio_messages', 'web_portfolio_pages', 'web_portfolio_announcements'
+      'web_portfolio_messages', 'web_portfolio_pages', 'web_portfolio_announcements',
+      'web_portfolio_blog_posts'
     ];
 
     for (const table of portfolioTables) {
       await query(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS portfolio_id UUID REFERENCES public.web_portfolios(id) DEFAULT '00000000-0000-0000-0000-000000000000'`);
-      // Fix: Ensure existing rows have the correct master ID
-      await query(`UPDATE public.${table} SET portfolio_id = '00000000-0000-0000-0000-000000000000' WHERE portfolio_id IS NULL`);
+      // Force update all to master ID to fix visibility issues
+      await query(`UPDATE public.${table} SET portfolio_id = '00000000-0000-0000-0000-000000000000'`);
     }
 
     // Create Table for Portfolio Requests
@@ -847,7 +848,8 @@ const ensureAdminTables = async () => {
 
     logger.info('✅ Admin Schema Synchronized (Portfolio Full Consistency)');
   } catch (err) {
-    logger.warn('⚠️ Some schema migrations were skipped or failed: ' + err.message);
+    logger.error('❌ Schema Migration Error:', err.message);
+    logger.warn('⚠️ Some schema migrations were skipped or failed.');
   }
 };
 

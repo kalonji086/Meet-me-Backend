@@ -6622,7 +6622,7 @@
         async function loadBlogPosts() {
             try {
                 const res = await axios.get(`${API_URL}/portfolio/admin/blog`, { headers: { Authorization: `Bearer ${token}` } });
-                const posts = res.data.data;
+                const posts = res.data.data || [];
                 document.getElementById('blog-list').innerHTML = posts.map(p => `
                     <div class="bg-white p-8 rounded-[3rem] border border-gray-100 flex gap-8 items-center group shadow-sm hover:shadow-xl transition-all">
                         <img src="${getFullUrl(p.image_url)}" class="w-32 h-20 rounded-2xl object-cover shadow-sm border border-gray-50 shrink-0">
@@ -6650,10 +6650,12 @@
             } catch (e) {}
         }
 
-        function prepareEditBlog(id) {
-            axios.get(`${API_URL}/portfolio/admin/blog`, { headers: { Authorization: `Bearer ${token}` } }).then(res => {
+        async function prepareEditBlog(id) {
+            try {
+                const res = await axios.get(`${API_URL}/portfolio/admin/blog`, { headers: { Authorization: `Bearer ${token}` } });
                 const p = res.data.data.find(x => x.id === id);
                 if (!p) return;
+
                 document.getElementById('blog-id').value = p.id;
                 document.getElementById('blog-title').value = p.title;
                 document.getElementById('blog-slug').value = p.slug;
@@ -6671,7 +6673,7 @@
                 document.getElementById('blog-save-label').innerText = "METTRE À JOUR L'ARTICLE";
                 document.getElementById('btn-cancel-blog').classList.remove('hidden');
                 document.getElementById('blog-title').focus();
-            });
+            } catch (err) { alert("Erreur lors de la récupération de l'article."); }
         }
 
         function resetBlogForm() {
@@ -6849,14 +6851,6 @@
                 loadExperiences();
                 toast(id ? "Impact mis à jour" : "Nouvel impact ajouté", "success");
             } catch (e) { alert("Erreur"); }
-        }
-
-        async function deleteExperience(id) {
-            if (!confirm("Supprimer cette expérience ?")) return;
-            try {
-                await axios.post(`${API_URL}/portfolio/admin/experiences`, { action: 'delete', id }, { headers: { Authorization: `Bearer ${token}` } });
-                loadExperiences();
-            } catch (e) {}
         }
 
         async function deleteExperience(id) {

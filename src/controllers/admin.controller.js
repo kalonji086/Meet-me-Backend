@@ -1191,9 +1191,8 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'create_campaign':
         case 'broadcast_message':
           const isBroadcast = action.action_type === 'broadcast_message';
-          const { title, message: msgText, content: bcContent, target: bcTarget, targetValue, specificEmail, scheduledAt, theme, ctaText, ctaUrl } = action.details;
+          const { title, message: msgText, content: bcContent, target: bcTarget, targetValue, specificEmail, scheduledAt, theme, ctaText, ctaUrl, fileUrl, fileName } = action.details;
           const finalContent = isBroadcast ? bcContent : msgText;
-          const finalTarget = isBroadcast ? bcTarget : bcTarget; // details use same field names usually
 
           const now = new Date();
           const sDate = scheduledAt ? new Date(scheduledAt) : now;
@@ -1202,16 +1201,18 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           const camp = await query(
             `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
              VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8) RETURNING id`,
-            [title, finalContent, bcTarget || 'all', targetValue || specificEmail || null, action.requested_by, isFut ? 'scheduled' : 'sent', sDate, JSON.stringify({ theme, ctaText, ctaUrl, isBroadcast })]
+            [title, finalContent, bcTarget || 'all', targetValue || specificEmail || null, action.requested_by, isFut ? 'scheduled' : 'sent', sDate, JSON.stringify({ theme, ctaText, ctaUrl, isBroadcast, fileUrl, fileName })]
           );
 
           if (!isFut) {
             const cta = ctaText ? { text: ctaText, url: ctaUrl } : null;
+            const attachment = fileUrl ? { url: fileUrl, name: fileName || 'document.pdf' } : null;
+
             if (bcTarget === 'all') {
               socketService.broadcast('push_notification', { title, body: finalContent, type: 'campaign' });
               const usrs = await query('SELECT id, email, full_name FROM public.profiles WHERE is_global_admin = FALSE');
               for (const u of usrs.rows) {
-                await mailService.sendSystemEmail(u.email, title, finalContent, theme, u.full_name || 'Utilisateur', cta);
+                await mailService.sendSystemEmail(u.email, title, finalContent, theme, u.full_name || 'Utilisateur', cta, attachment);
               }
               await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [usrs.rows.length, camp.rows[0].id]);
             } else {
@@ -1220,7 +1221,7 @@ const handlePendingAction = asyncHandler(async (req, res) => {
               for (const email of emails) {
                 const uRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [email]);
                 if (uRes.rows.length > 0) socketService.sendToUser(uRes.rows[0].id, 'push_notification', { title, body: finalContent, type: 'campaign' });
-                const success = await mailService.sendSystemEmail(email, title, finalContent, theme, uRes.rows[0]?.full_name || 'Utilisateur', cta);
+                const success = await mailService.sendSystemEmail(email, title, finalContent, theme, uRes.rows[0]?.full_name || 'Utilisateur', cta, attachment);
                 if (success) sCount++;
               }
               await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sCount, camp.rows[0].id]);
@@ -1647,7 +1648,7 @@ const getCampaigns = asyncHandler(async (req, res) => {
 });
 
 const createCampaign = asyncHandler(async (req, res) => {
-  const { title, message, target = 'all', targetValue, scheduledAt, theme = 'amazon', ctaText, ctaUrl } = req.body;
+  const { title, message, target = 'all', targetValue, scheduledAt, theme = 'amazon', ctaText, ctaUrl, fileUrl, fileName } = req.body;
   if (!title || !message) {
     return res.status(400).json({ success: false, error: 'Titre et message requis' });
   }
@@ -1665,17 +1666,19 @@ const createCampaign = asyncHandler(async (req, res) => {
   const campaign = await query(
     `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8) RETURNING *`,
-    [title, message, target || 'all', targetValue || null, req.user?.id || null, isFuture ? 'scheduled' : 'sent', scheduledDate, JSON.stringify({ theme, ctaText, ctaUrl })]
+    [title, message, target || 'all', targetValue || null, req.user?.id || null, isFuture ? 'scheduled' : 'sent', scheduledDate, JSON.stringify({ theme, ctaText, ctaUrl, fileUrl, fileName })]
   );
 
   // Si l'envoi est immédiat
   if (!isFuture) {
     const cta = ctaText ? { text: ctaText, url: ctaUrl } : null;
+    const attachment = fileUrl ? { url: fileUrl, name: fileName || 'document.pdf' } : null;
+
     if (target === 'all') {
       const users = await query('SELECT id, email, full_name FROM public.profiles WHERE is_global_admin = FALSE');
       for (const user of users.rows) {
         socketService.sendToUser(user.id, 'push_notification', { title, body: message, type: 'campaign' });
-        await mailService.sendSystemEmail(user.email, title, message, theme, user.full_name || 'Utilisateur', cta);
+        await mailService.sendSystemEmail(user.email, title, message, theme, user.full_name || 'Utilisateur', cta, attachment);
       }
       await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [users.rows.length, campaign.rows[0].id]);
     } else if (targetValue) {
@@ -1687,7 +1690,7 @@ const createCampaign = asyncHandler(async (req, res) => {
         if (userRes.rows.length > 0) {
           socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: message, type: 'campaign' });
         }
-        const success = await mailService.sendSystemEmail(email, title, message, theme, userName, cta);
+        const success = await mailService.sendSystemEmail(email, title, message, theme, userName, cta, attachment);
         if (success) sentCount++;
       }
       await query('UPDATE public.notification_campaigns SET sent_count = $1 WHERE id = $2', [sentCount, campaign.rows[0].id]);
@@ -1760,7 +1763,7 @@ const getAuditLogs = asyncHandler(async (req, res) => {
 });
 
 const broadcastMessage = asyncHandler(async (req, res) => {
-  const { content, title, target = 'all', specificEmail, scheduledAt, theme = 'amazon', ctaText, ctaUrl } = req.body;
+  const { content, title, target = 'all', specificEmail, scheduledAt, theme = 'amazon', ctaText, ctaUrl, fileUrl, fileName } = req.body;
   if (!content || !title) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
 
   await ensureAdminTables();
@@ -1777,26 +1780,27 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     const campaign = await query(
       `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
        VALUES ($1, $2, $3, $4, $5, 'scheduled', $6, 0, $7) RETURNING *`,
-      [title, content, target, specificEmail || null, req.user?.id || null, scheduledDate, JSON.stringify({ theme, isBroadcast: true, ctaText, ctaUrl })]
+      [title, content, target, specificEmail || null, req.user?.id || null, scheduledDate, JSON.stringify({ theme, isBroadcast: true, ctaText, ctaUrl, fileUrl, fileName })]
     );
     await logAdminAction(req, 'broadcast_scheduled', 'system', campaign.rows[0].id, { title, target, scheduledAt });
     return res.json({ success: true, message: 'Diffusion programmée avec succès.' });
   }
 
   const cta = ctaText ? { text: ctaText, url: ctaUrl } : null;
+  const attachment = fileUrl ? { url: fileUrl, name: fileName || 'document.pdf' } : null;
 
   if (target === 'all') {
     socketService.broadcast('push_notification', { title, body: content, type: 'system' });
     const users = await query('SELECT email, full_name FROM public.profiles WHERE is_global_admin = FALSE');
     for (const user of users.rows) {
-      await mailService.sendSystemEmail(user.email, title, content, theme, user.full_name || 'Utilisateur', cta);
+      await mailService.sendSystemEmail(user.email, title, content, theme, user.full_name || 'Utilisateur', cta, attachment);
     }
 
     // Sauvegarder dans l'historique
     await query(
       `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
        VALUES ($1, $2, $3, $4, $5, 'sent', NOW(), $6, $7)`,
-      [title, content, 'all', null, req.user?.id || null, users.rows.length, JSON.stringify({ theme, isBroadcast: true, ctaText, ctaUrl })]
+      [title, content, 'all', null, req.user?.id || null, users.rows.length, JSON.stringify({ theme, isBroadcast: true, ctaText, ctaUrl, fileUrl, fileName })]
     );
 
     await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'all', count: users.rows.length, theme });
@@ -1807,12 +1811,12 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     let sentCount = 0;
 
     for (const email of emails) {
-      const userRes = await query('SELECT id, full_name FROM public.profiles WHERE id = $1', [email]);
+      const userRes = await query('SELECT id, full_name FROM public.profiles WHERE email = $1', [email]);
       const userName = userRes.rows[0]?.full_name || 'Utilisateur';
       if (userRes.rows.length > 0) {
         socketService.sendToUser(userRes.rows[0].id, 'push_notification', { title, body: content, type: 'system' });
       }
-      const success = await mailService.sendSystemEmail(email, title, content, theme, userName, cta);
+      const success = await mailService.sendSystemEmail(email, title, content, theme, userName, cta, attachment);
       if (success) sentCount++;
     }
 
@@ -1820,7 +1824,7 @@ const broadcastMessage = asyncHandler(async (req, res) => {
     await query(
       `INSERT INTO public.notification_campaigns (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
        VALUES ($1, $2, $3, $4, $5, 'sent', NOW(), $6, $7)`,
-      [title, content, 'specific', specificEmail, req.user?.id || null, sentCount, JSON.stringify({ theme, isBroadcast: true, ctaText, ctaUrl })]
+      [title, content, 'specific', specificEmail, req.user?.id || null, sentCount, JSON.stringify({ theme, isBroadcast: true, ctaText, ctaUrl, fileUrl, fileName })]
     );
 
     await logAdminAction(req, 'broadcast_message', 'system', null, { title, target: 'specific', count: sentCount, emails: specificEmail, theme });

@@ -235,7 +235,7 @@ class MailService {
   /**
    * Envoyer un email de diffusion (Broadcast)
    */
-  async sendSystemEmail(email, title, body, theme = "amazon", name = "Utilisateur", cta = null) {
+  async sendSystemEmail(email, title, body, theme = "amazon", name = "Utilisateur", cta = null, attachment = null) {
     // Personnalisation du corps du message
     let personalizedBody = body;
     personalizedBody = personalizedBody.replace(/\{\{name\}\}/g, name);
@@ -271,6 +271,14 @@ class MailService {
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, title, theme);
     sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
+
+    if (attachment && attachment.url) {
+        // attachment format for Brevo: [{ url: "...", name: "..." }]
+        sendSmtpEmail.attachment = [{
+            url: attachment.url.startsWith('http') ? attachment.url : `${config.server.apiUrl}/${attachment.url.replace(/^\//, '')}`,
+            name: attachment.name || 'document.pdf'
+        }];
+    }
 
     try {
       await apiInstance.sendTransacEmail(sendSmtpEmail);

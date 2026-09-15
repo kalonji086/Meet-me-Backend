@@ -757,5 +757,5 @@ module.exports = {
   getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage, getCommunityMembers,
   getPortfolioRequestDetail, deletePortfolioRequest, deletePortfolio,
   getCommunityPosts, createCommunityPost, likeCommunityPost, commentCommunityPost, submitCommunitySupport,
-  manageBlogPost, getBlogPosts, likeBlogPost, commentBlogPost
+  manageBlogPost, getBlogPosts, getBlogPostsAdmin, getPostComments, likeBlogPost, commentBlogPost
 };

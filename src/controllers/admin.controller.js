@@ -701,6 +701,10 @@ const ensureAdminTables = async () => {
     await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_url TEXT');
     await query('ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_name TEXT');
 
+    // Campaign Enhancements
+    await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS file_url TEXT');
+    await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS file_name TEXT');
+
     // Sports & Announcements
     await query(`
       CREATE TABLE IF NOT EXISTS public.live_sports (

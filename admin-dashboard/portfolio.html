@@ -69,6 +69,35 @@
             .discord-channels { position: absolute; left: 72px; top: 0; bottom: 0; z-index: 150; transform: translateX(-100%); transition: transform 0.3s; }
             .discord-channels.open { transform: translateX(0); box-shadow: 20px 0 50px rgba(0,0,0,0.5); }
         }
+
+        /* Team Card Animation */
+        .team-card { position: relative; overflow: hidden; }
+        .team-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(transparent, transparent, transparent, #fbbf24);
+            animation: rotate-border 6s linear infinite;
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .team-card:hover::before { opacity: 1; }
+        .team-card-inner {
+            position: relative;
+            z-index: 1;
+            background: #0c0c0e;
+            margin: 2px;
+            border-radius: inherit;
+            height: calc(100% - 4px);
+        }
+        @keyframes rotate-border {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="selection:bg-cyan-500/30">
@@ -850,7 +879,22 @@
         }
 
         async function viewGenericPage(slug) { try { const res = await axios.get(`${API_BASE}/public`); const page = res.data.data.pages.find(p => p.slug === slug); if (page) { document.getElementById('generic-page-title').innerText = page.title; document.getElementById('generic-page-body').innerHTML = page.content; navigateTo('content'); } } catch (e) {} }
-        function renderTeam(team) { document.getElementById('team-grid').innerHTML = team.map(m => `<div class="group flex flex-col items-center"><div class="relative w-full aspect-[3/4] rounded-[2rem] md:rounded-[3.5rem] overflow-hidden glass mb-4 sm:mb-8"><img src="${getFullUrl(m.image_url)}" class="w-full h-full object-cover transition-all group-hover:scale-110"><div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] to-transparent opacity-80"></div><div class="absolute bottom-4 left-4 md:bottom-8 md:left-8 right-4 md:right-8"><p class="text-[8px] md:text-[10px] font-black text-cyan-400 uppercase tracking-widest">${m.role}</p><h4 class="text-xl md:text-3xl font-black text-white uppercase truncate">${m.name}</h4></div></div><p class="text-gray-500 text-xs text-center line-clamp-2">${m.bio || ''}</p></div>`).join(''); }
+        function renderTeam(team) {
+            document.getElementById('team-grid').innerHTML = team.map(m => `
+                <div class="team-card rounded-[2.2rem] md:rounded-[3.7rem]">
+                    <div class="team-card-inner group flex flex-col items-center p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem]">
+                        <div class="relative w-full aspect-[3/4] rounded-[1.5rem] md:rounded-[3rem] overflow-hidden glass mb-4 sm:mb-8">
+                            <img src="${getFullUrl(m.image_url)}" class="w-full h-full object-cover transition-all group-hover:scale-110">
+                            <div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] to-transparent opacity-80"></div>
+                            <div class="absolute bottom-4 left-4 md:bottom-8 md:left-8 right-4 md:right-8">
+                                <p class="text-[8px] md:text-[10px] font-black text-cyan-400 uppercase tracking-widest">${m.role}</p>
+                                <h4 class="text-xl md:text-3xl font-black text-white uppercase truncate">${m.name}</h4>
+                            </div>
+                        </div>
+                        <p class="text-gray-500 text-xs text-center line-clamp-2">${m.bio || ''}</p>
+                    </div>
+                </div>`).join('');
+        }
         function renderSkills(skills) {
             document.getElementById('skills-grid').innerHTML = skills.map(s => `
                 <div class="glass p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border-white/5 hover:border-cyan-500/40 transition-all hover:scale-[1.02] group relative overflow-hidden text-left flex flex-col h-full">

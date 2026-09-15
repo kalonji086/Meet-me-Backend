@@ -494,6 +494,16 @@ const manageTeam = asyncHandler(async (req, res) => {
     );
     return res.json({ success: true, data: resAdd.rows[0] });
   }
+  if (action === 'update') {
+    const resUp = await query(
+      `UPDATE public.web_portfolio_team
+       SET name = COALESCE($1, name), role = COALESCE($2, role), bio = COALESCE($3, bio),
+           image_url = COALESCE($4, image_url), order_index = COALESCE($5, order_index)
+       WHERE id = $6 AND portfolio_id = $7 RETURNING *`,
+      [name, role, bio, imageUrl, orderIndex, id, portfolioId]
+    );
+    return res.json({ success: true, data: resUp.rows[0] });
+  }
   if (action === 'delete') {
     await query('DELETE FROM public.web_portfolio_team WHERE id = $1 AND portfolio_id = $2', [id, portfolioId]);
     return res.json({ success: true });

@@ -815,9 +815,15 @@
                              <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Biographie / Texte</label>
                              <textarea id="team-bio" rows="3" class="w-full p-6 bg-gray-50 border border-gray-100 rounded-[2rem] outline-none font-medium text-sm focus:border-cyan-500" placeholder="Courte présentation..."></textarea>
                          </div>
-                         <button onclick="saveTeamMember()" class="mt-8 px-10 py-4 bg-cyan-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-cyan-700 transition-all flex items-center gap-2">
-                             <i data-lucide="plus"></i> AJOUTER À L'ÉQUIPE
-                         </button>
+                         <input type="hidden" id="team-id">
+                         <div class="flex gap-4 mt-8">
+                             <button id="btn-save-team" onclick="saveTeamMember()" class="px-10 py-4 bg-cyan-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-cyan-700 transition-all flex items-center gap-2">
+                                 <i data-lucide="plus"></i> <span id="team-save-label">AJOUTER À L'ÉQUIPE</span>
+                             </button>
+                             <button id="btn-cancel-team" onclick="resetTeamForm()" class="hidden px-8 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">
+                                 Annuler
+                             </button>
+                         </div>
                     </div>
                     <div id="team-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <!-- Injected by JS -->
@@ -6866,19 +6872,54 @@
                 const res = await axios.get(`${API_URL}/portfolio/public`);
                 const team = res.data.data.team;
                 document.getElementById('team-list').innerHTML = team.map(m => `
-                    <div class="bg-white p-6 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center group shadow-sm">
-                        <img src="${getFullUrl(m.image_url)}" class="w-24 h-24 rounded-full object-cover mb-4 border-4 border-gray-50 shadow-lg">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center group shadow-sm relative transition-all hover:shadow-xl">
+                        <img src="${getFullUrl(m.image_url)}" class="w-24 h-24 rounded-full object-cover mb-4 border-4 border-gray-50 shadow-lg group-hover:scale-105 transition-all">
                         <h4 class="text-lg font-black text-gray-900 uppercase">${m.name}</h4>
                         <p class="text-[10px] font-black text-cyan-600 uppercase mb-3 tracking-widest">${m.role}</p>
                         <p class="text-xs text-gray-500 font-medium line-clamp-3 mb-6">${m.bio || ''}</p>
-                        <button onclick="deleteTeamMember('${m.id}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        <div class="flex gap-2">
+                            <button onclick="prepareEditTeam('${m.id}')" class="p-3 bg-gray-50 text-gray-400 hover:text-cyan-600 rounded-xl transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button onclick="deleteTeamMember('${m.id}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
                     </div>
                 `).join('') || '<p class="col-span-full text-center py-20 text-gray-400 text-xs font-black uppercase">L\'équipe est vide</p>';
                 lucide.createIcons();
             } catch (e) {}
         }
 
+        async function prepareEditTeam(id) {
+            try {
+                const res = await axios.get(`${API_URL}/portfolio/public`);
+                const m = res.data.data.team.find(x => x.id === id);
+                if (!m) return;
+
+                document.getElementById('team-id').value = m.id;
+                document.getElementById('team-name').value = m.name;
+                document.getElementById('team-role').value = m.role;
+                document.getElementById('team-bio').value = m.bio || '';
+
+                if (m.image_url) document.getElementById('team-img-preview').src = getFullUrl(m.image_url);
+
+                document.getElementById('team-save-label').innerText = "METTRE À JOUR LE MEMBRE";
+                document.getElementById('btn-cancel-team').classList.remove('hidden');
+                document.getElementById('team-name').focus();
+            } catch (err) {}
+        }
+
+        function resetTeamForm() {
+            document.getElementById('team-id').value = '';
+            document.getElementById('team-name').value = '';
+            document.getElementById('team-role').value = '';
+            document.getElementById('team-bio').value = '';
+            document.getElementById('team-img-input').value = '';
+            document.getElementById('team-img-preview').src = 'https://ui-avatars.com/api/?name=Team';
+
+            document.getElementById('team-save-label').innerText = "AJOUTER À L'ÉQUIPE";
+            document.getElementById('btn-cancel-team').classList.add('hidden');
+        }
+
         async function saveTeamMember() {
+            const id = document.getElementById('team-id').value;
             const name = document.getElementById('team-name').value;
             const role = document.getElementById('team-role').value;
             const bio = document.getElementById('team-bio').value;
@@ -6893,14 +6934,14 @@
                     if (up.success) imageUrl = up.data.fileUrl;
                 }
 
-                await axios.post(`${API_URL}/portfolio/admin/team`, { action: 'add', name, role, bio, imageUrl }, { headers: { Authorization: `Bearer ${token}` } });
-                document.getElementById('team-name').value = '';
-                document.getElementById('team-role').value = '';
-                document.getElementById('team-bio').value = '';
-                document.getElementById('team-img-input').value = '';
-                document.getElementById('team-img-preview').src = 'https://ui-avatars.com/api/?name=Team';
+                const action = id ? 'update' : 'add';
+                await axios.post(`${API_URL}/portfolio/admin/team`, {
+                    action, id, name, role, bio, imageUrl
+                }, { headers: { Authorization: `Bearer ${token}` } });
+
+                resetTeamForm();
                 loadTeam();
-                toast("Membre ajouté", "success");
+                toast(id ? "Membre mis à jour" : "Nouveau membre ajouté", "success");
             } catch (e) { alert("Erreur"); }
         }
 

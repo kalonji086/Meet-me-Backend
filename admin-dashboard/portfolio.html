@@ -71,7 +71,7 @@
         }
 
         /* Team Card Animation */
-        .team-card { position: relative; overflow: hidden; }
+        .team-card { position: relative; overflow: hidden; background: rgba(255,255,255,0.05); }
         .team-card::before {
             content: '';
             position: absolute;
@@ -79,20 +79,18 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            background: conic-gradient(transparent, transparent, transparent, #fbbf24);
-            animation: rotate-border 6s linear infinite;
+            background: conic-gradient(transparent, transparent, #fbbf24, transparent);
+            animation: rotate-border 4s linear infinite;
             z-index: 0;
-            opacity: 0;
-            transition: opacity 0.5s;
         }
-        .team-card:hover::before { opacity: 1; }
         .team-card-inner {
             position: relative;
             z-index: 1;
-            background: #0c0c0e;
+            background: #0a0a0c;
             margin: 2px;
             border-radius: inherit;
             height: calc(100% - 4px);
+            width: calc(100% - 4px);
         }
         @keyframes rotate-border {
             from { transform: rotate(0deg); }

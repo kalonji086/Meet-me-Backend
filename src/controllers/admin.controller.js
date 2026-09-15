@@ -769,6 +769,8 @@ const ensureAdminTables = async () => {
 
     for (const table of portfolioTables) {
       await query(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS portfolio_id UUID REFERENCES public.web_portfolios(id) DEFAULT '00000000-0000-0000-0000-000000000000'`);
+      // Fix: Ensure existing rows have the correct master ID
+      await query(`UPDATE public.${table} SET portfolio_id = '00000000-0000-0000-0000-000000000000' WHERE portfolio_id IS NULL`);
     }
 
     // Create Table for Portfolio Requests

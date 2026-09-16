@@ -46,6 +46,12 @@ router.post('/upload-logo', uploadController.uploadMiddleware.singleFile, (req, 
 
 router.post('/request', portfolioController.submitPortfolioRequest);
 
+// Public upload for community and blog
+router.post('/upload-public', uploadController.uploadMiddleware.singleFile, (req, res, next) => {
+    req.userId = '00000000-0000-0000-0000-000000000000'; // System ID
+    next();
+}, asyncHandler(uploadController.uploadFile));
+
 // Admin restricted access
 router.use(authenticate);
 

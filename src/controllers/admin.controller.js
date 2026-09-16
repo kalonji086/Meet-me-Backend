@@ -627,6 +627,7 @@ const ensureAdminTables = async () => {
         parent_id UUID REFERENCES public.web_portfolio_blog_comments(id) ON DELETE CASCADE,
         author_name TEXT,
         content TEXT NOT NULL,
+        image_url TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);

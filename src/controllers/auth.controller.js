@@ -165,15 +165,11 @@ const register = asyncHandler(async (req, res) => {
       token,
       refreshToken,
       user: {
-        id: user.id,
+        ...user,
         name: user.full_name,
-        email: user.email,
-        username: user.username,
         avatar: user.avatar_url,
-        status: user.status,
-        isGlobalAdmin: user.is_global_admin,
-        push_token: user.push_token
-      },
+        isGlobalAdmin: user.is_global_admin
+      }
     }
   });
 });

@@ -1612,8 +1612,6 @@
                 }
             }
         }
-            }
-        }
         function getFullUrl(url) { if (!url || url === 'null') return 'https://placehold.co/400x400/000/fff?text=Photo'; if (url.startsWith('http')) return url; return '/' + url.replace(/^\//, ''); }
         function scrollToContact() { navigateTo('home'); setTimeout(() => document.getElementById('contact-home').scrollIntoView({ behavior: 'smooth' }), 100); }
         function openTrackingModal() { document.getElementById('modal-tracking').classList.remove('hidden'); }

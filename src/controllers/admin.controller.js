@@ -652,6 +652,18 @@ const ensureAdminTables = async () => {
       ALTER TABLE public.web_portfolio_blog_comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
     `);
 
+    // Table pour les codes de suivi temporaires
+    await query(`
+      CREATE TABLE IF NOT EXISTS public.web_portfolio_tracking_codes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email TEXT NOT NULL,
+        code TEXT NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_tracking_codes_email ON public.web_portfolio_tracking_codes(email);
+    `);
+
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS logo_url TEXT');
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS project_url TEXT');
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS is_in_progress BOOLEAN DEFAULT FALSE');

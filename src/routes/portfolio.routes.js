@@ -8,6 +8,7 @@ const { asyncHandler } = require('../middleware/error.middleware');
 router.get('/public', portfolioController.getPublicData); // Default (Together Tech)
 router.get('/:slug/public', portfolioController.getPublicData); // Custom Portfolio
 router.post('/quote', portfolioController.submitQuote);
+router.post('/client/tracking/request', portfolioController.requestTrackingCode);
 router.get('/client/tracking', portfolioController.getClientQuotes);
 router.get('/chat/:quoteId', portfolioController.handleChat);
 router.post('/chat/:quoteId', portfolioController.handleChat);

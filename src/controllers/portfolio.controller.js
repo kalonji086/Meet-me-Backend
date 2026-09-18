@@ -21,7 +21,7 @@ const getManagedPortfolioId = async (req) => {
  */
 const getPublicData = asyncHandler(async (req, res) => {
   const { slug } = req.params;
-  const portfolio = await query('SELECT * FROM public.web_portfolios WHERE slug = $1', [slug || 'together']);
+  const portfolio = await query("SELECT * FROM public.web_portfolios WHERE slug = $1 AND status = 'approved'", [slug || 'together']);
   if (portfolio.rows.length === 0) return res.status(404).json({ error: 'Portfolio non trouvé' });
 
   const portfolioId = portfolio.rows[0].id;
@@ -181,10 +181,48 @@ const togglePortfolioStatus = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Client tracking quotes
+ * @desc    Request a tracking code by email
+ */
+const requestTrackingCode = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email requis' });
+
+  // Vérifier si des devis existent pour cet email pour éviter de spammer
+  const check = await query('SELECT count(*) FROM public.web_portfolio_quotes WHERE client_email = $1', [email]);
+  if (parseInt(check.rows[0].count) === 0) {
+    return res.status(404).json({ error: 'Aucune demande trouvée pour cet email.' });
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 30 * 60000); // 30 mins
+
+  await query(
+    'INSERT INTO public.web_portfolio_tracking_codes (email, code, expires_at) VALUES ($1, $2, $3)',
+    [email, code, expiresAt]
+  );
+
+  await mailService.sendTrackingCodeEmail(email, code);
+  res.json({ success: true, message: 'Code envoyé par email.' });
+});
+
+/**
+ * @desc    Client tracking quotes (Secured with code)
  */
 const getClientQuotes = asyncHandler(async (req, res) => {
-  const { email, quoteId } = req.query;
+  const { email, code, quoteId } = req.query;
+
+  if (!email || !code) return res.status(400).json({ error: 'Email et code requis' });
+
+  // Vérifier le code
+  const codeCheck = await query(
+    'SELECT * FROM public.web_portfolio_tracking_codes WHERE email = $1 AND code = $2 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+    [email, code]
+  );
+
+  if (codeCheck.rows.length === 0) {
+    return res.status(401).json({ error: 'Code invalide ou expiré.' });
+  }
+
   const result = await query(
     'SELECT * FROM public.web_portfolio_quotes WHERE client_email = $1 AND (id::text = $2 OR $2 IS NULL) ORDER BY created_at DESC',
     [email, quoteId]
@@ -197,14 +235,24 @@ const getClientQuotes = asyncHandler(async (req, res) => {
  */
 const handleChat = asyncHandler(async (req, res) => {
   const { quoteId } = req.params;
-  const { content, senderType } = req.body;
+  const { content, senderType, email, code } = req.body;
+
+  // Sécurité pour les visiteurs
+  if (!req.user && senderType === 'client') {
+    if (!email || !code) return res.status(401).json({ error: 'Identification requise' });
+    const codeCheck = await query('SELECT 1 FROM public.web_portfolio_tracking_codes WHERE email = $1 AND code = $2 AND expires_at > NOW()', [email, code]);
+    if (codeCheck.rows.length === 0) return res.status(401).json({ error: 'Session expirée' });
+    const ownership = await query('SELECT 1 FROM public.web_portfolio_quotes WHERE id = $1 AND client_email = $2', [quoteId, email]);
+    if (ownership.rows.length === 0) return res.status(403).json({ error: 'Accès refusé' });
+  }
 
   if (req.method === 'POST') {
+    if (!content) return res.status(400).json({ error: 'Message vide' });
     const result = await query(
       'INSERT INTO public.web_portfolio_messages (quote_id, sender_type, content) VALUES ($1, $2, $3) RETURNING *',
-      [quoteId, senderType, content]
+      [quoteId, senderType || 'client', content]
     );
-    socketService.broadcast('portfolio:new_message', result.rows[0]);
+    socketService.broadcast('portfolio:new_message', { ...result.rows[0], quoteId });
     return res.json({ success: true, data: result.rows[0] });
   }
 
@@ -238,12 +286,19 @@ const updateContract = asyncHandler(async (req, res) => {
 
 const signContract = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { signatureData } = req.body;
+  const { email, code } = req.body;
+
+  if (!req.user) {
+    if (!email || !code) return res.status(401).json({ error: 'Identification requise' });
+    const codeCheck = await query('SELECT 1 FROM public.web_portfolio_tracking_codes WHERE email = $1 AND code = $2 AND expires_at > NOW()', [email, code]);
+    if (codeCheck.rows.length === 0) return res.status(401).json({ error: 'Session expirée' });
+  }
+
   const result = await query(
     `UPDATE public.web_portfolio_quotes
-     SET contract_signature_data = $1, contract_signed_at = NOW(), is_contract_archived = TRUE, updated_at = NOW()
-     WHERE id = $2 RETURNING *`,
-    [signatureData, id]
+     SET contract_signed_at = NOW(), is_contract_archived = TRUE, status = 'signed', updated_at = NOW()
+     WHERE id = $1 RETURNING *`,
+    [id]
   );
   socketService.broadcast('portfolio:contract_signed', result.rows[0]);
   res.json({ success: true, message: 'Contrat signé !' });
@@ -251,7 +306,14 @@ const signContract = asyncHandler(async (req, res) => {
 
 const updateSpecs = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { specs } = req.body;
+  const { specs, email, code } = req.body;
+
+  if (!req.user) {
+    if (!email || !code) return res.status(401).json({ error: 'Identification requise' });
+    const codeCheck = await query('SELECT 1 FROM public.web_portfolio_tracking_codes WHERE email = $1 AND code = $2 AND expires_at > NOW()', [email, code]);
+    if (codeCheck.rows.length === 0) return res.status(401).json({ error: 'Session expirée' });
+  }
+
   await query('UPDATE public.web_portfolio_quotes SET specifications = $1, updated_at = NOW() WHERE id = $2', [specs, id]);
   socketService.broadcast('portfolio:specs_updated', { quoteId: id, specs });
   res.json({ success: true, message: 'Cahier des charges mis à jour.' });
@@ -260,6 +322,10 @@ const updateSpecs = asyncHandler(async (req, res) => {
 const submitQuote = asyncHandler(async (req, res) => {
   const { clientName, clientEmail, projectDescription, budget, specifications, portfolioId } = req.body;
   if (!clientName || !clientEmail) return res.status(400).json({ error: 'Nom et Email requis' });
+  if (portfolioId) {
+    const portfolio = await query("SELECT id FROM public.web_portfolios WHERE id = $1 AND status = 'approved'", [portfolioId]);
+    if (portfolio.rows.length === 0) return res.status(400).json({ error: 'Portfolio invalide' });
+  }
   const result = await query(
     `INSERT INTO public.web_portfolio_quotes (client_name, client_email, project_description, budget, specifications, portfolio_id)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -722,7 +788,7 @@ const getCommunityMembers = asyncHandler(async (req, res) => {
 
 module.exports = {
   getPublicData, submitPortfolioRequest, approvePortfolioRequest, getPortfolioRequests, getAllPortfolios, togglePortfolioStatus,
-  getClientQuotes, handleChat, replyToQuote, updateContract, signContract, updateSpecs, submitQuote,
+  requestTrackingCode, getClientQuotes, handleChat, replyToQuote, updateContract, signContract, updateSpecs, submitQuote,
   manageSkill, manageExperience, manageService, manageTeam, getQuotes, updateQuoteStatusAdmin, updateProfileAdmin, managePage,
   getCommunityGroups, getCommunityMessages, sendCommunityMessage, togglePinMessage, getCommunityMembers,
   getPortfolioRequestDetail, deletePortfolioRequest, deletePortfolio,

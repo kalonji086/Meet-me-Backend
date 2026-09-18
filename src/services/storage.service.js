@@ -169,10 +169,21 @@ class StorageService {
     if (mimeType.startsWith('image/')) return 'image';
     if (mimeType.startsWith('audio/')) return 'audio';
     if (mimeType.startsWith('video/')) return 'video';
-    return 'document';
+    if (mimeType === 'application/pdf' || mimeType.includes('msword') || mimeType.includes('officedocument')) return 'document';
+    return 'other';
   }
 
-  validateFileType() { return true; }
+  validateFileType(mimeType, category) {
+    const allowedTypes = {
+      image: config.upload.allowedImageTypes,
+      audio: config.upload.allowedAudioTypes,
+      video: config.upload.allowedVideoTypes,
+      document: config.upload.allowedDocumentTypes,
+    };
+
+    if (!allowedTypes[category]) return false;
+    return allowedTypes[category].includes(mimeType);
+  }
 }
 
 const storageService = new StorageService();

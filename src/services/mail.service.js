@@ -574,6 +574,36 @@ class MailService {
 
     return this.sendSystemEmail(email, `Votre Portfolio "${portfolioTitle}" est prêt !`, content, 'modern', name);
   }
+
+  /**
+   * Envoyer un code de suivi de devis
+   */
+  async sendTrackingCodeEmail(email, code) {
+    const title = "Votre code de suivi de projet";
+    const content = `
+      <p>Vous avez demandé à accéder au suivi de vos devis et projets sur <strong>Together Tech</strong>.</p>
+      <p>Veuillez utiliser le code de vérification ci-dessous pour confirmer votre identité :</p>
+      <div class="otp-box" style="font-size: 32px; letter-spacing: 8px;">${code}</div>
+      <p>Ce code est <strong>valable pendant 30 minutes</strong>.</p>
+      <p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.</p>
+      <p>À bientôt,<br>L'équipe Together Tech</p>
+    `;
+
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = `${code} est votre code de suivi Together Tech`;
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Code d'accès sécurisé à vos devis.");
+    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
+    sendSmtpEmail.to = [{ email: email }];
+
+    try {
+      await apiInstance.sendTransacEmail(sendSmtpEmail);
+      logger.info(`Email de suivi envoyé à: ${email}`);
+      return true;
+    } catch (error) {
+      logger.error(`Erreur Brevo Tracking pour ${email}:`, error.response?.body || error);
+      return false;
+    }
+  }
 }
 
 module.exports = new MailService();

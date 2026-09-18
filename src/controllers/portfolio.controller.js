@@ -657,13 +657,13 @@ const likeBlogPost = asyncHandler(async (req, res) => {
 
 const commentBlogPost = asyncHandler(async (req, res) => {
     const { postId } = req.params;
-    const { content, authorName, parentId, imageUrl } = req.body;
+    const { content, authorName, parentId, imageUrl, stickerUrl } = req.body;
     const userId = req.user ? req.user.id : null;
 
     const result = await query(
-        `INSERT INTO public.web_portfolio_blog_comments (post_id, author_id, author_name, content, parent_id, image_url)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [postId, userId, authorName || 'Visiteur', content || '', parentId || null, imageUrl || null]
+        `INSERT INTO public.web_portfolio_blog_comments (post_id, author_id, author_name, content, parent_id, image_url, sticker_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [postId, userId, authorName || 'Visiteur', content || '', parentId || null, imageUrl || null, stickerUrl || null]
     );
 
     const comment = { ...result.rows[0], author_avatar: req.user?.avatar_url || null };

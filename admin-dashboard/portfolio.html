@@ -1037,6 +1037,11 @@
                                         <button onclick="clearBlogCommentFile()" class="absolute top-2 right-2 p-2 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
                                     </div>
 
+                                    <div id="blog-comment-sticker-preview" class="hidden mb-6 relative group w-32 h-32 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center bg-white/5">
+                                        <span id="blog-comment-sticker-img" class="text-6xl"></span>
+                                        <button onclick="clearBlogCommentSticker()" class="absolute top-2 right-2 p-2 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                    </div>
+
                                     <textarea id="comment-input" rows="5" placeholder="Votre avis nous intéresse..." class="w-full bg-transparent border-none outline-none text-white font-medium text-lg mb-8 resize-none" style="min-height: 150px;"></textarea>
 
                                     <div id="blog-emoji-picker" class="hidden absolute bottom-24 left-8 z-[200] bg-[#1e1f22] p-4 rounded-2xl border border-white/10 shadow-2xl max-h-48 overflow-y-auto custom-scrollbar w-64">
@@ -1045,13 +1050,21 @@
                                         </div>
                                     </div>
 
+                                    <div id="blog-sticker-picker" class="hidden absolute bottom-24 left-24 z-[200] bg-[#1e1f22] p-4 rounded-2xl border border-white/10 shadow-2xl max-h-48 overflow-y-auto custom-scrollbar w-64">
+                                        <div class="grid grid-cols-4 gap-3 text-center">
+                                            ${['🚀','🔥','🎉','💯','❤️','😎','👑','✨','👏','😍','🤩','💥','🎈','🏆','💡','🤖','🎮','🎵','🌟','🦾'].map(s => `<button onclick="selectBlogSticker('${s}')" class="text-3xl hover:bg-white/5 p-2 rounded transition-all transform hover:scale-110">${s}</button>`).join('')}
+                                        </div>
+                                    </div>
+
                                     <div class="flex justify-between items-center">
                                         <div class="flex gap-4 text-gray-400">
-                                            <button onclick="document.getElementById('blog-emoji-picker').classList.toggle('hidden')" class="hover:text-cyan-400 transition-all"><i data-lucide="smile" class="w-5 h-5"></i></button>
+                                            <button onclick="document.getElementById('blog-emoji-picker').classList.toggle('hidden'); document.getElementById('blog-sticker-picker').classList.add('hidden');" class="hover:text-cyan-400 transition-all"><i data-lucide="smile" class="w-5 h-5"></i></button>
+                                            <button onclick="document.getElementById('blog-sticker-picker').classList.toggle('hidden'); document.getElementById('blog-emoji-picker').classList.add('hidden');" class="hover:text-cyan-400 transition-all"><i data-lucide="sticky-note" class="w-5 h-5"></i></button>
                                             <button onclick="document.getElementById('blog-comment-file').click()" class="hover:text-cyan-400 transition-all"><i data-lucide="image" class="w-5 h-5"></i></button>
                                             <input type="file" id="blog-comment-file" class="hidden" onchange="previewBlogCommentFile(this)">
                                         </div>
                                         <input type="hidden" id="reply-parent-id">
+                                        <input type="hidden" id="blog-sticker-input">
                                         <button onclick="postComment('${post.id}')" class="px-12 py-5 bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 transition-all">Envoyer</button>
                                     </div>
                                 </div>
@@ -1100,6 +1113,11 @@
                                 <span class="text-[9px] text-gray-500 font-bold uppercase">${timeAgo(comment.created_at)}</span>
                             </div>
                             <p class="text-gray-400 text-sm leading-relaxed">${comment.content}</p>
+                            ${comment.sticker_url ? `
+                                <div class="mt-3 text-5xl filter drop-shadow-md transform hover:scale-110 transition-all select-none">
+                                    ${comment.sticker_url}
+                                </div>
+                            ` : ''}
                             ${comment.image_url ? `
                                 <div class="mt-4 w-full max-w-sm rounded-2xl overflow-hidden border border-white/5 shadow-2xl">
                                     <img src="${getFullUrl(comment.image_url)}" class="w-full h-auto object-cover">
@@ -1161,11 +1179,25 @@
             document.getElementById('blog-comment-file-preview').classList.add('hidden');
         }
 
+        function selectBlogSticker(sticker) {
+            document.getElementById('blog-sticker-input').value = sticker;
+            document.getElementById('blog-comment-sticker-img').innerText = sticker;
+            document.getElementById('blog-comment-sticker-preview').classList.remove('hidden');
+            document.getElementById('blog-sticker-picker').classList.add('hidden');
+        }
+
+        function clearBlogCommentSticker() {
+            document.getElementById('blog-sticker-input').value = '';
+            document.getElementById('blog-comment-sticker-preview').classList.add('hidden');
+        }
+
         async function postComment(postId) {
             const content = document.getElementById('comment-input').value.trim();
             const fileInput = document.getElementById('blog-comment-file');
+            const stickerInput = document.getElementById('blog-sticker-input');
+            const stickerUrl = stickerInput ? stickerInput.value : '';
 
-            if (!content && !fileInput.files[0]) return;
+            if (!content && !fileInput.files[0] && !stickerUrl) return;
 
             const visitorName = localStorage.getItem('visitor_name') || 'Visiteur';
             const parentId = document.getElementById('reply-parent-id').value;
@@ -1184,11 +1216,13 @@
                     authorName: visitorName,
                     visitorId: visitorId,
                     parentId: parentId || null,
-                    imageUrl: imageUrl
+                    imageUrl: imageUrl,
+                    stickerUrl: stickerUrl || null
                 });
 
                 document.getElementById('comment-input').value = "";
                 clearBlogCommentFile();
+                clearBlogCommentSticker();
                 cancelReply();
                 loadArticleComments(postId);
                 toast("Commentaire envoyé", "success");

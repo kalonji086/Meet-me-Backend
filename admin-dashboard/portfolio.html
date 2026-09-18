@@ -1068,7 +1068,7 @@
                     </div>
 
                     document.getElementById('generic-page-body').innerHTML = contentHTML;
-                    navigateTo('page-content');
+                    navigateTo('content');
                     lucide.createIcons();
                 }
             } catch (e) {
@@ -1146,6 +1146,30 @@
             lucide.createIcons();
         }
 
+        function formatBlogContentSteps(content) {
+            let contentText = content || "";
+            if (!contentText.includes('<p>') && !contentText.includes('<br>')) {
+                contentText = contentText.split('\n\n').map(p => `<p>${p}</p>`).join('');
+            }
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(`<div>${contentText}</div>`, 'text/html');
+            const paragraphs = Array.from(doc.body.firstChild.children).filter(el => el.innerText.trim().length > 0);
+
+            if (paragraphs.length > 1) {
+                return paragraphs.map((p, pIdx) => `
+                    <div class="relative pl-12 md:pl-20 group animate-pageIn" style="animation-delay: ${pIdx * 0.15}s">
+                        <div class="absolute left-0 top-1 w-6 h-6 md:w-8 md:h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-black text-[10px] md:text-xs flex items-center justify-center group-hover:bg-cyan-500 group-hover:text-white transition-all select-none">
+                            ${String(pIdx + 1).padStart(2, '0')}
+                        </div>
+                        <div class="text-gray-300 group-hover:text-white transition-all duration-300">
+                            ${p.outerHTML}
+                        </div>
+                    </div>
+                `).join('');
+            }
+            return contentText;
+        }
+
         async function readBlogPost(slug) {
             try {
                 // Prevent scrolling to top before transition
@@ -1181,34 +1205,7 @@
                             <h1 class="text-4xl sm:text-7xl font-black text-white uppercase tracking-tighter leading-[0.85] mb-12">${post.title}</h1>
 
                             <div class="text-gray-400 leading-relaxed font-medium mb-20 text-base sm:text-xl space-y-8">
-                                ${(() => {
-                                    // Diviser dynamiquement le contenu textuel en paragraphes pour en faire une lecture fluide sous forme d'étapes de blog
-                                    let contentText = post.content || "";
-
-                                    // Nettoyer ou scinder si c'est du texte long sans paragraphes imbriqués
-                                    if (!contentText.includes('<p>') && !contentText.includes('<br>')) {
-                                        contentText = contentText.split('\n\n').map(p => `<p>${p}</p>`).join('');
-                                    }
-
-                                    // S'il s'agit de blocs de paragraphes, nous les convertissons en magnifiques étapes de lecture animées en cascade
-                                    const parser = new DOMParser();
-                                    const doc = parser.parseFromString(`<div>${contentText}</div>`, 'text/html');
-                                    const paragraphs = Array.from(doc.body.firstChild.children).filter(el => el.innerText.trim().length > 0);
-
-                                    if (paragraphs.length > 1) {
-                                        return paragraphs.map((p, pIdx) => `
-                                            <div class="relative pl-12 md:pl-20 group animate-pageIn" style="animation-delay: ${pIdx * 0.15}s">
-                                                <div class="absolute left-0 top-1 w-6 h-6 md:w-8 md:h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-black text-[10px] md:text-xs flex items-center justify-center group-hover:bg-cyan-500 group-hover:text-white transition-all select-none">
-                                                    ${String(pIdx + 1).padStart(2, '0')}
-                                                </div>
-                                                <div class="text-gray-300 group-hover:text-white transition-all duration-300">
-                                                    ${p.outerHTML}
-                                                </div>
-                                            </div>
-                                        `).join('');
-                                    }
-                                    return contentText;
-                                })()}
+                                ${formatBlogContentSteps(post.content)}
                             </div>
 
                             ${post.cta_text ? `

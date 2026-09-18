@@ -180,17 +180,76 @@
                 </div>
             </section>
 
-            <!-- Quick Info / About -->
-            <section class="py-20 md:py-32 px-4 md:px-6">
-                <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 md:gap-20 items-center">
-                    <div class="relative h-[400px] md:h-[600px] rounded-[2.5rem] md:rounded-[4rem] overflow-hidden border border-white/10 shadow-2xl order-2 lg:order-1">
-                        <img id="about-photo" src="" class="w-full h-full object-cover">
-                        <div class="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] to-transparent opacity-40"></div>
+            <!-- Quick Info / About (Mysterious & Animated Interactive Section) -->
+            <section class="py-20 md:py-32 px-4 md:px-6 relative overflow-hidden bg-gradient-to-b from-transparent via-cyan-950/10 to-transparent">
+                <div class="absolute inset-0 bg-dot opacity-40"></div>
+
+                <div class="max-w-5xl mx-auto text-center relative z-10 space-y-12">
+                    <div class="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-xs font-black uppercase text-cyan-400 tracking-[0.2em] transform hover:scale-105 transition-all cursor-default animate-pulse">
+                        <i data-lucide="sparkles" class="w-4 h-4 animate-spin" style="animation-duration: 4s;"></i> Les Secrets Fondateurs
                     </div>
-                    <div class="space-y-6 md:space-y-8 order-1 lg:order-2 text-center lg:text-left">
-                        <h3 class="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">L'Histoire <span class="text-cyan-400">Together.</span></h3>
-                        <p id="about-text" class="text-lg md:text-xl text-gray-400 font-medium leading-relaxed italic"></p>
-                        <button onclick="navigateTo('team')" class="px-8 py-4 bg-white/5 border border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-cyan-500 transition-all">Rencontrer l'équipe</button>
+
+                    <h3 class="text-5xl md:text-7xl font-black tracking-tighter uppercase italic text-white leading-none">
+                        L'Histoire <span class="text-gradient">Together.</span>
+                    </h3>
+
+                    <!-- Interactive Animated Curiosity Blocks -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
+
+                        <!-- Block 1: Origine -->
+                        <div class="glass p-8 rounded-3xl border border-white/5 relative group overflow-hidden cursor-pointer hover:border-cyan-500/30 transition-all transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-cyan-500/5" onclick="revealSecret('origine')">
+                            <div class="absolute -right-8 -bottom-8 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all"></div>
+                            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-6 group-hover:bg-cyan-500 group-hover:text-white transition-all duration-300">
+                                <i data-lucide="help-circle" class="w-6 h-6"></i>
+                            </div>
+                            <h4 class="text-xl font-black uppercase tracking-tight text-white mb-2">01. L'Étincelle</h4>
+                            <p class="text-xs text-gray-500 uppercase font-black tracking-widest mb-4">D'où vient l'idée ?</p>
+                            <p class="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-all">Tout a commencé dans l'ombre d'un défi informatique insoluble. Cliquez pour lever le voile.</p>
+                            <div class="mt-4 text-[10px] font-black text-cyan-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1">Découvrir le secret <i data-lucide="plus" class="w-3 h-3"></i></div>
+                        </div>
+
+                        <!-- Block 2: La Vision -->
+                        <div class="glass p-8 rounded-3xl border border-white/5 relative group overflow-hidden cursor-pointer hover:border-purple-500/30 transition-all transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-purple-500/5" onclick="revealSecret('vision')">
+                            <div class="absolute -right-8 -bottom-8 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all"></div>
+                            <div class="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 mb-6 group-hover:bg-purple-500 group-hover:text-white transition-all duration-300">
+                                <i data-lucide="eye" class="w-6 h-6"></i>
+                            </div>
+                            <h4 class="text-xl font-black uppercase tracking-tight text-white mb-2">02. Le Manifeste</h4>
+                            <p class="text-xs text-gray-500 uppercase font-black tracking-widest mb-4">Notre code d'honneur</p>
+                            <p class="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-all">Nous refusons de créer du code ordinaire. Découvrez notre formule secrète d'innovation.</p>
+                            <div class="mt-4 text-[10px] font-black text-purple-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1">Entrer dans la vision <i data-lucide="plus" class="w-3 h-3"></i></div>
+                        </div>
+
+                        <!-- Block 3: Impact -->
+                        <div class="glass p-8 rounded-3xl border border-white/5 relative group overflow-hidden cursor-pointer hover:border-amber-500/30 transition-all transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/5" onclick="revealSecret('futur')">
+                            <div class="absolute -right-8 -bottom-8 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all"></div>
+                            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400 mb-6 group-hover:bg-amber-500 group-hover:text-white transition-all duration-300">
+                                <i data-lucide="zap" class="w-6 h-6"></i>
+                            </div>
+                            <h4 class="text-xl font-black uppercase tracking-tight text-white mb-2">03. Demain</h4>
+                            <p class="text-xs text-gray-500 uppercase font-black tracking-widest mb-4">La prochaine étape</p>
+                            <p class="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-all">Ce que vous voyez n'est que la surface d'un projet bien plus gigantesque. Osez voir plus loin.</p>
+                            <div class="mt-4 text-[10px] font-black text-amber-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1">Débloquer le futur <i data-lucide="plus" class="w-3 h-3"></i></div>
+                        </div>
+
+                    </div>
+
+                    <!-- Dynamic Reveal Modal / Text Context Container -->
+                    <div id="story-reveal-box" class="hidden glass p-8 md:p-12 rounded-[2rem] border border-cyan-500/20 max-w-3xl mx-auto text-left relative overflow-hidden transition-all duration-500 animate-pageIn">
+                        <div class="absolute top-4 right-4">
+                            <button onclick="closeSecret()" class="p-2 hover:bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        </div>
+                        <div class="flex items-start gap-6">
+                            <div id="reveal-icon" class="w-14 h-14 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0 hidden md:flex text-2xl font-black"></div>
+                            <div class="space-y-4">
+                                <h5 id="reveal-title" class="text-2xl font-black uppercase italic tracking-tight text-white"></h5>
+                                <p id="reveal-desc" class="text-gray-300 text-base leading-relaxed font-medium"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-6">
+                        <button onclick="navigateTo('team')" class="px-10 py-5 bg-white/5 border border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-cyan-500 hover:text-white hover:border-transparent transition-all shadow-xl">Rencontrer les fondateurs</button>
                     </div>
                 </div>
             </section>
@@ -710,6 +769,48 @@
                 `).join('') || '<div class="text-center py-20 opacity-30 uppercase font-black text-xs">Aucun poste pour le moment</div>';
                 lucide.createIcons();
             } catch (e) {}
+        }
+
+        // Secret Story Reveal Functions
+        function revealSecret(type) {
+            const box = document.getElementById('story-reveal-box');
+            const iconEl = document.getElementById('reveal-icon');
+            const titleEl = document.getElementById('reveal-title');
+            const descEl = document.getElementById('reveal-desc');
+
+            let icon = '⚡', title = '', desc = '';
+            let fullText = window.togetherStoryText || "L'histoire de Together Tech se construit chaque jour à travers le code.";
+
+            if (type === 'origine') {
+                icon = '🔬';
+                title = "L'Étincelle Initiale";
+                desc = "À l'origine, Together Tech n'était qu'un laboratoire clandestin né pour fusionner la simplicité des réseaux de messagerie instantanée avec la robustesse des écosystèmes d'affaires. L'idée phare était d'éradiquer la frontière entre un client et son équipe de développement. Un espace interconnecté d'égal à égal.";
+            } else if (type === 'vision') {
+                icon = '🛸';
+                title = "Le Manifeste Cyber-Design";
+                desc = "Notre code d'honneur stipule que l'interface utilisateur n'est pas un simple habillage, mais une expérience sensorielle. Chaque pixel inséré doit inciter à l'action. Nous combinons des structures de serveurs asynchrones avec des architectures légères en temps réel pour une vélocité sans limite.";
+            } else if (type === 'futur') {
+                icon = '🔮';
+                title = "L'Étoile Noire du Développement";
+                desc = "Ce portfolio et les modules SaaS que vous explorez sont l'ossature d'une plateforme d'automatisation intelligente encore plus vaste. Les prochaines itérations débloqueront des pipelines d'intelligence collective, où chaque utilisateur devient co-créateur de modules. Le futur s'écrit ensemble.";
+            }
+
+            // Append parts of database dynamic description safely if available
+            if (fullText.length > 30) {
+                desc += "<br><br><span class='text-xs text-cyan-500/80 uppercase font-black tracking-widest block border-t border-white/5 pt-3'>Note Contextuelle :</span> <span class='text-xs text-gray-400 italic'>" + fullText + "</span>";
+            }
+
+            iconEl.innerText = icon;
+            titleEl.innerText = title;
+            descEl.innerHTML = desc;
+
+            box.classList.remove('hidden');
+            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            lucide.createIcons();
+        }
+
+        function closeSecret() {
+            document.getElementById('story-reveal-box').classList.add('hidden');
         }
 
         async function createPost() {
@@ -1329,7 +1430,8 @@
             if (p.about_photo_url) document.getElementById('about-photo').src = getFullUrl(p.about_photo_url);
             if (p.hero_image_url) document.getElementById('hero-image').src = getFullUrl(p.hero_image_url);
 
-            if (p.about_description) document.getElementById('about-text').innerText = p.about_description;
+            // Save about_description into a global window variable to inject into secret blocks if needed
+            window.togetherStoryText = p.about_description || "";
             if (p.footer_contact) document.getElementById('footer-contact-info').innerText = p.footer_contact;
 
             // Render Social Links

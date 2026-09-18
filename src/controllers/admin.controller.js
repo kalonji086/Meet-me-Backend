@@ -651,15 +651,6 @@ const ensureAdminTables = async () => {
       ALTER TABLE public.web_portfolio_blog_comments ADD COLUMN IF NOT EXISTS image_url TEXT;
       ALTER TABLE public.web_portfolio_blog_comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
     `);
-        author_name TEXT,
-        content TEXT NOT NULL,
-        image_url TEXT,
-        sticker_url TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-      ALTER TABLE public.web_portfolio_blog_comments ADD COLUMN IF NOT EXISTS image_url TEXT;
-      ALTER TABLE public.web_portfolio_blog_comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
-    `);
 
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS logo_url TEXT');
     await query('ALTER TABLE public.web_portfolio_experiences ADD COLUMN IF NOT EXISTS project_url TEXT');

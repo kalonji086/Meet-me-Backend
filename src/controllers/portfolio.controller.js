@@ -643,9 +643,11 @@ const likeBlogPost = asyncHandler(async (req, res) => {
 
     if (userId) {
         await query('INSERT INTO public.web_portfolio_blog_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [postId, userId]);
+    } else if (visitorId) {
+        // Enregistrer le like anonyme avec le visitorId unique du stockage local du navigateur
+        await query('INSERT INTO public.web_portfolio_blog_likes (post_id, user_id, visitor_id) VALUES ($1, NULL, $2) ON CONFLICT DO NOTHING', [postId, visitorId]);
     } else {
-        // For visitors, we use the system ID. PK constraint prevents duplicates but we broadcast the current count.
-        await query('INSERT INTO public.web_portfolio_blog_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [postId, '00000000-0000-0000-0000-000000000000']);
+        await query('INSERT INTO public.web_portfolio_blog_likes (post_id, user_id) VALUES ($1, \'00000000-0000-0000-0000-000000000000\') ON CONFLICT DO NOTHING', [postId]);
     }
 
     const countRes = await query('SELECT count(*) FROM public.web_portfolio_blog_likes WHERE post_id = $1', [postId]);

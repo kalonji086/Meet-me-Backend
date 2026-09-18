@@ -617,8 +617,15 @@ const ensureAdminTables = async () => {
       CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_likes (
         post_id UUID REFERENCES public.web_portfolio_blog_posts(id) ON DELETE CASCADE,
         user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        visitor_id TEXT,
         PRIMARY KEY (post_id, user_id)
       );
+      ALTER TABLE public.web_portfolio_blog_likes DROP CONSTRAINT IF EXISTS web_portfolio_blog_likes_pkey;
+      ALTER TABLE public.web_portfolio_blog_likes ADD COLUMN IF NOT EXISTS visitor_id TEXT;
+      -- Permettre aux utilisateurs d'être NULL pour gérer les likes des visiteurs anonymes
+      ALTER TABLE public.web_portfolio_blog_likes ALTER COLUMN user_id DROP NOT NULL;
+      -- Recréer une clé primaire composite ou unique safe
+      ALTER TABLE public.web_portfolio_blog_likes ADD CONSTRAINT web_portfolio_blog_likes_unique UNIQUE (post_id, user_id, visitor_id);
 
       CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_comments (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

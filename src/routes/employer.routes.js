@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const employerController = require('../controllers/employer.controller');
-const { authenticate } = require('../middleware/auth.middleware');
+const { authenticate, isAdmin } = require('../middleware/auth.middleware');
 
 // Public routes
 router.get('/jobs', employerController.getAllJobs);
@@ -31,6 +31,6 @@ router.post('/schedules', authenticate, employerController.createSchedule);
 router.delete('/schedules/:id', authenticate, employerController.deleteSchedule);
 
 // Admin routes (Should be restricted by admin middleware in a real app)
-router.put('/approve/:requestId', authenticate, employerController.approveRequest);
+router.put('/approve/:requestId', authenticate, isAdmin, employerController.approveRequest);
 
 module.exports = router;

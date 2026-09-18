@@ -3,6 +3,27 @@ const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
 const logger = require('../utils/logger');
 
+const requireSchoolRole = async (req, res, schoolId, roles) => {
+  if (!schoolId) {
+    res.status(400).json({ success: false, error: 'ID de l’école requis' });
+    return null;
+  }
+
+  const result = await query(
+    `SELECT role, is_active FROM public.school_members
+     WHERE school_id = $1 AND user_id = $2 AND is_active = TRUE
+     AND role = ANY($3::text[])`,
+    [schoolId, req.userId, roles]
+  );
+
+  if (result.rows.length === 0) {
+    res.status(403).json({ success: false, error: 'Accès refusé à cet établissement' });
+    return null;
+  }
+
+  return result.rows[0];
+};
+
 /**
  * @desc    Get global overview and world schools
  */
@@ -25,8 +46,9 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
     query(
       `SELECT s.*,
               (SELECT COUNT(*) FROM public.school_members sm WHERE sm.school_id = s.id AND sm.is_active = TRUE) AS members_count
-       FROM public.school_schools s
-       ORDER BY s.created_at DESC
+      FROM public.school_schools s
+      WHERE s.status IN ('approved', 'active')
+      ORDER BY s.created_at DESC
        LIMIT 100`,
       []
     ),
@@ -89,13 +111,21 @@ const createSchool = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Vous avez déjà soumis une demande pour un établissement.' });
   }
 
-  const schoolResult = await query(
-    `INSERT INTO public.school_schools (
-      name, school_type, country, city, address, contact_email, phone, logo_url, description, status, created_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10)
-     RETURNING *`,
-    [name, schoolType || 'private', country, city || '', address || '', contactEmail || '', phone || '', logoUrl || '', description || '', userId]
-  );
+  let schoolResult;
+  try {
+    schoolResult = await query(
+      `INSERT INTO public.school_schools (
+        name, school_type, country, city, address, contact_email, phone, logo_url, description, status, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10)
+       RETURNING *`,
+      [name, schoolType || 'private', country, city || '', address || '', contactEmail || '', phone || '', logoUrl || '', description || '', userId]
+    );
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({ success: false, error: 'Vous avez déjà soumis une demande pour un établissement.' });
+    }
+    throw error;
+  }
 
   const school = schoolResult.rows[0];
 
@@ -184,6 +214,21 @@ const getDashboard = asyncHandler(async (req, res) => {
       revenue: parseFloat(allPayments.rows[0].sum || 0)
     };
   }
+  else if (role === 'parent') {
+    const [children, assignments, payments] = await Promise.all([
+      query('SELECT * FROM public.school_students WHERE school_id = $1 AND parent_id = $2 ORDER BY created_at DESC', [schoolId, userId]),
+      query(`SELECT a.*, p.full_name AS teacher_name
+             FROM public.school_assignments a
+             JOIN public.school_students s ON s.class_id = a.class_id
+             LEFT JOIN public.profiles p ON p.id = a.teacher_id
+             WHERE s.school_id = $1 AND s.parent_id = $2
+             ORDER BY a.due_date ASC`, [schoolId, userId]),
+      query('SELECT * FROM public.school_payments WHERE school_id = $1 AND parent_id = $2 ORDER BY created_at DESC', [schoolId, userId])
+    ]);
+    dashboardData.children = children.rows;
+    dashboardData.assignments = assignments.rows;
+    dashboardData.payments = payments.rows;
+  }
 
   res.json({ success: true, data: dashboardData });
 });
@@ -198,6 +243,14 @@ const submitAssignment = asyncHandler(async (req, res) => {
   // Find student ID linked to this user
   const studentRes = await query('SELECT id FROM public.school_students WHERE user_id = $1', [userId]);
   if (studentRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Profil élève non trouvé' });
+  
+  const assignmentRes = await query(
+    `SELECT a.id FROM public.school_assignments a
+     JOIN public.school_students s ON s.class_id = a.class_id AND s.school_id = a.school_id
+     WHERE a.id = $1 AND s.id = $2`,
+    [assignmentId, studentRes.rows[0].id]
+  );
+  if (assignmentRes.rows.length === 0) return res.status(403).json({ success: false, error: 'Devoir non autorisé' });
 
   const result = await query(
     `INSERT INTO public.school_submissions (assignment_id, student_id, content, file_url)
@@ -220,6 +273,14 @@ const submitAssignment = asyncHandler(async (req, res) => {
 const addGrade = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const { schoolId, studentId, classId, subject, score, maxScore, comment } = req.body;
+  
+  const member = await requireSchoolRole(req, res, schoolId, ['teacher']);
+  if (!member) return;
+  if (score === undefined || Number(score) < 0 || Number(score) > Number(maxScore || 20)) {
+    return res.status(400).json({ success: false, error: 'Note invalide' });
+  }
+  const studentRes = await query('SELECT id FROM public.school_students WHERE id = $1 AND school_id = $2 AND class_id = $3', [studentId, schoolId, classId]);
+  if (studentRes.rows.length === 0) return res.status(400).json({ success: false, error: 'Élève ou classe invalide' });
 
   const result = await query(
     `INSERT INTO public.school_grades (school_id, student_id, teacher_id, class_id, subject, score, max_score, comment)
@@ -244,7 +305,7 @@ const addGrade = asyncHandler(async (req, res) => {
 const getSchools = asyncHandler(async (req, res) => {
   const { country, city, type } = req.query;
 
-  let sql = `SELECT * FROM public.school_schools WHERE 1=1`;
+  let sql = `SELECT * FROM public.school_schools WHERE status IN ('approved', 'active')`;
   const params = [];
   let index = 1;
 
@@ -280,6 +341,9 @@ const createParentStudent = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Les informations de l’élève sont incomplètes.' });
   }
 
+  const member = await requireSchoolRole(req, res, schoolId, ['parent', 'promoter', 'director']);
+  if (!member) return;
+
   const result = await query(
     `INSERT INTO public.school_students (school_id, parent_id, first_name, last_name, age, grade_level, class_id, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
@@ -294,6 +358,9 @@ const createClass = asyncHandler(async (req, res) => {
   const { schoolId, name, level, capacity } = req.body;
   if (!schoolId || !name) return res.status(400).json({ success: false, error: 'Nom de classe et école requis' });
 
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'teacher']);
+  if (!member) return;
+
   const result = await query(
     `INSERT INTO public.school_classes (school_id, name, level, capacity)
      VALUES ($1, $2, $3, $4) RETURNING *`,
@@ -302,9 +369,34 @@ const createClass = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: result.rows[0] });
 });
 
+const updateClass = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, level, capacity } = req.body;
+  const classRes = await query('SELECT school_id FROM public.school_classes WHERE id = $1', [id]);
+  if (classRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Classe introuvable' });
+  const member = await requireSchoolRole(req, res, classRes.rows[0].school_id, ['promoter', 'director']);
+  if (!member) return;
+  if (!name) return res.status(400).json({ success: false, error: 'Nom de classe requis' });
+  const result = await query('UPDATE public.school_classes SET name = $1, level = $2, capacity = $3 WHERE id = $4 RETURNING *', [name, level || '', capacity || 30, id]);
+  res.json({ success: true, data: result.rows[0] });
+});
+
+const deleteClass = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const classRes = await query('SELECT school_id FROM public.school_classes WHERE id = $1', [id]);
+  if (classRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Classe introuvable' });
+  const member = await requireSchoolRole(req, res, classRes.rows[0].school_id, ['promoter', 'director']);
+  if (!member) return;
+  await query('DELETE FROM public.school_classes WHERE id = $1', [id]);
+  res.json({ success: true });
+});
+
 const createTeacher = asyncHandler(async (req, res) => {
   const { schoolId, userId, fullName, subject, email, phone } = req.body;
   if (!schoolId || !fullName) return res.status(400).json({ success: false, error: 'Nom et école requis' });
+
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director']);
+  if (!member) return;
 
   const result = await query(
     `INSERT INTO public.school_teachers (school_id, user_id, full_name, subject, email, phone)
@@ -318,6 +410,11 @@ const createAssignment = asyncHandler(async (req, res) => {
   const { schoolId, classId, title, description, dueDate } = req.body;
   const teacherId = req.userId;
 
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'teacher']);
+  if (!member) return;
+  const classRes = await query('SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2', [classId, schoolId]);
+  if (classRes.rows.length === 0) return res.status(400).json({ success: false, error: 'Classe invalide pour cet établissement' });
+
   const result = await query(
     `INSERT INTO public.school_assignments (school_id, class_id, teacher_id, title, description, due_date)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -328,10 +425,19 @@ const createAssignment = asyncHandler(async (req, res) => {
 
 const createPayment = asyncHandler(async (req, res) => {
   const { schoolId, studentId, parentId, amount, reference, status } = req.body;
+  const member = await requireSchoolRole(req, res, schoolId, ['parent', 'promoter', 'director']);
+  if (!member) return;
+  if (!amount || Number(amount) <= 0) return res.status(400).json({ success: false, error: 'Montant invalide' });
+  if (studentId) {
+    const student = await query('SELECT id FROM public.school_students WHERE id = $1 AND school_id = $2 AND parent_id = $3', [studentId, schoolId, req.userId]);
+    if (student.rows.length === 0 && !['promoter', 'director'].includes(member.role)) {
+      return res.status(403).json({ success: false, error: 'Élève non autorisé' });
+    }
+  }
   const result = await query(
     `INSERT INTO public.school_payments (school_id, student_id, parent_id, amount, reference, status)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [schoolId, studentId, parentId || req.userId, amount, reference, status || 'pending']
+    [schoolId, studentId, ['promoter', 'director'].includes(member.role) ? (parentId || req.userId) : req.userId, amount, reference, status === 'completed' && ['promoter', 'director'].includes(member.role) ? status : 'pending']
   );
   res.status(201).json({ success: true, data: result.rows[0] });
 });
@@ -339,6 +445,9 @@ const createPayment = asyncHandler(async (req, res) => {
 const sendMessage = asyncHandler(async (req, res) => {
   const { schoolId, recipientId, message } = req.body;
   const senderId = req.userId;
+
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'teacher', 'parent', 'student']);
+  if (!member) return;
 
   const result = await query(
     `INSERT INTO public.school_messages (school_id, sender_id, recipient_id, message)
@@ -380,7 +489,7 @@ const requestStaffAccount = asyncHandler(async (req, res) => {
   }
 
   // Verify requester is promoter of the school
-  const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND role = \'promoter\'', [schoolId, promoterId]);
+  const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND is_active = TRUE AND role = \'promoter\'', [schoolId, promoterId]);
   if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
 
   const result = await query(
@@ -434,6 +543,8 @@ const handleEnrollment = asyncHandler(async (req, res) => {
   const requestRes = await query('SELECT * FROM public.school_enrollment_requests WHERE id = $1', [id]);
   if (requestRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande non trouvée' });
   const request = requestRes.rows[0];
+  const member = await requireSchoolRole(req, res, request.school_id, ['promoter', 'director']);
+  if (!member) return;
 
   if (status === 'approved') {
     if (!classId) return res.status(400).json({ success: false, error: 'Veuillez assigner une classe.' });
@@ -443,6 +554,13 @@ const handleEnrollment = asyncHandler(async (req, res) => {
       `INSERT INTO public.school_students (school_id, parent_id, first_name, last_name, age, grade_level, class_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
       [request.school_id, request.parent_id, request.student_first_name, request.student_last_name, request.student_age, request.previous_level, classId]
+    );
+
+    await query(
+      `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+       VALUES ($1, $2, 'parent', TRUE)
+      ON CONFLICT (school_id, user_id, role) DO UPDATE SET is_active = TRUE`,
+      [request.school_id, request.parent_id]
     );
 
     // 2. Mark request as approved
@@ -486,7 +604,7 @@ const getEnrollmentRequests = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   // Verify access
-  const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND role IN (\'promoter\', \'director\')', [schoolId, userId]);
+  const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND is_active = TRUE AND role IN (\'promoter\', \'director\')', [schoolId, userId]);
   if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
 
   const result = await query(
@@ -506,6 +624,8 @@ const getEnrollmentRequests = asyncHandler(async (req, res) => {
  */
 const getSchoolClasses = asyncHandler(async (req, res) => {
   const { schoolId } = req.query;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'teacher', 'parent', 'student']);
+  if (!member) return;
   const result = await query('SELECT * FROM public.school_classes WHERE school_id = $1 ORDER BY level ASC, name ASC', [schoolId]);
   res.json({ success: true, data: result.rows });
 });
@@ -515,7 +635,8 @@ const getSchoolClasses = asyncHandler(async (req, res) => {
  */
 const getSchedules = asyncHandler(async (req, res) => {
   const { schoolId, classId } = req.query;
-  const userId = req.userId;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'teacher', 'parent', 'student']);
+  if (!member) return;
 
   let sql = `SELECT * FROM public.school_schedules WHERE 1=1`;
   const params = [];
@@ -547,7 +668,7 @@ const getStats = asyncHandler(async (req, res) => {
   const check = await query('SELECT id FROM public.school_members WHERE school_id = $1 AND user_id = $2 AND role IN (\'promoter\', \'director\')', [schoolId, userId]);
   if (check.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé' });
 
-  const [students, teachers, classes, payments] = await Promise.all([
+  const [students, teachers, classes, payments, monthlyEnrollments] = await Promise.all([
     query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1', [schoolId]),
     query('SELECT COUNT(*) FROM public.school_teachers WHERE school_id = $1', [schoolId]),
     query('SELECT COUNT(*) FROM public.school_classes WHERE school_id = $1', [schoolId]),
@@ -555,7 +676,12 @@ const getStats = asyncHandler(async (req, res) => {
             SUM(amount) as total_revenue,
             COUNT(*) filter (where status = 'completed') as paid_count,
             COUNT(*) filter (where status = 'pending') as pending_count
-           FROM public.school_payments WHERE school_id = $1`, [schoolId])
+          FROM public.school_payments WHERE school_id = $1`, [schoolId]),
+        query(`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month, COUNT(*)::INTEGER AS total
+          FROM public.school_students
+          WHERE school_id = $1 AND created_at >= NOW() - INTERVAL '6 months'
+          GROUP BY DATE_TRUNC('month', created_at)
+          ORDER BY month ASC`, [schoolId])
   ]);
 
   res.json({
@@ -568,9 +694,124 @@ const getStats = asyncHandler(async (req, res) => {
       payments: {
         paid: parseInt(payments.rows[0].paid_count),
         pending: parseInt(payments.rows[0].pending_count)
-      }
+      },
+      monthlyEnrollments: monthlyEnrollments.rows
     }
   });
+});
+
+const getSchoolFees = asyncHandler(async (req, res) => {
+  const { schoolId } = req.query;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'parent', 'student', 'teacher']);
+  if (!member) return;
+  const result = await query('SELECT * FROM public.school_fees_config WHERE school_id = $1 ORDER BY created_at ASC', [schoolId]);
+  res.json({ success: true, data: result.rows });
+});
+
+const createFeeConfig = asyncHandler(async (req, res) => {
+  const { schoolId, feeName, amount, dueDate, isMandatory } = req.body;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director']);
+  if (!member) return;
+  if (!feeName || !amount || Number(amount) <= 0) return res.status(400).json({ success: false, error: 'Nom et montant valides requis' });
+  const result = await query(
+    `INSERT INTO public.school_fees_config (school_id, fee_name, amount, due_date, is_mandatory)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [schoolId, feeName, amount, dueDate || null, isMandatory !== false]
+  );
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+const getSchoolPayments = asyncHandler(async (req, res) => {
+  const { schoolId } = req.query;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'parent']);
+  if (!member) return;
+  const params = [schoolId];
+  let sql = `SELECT sp.*, s.first_name, s.last_name
+             FROM public.school_payments sp
+             LEFT JOIN public.school_students s ON s.id = sp.student_id
+             WHERE sp.school_id = $1`;
+  if (member.role === 'parent') {
+    sql += ' AND sp.parent_id = $2';
+    params.push(req.userId);
+  }
+  sql += ' ORDER BY sp.created_at DESC';
+  const result = await query(sql, params);
+  res.json({ success: true, data: result.rows });
+});
+
+const createSchedule = asyncHandler(async (req, res) => {
+  const { schoolId, classId, subject, teacherName, dayOfWeek, startTime, endTime } = req.body;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'teacher']);
+  if (!member) return;
+  if (!classId || !subject || !dayOfWeek || !startTime || !endTime) return res.status(400).json({ success: false, error: 'Informations du cours incomplètes' });
+  const classRes = await query('SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2', [classId, schoolId]);
+  if (classRes.rows.length === 0) return res.status(400).json({ success: false, error: 'Classe invalide pour cet établissement' });
+  const result = await query(
+    `INSERT INTO public.school_schedules (class_id, subject, teacher_name, day_of_week, start_time, end_time)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [classId, subject, teacherName || '', dayOfWeek, startTime, endTime]
+  );
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+const deleteSchedule = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const schedule = await query(
+    `SELECT ss.id, sc.school_id FROM public.school_schedules ss
+     JOIN public.school_classes sc ON sc.id = ss.class_id WHERE ss.id = $1`,
+    [id]
+  );
+  if (schedule.rows.length === 0) return res.status(404).json({ success: false, error: 'Horaire introuvable' });
+  const member = await requireSchoolRole(req, res, schedule.rows[0].school_id, ['promoter', 'director', 'teacher']);
+  if (!member) return;
+  await query('DELETE FROM public.school_schedules WHERE id = $1', [id]);
+  res.json({ success: true });
+});
+
+const createAnnouncement = asyncHandler(async (req, res) => {
+  const { schoolId, title, content } = req.body;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director']);
+  if (!member) return;
+  if (!title || !content) return res.status(400).json({ success: false, error: 'Titre et contenu requis' });
+  const result = await query(
+    `INSERT INTO public.school_announcements (school_id, title, content)
+     VALUES ($1, $2, $3) RETURNING *`,
+    [schoolId, title, content]
+  );
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+const deleteAnnouncement = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const announcement = await query('SELECT school_id FROM public.school_announcements WHERE id = $1', [id]);
+  if (announcement.rows.length === 0) return res.status(404).json({ success: false, error: 'Annonce introuvable' });
+  const member = await requireSchoolRole(req, res, announcement.rows[0].school_id, ['promoter', 'director']);
+  if (!member) return;
+  await query('DELETE FROM public.school_announcements WHERE id = $1', [id]);
+  res.json({ success: true });
+});
+
+const getSchoolTeachers = asyncHandler(async (req, res) => {
+  const { schoolId } = req.query;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director', 'teacher']);
+  if (!member) return;
+  const result = await query('SELECT * FROM public.school_teachers WHERE school_id = $1 ORDER BY full_name ASC', [schoolId]);
+  res.json({ success: true, data: result.rows });
+});
+
+const assignTeacherToClass = asyncHandler(async (req, res) => {
+  const { schoolId, teacherId, classId } = req.body;
+  const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director']);
+  if (!member) return;
+  const relation = await query(
+    `SELECT t.id AS teacher_id, c.id AS class_id
+     FROM public.school_teachers t CROSS JOIN public.school_classes c
+     WHERE t.id = $1 AND c.id = $2 AND t.school_id = $3 AND c.school_id = $3`,
+    [teacherId, classId, schoolId]
+  );
+  if (relation.rows.length === 0) return res.status(400).json({ success: false, error: 'Enseignant ou classe invalide' });
+  await query('INSERT INTO public.school_teacher_classes (teacher_id, class_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [teacherId, classId]);
+  res.status(201).json({ success: true });
 });
 
 module.exports = {
@@ -583,6 +824,8 @@ module.exports = {
   getSchools,
   createParentStudent,
   createClass,
+  updateClass,
+  deleteClass,
   createTeacher,
   createAssignment,
   createPayment,
@@ -594,5 +837,14 @@ module.exports = {
   getEnrollmentRequests,
   getSchoolClasses,
   getSchedules,
-  getStats
+  getStats,
+  getSchoolFees,
+  createFeeConfig,
+  getSchoolPayments,
+  createSchedule,
+  deleteSchedule,
+  createAnnouncement,
+  deleteAnnouncement,
+  getSchoolTeachers,
+  assignTeacherToClass
 };

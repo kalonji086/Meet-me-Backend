@@ -742,6 +742,12 @@ CREATE TABLE IF NOT EXISTS public.school_teachers (
   phone TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ 
+CREATE TABLE IF NOT EXISTS public.school_teacher_classes (
+  teacher_id UUID REFERENCES public.school_teachers(id) ON DELETE CASCADE,
+  class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
+  PRIMARY KEY (teacher_id, class_id)
+);
 
 CREATE TABLE IF NOT EXISTS public.school_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -864,6 +870,9 @@ CREATE TABLE IF NOT EXISTS public.school_messages (
 -- Indexes pour les nouveaux modules
 CREATE INDEX IF NOT EXISTS idx_school_staff_requests_school ON public.school_staff_requests(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_schools_country ON public.school_schools(country);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_school_schools_created_by_unique
+  ON public.school_schools(created_by)
+  WHERE created_by IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_school_members_school ON public.school_members(school_id);
 CREATE INDEX IF NOT EXISTS idx_school_members_user ON public.school_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_school_students_school ON public.school_students(school_id);

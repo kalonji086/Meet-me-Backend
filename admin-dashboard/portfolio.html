@@ -977,19 +977,46 @@
         async function loadData() {
             try {
                 const res = await axios.get(`${API_BASE}/${portfolioSlug}/public`);
-                const { skills, experiences, services, team, profile, pages, config } = res.data.data;
+                const { skills, experiences, services, team, profile, pages, config } = res.data.data || {};
                 if (config) {
                     document.title = config.title;
                     if (config.theme_color) document.documentElement.style.setProperty('--primary-color', config.theme_color);
-                    document.getElementById('brand-name').innerText = config.title;
-                    document.getElementById('footer-brand-name').innerText = config.title;
-                    document.getElementById('btn-create-saas').classList.toggle('hidden', portfolioSlug !== 'together');
-                    if (config.enabled_modules) document.querySelectorAll('[data-module]').forEach(btn => btn.classList.toggle('hidden', !config.enabled_modules.includes(btn.getAttribute('data-module'))));
+
+                    const brandName = document.getElementById('brand-name');
+                    if (brandName) brandName.innerText = config.title;
+
+                    const footerBrandName = document.getElementById('footer-brand-name');
+                    if (footerBrandName) footerBrandName.innerText = config.title;
+
+                    const createSaasBtn = document.getElementById('btn-create-saas');
+                    if (createSaasBtn) createSaasBtn.classList.toggle('hidden', portfolioSlug !== 'together');
+
+                    if (config.enabled_modules) {
+                        let enabledList = config.enabled_modules;
+                        if (typeof enabledList === 'string' && enabledList.startsWith('{')) {
+                            enabledList = enabledList.replace(/[{}]/g, '').split(',');
+                        }
+                        if (!Array.isArray(enabledList)) enabledList = [];
+
+                        document.querySelectorAll('[data-module]').forEach(btn => {
+                            const mod = btn.getAttribute('data-module');
+                            btn.classList.toggle('hidden', !enabledList.includes(mod));
+                        });
+                    }
                 }
-                renderSkills(skills); renderExperiences(experiences); renderServices(services); renderTeam(team); renderProfile(profile); renderFooterPages(pages, profile);
+
+                if (Array.isArray(skills)) renderSkills(skills);
+                if (Array.isArray(experiences)) renderExperiences(experiences);
+                if (Array.isArray(services)) renderServices(services);
+                if (Array.isArray(team)) renderTeam(team);
+
+                renderProfile(profile);
+                renderFooterPages(pages, profile);
+
                 loadBlogData();
                 lucide.createIcons();
             } catch (e) {
+                console.error("Load Data Error:", e);
                 if (e.response?.status === 404) document.body.innerHTML = '<div class="h-screen flex items-center justify-center flex-col space-y-4"><h1>404 - Portfolio Non Trouvé</h1><button onclick="location.href=\'/portfolio\'">Retour</button></div>';
             }
         }
@@ -997,14 +1024,15 @@
         function renderFooterPages(pages, profile) {
             const list = document.getElementById('footer-pages-list');
             const resList = document.getElementById('footer-resources-list');
-            if (list) list.innerHTML = pages.map(p => `<li><button onclick="viewGenericPage('${p.slug}')" class="hover:text-cyan-400 uppercase">${p.title}</button></li>`).join('');
+            if (list && Array.isArray(pages)) list.innerHTML = pages.map(p => `<li><button onclick="viewGenericPage('${p.slug}')" class="hover:text-cyan-400 uppercase">${p.title}</button></li>`).join('');
             if (resList) resList.innerHTML = `<li><button onclick="navigateTo('blog')" class="hover:text-cyan-400 uppercase">Le Blog</button></li><li><button onclick="navigateTo('community')" class="hover:text-cyan-400 uppercase">Communautés</button></li>`;
         }
 
         async function viewGenericPage(slug) {
             try {
-                const res = await axios.get(`${API_BASE}/public`);
-                const page = res.data.data.pages.find(p => p.slug === slug);
+                const res = await axios.get(`${API_BASE}/${portfolioSlug}/public`);
+                const pages = res.data.data?.pages || [];
+                const page = pages.find(p => p.slug === slug);
                 if (page) {
                     document.getElementById('generic-page-title').innerText = page.title;
 
@@ -1510,6 +1538,7 @@
             scrollToContact();
         }
         function renderProfile(p) {
+            if (!p) return;
             const logoImg = document.getElementById('site-logo');
             const footerLogo = document.getElementById('footer-logo');
             const discordLogo = document.getElementById('discord-main-logo');
@@ -1517,26 +1546,37 @@
 
             if (p.logo_url) {
                 const url = getFullUrl(p.logo_url);
-                logoImg.src = url;
-                logoImg.classList.remove('hidden');
-                document.getElementById('site-logo-fallback').classList.add('hidden');
+                if (logoImg) {
+                    logoImg.src = url;
+                    logoImg.classList.remove('hidden');
+                }
+                const siteFallback = document.getElementById('site-logo-fallback');
+                if (siteFallback) siteFallback.classList.add('hidden');
 
-                footerLogo.src = url;
-                footerLogo.classList.remove('hidden');
-                document.getElementById('footer-logo-fallback').classList.add('hidden');
+                if (footerLogo) {
+                    footerLogo.src = url;
+                    footerLogo.classList.remove('hidden');
+                }
+                const footerFallback = document.getElementById('footer-logo-fallback');
+                if (footerFallback) footerFallback.classList.add('hidden');
 
                 if (discordLogo) {
                     discordLogo.src = url;
                     discordLogo.classList.remove('hidden');
-                    discordFallback.classList.add('hidden');
                 }
+                if (discordFallback) discordFallback.classList.add('hidden');
             }
-            if (p.about_photo_url) document.getElementById('about-photo').src = getFullUrl(p.about_photo_url);
-            if (p.hero_image_url) document.getElementById('hero-image').src = getFullUrl(p.hero_image_url);
+
+            const aboutPhoto = document.getElementById('about-photo');
+            if (aboutPhoto && p.about_photo_url) aboutPhoto.src = getFullUrl(p.about_photo_url);
+
+            const heroImg = document.getElementById('hero-image');
+            if (heroImg && p.hero_image_url) heroImg.src = getFullUrl(p.hero_image_url);
 
             // Save about_description into a global window variable to inject into secret blocks if needed
             window.togetherStoryText = p.about_description || "";
-            if (p.footer_contact) document.getElementById('footer-contact-info').innerText = p.footer_contact;
+            const footerContact = document.getElementById('footer-contact-info');
+            if (footerContact && p.footer_contact) footerContact.innerText = p.footer_contact;
 
             // Render Social Links
             const socialContainer = document.getElementById('footer-social-links');
@@ -1560,14 +1600,18 @@
             if (p.background_url) {
                 const bgContainer = document.getElementById('portfolio-bg-container');
                 const bgImg = document.getElementById('portfolio-bg-image');
-                bgImg.src = getFullUrl(p.background_url);
-                bgContainer.classList.remove('hidden');
+                if (bgImg) {
+                    bgImg.src = getFullUrl(p.background_url);
+                    if (bgContainer) bgContainer.classList.remove('hidden');
 
-                // Reset animations
-                bgImg.className = "";
-                if (p.background_animation && p.background_animation !== 'none') {
-                    bgImg.classList.add('anim-' + p.background_animation);
+                    // Reset animations
+                    bgImg.className = "";
+                    if (p.background_animation && p.background_animation !== 'none') {
+                        bgImg.classList.add('anim-' + p.background_animation);
+                    }
                 }
+            }
+        }
             }
         }
         function getFullUrl(url) { if (!url || url === 'null') return 'https://placehold.co/400x400/000/fff?text=Photo'; if (url.startsWith('http')) return url; return '/' + url.replace(/^\//, ''); }

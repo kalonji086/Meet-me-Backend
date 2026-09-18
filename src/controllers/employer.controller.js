@@ -75,7 +75,7 @@ const getEmployerStatus = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
   const requestRes = await query(
-    'SELECT * FROM public.employer_requests WHERE user_id = $1',
+    'SELECT * FROM public.employer_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
     [userId]
   );
 

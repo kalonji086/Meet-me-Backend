@@ -614,24 +614,43 @@ const ensureAdminTables = async () => {
         UNIQUE(portfolio_id, slug)
       );
 
-      CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_likes (
-        post_id UUID REFERENCES public.web_portfolio_blog_posts(id) ON DELETE CASCADE,
-        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-        visitor_id TEXT,
-        PRIMARY KEY (post_id, user_id)
-      );
-      ALTER TABLE public.web_portfolio_blog_likes DROP CONSTRAINT IF EXISTS web_portfolio_blog_likes_pkey;
-      ALTER TABLE public.web_portfolio_blog_likes ADD COLUMN IF NOT EXISTS visitor_id TEXT;
-      -- Permettre aux utilisateurs d'être NULL pour gérer les likes des visiteurs anonymes
-      ALTER TABLE public.web_portfolio_blog_likes ALTER COLUMN user_id DROP NOT NULL;
-      -- Recréer une clé primaire composite ou unique safe
-      ALTER TABLE public.web_portfolio_blog_likes ADD CONSTRAINT web_portfolio_blog_likes_unique UNIQUE (post_id, user_id, visitor_id);
+    `);
 
+    // Gérer l'isolation des requêtes ALTER de manière sécurisée hors de la chaîne principale de chaînage SQL natif pour éviter les crashs de schéma
+    try {
+      await query('CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_likes (post_id UUID REFERENCES public.web_portfolio_blog_posts(id) ON DELETE CASCADE, user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE)');
+    } catch(e) {}
+    try {
+      await query('ALTER TABLE public.web_portfolio_blog_likes DROP CONSTRAINT IF EXISTS web_portfolio_blog_likes_pkey');
+    } catch(e) {}
+    try {
+      await query('ALTER TABLE public.web_portfolio_blog_likes ADD COLUMN IF NOT EXISTS visitor_id TEXT');
+    } catch(e) {}
+    try {
+      await query('ALTER TABLE public.web_portfolio_blog_likes ALTER COLUMN user_id DROP NOT NULL');
+    } catch(e) {}
+    try {
+      await query('ALTER TABLE public.web_portfolio_blog_likes DROP CONSTRAINT IF EXISTS web_portfolio_blog_likes_unique');
+    } catch(e) {}
+    try {
+      await query('ALTER TABLE public.web_portfolio_blog_likes ADD CONSTRAINT web_portfolio_blog_likes_unique UNIQUE (post_id, user_id, visitor_id)');
+    } catch(e) {}
+
+    await query(`
       CREATE TABLE IF NOT EXISTS public.web_portfolio_blog_comments (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         post_id UUID REFERENCES public.web_portfolio_blog_posts(id) ON DELETE CASCADE,
         author_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
         parent_id UUID REFERENCES public.web_portfolio_blog_comments(id) ON DELETE CASCADE,
+        author_name TEXT,
+        content TEXT NOT NULL,
+        image_url TEXT,
+        sticker_url TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      ALTER TABLE public.web_portfolio_blog_comments ADD COLUMN IF NOT EXISTS image_url TEXT;
+      ALTER TABLE public.web_portfolio_blog_comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
+    `);
         author_name TEXT,
         content TEXT NOT NULL,
         image_url TEXT,

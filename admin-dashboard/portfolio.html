@@ -201,13 +201,21 @@
                         L'Histoire <span class="text-gradient">Together.</span>
                     </h3>
 
-                    <!-- Frise Chronologique Interactive en Étapes -->
-                    <div id="history-steps" class="space-y-12 relative text-left max-w-4xl mx-auto pt-8 before:absolute before:inset-0 before:left-6 md:before:left-12 before:w-[2px] before:bg-gradient-to-b before:from-cyan-500 before:via-purple-500 before:to-transparent before:opacity-20">
+                    <!-- Bouton pour Déplier / Replier l'Histoire de manière interactive -->
+                    <div class="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <button onclick="toggleHistoryCollapse()" id="btn-toggle-history" class="px-8 py-4 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all shadow-xl flex items-center gap-2">
+                            <span>Découvrir l'Histoire</span> <i data-lucide="chevron-down" id="icon-toggle-history" class="w-4 h-4 transition-all"></i>
+                        </button>
+                        <button onclick="navigateTo('team')" class="px-8 py-4 bg-white/5 border border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-cyan-500 hover:text-white hover:border-transparent transition-all shadow-xl">Rencontrer les fondateurs</button>
+                    </div>
+
+                    <!-- Frise Chronologique Interactive en Étapes (Masquée par défaut avec max-h-0 pour effet fluide) -->
+                    <div id="history-steps" class="max-h-0 opacity-0 overflow-hidden transition-all duration-700 space-y-12 relative text-left max-w-4xl mx-auto pt-0 before:absolute before:inset-0 before:left-6 md:before:left-12 before:w-[2px] before:bg-gradient-to-b before:from-cyan-500 before:via-purple-500 before:to-transparent before:opacity-20">
 
                         <!-- Étape 1: L'Étincelle -->
-                        <div class="relative pl-14 md:pl-28 group animate-pageIn">
+                        <div class="relative pl-14 md:pl-28 group animate-pageIn pt-8">
                             <!-- Badge d'étape Numérique et Lumineux -->
-                            <div class="absolute left-2 md:left-6 top-0 w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-cyan-500/10 to-purple-500/10 border border-white/5 group-hover:border-cyan-500/50 flex items-center justify-center font-black text-xs md:text-sm text-cyan-400 group-hover:text-white group-hover:from-cyan-500 group-hover:to-purple-500 shadow-2xl transition-all duration-300 z-10 select-none">
+                            <div class="absolute left-2 md:left-6 top-8 w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-cyan-500/10 to-purple-500/10 border border-white/5 group-hover:border-cyan-500/50 flex items-center justify-center font-black text-xs md:text-sm text-cyan-400 group-hover:text-white group-hover:from-cyan-500 group-hover:to-purple-500 shadow-2xl transition-all duration-300 z-10 select-none">
                                 01
                             </div>
                             <!-- Conteneur de l'étape -->
@@ -221,7 +229,7 @@
                                         <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-0.5">D'où vient l'idée ?</p>
                                     </div>
                                 </div>
-                                <p class="text-gray-400 group-hover:text-gray-300 text-sm md:text-base leading-relaxed font-medium transition-all">À l'origine, Together Tech n'était qu'un laboratoire clandestin né pour fusionner la simplicité des réseaux de messagerie instantanée avec la robustesse des écosystèmes d'affaires. L'idée phare était d'éradiquer la frontière entre un client et son équipe de développement. Un espace interconnecté d'égal à égal.</p>
+                                <p class="text-gray-400 group-hover:text-gray-300 text-sm md:text-base leading-relaxed font-medium transition-all">À l'origine, Together Tech n'était qu'un laboratory clandestin né pour fusionner la simplicité des réseaux de messagerie instantanée avec la robustesse des écosystèmes d'affaires. L'idée phare était d'éradiquer la frontière entre un client et son équipe de développement. Un espace interconnecté d'égal à égal.</p>
                             </div>
                         </div>
 
@@ -801,6 +809,30 @@
                 `).join('') || '<div class="text-center py-20 opacity-30 uppercase font-black text-xs">Aucun poste pour le moment</div>';
                 lucide.createIcons();
             } catch (e) { console.error('Posts loading error:', e); toast('Publications indisponibles', 'error'); }
+        }
+
+        // Fonction pliable pour l'histoire Together
+        function toggleHistoryCollapse() {
+            const steps = document.getElementById('history-steps');
+            const btn = document.getElementById('btn-toggle-history');
+            const icon = document.getElementById('icon-toggle-history');
+
+            if (!steps) return;
+
+            if (steps.classList.contains('max-h-0')) {
+                // Déplier
+                steps.classList.remove('max-h-0', 'opacity-0', 'overflow-hidden');
+                steps.classList.add('max-h-[3000px]', 'opacity-100', 'pt-8');
+                if (btn) btn.querySelector('span').innerText = 'Replier l\'Histoire';
+                if (icon) icon.style.transform = 'rotate(180deg)';
+                steps.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                // Replier
+                steps.classList.add('max-h-0', 'opacity-0', 'overflow-hidden');
+                steps.classList.remove('max-h-[3000px]', 'opacity-100', 'pt-8');
+                if (btn) btn.querySelector('span').innerText = 'Découvrir l\'Histoire';
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            }
         }
 
         // Secret Story Reveal Functions

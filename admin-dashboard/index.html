@@ -4387,10 +4387,22 @@
 
                 const ctx = document.getElementById('overviewMasterChart').getContext('2d');
                 if (charts.master) charts.master.destroy();
-                const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6'];
-                charts.master = new Chart(ctx, { type: 'polarArea', data: { labels: ['Utilisateurs', 'En ligne', 'Groupes', 'Messages'], datasets: [{ data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages], backgroundColor: colors.map(c => c + 'CC'), borderColor: '#fff', borderWidth: 4 }] } });
+                // Ajout des couleurs spécifiques pour inclure de manière fluide les nouvelles statistiques (Écoles, Emplois, Market)
+                const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6', '#06B6D4', '#6366F1', '#F59E0B'];
+                charts.master = new Chart(ctx, {
+                    type: 'polarArea',
+                    data: {
+                        labels: ['Utilisateurs', 'En ligne', 'Groupes', 'Messages', 'Écoles', 'Emplois', 'Market'],
+                        datasets: [{
+                            data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalSchools || 0, d.totalJobs || 0, d.totalMarket || 0],
+                            backgroundColor: colors.map(c => c + 'CC'),
+                            borderColor: '#fff',
+                            borderWidth: 4
+                        }]
+                    }
+                });
                 const legend = document.getElementById('master-legend');
-                legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes Chat', 'Messages'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages][i]}</p></div>`).join('');
+                legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes Chat', 'Messages', 'Écoles Créées', 'Offres d\'Emploi', 'Annonces Market'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalSchools || 0, d.totalJobs || 0, d.totalMarket || 0][i]}</p></div>`).join('');
                 lucide.createIcons();
             } catch (e) {}
         }

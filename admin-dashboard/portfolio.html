@@ -835,6 +835,28 @@
             }
         }
 
+        // Fonction pliable générique pour les pages du pied de site (Conditions d'utilisation / Confidentialité)
+        function toggleGenericPageCollapse() {
+            const steps = document.getElementById('generic-page-steps');
+            const btn = document.getElementById('btn-toggle-generic-page');
+            const icon = document.getElementById('icon-toggle-generic-page');
+
+            if (!steps) return;
+
+            if (steps.classList.contains('max-h-0')) {
+                steps.classList.remove('max-h-0', 'opacity-0', 'overflow-hidden');
+                steps.classList.add('max-h-[5000px]', 'opacity-100');
+                if (btn) btn.querySelector('span').innerText = 'Replier le Document';
+                if (icon) icon.style.transform = 'rotate(180deg)';
+                steps.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                steps.classList.add('max-h-0', 'opacity-0', 'overflow-hidden');
+                steps.classList.remove('max-h-[5000px]', 'opacity-100');
+                if (btn) btn.querySelector('span').innerText = 'Découvrir le Document';
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
         // Secret Story Reveal Functions
         function revealSecret(type) {
             const box = document.getElementById('story-reveal-box');
@@ -1135,12 +1157,19 @@
                             steps.push({ title: currentStepTitle, content: currentStepTexts.join('<br><br>') });
                         }
 
-                        // Si on a réussi à extraire des étapes, on génère une timeline animée interactive
+                        // Si on a réussi à extraire des étapes, on génère une timeline animée interactive pliable
                         if (steps.length > 0) {
                             contentHTML = `
-                                <div class="space-y-12 relative before:absolute before:inset-0 before:left-6 md:before:left-12 before:w-[2px] before:bg-gradient-to-b before:from-cyan-500 before:via-purple-500 before:to-transparent before:opacity-20">
+                                <!-- Bouton pour Déplier / Replier le document de manière interactive -->
+                                <div class="mb-8 flex justify-center">
+                                    <button onclick="toggleGenericPageCollapse()" id="btn-toggle-generic-page" class="px-8 py-4 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-purple-500 hover:text-white transition-all shadow-xl flex items-center gap-2">
+                                        <span>Découvrir le Document</span> <i data-lucide="chevron-down" id="icon-toggle-generic-page" class="w-4 h-4 transition-all"></i>
+                                    </button>
+                                </div>
+
+                                <div id="generic-page-steps" class="max-h-0 opacity-0 overflow-hidden transition-all duration-700 space-y-12 relative before:absolute before:inset-0 before:left-6 md:before:left-12 before:w-[2px] before:bg-gradient-to-b before:from-cyan-500 before:via-purple-500 before:to-transparent before:opacity-20">
                                     ${steps.map((step, idx) => `
-                                        <div class="relative pl-14 md:pl-24 group animate-pageIn" style="animation-delay: ${idx * 0.1}s">
+                                        <div class="relative pl-14 md:pl-24 group animate-pageIn" style="animation-delay: ${idx * 0.05}s">
                                             <!-- Badge d'étape Numérique et Lumineux -->
                                             <div class="absolute left-2 md:left-6 top-0 w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-cyan-500/10 to-purple-500/10 border border-white/5 group-hover:border-cyan-500/50 flex items-center justify-center font-black text-xs md:text-sm text-cyan-400 group-hover:text-white group-hover:from-cyan-500 group-hover:to-purple-500 shadow-2xl transition-all duration-300 z-10 select-none">
                                                 ${String(idx + 1).padStart(2, '0')}
@@ -1148,6 +1177,16 @@
 
                                             <!-- Conteneur de l'étape -->
                                             <div class="glass p-6 md:p-10 rounded-3xl border border-white/5 group-hover:border-white/10 transition-all duration-300 bg-white/[0.01] hover:bg-white/[0.02] shadow-xl hover:shadow-2xl">
+                                                <h4 class="text-lg md:text-2xl font-black uppercase tracking-tight text-white mb-4 group-hover:text-cyan-400 transition-all flex items-center gap-2">
+                                                    <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-all"></i> ${step.title}
+                                                </h4>
+                                                <p class="text-gray-400 group-hover:text-gray-300 text-sm md:text-base leading-relaxed font-medium transition-all">${step.content}</p>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
                                                 <h4 class="text-lg md:text-2xl font-black uppercase tracking-tight text-white mb-4 group-hover:text-cyan-400 transition-all flex items-center gap-2">
                                                     <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-all"></i> ${step.title}
                                                 </h4>

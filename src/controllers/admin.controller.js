@@ -70,6 +70,11 @@ const getStats = asyncHandler(async (req, res) => {
   const chatsCount = await query('SELECT COUNT(*) FROM public.chats WHERE type = \'group\'');
   const onlineCount = await query("SELECT COUNT(*) FROM public.profiles WHERE status = 'online' AND is_global_admin = FALSE");
 
+  // Nouvelles statistiques indépendantes demandées sans impacter l'existant
+  const schoolsCount = await query('SELECT COUNT(*) FROM public.school_schools');
+  const jobsCount = await query('SELECT COUNT(*) FROM public.job_postings');
+  const marketCount = await query('SELECT COUNT(*) FROM public.market_posts');
+
   res.json({
     success: true,
     data: {
@@ -77,6 +82,9 @@ const getStats = asyncHandler(async (req, res) => {
       totalMessages: parseInt(messagesCount.rows[0].count),
       totalGroups: parseInt(chatsCount.rows[0].count),
       onlineUsers: parseInt(onlineCount.rows[0].count),
+      totalSchools: parseInt(schoolsCount.rows[0].count || 0),
+      totalJobs: parseInt(jobsCount.rows[0].count || 0),
+      totalMarket: parseInt(marketCount.rows[0].count || 0),
     },
   });
 });

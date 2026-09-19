@@ -887,7 +887,8 @@
             </div>
 
             <div id="section-stats" class="animate-fade-in">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8 mb-10" id="stats-summary">
+                    <!-- Première rangée : Statistiques Globales existantes -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8 mb-6" id="stats-summary">
                         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users" class="w-7 h-7 text-purple-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Utilisateurs</p><h4 id="stat-users" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
@@ -903,6 +904,22 @@
                         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users-2" class="w-7 h-7 text-orange-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Groupes</p><h4 id="stat-groups" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
+                        </div>
+                    </div>
+
+                    <!-- Deuxième rangée : Nouvelles Statistiques d'Écosystème (Écoles, Emplois, Markets) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-8 mb-10">
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
+                            <div class="w-14 h-14 bg-cyan-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="graduation-cap" class="w-7 h-7 text-cyan-600"></i></div>
+                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Écoles Créées</p><h4 id="stat-schools" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
+                            <div class="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="briefcase" class="w-7 h-7 text-indigo-600"></i></div>
+                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Offres d'Emploi</p><h4 id="stat-jobs" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
+                            <div class="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="shopping-bag" class="w-7 h-7 text-amber-600"></i></div>
+                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Annonces Market</p><h4 id="stat-market" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
                         </div>
                     </div>
                     <div class="bg-white p-6 lg:p-10 rounded-[2.5rem] lg:rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center">
@@ -4362,12 +4379,19 @@
                 document.getElementById('stat-online').innerText = d.onlineUsers;
                 document.getElementById('stat-messages').innerText = d.totalMessages;
                 document.getElementById('stat-groups').innerText = d.totalGroups;
+
+                // Assignation des 3 nouvelles statistiques d'écosystème avec sécurité
+                if (document.getElementById('stat-schools')) document.getElementById('stat-schools').innerText = d.totalSchools || 0;
+                if (document.getElementById('stat-jobs')) document.getElementById('stat-jobs').innerText = d.totalJobs || 0;
+                if (document.getElementById('stat-market')) document.getElementById('stat-market').innerText = d.totalMarket || 0;
+
                 const ctx = document.getElementById('overviewMasterChart').getContext('2d');
                 if (charts.master) charts.master.destroy();
                 const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6'];
                 charts.master = new Chart(ctx, { type: 'polarArea', data: { labels: ['Utilisateurs', 'En ligne', 'Groupes', 'Messages'], datasets: [{ data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages], backgroundColor: colors.map(c => c + 'CC'), borderColor: '#fff', borderWidth: 4 }] } });
                 const legend = document.getElementById('master-legend');
                 legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes Chat', 'Messages'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages][i]}</p></div>`).join('');
+                lucide.createIcons();
             } catch (e) {}
         }
 

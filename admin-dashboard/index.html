@@ -456,17 +456,22 @@
                             <div class="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
                                 <h3 class="text-xl font-black text-gray-900 mb-6 uppercase tracking-tighter italic">Arrière-plan du Site</h3>
                                 <div class="space-y-4">
-                                    <div class="relative group w-full h-40 rounded-[2rem] overflow-hidden bg-gray-100 border border-gray-100">
+                                    <div class="relative group w-full h-40 rounded-[2rem] overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center">
                                         <img id="port-bg-preview" src="https://ui-avatars.com/api/?name=Background" class="w-full h-full object-cover">
+                                        <video id="port-bg-video-preview" autoplay muted loop playsinline class="w-full h-full object-cover hidden"></video>
                                         <button onclick="document.getElementById('port-bg-input').click()" class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                                            <i data-lucide="image" class="w-8 h-8 text-white"></i>
+                                            <i data-lucide="upload-cloud" class="w-8 h-8 text-white"></i>
                                         </button>
-                                        <input type="file" id="port-bg-input" class="hidden" onchange="previewPortfolioImg(this, 'port-bg-preview')">
+                                        <input type="file" id="port-bg-input" class="hidden" accept="image/*,video/*" onchange="previewPortfolioBgMedia(this)">
+                                    </div>
+                                    <div class="flex flex-col gap-2">
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase ml-1">Ou coller l'URL directe d'une image/vidéo</label>
+                                        <input type="text" id="port-bg-url-input" placeholder="https://exemple.com/video.mp4 ou image.jpg" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Animation de l'arrière-plan</label>
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Animation (Images Statiques uniquement)</label>
                                         <select id="port-bg-animation" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs">
-                                            <option value="none">Aucune (Statique)</option>
+                                            <option value="none">Aucune (Statique / Vidéo)</option>
                                             <option value="zoom">Zoom infini (Subtile)</option>
                                             <option value="pan">Défilement Horizontal</option>
                                             <option value="float">Flottement vertical</option>

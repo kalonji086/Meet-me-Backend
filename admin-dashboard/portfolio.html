@@ -45,7 +45,8 @@
         /* Animated Background Styles */
         #portfolio-bg-container { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
         #main-content { position: relative; z-index: 1; }
-        #portfolio-bg-image { width: 100%; height: 100%; object-fit: cover; opacity: 0.15; filter: blur(3px); }
+        #portfolio-bg-image, #portfolio-bg-video { width: 100%; height: 100%; object-fit: cover; opacity: 0.15; filter: blur(3px); }
+        #portfolio-bg-video { display: none; }
 
         @keyframes bg-zoom { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         .anim-zoom { animation: bg-zoom 20s ease-in-out infinite; }
@@ -100,9 +101,10 @@
     </style>
 </head>
 <body class="selection:bg-cyan-500/30">
-    <!-- Animated Background -->
+    <!-- Animated Background (Supports Image & Video dynamically) -->
     <div id="portfolio-bg-container" class="hidden">
         <img id="portfolio-bg-image" src="" alt="Background">
+        <video id="portfolio-bg-video" autoplay muted loop playsinline></video>
     </div>
 
     <!-- Header / Nav -->
@@ -1703,15 +1705,33 @@
                 lucide.createIcons();
             }
 
-            // Apply Animated Background
+            // Apply Animated Background (Image & Video Dynamic Detection)
             if (p.background_url) {
                 const bgContainer = document.getElementById('portfolio-bg-container');
                 const bgImg = document.getElementById('portfolio-bg-image');
-                if (bgImg) {
-                    bgImg.src = getFullUrl(p.background_url);
-                    if (bgContainer) bgContainer.classList.remove('hidden');
+                const bgVideo = document.getElementById('portfolio-bg-video');
+                const fullUrl = getFullUrl(p.background_url);
 
-                    // Reset animations
+                if (bgContainer) bgContainer.classList.remove('hidden');
+
+                // Détection de l'extension pour identifier une vidéo (.mp4, .webm, .ogg)
+                const isVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(fullUrl);
+
+                if (isVideo && bgVideo) {
+                    if (bgImg) bgImg.style.display = 'none';
+                    bgVideo.style.display = 'block';
+                    bgVideo.src = fullUrl;
+                    bgVideo.load();
+                    bgVideo.play().catch(err => console.log("Autoplay blocked or video loading:", err));
+                } else if (bgImg) {
+                    if (bgVideo) {
+                        bgVideo.style.display = 'none';
+                        bgVideo.src = '';
+                    }
+                    bgImg.style.display = 'block';
+                    bgImg.src = fullUrl;
+
+                    // Réinitialisation et application des animations CSS pour l'image
                     bgImg.className = "";
                     if (p.background_animation && p.background_animation !== 'none') {
                         bgImg.classList.add('anim-' + p.background_animation);

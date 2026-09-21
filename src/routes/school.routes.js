@@ -6,6 +6,7 @@ const { authenticate } = require('../middleware/auth.middleware');
 router.use(authenticate);
 
 router.get('/overview', schoolController.getSchoolOverview);
+router.post('/link-student', schoolController.linkStudentAccount);
 router.get('/world', schoolController.getSchools);
 router.get('/my-school', schoolController.getMySchool);
 router.get('/dashboard', schoolController.getDashboard);

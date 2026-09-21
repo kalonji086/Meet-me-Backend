@@ -30,6 +30,36 @@ const requireSchoolRole = async (req, res, schoolId, roles) => {
 const getSchoolOverview = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
+  // Refonte: Auto-liaison bidirectionnelle des enseignants par email et des étudiants par user_id
+  const userProfile = await query('SELECT email FROM public.profiles WHERE id = $1', [userId]);
+  const userEmail = userProfile.rows[0]?.email;
+
+  if (userEmail) {
+    const openTeachers = await query(
+      'SELECT id, school_id FROM public.school_teachers WHERE email = $1 AND user_id IS NULL',
+      [userEmail]
+    );
+    for (const t of openTeachers.rows) {
+      await query('UPDATE public.school_teachers SET user_id = $1 WHERE id = $2', [userId, t.id]);
+      await query(
+        `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+         VALUES ($1, $2, 'teacher', TRUE)
+         ON CONFLICT (school_id, user_id, role) DO UPDATE SET is_active = TRUE`,
+        [t.school_id, userId]
+      );
+    }
+  }
+
+  const studentRows = await query('SELECT school_id FROM public.school_students WHERE user_id = $1', [userId]);
+  for (const s of studentRows.rows) {
+    await query(
+      `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+       VALUES ($1, $2, 'student', TRUE)
+       ON CONFLICT (school_id, user_id, role) DO UPDATE SET is_active = TRUE`,
+      [s.school_id, userId]
+    );
+  }
+
   const [mySchools, worldSchools, myStudents, pendingAssignments] = await Promise.all([
     query(
       `SELECT sm.role, sm.is_active, s.*
@@ -39,8 +69,11 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
        ORDER BY (CASE
          WHEN sm.role = 'promoter' THEN 0
          WHEN sm.role = 'director' THEN 1
-         WHEN s.created_by = $1 THEN 2
-         ELSE 3 END) ASC, s.created_at DESC`,
+         WHEN sm.role = 'teacher' THEN 2
+         WHEN sm.role = 'parent' THEN 3
+         WHEN sm.role = 'student' THEN 4
+         WHEN s.created_by = $1 THEN 5
+         ELSE 6 END) ASC, s.created_at DESC`,
       [userId]
     ),
     query(
@@ -397,11 +430,29 @@ const createTeacher = asyncHandler(async (req, res) => {
   const member = await requireSchoolRole(req, res, schoolId, ['promoter', 'director']);
   if (!member) return;
 
+  let finalUserId = userId;
+  if (!finalUserId && email) {
+    const profileRes = await query('SELECT id FROM public.profiles WHERE email = $1 LIMIT 1', [email.trim()]);
+    if (profileRes.rows.length > 0) {
+      finalUserId = profileRes.rows[0].id;
+    }
+  }
+
   const result = await query(
     `INSERT INTO public.school_teachers (school_id, user_id, full_name, subject, email, phone)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [schoolId, userId, fullName, subject || '', email || '', phone || '']
+    [schoolId, finalUserId, fullName, subject || '', email || '', phone || '']
   );
+
+  if (finalUserId) {
+    await query(
+      `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+       VALUES ($1, $2, 'teacher', TRUE)
+       ON CONFLICT (school_id, user_id, role) DO UPDATE SET is_active = TRUE`,
+      [schoolId, finalUserId]
+    );
+  }
+
   res.status(201).json({ success: true, data: result.rows[0] });
 });
 
@@ -813,6 +864,38 @@ const assignTeacherToClass = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true });
 });
 
+const linkStudentAccount = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { schoolId, firstName, lastName } = req.body;
+
+  if (!schoolId || !firstName || !lastName) {
+    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants.' });
+  }
+
+  const studentCheck = await query(
+    `SELECT id FROM public.school_students
+     WHERE school_id = $1 AND LOWER(first_name) = LOWER($2) AND LOWER(last_name) = LOWER($3) AND user_id IS NULL
+     LIMIT 1`,
+    [schoolId, firstName.trim(), lastName.trim()]
+  );
+
+  if (studentCheck.rows.length === 0) {
+    return res.status(400).json({ success: false, error: 'Aucun profil élève disponible correspondant à ce nom.' });
+  }
+
+  const studentId = studentCheck.rows[0].id;
+  await query('UPDATE public.school_students SET user_id = $1 WHERE id = $2', [userId, studentId]);
+
+  await query(
+    `INSERT INTO public.school_members (school_id, user_id, role, is_active)
+     VALUES ($1, $2, 'student', TRUE)
+     ON CONFLICT (school_id, user_id, role) DO UPDATE SET is_active = TRUE`,
+    [schoolId, userId]
+  );
+
+  res.json({ success: true, message: 'Votre compte a été lié avec succès au profil élève.' });
+});
+
 module.exports = {
   getSchoolOverview,
   createSchool,
@@ -845,5 +928,6 @@ module.exports = {
   createAnnouncement,
   deleteAnnouncement,
   getSchoolTeachers,
-  assignTeacherToClass
+  assignTeacherToClass,
+  linkStudentAccount
 };

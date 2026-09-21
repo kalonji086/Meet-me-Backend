@@ -71,7 +71,6 @@ const getStats = asyncHandler(async (req, res) => {
   const onlineCount = await query("SELECT COUNT(*) FROM public.profiles WHERE status = 'online' AND is_global_admin = FALSE");
 
   // Nouvelles statistiques indépendantes demandées sans impacter l'existant
-  const schoolsCount = await query('SELECT COUNT(*) FROM public.school_schools');
   const jobsCount = await query('SELECT COUNT(*) FROM public.job_postings');
   const marketCount = await query('SELECT COUNT(*) FROM public.market_posts');
 
@@ -82,7 +81,6 @@ const getStats = asyncHandler(async (req, res) => {
       totalMessages: parseInt(messagesCount.rows[0].count),
       totalGroups: parseInt(chatsCount.rows[0].count),
       onlineUsers: parseInt(onlineCount.rows[0].count),
-      totalSchools: parseInt(schoolsCount.rows[0].count || 0),
       totalJobs: parseInt(jobsCount.rows[0].count || 0),
       totalMarket: parseInt(marketCount.rows[0].count || 0),
     },
@@ -412,7 +410,7 @@ const ensureAdminTables = async () => {
     logger.error('Error adding is_boosted columns:', e.message);
   }
 
-  // School tables initialization
+  // Statuses and social tables initialization
   try {
     await query(`
       CREATE TABLE IF NOT EXISTS public.statuses (
@@ -440,89 +438,13 @@ const ensureAdminTables = async () => {
         type TEXT NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
-
-      CREATE TABLE IF NOT EXISTS public.school_schools (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          name TEXT NOT NULL,
-          school_type TEXT DEFAULT 'private',
-          country TEXT NOT NULL,
-          city TEXT,
-          address TEXT,
-          contact_email TEXT,
-          phone TEXT,
-          logo_url TEXT,
-          description TEXT,
-          status TEXT DEFAULT 'pending',
-          created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-          director_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-      CREATE TABLE IF NOT EXISTS public.school_members (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
-          user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-          role TEXT NOT NULL CHECK (role IN ('student', 'parent', 'teacher', 'director', 'promoter')),
-          is_active BOOLEAN DEFAULT TRUE,
-          joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          UNIQUE(school_id, user_id)
-      );
-      CREATE TABLE IF NOT EXISTS public.school_classes (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
-          name TEXT NOT NULL,
-          level TEXT,
-          capacity INTEGER DEFAULT 30,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-      CREATE TABLE IF NOT EXISTS public.school_students (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
-          user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-          parent_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-          first_name TEXT NOT NULL,
-          last_name TEXT NOT NULL,
-          age INTEGER,
-          grade_level TEXT,
-          class_id UUID REFERENCES public.school_classes(id) ON DELETE SET NULL,
-          status TEXT DEFAULT 'active',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-      CREATE TABLE IF NOT EXISTS public.school_grades (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
-          student_id UUID REFERENCES public.school_students(id) ON DELETE CASCADE,
-          teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-          class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
-          subject TEXT NOT NULL,
-          score DECIMAL NOT NULL,
-          max_score DECIMAL DEFAULT 20,
-          comment TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-      CREATE TABLE IF NOT EXISTS public.school_assignments (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          school_id UUID REFERENCES public.school_schools(id) ON DELETE CASCADE,
-          class_id UUID REFERENCES public.school_classes(id) ON DELETE CASCADE,
-          teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-          title TEXT NOT NULL,
-          description TEXT,
-          due_date TIMESTAMP WITH TIME ZONE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
     `);
   } catch (e) {
-    logger.error('Error ensuring school tables:', e.message);
+    logger.error('Error ensuring social tables:', e.message);
   }
 
   // Final robust schema synchronization for Admin Modules
   try {
-    // School Management & Monitoring
-    await query('ALTER TABLE public.school_schools ADD COLUMN IF NOT EXISTS director_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL');
-    await query('ALTER TABLE public.school_members ADD COLUMN IF NOT EXISTS allowed_modules TEXT[] DEFAULT \'{}\'');
-    await query('ALTER TABLE public.school_members ADD COLUMN IF NOT EXISTS enrollment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
-    await query('ALTER TABLE public.school_members ADD COLUMN IF NOT EXISTS joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
-
     // Moderation & Boost
     await query('ALTER TABLE public.statuses ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
     await query('ALTER TABLE public.market_posts ADD COLUMN IF NOT EXISTS is_boosted BOOLEAN DEFAULT FALSE');
@@ -1138,15 +1060,6 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'reply_appeal':
           await query('UPDATE public.appeals SET admin_reply = $1, status = $2, resolved_at = NOW() WHERE id = $3', [action.details.reply, action.details.action === 'resolved' ? 'resolved' : 'reviewed', action.target_id]);
           break;
-        case 'approve_school':
-          await query("UPDATE public.school_schools SET status = 'approved', updated_at = NOW() WHERE id = $1", [action.target_id]);
-          break;
-        case 'block_school':
-          await query("UPDATE public.school_schools SET status = 'blocked', updated_at = NOW() WHERE id = $1", [action.target_id]);
-          break;
-        case 'delete_school':
-          await query('DELETE FROM public.school_schools WHERE id = $1', [action.target_id]);
-          break;
         case 'handle_employer':
           const { status: empStatus } = action.details;
           await query("UPDATE public.employer_requests SET status = $1, updated_at = NOW() WHERE id = $2", [empStatus, action.target_id]);
@@ -1159,25 +1072,6 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'delete_collaborator':
           await query('UPDATE public.profiles SET collab_deleted_at = NOW(), is_collaborator = FALSE WHERE id = $1', [action.target_id]);
           await query('UPDATE public.admin_delegations SET is_active = FALSE WHERE user_id = $1', [action.target_id]);
-          break;
-        case 'create_account':
-          // Re-use logic or manual
-          const { fullName: fName, email: fEmail, password: fPass, role: fRole, schoolId: fSchoolId, allowedModules: fModules, enrollmentDate: fDate, gender: fGender, country: fCountry } = action.details;
-          let uId;
-          const uRes = await query('SELECT id FROM public.profiles WHERE email = $1', [fEmail]);
-          if (uRes.rows.length === 0) {
-            const bc = require('bcryptjs');
-            const hPass = await bc.hash(fPass || 'MeetMe2024', 10);
-            const nP = await query('INSERT INTO public.profiles (full_name, email, password, gender, country, created_at, must_change_password) VALUES ($1, $2, $3, $4, $5, $6, TRUE) RETURNING id', [fName, fEmail, hPass, fGender || 'M', fCountry || 'RDC', fDate || new Date()]);
-            uId = nP.rows[0].id;
-          } else { uId = uRes.rows[0].id; }
-          if (fSchoolId) { await query('INSERT INTO public.school_members (school_id, user_id, role, is_active, allowed_modules, enrollment_date) VALUES ($1, $2, $3, TRUE, $4, $5) ON CONFLICT (school_id, user_id) DO UPDATE SET role = $3, allowed_modules = $4, enrollment_date = $5, is_active = TRUE', [fSchoolId, uId, fRole, fModules || [], fDate || new Date()]); }
-          break;
-        case 'update_account':
-          await query('UPDATE public.school_members SET role = COALESCE($1, role), allowed_modules = COALESCE($2, allowed_modules), is_active = COALESCE($3, is_active) WHERE id = $4', [action.details.role, action.details.allowedModules, action.details.is_active, action.target_id]);
-          break;
-        case 'delete_account':
-          await query('DELETE FROM public.school_members WHERE id = $1', [action.target_id]);
           break;
         case 'collab_application':
           let applyTeamId = action.details.teamId;
@@ -2569,138 +2463,6 @@ const moderateContent = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Get all pending school creation requests
- * @route   GET /api/admin/schools/pending
- */
-const getPendingSchools = asyncHandler(async (req, res) => {
-  const result = await query(`
-    SELECT s.*, p.full_name as creator_name, p.email as creator_email
-    FROM public.school_schools s
-    JOIN public.profiles p ON s.created_by = p.id
-    WHERE s.status = 'pending'
-    ORDER BY s.created_at DESC
-  `);
-  res.json({ success: true, data: result.rows });
-});
-
-/**
- * @desc    Approve a school
- * @route   PUT /api/admin/schools/:id/approve
- */
-const approveSchool = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const schoolCheck = await query('SELECT name, created_by FROM public.school_schools WHERE id = $1', [id]);
-  if (schoolCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
-
-  const canExecute = await processSensitiveAction(req, 'approve_school', id, schoolCheck.rows[0].name, { approved: true }, 'school-admin', 'approve');
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande d\'approbation d\'école mise en attente.' });
-
-  const result = await query(
-    "UPDATE public.school_schools SET status = 'approved', updated_at = NOW() WHERE id = $1 RETURNING *",
-    [id]
-  );
-
-  const school = result.rows[0];
-
-  // SÉCURITÉ : S'assurer que le créateur est bien membre et promu 'promoter' avec accès complet par défaut
-  const defaultModules = ['dashboard', 'students', 'teachers', 'finance', 'schedule', 'messages'];
-
-  const memberResult = await query(
-    `UPDATE public.school_members
-     SET role = 'promoter', is_active = TRUE, allowed_modules = $3
-     WHERE school_id = $1 AND user_id = $2
-     RETURNING id`,
-    [id, school.created_by, defaultModules]
-  );
-
-  if (memberResult.rows.length === 0) {
-    await query(
-      `INSERT INTO public.school_members (school_id, user_id, role, is_active, allowed_modules)
-       VALUES ($1, $2, 'promoter', TRUE, $3)`,
-      [id, school.created_by, defaultModules]
-    );
-  }
-
-  // Marquer le profil utilisateur comme vérifié/promoteur si nécessaire (optionnel selon vos règles)
-  await query('UPDATE public.profiles SET is_verified = TRUE WHERE id = $1', [school.created_by]);
-
-  // Notify creator via socket and email
-  socketService.emitToUser(school.created_by, 'school:approved', {
-    schoolId: school.id,
-    schoolName: school.name,
-    role: 'promoter',
-    modules: defaultModules
-  });
-
-  // Global broadcast to update world directory in real-time
-  socketService.broadcast('school:new_active', {
-    id: school.id,
-    name: school.name,
-    school_type: school.school_type,
-    city: school.city,
-    country: school.country,
-    logo_url: school.logo_url,
-    status: 'approved'
-  });
-
-  await logAdminAction(req, 'approve_school', 'school', id, { schoolName: school.name });
-  res.json({ success: true, message: `L'école ${school.name} a été approuvée.` });
-});
-
-/**
- * @desc    Block/Reject a school
- * @route   PUT /api/admin/schools/:id/block
- */
-const blockSchool = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { reason } = req.body;
-
-  const schoolCheck = await query('SELECT name FROM public.school_schools WHERE id = $1', [id]);
-  if (schoolCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
-
-  const canExecute = await processSensitiveAction(req, 'block_school', id, schoolCheck.rows[0].name, { reason }, 'school-admin', 'approve');
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de blocage d\'école mise en attente.' });
-
-  const result = await query(
-    "UPDATE public.school_schools SET status = 'blocked', updated_at = NOW() WHERE id = $1 RETURNING *",
-    [id]
-  );
-
-  const school = result.rows[0];
-
-  socketService.sendToUser(school.created_by, 'school:blocked', { schoolName: school.name, reason });
-
-  await logAdminAction(req, 'block_school', 'school', id, { schoolName: school.name, reason });
-  res.json({ success: true, message: `L'école ${school.name} a été bloquée.` });
-});
-
-/**
- * @desc    Delete a school
- * @route   DELETE /api/admin/schools/:id
- */
-const deleteSchool = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const schoolRes = await query('SELECT name, created_by FROM public.school_schools WHERE id = $1', [id]);
-  if (schoolRes.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
-
-  const school = schoolRes.rows[0];
-
-  const canExecute = await processSensitiveAction(req, 'delete_school', id, school.name, { deleted: true }, 'school-admin', 'settings');
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression d\'école mise en attente.' });
-
-  await query('DELETE FROM public.school_schools WHERE id = $1', [id]);
-
-  // Real-time notification to the promoter and global broadcast
-  socketService.emitToUser(school.created_by, 'school:deleted', { schoolName: school.name });
-  socketService.broadcast('admin:school_deleted', { schoolId: id });
-
-  await logAdminAction(req, 'delete_school', 'school', id, { schoolName: school.name });
-  res.json({ success: true, message: `L'école ${school.name} a été supprimée définitivement.` });
-});
-
-/**
  * @desc    Get all pending employer requests
  * @route   GET /api/admin/employer-requests
  */
@@ -2768,293 +2530,13 @@ const handleEmployerRequest = asyncHandler(async (req, res) => {
 
   } else {
     await query(
-      "UPDATE public.employer_requests SET status = 'rejected', updated_at = NOW() WHERE id = $1",
+      "UPDATE public.employer_requests SET status = 'rejected', updated_at = NOW() WHERE id = $2",
       [id]
     );
   }
 
   await logAdminAction(req, `employer_request_${status}`, 'employer', id, { companyName: request.company_name });
   res.json({ success: true, message: `Demande ${status === 'approved' ? 'approuvée' : 'rejetée'}.` });
-});
-
-/**
- * @desc    Get global statistics for all schools
- * @route   GET /api/admin/schools/stats
- */
-const getSchoolsStats = asyncHandler(async (req, res) => {
-  const result = await query(`
-    SELECT s.id, s.name, s.school_type, s.city, s.country, s.status, s.logo_url,
-           p.full_name as promoter_name,
-           (SELECT COUNT(*) FROM public.school_students WHERE school_id = s.id) as students_count,
-           (SELECT COUNT(*) FROM public.school_classes WHERE school_id = s.id) as classes_count,
-           (SELECT COUNT(*) FROM public.school_teachers WHERE school_id = s.id) as teachers_count,
-           (SELECT COALESCE(SUM(amount), 0) FROM public.school_payments WHERE school_id = s.id AND status = 'completed') as total_revenue
-    FROM public.school_schools s
-    JOIN public.profiles p ON s.created_by = p.id
-    WHERE s.status != 'pending'
-    ORDER BY total_revenue DESC, students_count DESC
-  `);
-
-  res.json({
-    success: true,
-    data: result.rows
-  });
-});
-
-/**
- * @desc    Get full details of a specific school for admin examination
- * @route   GET /api/admin/schools/:id/details
- */
-const getSchoolDetailsAdmin = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const [schoolRes, students, teachers, classes, payments] = await Promise.all([
-    query(`SELECT s.*, p.full_name as promoter_name, p.email as promoter_email
-           FROM public.school_schools s
-           JOIN public.profiles p ON s.created_by = p.id
-           WHERE s.id = $1`, [id]),
-    query('SELECT count(*) FROM public.school_students WHERE school_id = $1', [id]),
-    query('SELECT count(*) FROM public.school_teachers WHERE school_id = $1', [id]),
-    query('SELECT count(*) FROM public.school_classes WHERE school_id = $1', [id]),
-    query(`SELECT p.*, pr.full_name as parent_name
-           FROM public.school_payments p
-           JOIN public.profiles pr ON p.parent_id = pr.id
-           WHERE p.school_id = $1 ORDER BY p.created_at DESC LIMIT 10`, [id])
-  ]);
-
-  if (schoolRes.rows.length === 0) return res.status(404).json({ success: false, error: 'École non trouvée' });
-
-  res.json({
-    success: true,
-    data: {
-      school: schoolRes.rows[0],
-      stats: {
-        students: parseInt(students.rows[0].count),
-        teachers: parseInt(teachers.rows[0].count),
-        classes: parseInt(classes.rows[0].count)
-      },
-      recentPayments: payments.rows
-    }
-  });
-});
-
-/**
- * @desc    Get all pending staff account requests (Promoters asking for staff accounts)
- * @route   GET /api/admin/schools/staff-requests
- */
-const getStaffRequests = asyncHandler(async (req, res) => {
-  const result = await query(`
-    SELECT sr.*, s.name as school_name, p.full_name as promoter_name
-    FROM public.school_staff_requests sr
-    JOIN public.school_schools s ON sr.school_id = s.id
-    JOIN public.profiles p ON sr.promoter_id = p.id
-    WHERE sr.status = 'pending'
-    ORDER BY sr.created_at DESC
-  `);
-  res.json({ success: true, data: result.rows });
-});
-
-/**
- * @desc    Handle staff account request (Promote existing user or send invite)
- * @route   PUT /api/admin/schools/staff-requests/:id
- */
-const handleStaffRequest = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { status, admin_notes } = req.body;
-
-  const requestRes = await query('SELECT * FROM public.school_staff_requests WHERE id = $1', [id]);
-  if (requestRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande non trouvée' });
-  const request = requestRes.rows[0];
-
-  if (status === 'approved') {
-    // 1. Check if user exists by email
-    const userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [request.email]);
-
-    if (userRes.rows.length > 0) {
-      const userId = userRes.rows[0].id;
-      // 2. Add to school members
-      await query(
-        `INSERT INTO public.school_members (school_id, user_id, role, is_active)
-         VALUES ($1, $2, $3, TRUE)
-         ON CONFLICT (school_id, user_id) DO UPDATE SET role = $3, is_active = TRUE`,
-        [request.school_id, userId, request.role_requested]
-      );
-
-      // 3. Mark request as approved
-      await query("UPDATE public.school_staff_requests SET status = 'approved', updated_at = NOW() WHERE id = $1", [id]);
-
-      socketService.emitToUser(userId, 'school:staff_activated', { schoolId: request.school_id, role: request.role_requested });
-    } else {
-      return res.status(400).json({ success: false, error: 'Cet utilisateur doit d’abord créer un compte Meet Me avec cet email.' });
-    }
-  } else {
-    await query("UPDATE public.school_staff_requests SET status = 'rejected', admin_notes = $1, updated_at = NOW() WHERE id = $2", [admin_notes, id]);
-  }
-
-  res.json({ success: true, message: 'Demande staff traitée.' });
-});
-
-/**
- * @desc    Create a managed account with specific roles and modules (Amazon style)
- * @route   POST /api/admin/accounts
- */
-const createManagedAccount = asyncHandler(async (req, res) => {
-  const adminId = req.userId;
-  const {
-    fullName, email, phone, password,
-    role, schoolId, allowedModules,
-    enrollmentDate, gender, country
-  } = req.body;
-
-  if (!email || !role || !fullName) {
-    return res.status(400).json({ success: false, error: 'Nom, Email et Rôle sont requis.' });
-  }
-
-  const canExecute = await processSensitiveAction(req, 'create_account', null, fullName, req.body, 'accounts', 'create');
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de création de compte mise en attente.' });
-
-  try {
-    // 1. Check or Create Profile
-    let userRes = await query('SELECT id FROM public.profiles WHERE email = $1', [email]);
-    let userId;
-
-    if (userRes.rows.length === 0) {
-      // Create new profile with temporary password
-      const bcrypt = require('bcryptjs');
-      const hashedPassword = await bcrypt.hash(password || 'MeetMe2024', 10);
-
-      const newProfile = await query(
-        `INSERT INTO public.profiles (full_name, email, phone_number, password, gender, country, created_at, must_change_password)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE) RETURNING id`,
-        [fullName, email, phone || null, hashedPassword, gender || 'M', country || 'RDC', enrollmentDate || new Date()]
-      );
-      userId = newProfile.rows[0].id;
-    } else {
-      userId = userRes.rows[0].id;
-    }
-
-    // 2. Assign to School if provided
-    if (schoolId) {
-      await query(
-        `INSERT INTO public.school_members (school_id, user_id, role, is_active, allowed_modules, enrollment_date)
-         VALUES ($1, $2, $3, TRUE, $4, $5)
-         ON CONFLICT (school_id, user_id) DO UPDATE
-         SET role = $3, allowed_modules = $4, enrollment_date = $5, is_active = TRUE`,
-        [schoolId, userId, role, allowedModules || [], enrollmentDate || new Date()]
-      );
-    }
-
-    // 3. Log Creation
-    await query(
-      `INSERT INTO public.account_creation_logs (created_by, user_id, role, modules)
-       VALUES ($1, $2, $3, $4)`,
-      [adminId, userId, role, allowedModules || []]
-    );
-
-    // 4. Notify concerned user
-    socketService.emitToUser(userId, 'account:created', {
-      message: `Votre compte ${role} a été configuré par l'administration.`,
-      role,
-      modules: allowedModules,
-      enrollmentDate
-    });
-
-    // 5. Audit Log
-    await logAdminAction(req, 'create_account', 'user', userId, { role, modules: allowedModules });
-
-    res.status(201).json({
-      success: true,
-      message: `Compte ${fullName} créé et configuré avec succès.`,
-      data: { userId, email, role }
-    });
-
-  } catch (error) {
-    logger.error('Account Creation Error:', error.message);
-    res.status(500).json({ success: false, error: 'Erreur lors de la création du compte.' });
-  }
-});
-
-/**
- * @desc    Get list of managed school accounts
- * @route   GET /api/admin/accounts
- */
-const getManagedAccounts = asyncHandler(async (req, res) => {
-  const hasReadPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions.accounts && req.user.granular_permissions.accounts.includes('read'));
-  if (!hasReadPerm) {
-    return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir les comptes gérés.' });
-  }
-
-  const result = await query(`
-    SELECT sm.id as member_id, sm.role, sm.allowed_modules, sm.enrollment_date, sm.is_active,
-           p.id as user_id, p.full_name, p.email, p.avatar_url,
-           s.name as school_name
-    FROM public.school_members sm
-    JOIN public.profiles p ON sm.user_id = p.id
-    LEFT JOIN public.school_schools s ON sm.school_id = s.id
-    ORDER BY sm.enrollment_date DESC
-    LIMIT 100
-  `);
-
-  res.json({ success: true, data: result.rows });
-});
-
-/**
- * @desc    Update a managed account (Role and Modules)
- * @route   PUT /api/admin/accounts/:id
- */
-const updateManagedAccount = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { role, allowedModules, is_active } = req.body;
-
-  const memberRes = await query('SELECT p.full_name FROM public.school_members sm JOIN public.profiles p ON sm.user_id = p.id WHERE sm.id = $1', [id]);
-  if (memberRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Compte non trouvé' });
-
-  const perm = is_active !== undefined ? 'toggle_active' : 'update';
-  const canExecute = await processSensitiveAction(req, 'update_account', id, memberRes.rows[0].full_name, req.body, 'accounts', perm);
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Mise à jour du compte mise en attente.' });
-
-  const result = await query(
-    `UPDATE public.school_members
-     SET role = COALESCE($1, role),
-         allowed_modules = COALESCE($2, allowed_modules),
-         is_active = COALESCE($3, is_active)
-     WHERE id = $4 RETURNING *`,
-    [role, allowedModules, is_active, id]
-  );
-
-  const updated = result.rows[0];
-
-  // Notifier l'utilisateur en temps réel
-  socketService.emitToUser(updated.user_id, 'account:updated', {
-    role: updated.role,
-    modules: updated.allowed_modules,
-    isActive: updated.is_active
-  });
-
-  res.json({ success: true, message: 'Compte mis à jour avec succès.', data: updated });
-});
-
-/**
- * @desc    Delete a managed account from a school
- * @route   DELETE /api/admin/accounts/:id
- */
-const deleteManagedAccount = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const check = await query('SELECT sm.user_id, p.full_name FROM public.school_members sm JOIN public.profiles p ON sm.user_id = p.id WHERE sm.id = $1', [id]);
-  if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Compte non trouvé' });
-
-  const { user_id, full_name } = check.rows[0];
-
-  const canExecute = await processSensitiveAction(req, 'delete_account', id, full_name, { deleted: true }, 'accounts', 'delete');
-  if (!canExecute) return res.json({ success: true, pending: true, message: 'Demande de suppression de compte mise en attente.' });
-
-  await query('DELETE FROM public.school_members WHERE id = $1', [id]);
-
-  // Optionnel: Déconnecter l'utilisateur si on veut "temps réel"
-  socketService.emitToUser(user_id, 'account:removed', { id });
-
-  res.json({ success: true, message: 'Compte supprimé de l\'établissement.' });
 });
 
 module.exports = {
@@ -3110,20 +2592,8 @@ module.exports = {
   deleteCollaborator,
   getModerationFeed,
   moderateContent,
-  getPendingSchools,
-  approveSchool,
-  blockSchool,
-  deleteSchool,
-  getSchoolsStats,
-  getSchoolDetailsAdmin,
   getEmployerRequests,
   handleEmployerRequest,
-  getStaffRequests,
-  handleStaffRequest,
-  createManagedAccount,
-  getManagedAccounts,
-  updateManagedAccount,
-  deleteManagedAccount,
   resetUserPassword,
   ensureAdminTables,
   processSensitiveAction

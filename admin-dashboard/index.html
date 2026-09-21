@@ -170,9 +170,6 @@
                 <a href="#" onclick="showSection('accounts')" id="nav-accounts" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="user-cog" class="w-5 h-5 mr-4 text-emerald-400"></i><span class="font-medium text-sm">Gestion des Comptes</span>
                 </a>
-                <a href="#" onclick="showSection('school-admin')" id="nav-school-admin" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
-                    <i data-lucide="graduation-cap" class="w-5 h-5 mr-4 text-indigo-400"></i><span class="font-medium text-sm">Gestion School</span>
-                </a>
                 <a href="#" onclick="showSection('portfolio')" id="nav-portfolio" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="layout-template" class="w-5 h-5 mr-4 text-cyan-400"></i><span class="font-medium text-sm">Portfolio Web</span>
                 </a>
@@ -308,51 +305,6 @@
                             <!-- Accounts will be injected here -->
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            <!-- SCHOOL ADMIN SECTION -->
-            <div id="section-school-admin" class="hidden animate-fade-in">
-                <div class="flex items-center justify-between mb-8">
-                    <div>
-                        <h2 class="text-3xl font-black text-gray-900 tracking-tighter uppercase">Validation des Écoles</h2>
-                        <p class="text-gray-500 font-medium mt-1">Approuvez ou bloquez les établissements scolaires créés par les utilisateurs.</p>
-                    </div>
-                </div>
-
-                <div id="school-pending-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Pending schools injected by JS -->
-                </div>
-
-                <div class="mt-12">
-                    <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6 flex items-center gap-3">
-                        Demandes de Comptes Staff <span class="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-[10px]">Promoteurs</span>
-                    </h3>
-                    <div id="school-staff-requests-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- Injected by JS -->
-                    </div>
-                </div>
-
-                <div class="mt-12">
-                    <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter mb-6">Monitoring des Écoles Actives</h3>
-                    <div class="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
-                        <table class="w-full text-left">
-                            <thead class="bg-gray-50 border-b border-gray-100">
-                                <tr>
-                                    <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Établissement</th>
-                                    <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Type / Lieu</th>
-                                    <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Élèves</th>
-                                    <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Employés</th>
-                                    <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Classes</th>
-                                    <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Revenus ($)</th>
-                                    <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="school-monitoring-table" class="divide-y divide-gray-50 font-medium">
-                                <!-- Data injected by JS -->
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             </div>
 
@@ -912,12 +864,8 @@
                         </div>
                     </div>
 
-                    <!-- Deuxième rangée : Nouvelles Statistiques d'Écosystème (Écoles, Emplois, Markets) -->
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-8 mb-10">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
-                            <div class="w-14 h-14 bg-cyan-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="graduation-cap" class="w-7 h-7 text-cyan-600"></i></div>
-                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Écoles Créées</p><h4 id="stat-schools" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
-                        </div>
+                    <!-- Deuxième rangée : Nouvelles Statistiques d'Écosystème (Emplois, Markets) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-8 mb-10">
                         <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
                             <div class="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="briefcase" class="w-7 h-7 text-indigo-600"></i></div>
                             <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Offres d'Emploi</p><h4 id="stat-jobs" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
@@ -2085,7 +2033,7 @@
         function continueDashboardLoad(user) {
             if (user.isGlobalAdmin) {
                 // Ensure allowedModules is full for Global Admin
-                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'school-admin', 'portfolio'];
+                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'portfolio'];
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('login-container').classList.add('hidden');
@@ -2240,7 +2188,7 @@
                 'audit': 'nav-audit', 'campaigns': 'nav-campaigns', 'legal': 'nav-legal',
                 'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration',
-                'moderation': 'nav-moderation', 'school-admin': 'nav-school-admin',
+                'moderation': 'nav-moderation',
                 'portfolio': 'nav-portfolio', 'portfolios-saas': 'nav-portfolios-saas',
                 'accounts': 'nav-accounts'
             };
@@ -2324,11 +2272,6 @@
             socket.on('admin:new_verification', (data) => {
                 if(!document.getElementById('section-verifications').classList.contains('hidden')) loadVerifications();
                 addNotification('security', 'Demande Badge', `${data.name} a soumis ses documents.`, 'check-circle');
-            });
-
-            socket.on('admin:new_school_request', (data) => {
-                if(!document.getElementById('section-school-admin').classList.contains('hidden')) loadPendingSchools();
-                addNotification('security', 'Nouvelle École', `L'établissement ${data.schoolName} attend validation.`, 'graduation-cap');
             });
 
             socket.on('admin:new_web_quote', (data) => {
@@ -2613,14 +2556,14 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'school-admin', 'portfolio', 'portfolios-saas'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
-                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-admin' ? 'nav-school-admin' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s)))));
+                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s))));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
             });
             const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-admin' ? 'nav-school-admin' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name)))));
+            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name))));
             const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
             document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 
@@ -2641,287 +2584,9 @@
             if (name === 'collaboration') loadCollaboration();
             if (name === 'moderation') loadModerationFeed();
             if (name === 'accounts') loadAccounts();
-            if (name === 'school-admin') {
-                loadPendingSchools();
-                loadSchoolsMonitoring();
-                loadStaffRequests();
-            }
             if (name === 'portfolio') switchPortfolioTab('skills');
 
             lucide.createIcons();
-        }
-
-        async function loadStaffRequests() {
-            try {
-                const res = await axios.get(`${API_URL}/admin/schools/staff-requests`, { headers: { Authorization: `Bearer ${token}` } });
-                const container = document.getElementById('school-staff-requests-list');
-                if (!container) return;
-
-                container.innerHTML = "";
-
-                if (res.data.data.length === 0) {
-                    container.innerHTML = `<div class="col-span-full py-10 text-center text-gray-400 font-bold uppercase text-[10px]">Aucune demande staff</div>`;
-                    return;
-                }
-
-                res.data.data.forEach(sr => {
-                    const card = document.createElement('div');
-                    card.className = "bg-white p-6 rounded-[2rem] border border-gray-100 flex flex-col gap-4";
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <p class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">${sr.role_requested}</p>
-                                <h4 class="text-lg font-black text-gray-900">${sr.full_name}</h4>
-                            </div>
-                            <span class="px-2 py-1 bg-gray-50 text-gray-400 text-[8px] font-black rounded uppercase">${sr.school_name}</span>
-                        </div>
-                        <div class="p-4 bg-gray-50 rounded-xl">
-                            <p class="text-[10px] text-gray-400 font-medium">Email du compte à activer :</p>
-                            <p class="text-xs font-bold text-gray-800">${sr.email}</p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 pt-2">
-                            <button onclick="handleStaffAction('${sr.id}', 'approve')" class="px-4 py-3 bg-indigo-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest">Activer</button>
-                            <button onclick="handleStaffAction('${sr.id}', 'rejected')" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-black text-[9px] uppercase tracking-widest">Rejeter</button>
-                        </div>
-                    `;
-                    container.appendChild(card);
-                });
-                lucide.createIcons();
-            } catch (e) {}
-        }
-
-        async function handleStaffAction(id, status) {
-            try {
-                const res = await axios.put(`${API_URL}/admin/schools/staff-requests/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
-                if (res.data.success) {
-                    toast(res.data.message, "success");
-                    loadStaffRequests();
-                    loadSchoolsMonitoring();
-                }
-            } catch (e) { toast(e.response?.data?.error || "Erreur activation staff", "error"); }
-        }
-
-        async function loadSchoolsMonitoring() {
-            try {
-                const res = await axios.get(`${API_URL}/admin/schools/stats`, { headers: { Authorization: `Bearer ${token}` } });
-                const container = document.getElementById('school-monitoring-table');
-                container.innerHTML = "";
-
-                if (res.data.data.length === 0) {
-                    container.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">Aucun établissement actif monitoré.</td></tr>`;
-                    return;
-                }
-
-                res.data.data.forEach(s => {
-                    const row = document.createElement('tr');
-                    row.className = "hover:bg-gray-50/50 transition-all";
-                    row.innerHTML = `
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-3">
-                                <img src="${getFullUrl(s.logo_url)}" class="w-8 h-8 rounded-lg object-cover">
-                                <div class="overflow-hidden">
-                                    <p class="text-xs font-black text-gray-900 truncate">${s.name}</p>
-                                    <p class="text-[10px] text-gray-400 truncate">${s.promoter_name}</p>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <p class="text-[10px] font-bold text-indigo-500 uppercase">${s.school_type}</p>
-                            <p class="text-[10px] text-gray-400">${s.city}, ${s.country}</p>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-md text-[10px] font-black">${s.students_count}</span>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="px-2 py-1 bg-gray-50 text-gray-600 rounded-md text-[10px] font-black">${s.teachers_count}</span>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="px-2 py-1 bg-purple-50 text-purple-600 rounded-md text-[10px] font-black">${s.classes_count}</span>
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <p class="text-xs font-black text-emerald-600">${parseFloat(s.total_revenue).toFixed(2)}$</p>
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <div class="flex justify-end gap-2">
-                                <button onclick="handleSchoolAction('${s.id}', '${s.status === 'blocked' ? 'approve' : 'block'}', this)" class="p-2 ${s.status === 'blocked' ? 'text-green-500' : 'text-gray-400'} hover:text-red-600 transition-all" title="${s.status === 'blocked' ? 'Débloquer' : 'Bloquer'}">
-                                    <i data-lucide="${s.status === 'blocked' ? 'unlock' : 'lock'}" class="w-4 h-4"></i>
-                                </button>
-                                <button onclick="deleteSchoolAction('${s.id}', '${s.name.replace(/'/g, "\\'")}')" class="p-2 text-gray-400 hover:text-red-600 transition-all" title="Supprimer">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
-                                <button onclick="examineSchoolDetail('${s.id}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all" title="Voir détails">
-                                    <i data-lucide="eye" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-                        </td>
-                    `;
-                    container.appendChild(row);
-                });
-                lucide.createIcons();
-            } catch (e) { toast("Erreur monitoring schools", "error"); }
-        }
-
-        async function loadPendingSchools() {
-            try {
-                const res = await axios.get(`${API_URL}/admin/schools/pending`, { headers: { Authorization: `Bearer ${token}` } });
-                const container = document.getElementById('school-pending-list');
-                container.innerHTML = "";
-
-                if (res.data.data.length === 0) {
-                    container.innerHTML = `<div class="col-span-full py-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune école en attente</div>`;
-                    return;
-                }
-
-                res.data.data.forEach(school => {
-                    const card = document.createElement('div');
-                    card.className = "bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 flex flex-col gap-6";
-                    card.innerHTML = `
-                        <div class="flex items-center gap-6">
-                            <img src="${getFullUrl(school.logo_url)}" class="w-20 h-20 rounded-[1.5rem] object-cover bg-gray-50 border border-gray-100">
-                            <div>
-                                <h4 class="text-xl font-black text-gray-900 leading-none mb-2">${school.name}</h4>
-                                <p class="text-indigo-500 font-bold text-xs uppercase tracking-widest">${school.school_type} • ${school.city}, ${school.country}</p>
-                                ${school.status === 'approved' ? `<span class="mt-2 inline-block px-2 py-0.5 bg-green-50 text-green-600 text-[8px] font-black rounded uppercase">Approuvée le ${new Date(school.updated_at).toLocaleDateString()}</span>` : ''}
-                            </div>
-                        </div>
-                        <div class="space-y-4">
-                            <div class="p-4 bg-gray-50 rounded-2xl">
-                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Promoteur</p>
-                                <p class="text-sm font-bold text-gray-800">${school.creator_name} (${school.creator_email})</p>
-                            </div>
-                            <p class="text-gray-500 text-sm font-medium line-clamp-2">${school.description || 'Pas de description.'}</p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4 mt-auto pt-4">
-                            ${school.status === 'pending' ? `
-                                <button onclick="handleSchoolAction('${school.id}', 'approve', this)" class="px-6 py-4 bg-green-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-600 transition-all active:scale-95">Approuver</button>
-                                <button onclick="handleSchoolAction('${school.id}', 'block', this)" class="px-6 py-4 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95">Bloquer</button>
-                            ` : `<p class="col-span-2 text-center font-black text-[10px] uppercase text-green-500">Déjà traitée</p>`}
-                        </div>
-                    `;
-                    container.appendChild(card);
-                });
-                lucide.createIcons();
-            } catch (e) { toast("Erreur lors du chargement des écoles.", "error"); }
-        }
-
-        async function handleSchoolAction(id, action, btn = null) {
-            let originalText = "";
-            if (btn) {
-                originalText = btn.innerText;
-                btn.innerText = "Traitement...";
-                btn.disabled = true;
-            }
-            try {
-                const res = await axios.put(`${API_URL}/admin/schools/${id}/${action}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-                if (res.data.success) {
-                    toast(res.data.message, "success");
-                    loadPendingSchools();
-                    loadSchoolsMonitoring();
-                    if(!document.getElementById('impact-modal').classList.contains('hidden')) closeImpactModal();
-                }
-            } catch (e) {
-                toast(e.response?.data?.error || "Erreur action school", "error");
-                if (btn) { btn.innerText = originalText; btn.disabled = false; }
-            }
-        }
-
-        async function deleteSchoolAction(id, name) {
-            if (!confirm(`Voulez-vous vraiment supprimer l'école "${name}" ? Cette action est irréversible et supprimera toutes les données liées (élèves, notes, etc.).`)) return;
-            try {
-                const res = await axios.delete(`${API_URL}/admin/schools/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-                if (res.data.success) {
-                    toast(res.data.message, "success");
-                    loadSchoolsMonitoring();
-                    loadPendingSchools();
-                }
-            } catch (e) { toast("Erreur lors de la suppression de l'école.", "error"); }
-        }
-
-        async function examineSchoolDetail(id) {
-            try {
-                const res = await axios.get(`${API_URL}/admin/schools/${id}/details`, { headers: { Authorization: `Bearer ${token}` } });
-                const { school, stats, recentPayments } = res.data.data;
-
-                const modal = document.getElementById('impact-modal');
-                const card = document.getElementById('impact-card');
-                const header = document.getElementById('impact-header');
-                const messageEl = document.getElementById('impact-message');
-                const footer = document.getElementById('impact-footer');
-                const titleEl = document.getElementById('impact-title');
-
-                // Reset states
-                card.classList.remove('draggable-modal', 'minimized-card');
-                document.getElementById('drag-hint').innerText = "Maintenir pour déplacer";
-                card.style.top = ''; card.style.left = '';
-                modal.classList.remove('hidden', 'no-backdrop');
-                modal.classList.add('flex', 'items-center', 'justify-center');
-
-                header.className = `h-40 flex flex-col items-center justify-center bg-indigo-600 drag-handle relative`;
-                titleEl.innerText = "MONITORING TOTAL : " + school.name;
-
-                messageEl.innerHTML = `
-                    <div class="space-y-6 text-left">
-                        <div class="flex items-center gap-6 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                            <img src="${getFullUrl(school.logo_url)}" class="w-16 h-16 rounded-2xl object-cover shadow-lg">
-                            <div>
-                                <p class="text-xl font-black text-gray-900">${school.name}</p>
-                                <p class="text-xs text-indigo-500 font-bold uppercase tracking-widest">${school.school_type} • ${school.city}</p>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-3 gap-4">
-                            <div class="p-6 bg-blue-50 rounded-[2rem] text-center">
-                                <i data-lucide="users" class="w-6 h-6 text-blue-600 mx-auto mb-2"></i>
-                                <p class="text-2xl font-black text-blue-900">${stats.students}</p>
-                                <p class="text-[9px] font-black text-blue-400 uppercase">Élèves</p>
-                            </div>
-                            <div class="p-6 bg-purple-50 rounded-[2rem] text-center">
-                                <i data-lucide="graduation-cap" class="w-6 h-6 text-purple-600 mx-auto mb-2"></i>
-                                <p class="text-2xl font-black text-purple-900">${stats.teachers}</p>
-                                <p class="text-[9px] font-black text-purple-400 uppercase">Employés</p>
-                            </div>
-                            <div class="p-6 bg-emerald-50 rounded-[2rem] text-center">
-                                <i data-lucide="layout-grid" class="w-6 h-6 text-emerald-600 mx-auto mb-2"></i>
-                                <p class="text-2xl font-black text-emerald-900">${stats.classes}</p>
-                                <p class="text-[9px] font-black text-emerald-400 uppercase">Classes</p>
-                            </div>
-                        </div>
-
-                        <div class="bg-gray-50 p-6 rounded-[2.5rem]">
-                            <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <i data-lucide="credit-card" class="w-3 h-3"></i> 10 Derniers Paiements
-                            </h4>
-                            <div class="space-y-3">
-                                ${recentPayments.length === 0 ? '<p class="text-center text-[10px] text-gray-400">Aucune transaction enregistrée.</p>' :
-                                  recentPayments.map(p => `
-                                    <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100">
-                                        <div>
-                                            <p class="text-[10px] font-black text-gray-800">${p.parent_name}</p>
-                                            <p class="text-[8px] text-gray-400">${new Date(p.created_at).toLocaleString()}</p>
-                                        </div>
-                                        <p class="text-xs font-black text-emerald-600">+${parseFloat(p.amount).toFixed(2)}$</p>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-
-                        <div class="p-6 bg-gray-900 rounded-[2rem] text-white">
-                            <p class="text-[10px] font-black text-gray-400 uppercase mb-1">Coordonnées Promoteur</p>
-                            <p class="font-bold text-sm">${school.promoter_name}</p>
-                            <p class="text-xs text-gray-400 mt-1">${school.promoter_email}</p>
-                        </div>
-                    </div>
-                `;
-
-                footer.innerHTML = `
-                    <button onclick="closeImpactModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl uppercase text-[10px]">Fermer</button>
-                    <button onclick="handleSchoolAction('${school.id}', '${school.status === 'blocked' ? 'approve' : 'block'}', this)" class="flex-[2] ${school.status === 'blocked' ? 'bg-green-500 text-white' : 'bg-red-50 text-red-600'} py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">
-                        ${school.status === 'blocked' ? 'DÉBLOQUER ÉTABLISSEMENT' : 'BLOQUER ÉTABLISSEMENT'}
-                    </button>
-                `;
-
-                lucide.createIcons();
-            } catch (e) { toast("Erreur lors de la récupération des détails.", "error"); }
         }
 
         // --- MODERATION & BOOST SYSTEM ---
@@ -4385,21 +4050,20 @@
                 document.getElementById('stat-messages').innerText = d.totalMessages;
                 document.getElementById('stat-groups').innerText = d.totalGroups;
 
-                // Assignation des 3 nouvelles statistiques d'écosystème avec sécurité
-                if (document.getElementById('stat-schools')) document.getElementById('stat-schools').innerText = d.totalSchools || 0;
+                // Assignation des 2 nouvelles statistiques d'écosystème avec sécurité
                 if (document.getElementById('stat-jobs')) document.getElementById('stat-jobs').innerText = d.totalJobs || 0;
                 if (document.getElementById('stat-market')) document.getElementById('stat-market').innerText = d.totalMarket || 0;
 
                 const ctx = document.getElementById('overviewMasterChart').getContext('2d');
                 if (charts.master) charts.master.destroy();
-                // Ajout des couleurs spécifiques pour inclure de manière fluide les nouvelles statistiques (Écoles, Emplois, Market)
-                const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6', '#06B6D4', '#6366F1', '#F59E0B'];
+                // Ajout des couleurs spécifiques pour inclure de manière fluide les nouvelles statistiques (Emplois, Market)
+                const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6', '#8B5CF6', '#F59E0B'];
                 charts.master = new Chart(ctx, {
                     type: 'polarArea',
                     data: {
-                        labels: ['Utilisateurs', 'En ligne', 'Groupes', 'Messages', 'Écoles', 'Emplois', 'Market'],
+                        labels: ['Utilisateurs', 'En ligne', 'Groupes', 'Messages', 'Emplois', 'Market'],
                         datasets: [{
-                            data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalSchools || 0, d.totalJobs || 0, d.totalMarket || 0],
+                            data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalJobs || 0, d.totalMarket || 0],
                             backgroundColor: colors.map(c => c + 'CC'),
                             borderColor: '#fff',
                             borderWidth: 4
@@ -4407,7 +4071,7 @@
                     }
                 });
                 const legend = document.getElementById('master-legend');
-                legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes Chat', 'Messages', 'Écoles Créées', 'Offres d\'Emploi', 'Annonces Market'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalSchools || 0, d.totalJobs || 0, d.totalMarket || 0][i]}</p></div>`).join('');
+                legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes Chat', 'Messages', 'Offres d\'Emploi', 'Annonces Market'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalJobs || 0, d.totalMarket || 0][i]}</p></div>`).join('');
                 lucide.createIcons();
             } catch (e) {}
         }
@@ -4740,28 +4404,18 @@
 
         async function showNewAccountModal() {
             try {
-                // Fetch schools for dropdown
-                const res = await axios.get(`${API_URL}/admin/schools/stats`, { headers: { Authorization: `Bearer ${token}` } });
-                const schools = res.data.data;
-
-                const schoolOptions = schools.map(s => `<option value="${s.id}">${s.name} (${s.city})</option>`).join('');
                 const roles = [
-                    { id: 'student', label: 'Étudiant' },
-                    { id: 'parent', label: 'Parent' },
-                    { id: 'teacher', label: 'Enseignant' },
-                    { id: 'director', label: 'Directeur' },
-                    { id: 'promoter', label: 'Promoteur' },
-                    { id: 'prefect', label: 'Préfet' }
+                    { id: 'admin', label: 'Administrateur' },
+                    { id: 'moderator', label: 'Modérateur' },
+                    { id: 'support', label: 'Support' }
                 ];
 
                 const modules = [
-                    { id: 'grades', label: 'Notes' },
-                    { id: 'assignments', label: 'Devoirs' },
-                    { id: 'payments', label: 'Paiements' },
-                    { id: 'classes', label: 'Classes' },
-                    { id: 'staff', label: 'Gestion Staff' },
-                    { id: 'announcements', label: 'Annonces' },
-                    { id: 'financials', label: 'Dashboard Financier' }
+                    { id: 'stats', label: 'Statistiques' },
+                    { id: 'users', label: 'Utilisateurs' },
+                    { id: 'groups', label: 'Groupes' },
+                    { id: 'market', label: 'Marketplace' },
+                    { id: 'emploi', label: 'Emploi' }
                 ];
 
                 let html = `
@@ -4784,13 +4438,6 @@
                                     ${roles.map(r => `<option value="${r.id}">${r.label}</option>`).join('')}
                                 </select>
                             </div>
-                            <div>
-                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Établissement Scolaire</label>
-                                <select id="acc-school" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm">
-                                    <option value="">-- Aucun --</option>
-                                    ${schoolOptions}
-                                </select>
-                            </div>
                         </div>
 
                         <div>
@@ -4810,10 +4457,6 @@
                                 <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Mot de passe temporaire</label>
                                 <input type="text" id="acc-pass" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" value="MeetMe2024">
                             </div>
-                            <div>
-                                <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Date d'Enrôlement</label>
-                                <input type="date" id="acc-date" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" value="${new Date().toISOString().split('T')[0]}">
-                            </div>
                         </div>
                     </div>
                 `;
@@ -4823,9 +4466,7 @@
                         fullName: document.getElementById('acc-name').value,
                         email: document.getElementById('acc-email').value,
                         role: document.getElementById('acc-role').value,
-                        schoolId: document.getElementById('acc-school').value,
                         password: document.getElementById('acc-pass').value,
-                        enrollmentDate: document.getElementById('acc-date').value,
                         allowedModules: Array.from(document.querySelectorAll('.acc-module-checkbox:checked')).map(cb => cb.value)
                     };
 
@@ -4863,7 +4504,6 @@
                         <td class="px-8 py-5">
                             <span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest">${a.role}</span>
                         </td>
-                        <td class="px-8 py-5 text-sm text-gray-500 font-bold">${a.school_name || '--'}</td>
                         <td class="px-8 py-5 text-center text-[10px] font-black uppercase tracking-widest">
                             <span class="${a.is_active ? 'text-emerald-500' : 'text-red-500'}">${a.is_active ? 'Actif' : 'Désactivé'}</span>
                         </td>
@@ -5896,7 +5536,6 @@
                 { id: 'support', label: 'Support & Appeals', icon: 'help-circle', perms: [{id:'read', label:'Lire', icon:'eye'}, {id:'reply', label:'Répondre', icon:'message-circle'}, {id:'resolve', label:'Résoudre', icon:'check-square'}] },
                 { id: 'market-requests', label: 'Market & Boutiques', icon: 'shopping-bag', perms: [{id:'read', label:'Consulter', icon:'search'}, {id:'approve', label:'Approuver', icon:'check'}, {id:'boost', label:'Mettre en avant', icon:'zap'}, {id:'delete', label:'Supprimer', icon:'x-circle'}] },
                 { id: 'employer-requests', label: 'Recrutement', icon: 'briefcase', perms: [{id:'read', label:'Consulter', icon:'file-text'}, {id:'approve', label:'Approuver', icon:'check-square'}, {id:'settings', label:'Gérer', icon:'sliders'}] },
-                { id: 'school-admin', label: 'Gestion School', icon: 'graduation-cap', perms: [{id:'read', label:'Consulter', icon:'eye'}, {id:'approve', label:'Approuver', icon:'check-circle'}, {id:'settings', label:'Gérer', icon:'settings'}, {id:'manage_accounts', label:'Comptes', icon:'users'}] },
                 { id: 'accounts', label: 'Gestion des Comptes', icon: 'user-cog', perms: [{id:'read', label:'Consulter', icon:'list'}, {id:'create', label:'Créer', icon:'plus-circle'}, {id:'update', label:'Éditer', icon:'edit'}, {id:'delete', label:'Supprimer', icon:'trash'}, {id:'toggle_active', label:'Activer/Désact.', icon:'power'}] },
                 { id: 'collaboration', label: 'Collaboration Interne', icon: 'layers', perms: [{id:'read', label:'Voir Projets', icon:'folder'}, {id:'create_team', label:'Créer Projet', icon:'plus-square'}, {id:'manage_members', label:'Gérer Membres', icon:'user-plus'}, {id:'manage_teams', label:'Gérer Projets', icon:'tool'}] },
                 { id: 'portfolio', label: 'Portfolio Web', icon: 'globe', perms: [{id:'read', label:'Voir', icon:'layout'}, {id:'edit_identity', label:'Identité', icon:'fingerprint'}, {id:'manage_skills', label:'Skills', icon:'cpu'}, {id:'manage_team', label:'Équipe', icon:'users-2'}, {id:'manage_services', label:'Services', icon:'package'}, {id:'manage_pages', label:'Pages', icon:'file-code'}, {id:'manage_quotes', label:'Devis', icon:'clipboard-list'}] },

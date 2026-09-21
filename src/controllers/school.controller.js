@@ -47,8 +47,7 @@ const getSchoolOverview = asyncHandler(async (req, res) => {
       `SELECT s.*,
               (SELECT COUNT(*) FROM public.school_members sm WHERE sm.school_id = s.id AND sm.is_active = TRUE) AS members_count
       FROM public.school_schools s
-      WHERE s.status IN ('approved', 'active')
-      ORDER BY s.created_at DESC
+      ORDER BY (CASE WHEN s.status = 'approved' THEN 0 WHEN s.status = 'active' THEN 1 ELSE 2 END) ASC, s.created_at DESC
        LIMIT 100`,
       []
     ),

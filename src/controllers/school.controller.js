@@ -337,7 +337,7 @@ const addGrade = asyncHandler(async (req, res) => {
 const getSchools = asyncHandler(async (req, res) => {
   const { country, city, type } = req.query;
 
-  let sql = `SELECT * FROM public.school_schools WHERE status IN ('approved', 'active')`;
+  let sql = `SELECT * FROM public.school_schools WHERE 1=1`;
   const params = [];
   let index = 1;
 

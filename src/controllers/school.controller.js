@@ -127,15 +127,16 @@ const getSchoolDashboardData = asyncHandler(async (req, res) => {
     });
   }
 
-  // Données factices / initiales pour la gestion de l'école
+  // Données réelles tirées de la table school_requests
+  const school = schoolCheck.rows[0];
   res.json({
     success: true,
-    school: schoolCheck.rows[0],
+    school: school,
     stats: {
-      totalStudents: 120,
-      totalTeachers: 12,
-      totalClasses: 6,
-      monthlyRevenue: '4,500 $'
+      totalStudents: school.total_students || 0,
+      totalTeachers: school.total_teachers || 0,
+      totalClasses: school.total_classes || 0,
+      monthlyRevenue: school.monthly_revenue || '0 $'
     }
   });
 });

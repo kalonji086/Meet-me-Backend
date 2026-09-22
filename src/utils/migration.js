@@ -28,6 +28,14 @@ const runMigrations = async () => {
       logger.info('✅ Migration Collaboration terminée');
     }
 
+    // Migration School
+    const schoolSqlPath = path.join(__dirname, '..', '..', 'scripts', 'migration_school.sql');
+    if (fs.existsSync(schoolSqlPath)) {
+      const schoolSql = fs.readFileSync(schoolSqlPath, 'utf8');
+      await pool.query(schoolSql);
+      logger.info('✅ Migration School terminée');
+    }
+
     // Initialisation des tables admin et du compte admin principal
     const adminController = require('../controllers/admin.controller');
     await adminController.ensureAdminTables();

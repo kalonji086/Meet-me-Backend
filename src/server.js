@@ -25,6 +25,7 @@ const marketRoutes = require('./routes/market.routes');
 const collabRoutes = require('./routes/collab.routes');
 const employerRoutes = require('./routes/employer.routes');
 const portfolioRoutes = require('./routes/portfolio.routes');
+const schoolRoutes = require('./routes/school.routes');
 
 // Controllers pour routes directes
 const userController = require('./controllers/user.controller');
@@ -183,6 +184,7 @@ class Server {
     this.app.use('/api/collab', collabRoutes);
     this.app.use('/api/employer', employerRoutes);
     this.app.use('/api/portfolio', portfolioRoutes);
+    this.app.use('/api/school', schoolRoutes);
 
     // Servir le Dashboard Admin
     const adminPath = path.join(__dirname, '..', 'admin-dashboard');

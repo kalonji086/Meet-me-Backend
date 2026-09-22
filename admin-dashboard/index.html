@@ -2570,12 +2570,12 @@
         function showSection(name) {
             ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
-                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s))));
+                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s)))));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
             });
             const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-requests' ? 'nav-school-requests' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name))));
+            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-requests' ? 'nav-school-requests' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name)))));
             const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
             document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 

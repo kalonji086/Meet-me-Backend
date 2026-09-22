@@ -2057,7 +2057,7 @@
         function continueDashboardLoad(user) {
             if (user.isGlobalAdmin) {
                 // Ensure allowedModules is full for Global Admin
-                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'portfolio'];
+                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'portfolio'];
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('login-container').classList.add('hidden');
@@ -2207,7 +2207,7 @@
             const sidebarMapping = {
                 'stats': 'nav-stats', 'users': 'nav-users', 'groups': 'nav-groups',
                 'support': 'nav-appeals', 'reports': 'nav-appeals',
-                'market-requests': 'nav-market-requests', 'employer-requests': 'nav-employer-requests',
+                'market-requests': 'nav-market-requests', 'school-requests': 'nav-school-requests', 'school-account-requests': 'nav-school-account-requests', 'employer-requests': 'nav-employer-requests',
                 'verifications': 'nav-verifications',
                 'audit': 'nav-audit', 'campaigns': 'nav-campaigns', 'legal': 'nav-legal',
                 'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
@@ -4332,7 +4332,9 @@
                         <td class="px-8 py-5 text-right"><button onclick="examineMarket('${m.id}')" class="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-purple-700">Examiner</button></td>
                     </tr>
                 `).join(''); lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                toast("Erreur lors du chargement des demandes.", "error");
+            }
         }
 
         async function loadSchools() {
@@ -4356,7 +4358,9 @@
                         </td>
                     </tr>
                 `).join(''); lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                toast("Erreur lors du chargement des écoles.", "error");
+            }
         }
 
         async function changeSchoolStatus(id, status) {
@@ -4398,7 +4402,9 @@
                         </td>
                     </tr>
                 `).join(''); lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                toast("Erreur lors du chargement des comptes scolaires.", "error");
+            }
         }
 
         async function handleAdminStaffAccount(id, action) {
@@ -4431,7 +4437,9 @@
                         </td>
                     </tr>
                 `).join(''); lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                toast("Erreur lors du chargement des demandes d'emploi.", "error");
+            }
         }
 
         async function examineEmployerRequest(id) {

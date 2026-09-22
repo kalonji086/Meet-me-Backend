@@ -51,6 +51,11 @@ router.delete('/legal/:type', adminController.deleteLegalDoc);
 router.get('/verifications', adminController.getVerificationRequests);
 router.put('/verifications/:id', adminController.handleVerification);
 
+router.get('/accounts', adminController.getDelegations);
+router.post('/accounts', adminController.createCollaborator);
+router.put('/accounts/:userId', adminController.updateCollaborator);
+router.delete('/accounts/:userId', adminController.deleteCollaborator);
+
 router.get('/market-requests', adminController.getMarketRequests);
 router.put('/market-requests/:id', adminController.handleMarketRequest);
 router.get('/school-requests', adminController.getSchoolRequests);

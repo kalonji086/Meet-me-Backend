@@ -1209,7 +1209,9 @@ const deletePendingAction = asyncHandler(async (req, res) => {
  */
 const getDelegations = asyncHandler(async (req, res) => {
   const result = await query(`
-    SELECT ad.*, p.full_name, p.email, p.avatar_url, p.is_global_admin
+    SELECT ad.*, ad.user_id as member_id, ad.modules as allowed_modules, ad.created_at as enrollment_date,
+           p.full_name, p.email, p.avatar_url, p.is_global_admin,
+           'Collaborateur' as role
     FROM public.admin_delegations ad
     JOIN public.profiles p ON ad.user_id = p.id
     WHERE p.is_global_admin = FALSE
@@ -2421,6 +2423,22 @@ const createCollaborator = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Mettre à jour un collaborateur
+ */
+const updateCollaborator = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { allowedModules, is_active } = req.body;
+
+  await query(
+    'UPDATE public.admin_delegations SET modules = $1, is_active = $2, updated_at = NOW() WHERE user_id = $3',
+    [allowedModules || [], is_active !== undefined ? is_active : true, userId]
+  );
+
+  await logAdminAction(req, 'update_collaborator', 'collaborator', userId, { modules: allowedModules, isActive: is_active });
+  res.json({ success: true, message: 'Compte collaborateur mis à jour.' });
+});
+
+/**
  * @desc    Supprimer un collaborateur (Soft delete avec date)
  */
 const deleteCollaborator = asyncHandler(async (req, res) => {
@@ -2678,6 +2696,7 @@ module.exports = {
   getDelegations,
   saveDelegation,
   createCollaborator,
+  updateCollaborator,
   deleteCollaborator,
   getModerationFeed,
   moderateContent,

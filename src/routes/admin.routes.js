@@ -53,6 +53,10 @@ router.put('/verifications/:id', adminController.handleVerification);
 
 router.get('/market-requests', adminController.getMarketRequests);
 router.put('/market-requests/:id', adminController.handleMarketRequest);
+router.get('/school-requests', adminController.getSchoolRequests);
+router.put('/school-requests/:id', adminController.handleSchoolRequest);
+router.put('/school-requests/:id/toggle-block', adminController.toggleSchoolBlock);
+router.delete('/school-requests/:id', adminController.deleteSchoolRequest);
 router.get('/employer-requests', adminController.getEmployerRequests);
 router.put('/employer-requests/:id', adminController.handleEmployerRequest);
 router.put('/market-requests/:id/toggle-block', adminController.toggleMarketBlock);

@@ -2034,6 +2034,50 @@ const getMarketRequests = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get all school requests for admin
+ */
+const getSchoolRequests = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT sr.*, p.full_name as owner_name, p.email as owner_email
+    FROM public.school_requests sr
+    JOIN public.profiles p ON sr.user_id = p.id
+    ORDER BY sr.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Approve, Reject or Modify School request access
+ */
+const handleSchoolRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // approuve, rejete, en_attente
+
+  await query('UPDATE public.school_requests SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
+  res.json({ success: true, message: 'Statut de l\'école mis à jour avec succès.' });
+});
+
+/**
+ * @desc    Toggle block a school request
+ */
+const toggleSchoolBlock = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // e.g. 'bloque' or 'en_attente'
+
+  await query('UPDATE public.school_requests SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
+  res.json({ success: true, message: 'Statut de blocage école mis à jour.' });
+});
+
+/**
+ * @desc    Delete a school request
+ */
+const deleteSchoolRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  await query('DELETE FROM public.school_requests WHERE id = $1', [id]);
+  res.json({ success: true, message: 'École supprimée avec succès.' });
+});
+
+/**
  * @desc    Approve or reject a market business
  */
 const handleMarketRequest = asyncHandler(async (req, res) => {
@@ -2577,6 +2621,10 @@ module.exports = {
   handleVerification,
   getMarketRequests,
   handleMarketRequest,
+  getSchoolRequests,
+  handleSchoolRequest,
+  toggleSchoolBlock,
+  deleteSchoolRequest,
   toggleMarketBlock,
   deleteMarketBusiness,
   createOfficialGroup,

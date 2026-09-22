@@ -148,7 +148,7 @@ const getSchoolDashboardData = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Get all students of a school
+ * @desc    Get all students of a school (with class info)
  */
 const getStudents = asyncHandler(async (req, res) => {
   const userId = req.userId;
@@ -159,23 +159,33 @@ const getStudents = asyncHandler(async (req, res) => {
     SELECT s.*, c.name as class_name
     FROM public.school_students s
     LEFT JOIN public.school_classes c ON s.class_id = c.id
-    WHERE s.school_id = $1 ORDER BY s.created_at DESC
+    WHERE s.school_id = $1 ORDER BY s.full_name ASC
   `, [school.rows[0].id]);
 
   res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Enroll a student
+ * @desc    Enroll or Update student
  */
 const addStudent = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
   if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
 
-  const { fullName, gender, birthDate, classId } = req.body;
-  const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+  const { id, fullName, gender, birthDate, classId, isActive } = req.body;
 
+  if (id) {
+    // Update
+    const result = await query(`
+      UPDATE public.school_students
+      SET full_name = $1, gender = $2, birth_date = $3, class_id = $4, is_active = $5, updated_at = NOW()
+      WHERE id = $6 AND school_id = $7 RETURNING *
+    `, [fullName, gender, birthDate, classId || null, isActive !== undefined ? isActive : true, id, school.rows[0].id]);
+    return res.json({ success: true, data: result.rows[0] });
+  }
+
+  const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
   const result = await query(`
     INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
@@ -185,94 +195,75 @@ const addStudent = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Universal school login by unique code
- */
-const loginByCode = asyncHandler(async (req, res) => {
-  const { code } = req.body;
-  if (!code) return res.status(400).json({ success: false, error: 'Code requis' });
-
-  // 1. Check if it's a staff member
-  const staffCheck = await query(`
-    SELECT sar.*, sr.school_name, sr.status as school_status
-    FROM public.school_account_requests sar
-    JOIN public.school_requests sr ON sar.school_id = sr.id
-    WHERE sar.generated_code = $1 AND sar.status = 'approuve'
-  `, [code]);
-
-  if (staffCheck.rows.length > 0) {
-    const staff = staffCheck.rows[0];
-    if (staff.school_status !== 'approuve') return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
-
-    return res.json({
-      success: true,
-      type: 'staff',
-      role: staff.role,
-      user: {
-        id: staff.id,
-        fullName: staff.full_name,
-        schoolName: staff.school_name,
-        schoolId: staff.school_id
-      }
-    });
-  }
-
-  // 2. Check if it's a student
-  const studentCheck = await query(`
-    SELECT s.*, sr.school_name, sr.status as school_status, c.name as class_name
-    FROM public.school_students s
-    JOIN public.school_requests sr ON s.school_id = sr.id
-    LEFT JOIN public.school_classes c ON s.class_id = c.id
-    WHERE s.access_code = $1
-  `, [code]);
-
-  if (studentCheck.rows.length > 0) {
-    const student = studentCheck.rows[0];
-    if (student.school_status !== 'approuve') return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
-
-    return res.json({
-      success: true,
-      type: 'student',
-      role: 'eleve',
-      user: {
-        id: student.id,
-        fullName: student.full_name,
-        schoolName: student.school_name,
-        className: student.class_name,
-        schoolId: student.school_id
-      }
-    });
-  }
-
-  res.status(404).json({ success: false, error: 'Code invalide ou compte non encore approuvé.' });
-});
-
-/**
- * @desc    Get all classes of a school
+ * @desc    Get all classes of a school (with staff info)
  */
 const getClasses = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
   if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
 
-  const result = await query('SELECT * FROM public.school_classes WHERE school_id = $1 ORDER BY name ASC', [school.rows[0].id]);
+  const result = await query(`
+    SELECT c.*, sar.full_name as staff_name, sar.role as staff_role,
+           (SELECT COUNT(*) FROM public.school_students s WHERE s.class_id = c.id) as student_count
+    FROM public.school_classes c
+    LEFT JOIN public.school_account_requests sar ON c.staff_id = sar.id
+    WHERE c.school_id = $1 ORDER BY c.name ASC
+  `, [school.rows[0].id]);
+
   res.json({ success: true, data: result.rows });
 });
 
 /**
- * @desc    Add a class
+ * @desc    Add or Update a class
  */
 const addClass = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
   if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
 
-  const { name, level } = req.body;
+  const { id, name, level, staffId, isActive } = req.body;
+
+  if (id) {
+    const result = await query(`
+      UPDATE public.school_classes
+      SET name = $1, level = $2, staff_id = $3, is_active = $4
+      WHERE id = $5 AND school_id = $6 RETURNING *
+    `, [name, level, staffId || null, isActive !== undefined ? isActive : true, id, school.rows[0].id]);
+    return res.json({ success: true, data: result.rows[0] });
+  }
+
   const result = await query(`
-    INSERT INTO public.school_classes (school_id, name, level)
-    VALUES ($1, $2, $3) RETURNING *
-  `, [school.rows[0].id, name, level]);
+    INSERT INTO public.school_classes (school_id, name, level, staff_id)
+    VALUES ($1, $2, $3, $4) RETURNING *
+  `, [school.rows[0].id, name, level, staffId || null]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Delete a class
+ */
+const deleteClass = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
+  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+
+  const { id } = req.params;
+  await query('DELETE FROM public.school_classes WHERE id = $1 AND school_id = $2', [id, school.rows[0].id]);
+  res.json({ success: true, message: 'Classe supprimée' });
+});
+
+/**
+ * @desc    Delete a student
+ */
+const deleteStudent = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
+  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+
+  const { id } = req.params;
+  await query('DELETE FROM public.school_students WHERE id = $1 AND school_id = $2', [id, school.rows[0].id]);
+  res.json({ success: true, message: 'Élève supprimé' });
 });
 
 /**
@@ -395,5 +386,7 @@ module.exports = {
   addFeeInvoice,
   addAccountRequest,
   getAccountRequests,
-  loginByCode
+  loginByCode,
+  deleteClass,
+  deleteStudent
 };

@@ -1,8 +1,10 @@
 CREATE TABLE IF NOT EXISTS public.school_classes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID NOT NULL REFERENCES public.school_requests(id) ON DELETE CASCADE,
+  staff_id UUID REFERENCES public.school_account_requests(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   level TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -14,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.school_students (
   gender TEXT,
   birth_date TEXT,
   access_code TEXT UNIQUE,
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

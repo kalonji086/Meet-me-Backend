@@ -11,8 +11,10 @@ router.get('/dashboard', authenticate, schoolController.getSchoolDashboardData);
 // Sub-modules École
 router.get('/students', authenticate, schoolController.getStudents);
 router.post('/students', authenticate, schoolController.addStudent);
+router.delete('/students/:id', authenticate, schoolController.deleteStudent);
 router.get('/classes', authenticate, schoolController.getClasses);
 router.post('/classes', authenticate, schoolController.addClass);
+router.delete('/classes/:id', authenticate, schoolController.deleteClass);
 router.get('/schedules', authenticate, schoolController.getSchedules);
 router.post('/schedules', authenticate, schoolController.addSchedule);
 router.get('/fees', authenticate, schoolController.getFees);

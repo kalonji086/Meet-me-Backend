@@ -315,7 +315,6 @@ const getAccountRequests = asyncHandler(async (req, res) => {
   const result = await query('SELECT * FROM public.school_account_requests WHERE school_id = $1 ORDER BY created_at DESC', [school.rows[0].id]);
   res.json({ success: true, data: result.rows });
 });
-});
 
 module.exports = {
   submitSchoolRequest,

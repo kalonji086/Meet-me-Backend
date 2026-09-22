@@ -2665,7 +2665,7 @@ module.exports = {
   toggleSchoolBlock,
   deleteSchoolRequest,
   getAdminSchoolAccountRequests,
-  approveAdminSchoolAccountRequest
+  approveAdminSchoolAccountRequest,
   toggleMarketBlock,
   deleteMarketBusiness,
   createOfficialGroup,

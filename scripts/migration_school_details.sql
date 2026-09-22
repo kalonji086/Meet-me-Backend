@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.school_students (
   full_name TEXT NOT NULL,
   gender TEXT,
   birth_date TEXT,
+  access_code TEXT UNIQUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

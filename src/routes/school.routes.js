@@ -20,6 +20,9 @@ router.post('/fees', authenticate, schoolController.addFeeInvoice);
 router.get('/account-requests', authenticate, schoolController.getAccountRequests);
 router.post('/account-requests', authenticate, schoolController.addAccountRequest);
 
+// Login Universel par Code (Public)
+router.post('/login-by-code', schoolController.loginByCode);
+
 // Route Admin d'approbation
 router.put('/approve/:requestId', authenticate, isAdmin, schoolController.approveSchoolRequest);
 

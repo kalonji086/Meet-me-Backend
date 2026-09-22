@@ -174,12 +174,76 @@ const addStudent = asyncHandler(async (req, res) => {
   if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { fullName, gender, birthDate, classId } = req.body;
+  const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+
   const result = await query(`
-    INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date)
-    VALUES ($1, $2, $3, $4, $5) RETURNING *
-  `, [school.rows[0].id, classId || null, fullName, gender, birthDate]);
+    INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
+    VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+  `, [school.rows[0].id, classId || null, fullName, gender, birthDate, accessCode]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Universal school login by unique code
+ */
+const loginByCode = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ success: false, error: 'Code requis' });
+
+  // 1. Check if it's a staff member
+  const staffCheck = await query(`
+    SELECT sar.*, sr.school_name, sr.status as school_status
+    FROM public.school_account_requests sar
+    JOIN public.school_requests sr ON sar.school_id = sr.id
+    WHERE sar.generated_code = $1 AND sar.status = 'approuve'
+  `, [code]);
+
+  if (staffCheck.rows.length > 0) {
+    const staff = staffCheck.rows[0];
+    if (staff.school_status !== 'approuve') return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
+
+    return res.json({
+      success: true,
+      type: 'staff',
+      role: staff.role,
+      user: {
+        id: staff.id,
+        fullName: staff.full_name,
+        schoolName: staff.school_name,
+        schoolId: staff.school_id
+      }
+    });
+  }
+
+  // 2. Check if it's a student
+  const studentCheck = await query(`
+    SELECT s.*, sr.school_name, sr.status as school_status, c.name as class_name
+    FROM public.school_students s
+    JOIN public.school_requests sr ON s.school_id = sr.id
+    LEFT JOIN public.school_classes c ON s.class_id = c.id
+    WHERE s.access_code = $1
+  `, [code]);
+
+  if (studentCheck.rows.length > 0) {
+    const student = studentCheck.rows[0];
+    if (student.school_status !== 'approuve') return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
+
+    return res.json({
+      success: true,
+      type: 'student',
+      role: 'eleve',
+      user: {
+        id: student.id,
+        fullName: student.full_name,
+        schoolName: student.school_name,
+        className: student.class_name,
+        schoolId: student.school_id
+      }
+    });
+  }
+
+  res.status(404).json({ success: false, error: 'Code invalide ou compte non encore approuvé.' });
 });
 
 /**
@@ -330,5 +394,6 @@ module.exports = {
   getFees,
   addFeeInvoice,
   addAccountRequest,
-  getAccountRequests
+  getAccountRequests,
+  loginByCode
 };

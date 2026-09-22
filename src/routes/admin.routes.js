@@ -57,6 +57,8 @@ router.get('/school-requests', adminController.getSchoolRequests);
 router.put('/school-requests/:id', adminController.handleSchoolRequest);
 router.put('/school-requests/:id/toggle-block', adminController.toggleSchoolBlock);
 router.delete('/school-requests/:id', adminController.deleteSchoolRequest);
+router.get('/school-account-requests', adminController.getAdminSchoolAccountRequests);
+router.put('/school-account-requests/:id', adminController.approveAdminSchoolAccountRequest);
 router.get('/employer-requests', adminController.getEmployerRequests);
 router.put('/employer-requests/:id', adminController.handleEmployerRequest);
 router.put('/market-requests/:id/toggle-block', adminController.toggleMarketBlock);

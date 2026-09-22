@@ -38,3 +38,15 @@ CREATE TABLE IF NOT EXISTS public.school_fees (
   due_date TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS public.school_account_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID NOT NULL REFERENCES public.school_requests(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL, -- prefet, directeur, enseignant, professeur
+  phone TEXT,
+  status TEXT DEFAULT 'en_attente', -- en_attente, approuve, rejete
+  generated_code TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

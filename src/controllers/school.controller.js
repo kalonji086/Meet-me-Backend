@@ -280,6 +280,41 @@ const addFeeInvoice = asyncHandler(async (req, res) => {
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });
+
+/**
+ * @desc    Submit a staff account request from promoter
+ */
+const addAccountRequest = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
+  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable ou non approuvée' });
+
+  const { fullName, email, role, phone } = req.body;
+  if (!fullName || !email || !role) {
+    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants' });
+  }
+
+  const generatedCode = 'SCH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+
+  const result = await query(`
+    INSERT INTO public.school_account_requests (school_id, full_name, email, role, phone, generated_code)
+    VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+  `, [school.rows[0].id, fullName, email, role, phone, generatedCode]);
+
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+/**
+ * @desc    Get staff account requests for promoter view
+ */
+const getAccountRequests = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
+  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+
+  const result = await query('SELECT * FROM public.school_account_requests WHERE school_id = $1 ORDER BY created_at DESC', [school.rows[0].id]);
+  res.json({ success: true, data: result.rows });
+});
 });
 
 module.exports = {
@@ -294,5 +329,7 @@ module.exports = {
   getSchedules,
   addSchedule,
   getFees,
-  addFeeInvoice
+  addFeeInvoice,
+  addAccountRequest,
+  getAccountRequests
 };

@@ -149,6 +149,9 @@
                 <a href="#" onclick="showSection('school-requests')" id="nav-school-requests" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="graduation-cap" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Demandes École</span>
                 </a>
+                <a href="#" onclick="showSection('school-account-requests')" id="nav-school-account-requests" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="user-check" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Comptes Scolaires</span>
+                </a>
                 <a href="#" onclick="showSection('employer-requests')" id="nav-employer-requests" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="briefcase" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Demandes Emploi</span>
                 </a>
@@ -925,6 +928,15 @@
                         <table class="w-full text-left min-w-[600px]">
                             <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5">École</th><th class="px-8 py-5">Email</th><th class="px-8 py-5">Type</th><th class="px-8 py-5">Statut</th><th class="px-8 py-5 text-right">Action</th></tr></thead>
                             <tbody id="school-requests-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="section-school-account-requests" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-[2rem] lg:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left min-w-[600px]">
+                            <thead class="bg-gray-50 border-b border-gray-100"><tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest"><th class="px-8 py-5">Nom</th><th class="px-8 py-5">Email / Rôle</th><th class="px-8 py-5">École</th><th class="px-8 py-5">Code Unique</th><th class="px-8 py-5">Statut</th><th class="px-8 py-5 text-right">Action</th></tr></thead>
+                            <tbody id="school-account-requests-table-body"></tbody>
                         </table>
                     </div>
                 </div>
@@ -2568,14 +2580,14 @@
         }
 
         function showSection(name) {
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
-                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s)))));
+                const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'school-account-requests' ? 'nav-school-account-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s))))));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
             });
             const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-requests' ? 'nav-school-requests' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name)))));
+            const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-requests' ? 'nav-school-requests' : (name === 'school-account-requests' ? 'nav-school-account-requests' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name))))));
             const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
             document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
 
@@ -2584,6 +2596,7 @@
             if (name === 'portfolios-saas') loadPortfolioSaas();
             if (name === 'market-requests') loadMarket();
             if (name === 'school-requests') loadSchools();
+            if (name === 'school-account-requests') loadAdminSchoolAccounts();
             if (name === 'employer-requests') loadEmployerRequests();
             if (name === 'appeals') loadAppeals();
             if (name === 'verifications') loadVerifications();
@@ -4364,6 +4377,37 @@
                 loadSchools();
             } catch (e) {
                 alert("Erreur lors de la suppression.");
+            }
+        }
+
+        async function loadAdminSchoolAccounts() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/school-account-requests`, { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('school-account-requests-table-body').innerHTML = res.data.data.map(sar => `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
+                        <td class="px-8 py-5"><p class="font-bold text-sm text-gray-800">${sar.full_name}</p></td>
+                        <td class="px-8 py-5 text-sm text-gray-600">${sar.email} <br><span class="text-xs text-purple-600 font-bold">${sar.role}</span></td>
+                        <td class="px-8 py-5 text-sm text-gray-600">${sar.school_name}</td>
+                        <td class="px-8 py-5 text-sm font-mono text-gray-700">${sar.generated_code}</td>
+                        <td class="px-8 py-5"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${sar.status === 'approuve' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-black'}">${sar.status}</span></td>
+                        <td class="px-8 py-5 text-right space-x-1">
+                            ${sar.status === 'en_attente' ? `
+                                <button onclick="handleAdminStaffAccount('${sar.id}', 'approuve')" class="px-3 py-1 bg-green-600 text-white rounded text-[10px] font-black uppercase">Approuver</button>
+                                <button onclick="handleAdminStaffAccount('${sar.id}', 'rejete')" class="px-3 py-1 bg-red-600 text-white rounded text-[10px] font-black uppercase">Rejeter</button>
+                            ` : '<span class="text-xs text-gray-400">Aucune Action</span>'}
+                        </td>
+                    </tr>
+                `).join(''); lucide.createIcons();
+            } catch (e) {}
+        }
+
+        async function handleAdminStaffAccount(id, action) {
+            try {
+                const res = await axios.put(`${API_URL}/admin/school-account-requests/${id}`, { action }, { headers: { Authorization: `Bearer ${token}` } });
+                toast(res.data.message, "success");
+                loadAdminSchoolAccounts();
+            } catch (e) {
+                alert("Erreur lors de l'opération.");
             }
         }
 

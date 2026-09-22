@@ -17,6 +17,8 @@ router.get('/schedules', authenticate, schoolController.getSchedules);
 router.post('/schedules', authenticate, schoolController.addSchedule);
 router.get('/fees', authenticate, schoolController.getFees);
 router.post('/fees', authenticate, schoolController.addFeeInvoice);
+router.get('/account-requests', authenticate, schoolController.getAccountRequests);
+router.post('/account-requests', authenticate, schoolController.addAccountRequest);
 
 // Route Admin d'approbation
 router.put('/approve/:requestId', authenticate, isAdmin, schoolController.approveSchoolRequest);

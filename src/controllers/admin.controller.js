@@ -2069,6 +2069,45 @@ const toggleSchoolBlock = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get all school staff account requests for Admin
+ */
+const getAdminSchoolAccountRequests = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT sar.*, sr.school_name
+    FROM public.school_account_requests sar
+    JOIN public.school_requests sr ON sar.school_id = sr.id
+    ORDER BY sar.created_at DESC
+  `);
+  res.json({ success: true, data: result.rows });
+});
+
+/**
+ * @desc    Approve school staff account request and create official account
+ */
+const approveAdminSchoolAccountRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { action } = req.body; // approuve or rejete
+
+  if (action === 'rejete') {
+    await query("UPDATE public.school_account_requests SET status = 'rejete' WHERE id = $1", [id]);
+    return res.json({ success: true, message: 'Demande rejetée.' });
+  }
+
+  const check = await query('SELECT * FROM public.school_account_requests WHERE id = $1', [id]);
+  if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
+  const staff = check.rows[0];
+
+  // Mettre à jour le statut
+  await query("UPDATE public.school_account_requests SET status = 'approuve' WHERE id = $1", [id]);
+
+  res.json({
+    success: true,
+    message: 'Compte scolaire approuvé avec succès ! Code d\'accès unique généré : ' + staff.generated_code,
+    code: staff.generated_code
+  });
+});
+
+/**
  * @desc    Delete a school request
  */
 const deleteSchoolRequest = asyncHandler(async (req, res) => {
@@ -2625,6 +2664,8 @@ module.exports = {
   handleSchoolRequest,
   toggleSchoolBlock,
   deleteSchoolRequest,
+  getAdminSchoolAccountRequests,
+  approveAdminSchoolAccountRequest
   toggleMarketBlock,
   deleteMarketBusiness,
   createOfficialGroup,

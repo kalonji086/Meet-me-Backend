@@ -301,36 +301,6 @@ const addStudent = asyncHandler(async (req, res) => {
   }
 });
 
-  try {
-    if (id) {
-      // Update
-      const result = await query(`
-        UPDATE public.school_students
-        SET full_name = $1, gender = $2, birth_date = $3, class_id = $4, is_active = $5, updated_at = NOW()
-        WHERE id = $6 AND school_id = $7 RETURNING *
-      `, [fullName.trim(), cleanGender, cleanBirthDate, cleanClassId, isActive !== undefined ? isActive : true, id, school.id]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, error: 'Élève introuvable.' });
-      }
-      return res.json({ success: true, data: result.rows[0] });
-    }
-
-    const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-    const result = await query(`
-      INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-    `, [school.id, cleanClassId, fullName.trim(), cleanGender, cleanBirthDate, accessCode]);
-
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    if (err.code === '23503') {
-      return res.status(400).json({ success: false, error: 'La classe sélectionnée n\'existe pas.' });
-    }
-    throw err;
-  }
-});
-
 /**
  * @desc    Universal school login by unique code
  */

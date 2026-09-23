@@ -236,31 +236,46 @@ const addStudent = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Le nom complet de l\'élève est requis.' });
   }
 
-  const cleanClassId = (classId && classId.toString().trim() !== '') ? classId : null;
+  let cleanClassId = (classId && classId.toString().trim() !== '') ? classId : null;
+  if (cleanClassId) {
+    // Check if the referenced class actually exists in the database
+    const classCheck = await query('SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2', [cleanClassId, school.id]);
+    if (classCheck.rows.length === 0) {
+      cleanClassId = null; // Reset to null if referenced class does not exist
+    }
+  }
+
   const cleanGender = gender || 'M';
   const cleanBirthDate = (birthDate && birthDate.toString().trim() !== '') ? birthDate : null;
 
-  if (id) {
-    // Update
-    const result = await query(`
-      UPDATE public.school_students
-      SET full_name = $1, gender = $2, birth_date = $3, class_id = $4, is_active = $5, updated_at = NOW()
-      WHERE id = $6 AND school_id = $7 RETURNING *
-    `, [fullName.trim(), cleanGender, cleanBirthDate, cleanClassId, isActive !== undefined ? isActive : true, id, school.id]);
+  try {
+    if (id) {
+      // Update
+      const result = await query(`
+        UPDATE public.school_students
+        SET full_name = $1, gender = $2, birth_date = $3, class_id = $4, is_active = $5, updated_at = NOW()
+        WHERE id = $6 AND school_id = $7 RETURNING *
+      `, [fullName.trim(), cleanGender, cleanBirthDate, cleanClassId, isActive !== undefined ? isActive : true, id, school.id]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Élève introuvable.' });
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Élève introuvable.' });
+      }
+      return res.json({ success: true, data: result.rows[0] });
     }
-    return res.json({ success: true, data: result.rows[0] });
+
+    const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+    const result = await query(`
+      INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+    `, [school.id, cleanClassId, fullName.trim(), cleanGender, cleanBirthDate, accessCode]);
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(400).json({ success: false, error: 'La classe sélectionnée n\'existe pas.' });
+    }
+    throw err;
   }
-
-  const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-  const result = await query(`
-    INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
-    VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-  `, [school.id, cleanClassId, fullName.trim(), cleanGender, cleanBirthDate, accessCode]);
-
-  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 /**
@@ -376,7 +391,13 @@ const addClass = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Le nom et le niveau de la classe sont requis.' });
   }
 
-  const cleanStaffId = (staffId && staffId.toString().trim() !== '') ? staffId : null;
+  let cleanStaffId = (staffId && staffId.toString().trim() !== '') ? staffId : null;
+  if (cleanStaffId) {
+    const staffCheck = await query('SELECT id FROM public.school_account_requests WHERE id = $1 AND school_id = $2', [cleanStaffId, school.id]);
+    if (staffCheck.rows.length === 0) {
+      cleanStaffId = null; // Reset to null if staffId does not exist in school_account_requests
+    }
+  }
 
   try {
     if (id) {
@@ -399,6 +420,25 @@ const addClass = asyncHandler(async (req, res) => {
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (e) {
+    if (e.code === '23503') {
+      // Foreign key violation error handling fallback
+      if (id) {
+        const result = await query(`
+          UPDATE public.school_classes
+          SET name = $1, level = $2, is_active = $3
+          WHERE id = $4 AND school_id = $5 RETURNING *
+        `, [name.trim(), level.trim(), isActive !== undefined ? isActive : true, id, school.id]);
+        return res.json({ success: true, data: result.rows[0] });
+      }
+
+      const result = await query(`
+        INSERT INTO public.school_classes (school_id, name, level)
+        VALUES ($1, $2, $3) RETURNING *
+      `, [school.id, name.trim(), level.trim()]);
+
+      return res.status(201).json({ success: true, data: result.rows[0] });
+    }
+
     if (id) {
       const result = await query(`
         UPDATE public.school_classes

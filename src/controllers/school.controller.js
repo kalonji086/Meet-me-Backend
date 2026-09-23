@@ -125,6 +125,53 @@ const getPromoterSchool = async (userId) => {
 };
 
 /**
+ * Auto-heal database columns for school module if table was created in an older schema version
+ */
+let columnsEnsured = false;
+const ensureSchoolColumns = async () => {
+  if (columnsEnsured) return;
+  try {
+    await query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_classes') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_classes' AND column_name = 'staff_id') THEN
+            ALTER TABLE public.school_classes ADD COLUMN staff_id UUID REFERENCES public.school_account_requests(id) ON DELETE SET NULL;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_classes' AND column_name = 'is_active') THEN
+            ALTER TABLE public.school_classes ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+          END IF;
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_students') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'birth_date') THEN
+            ALTER TABLE public.school_students ADD COLUMN birth_date TEXT;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'access_code') THEN
+            ALTER TABLE public.school_students ADD COLUMN access_code TEXT UNIQUE;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'is_active') THEN
+            ALTER TABLE public.school_students ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+          END IF;
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_account_requests') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_account_requests' AND column_name = 'generated_code') THEN
+            ALTER TABLE public.school_account_requests ADD COLUMN generated_code TEXT;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_account_requests' AND column_name = 'status') THEN
+            ALTER TABLE public.school_account_requests ADD COLUMN status TEXT DEFAULT 'en_attente';
+          END IF;
+        END IF;
+      END $$;
+    `);
+    columnsEnsured = true;
+  } catch (err) {
+    logger.error('Error auto-healing school database columns:', err.message);
+  }
+};
+
+/**
  * @desc    Get metrics / dashboard details for an approved school
  * @route   GET /api/school/dashboard
  * @access  Private
@@ -290,15 +337,27 @@ const getClasses = asyncHandler(async (req, res) => {
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
-  const result = await query(`
-    SELECT c.*, sar.full_name as staff_name, sar.role as staff_role,
-           (SELECT COUNT(*) FROM public.school_students s WHERE s.class_id = c.id) as student_count
-    FROM public.school_classes c
-    LEFT JOIN public.school_account_requests sar ON c.staff_id = sar.id
-    WHERE c.school_id = $1 ORDER BY c.name ASC
-  `, [school.id]);
+  await ensureSchoolColumns();
 
-  res.json({ success: true, data: result.rows });
+  try {
+    const result = await query(`
+      SELECT c.*, sar.full_name as staff_name, sar.role as staff_role,
+             (SELECT COUNT(*) FROM public.school_students s WHERE s.class_id = c.id) as student_count
+      FROM public.school_classes c
+      LEFT JOIN public.school_account_requests sar ON c.staff_id = sar.id
+      WHERE c.school_id = $1 ORDER BY c.name ASC
+    `, [school.id]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (e) {
+    const result = await query(`
+      SELECT c.*,
+             (SELECT COUNT(*) FROM public.school_students s WHERE s.class_id = c.id) as student_count
+      FROM public.school_classes c
+      WHERE c.school_id = $1 ORDER BY c.name ASC
+    `, [school.id]);
+    res.json({ success: true, data: result.rows });
+  }
 });
 
 /**
@@ -309,6 +368,8 @@ const addClass = asyncHandler(async (req, res) => {
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
+  await ensureSchoolColumns();
+
   const { id, name, level, staffId, isActive } = req.body;
 
   if (!name || name.trim() === '' || !level || level.trim() === '') {
@@ -317,25 +378,43 @@ const addClass = asyncHandler(async (req, res) => {
 
   const cleanStaffId = (staffId && staffId.toString().trim() !== '') ? staffId : null;
 
-  if (id) {
-    const result = await query(`
-      UPDATE public.school_classes
-      SET name = $1, level = $2, staff_id = $3, is_active = $4
-      WHERE id = $5 AND school_id = $6 RETURNING *
-    `, [name.trim(), level.trim(), cleanStaffId, isActive !== undefined ? isActive : true, id, school.id]);
+  try {
+    if (id) {
+      const result = await query(`
+        UPDATE public.school_classes
+        SET name = $1, level = $2, staff_id = $3, is_active = $4
+        WHERE id = $5 AND school_id = $6 RETURNING *
+      `, [name.trim(), level.trim(), cleanStaffId, isActive !== undefined ? isActive : true, id, school.id]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Classe introuvable.' });
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Classe introuvable.' });
+      }
+      return res.json({ success: true, data: result.rows[0] });
     }
-    return res.json({ success: true, data: result.rows[0] });
+
+    const result = await query(`
+      INSERT INTO public.school_classes (school_id, name, level, staff_id)
+      VALUES ($1, $2, $3, $4) RETURNING *
+    `, [school.id, name.trim(), level.trim(), cleanStaffId]);
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (e) {
+    if (id) {
+      const result = await query(`
+        UPDATE public.school_classes
+        SET name = $1, level = $2, is_active = $3
+        WHERE id = $4 AND school_id = $5 RETURNING *
+      `, [name.trim(), level.trim(), isActive !== undefined ? isActive : true, id, school.id]);
+      return res.json({ success: true, data: result.rows[0] });
+    }
+
+    const result = await query(`
+      INSERT INTO public.school_classes (school_id, name, level)
+      VALUES ($1, $2, $3) RETURNING *
+    `, [school.id, name.trim(), level.trim()]);
+
+    res.status(201).json({ success: true, data: result.rows[0] });
   }
-
-  const result = await query(`
-    INSERT INTO public.school_classes (school_id, name, level, staff_id)
-    VALUES ($1, $2, $3, $4) RETURNING *
-  `, [school.id, name.trim(), level.trim(), cleanStaffId]);
-
-  res.status(201).json({ success: true, data: result.rows[0] });
 });
 
 /**

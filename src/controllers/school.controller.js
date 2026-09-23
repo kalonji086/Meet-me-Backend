@@ -112,6 +112,19 @@ const approveSchoolRequest = asyncHandler(async (req, res) => {
 });
 
 /**
+/**
+ * Helper to fetch school by promoter user_id
+ */
+const getPromoterSchool = async (userId) => {
+  const result = await query(
+    "SELECT * FROM public.school_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+    [userId]
+  );
+  if (result.rows.length === 0) return null;
+  return result.rows[0];
+};
+
+/**
  * @desc    Get metrics / dashboard details for an approved school
  * @route   GET /api/school/dashboard
  * @access  Private
@@ -119,16 +132,13 @@ const approveSchoolRequest = asyncHandler(async (req, res) => {
 const getSchoolDashboardData = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
-  const schoolCheck = await query("SELECT * FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (schoolCheck.rows.length === 0) {
+  const school = await getPromoterSchool(userId);
+  if (!school) {
     return res.status(403).json({
       success: false,
-      error: 'Accès refusé. Votre école n\'est pas encore approuvée ou n\'existe pas.'
+      error: 'Accès refusé. Votre école n\'est pas encore enregistrée.'
     });
   }
-
-  // Données réelles tirées de la table school_requests
-  const school = schoolCheck.rows[0];
 
   // Requêtes réelles pour mettre à jour les métriques à la volée
   const studentsCount = await query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1', [school.id]);
@@ -152,15 +162,15 @@ const getSchoolDashboardData = asyncHandler(async (req, res) => {
  */
 const getStudents = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const result = await query(`
     SELECT s.*, c.name as class_name
     FROM public.school_students s
     LEFT JOIN public.school_classes c ON s.class_id = c.id
     WHERE s.school_id = $1 ORDER BY s.full_name ASC
-  `, [school.rows[0].id]);
+  `, [school.id]);
 
   res.json({ success: true, data: result.rows });
 });
@@ -170,10 +180,18 @@ const getStudents = asyncHandler(async (req, res) => {
  */
 const addStudent = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { id, fullName, gender, birthDate, classId, isActive } = req.body;
+
+  if (!fullName || fullName.trim() === '') {
+    return res.status(400).json({ success: false, error: 'Le nom complet de l\'élève est requis.' });
+  }
+
+  const cleanClassId = (classId && classId.toString().trim() !== '') ? classId : null;
+  const cleanGender = gender || 'M';
+  const cleanBirthDate = (birthDate && birthDate.toString().trim() !== '') ? birthDate : null;
 
   if (id) {
     // Update
@@ -181,7 +199,11 @@ const addStudent = asyncHandler(async (req, res) => {
       UPDATE public.school_students
       SET full_name = $1, gender = $2, birth_date = $3, class_id = $4, is_active = $5, updated_at = NOW()
       WHERE id = $6 AND school_id = $7 RETURNING *
-    `, [fullName, gender, birthDate, classId || null, isActive !== undefined ? isActive : true, id, school.rows[0].id]);
+    `, [fullName.trim(), cleanGender, cleanBirthDate, cleanClassId, isActive !== undefined ? isActive : true, id, school.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Élève introuvable.' });
+    }
     return res.json({ success: true, data: result.rows[0] });
   }
 
@@ -189,7 +211,7 @@ const addStudent = asyncHandler(async (req, res) => {
   const result = await query(`
     INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-  `, [school.rows[0].id, classId || null, fullName, gender, birthDate, accessCode]);
+  `, [school.id, cleanClassId, fullName.trim(), cleanGender, cleanBirthDate, accessCode]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });
@@ -211,7 +233,9 @@ const loginByCode = asyncHandler(async (req, res) => {
 
   if (staffCheck.rows.length > 0) {
     const staff = staffCheck.rows[0];
-    if (staff.school_status !== 'approuve') return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
+    if (staff.school_status !== 'approuve' && staff.school_status !== 'approuvé') {
+      return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
+    }
 
     return res.json({
       success: true,
@@ -237,7 +261,9 @@ const loginByCode = asyncHandler(async (req, res) => {
 
   if (studentCheck.rows.length > 0) {
     const student = studentCheck.rows[0];
-    if (student.school_status !== 'approuve') return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
+    if (student.school_status !== 'approuve' && student.school_status !== 'approuvé') {
+      return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
+    }
 
     return res.json({
       success: true,
@@ -261,8 +287,8 @@ const loginByCode = asyncHandler(async (req, res) => {
  */
 const getClasses = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const result = await query(`
     SELECT c.*, sar.full_name as staff_name, sar.role as staff_role,
@@ -270,7 +296,7 @@ const getClasses = asyncHandler(async (req, res) => {
     FROM public.school_classes c
     LEFT JOIN public.school_account_requests sar ON c.staff_id = sar.id
     WHERE c.school_id = $1 ORDER BY c.name ASC
-  `, [school.rows[0].id]);
+  `, [school.id]);
 
   res.json({ success: true, data: result.rows });
 });
@@ -280,24 +306,34 @@ const getClasses = asyncHandler(async (req, res) => {
  */
 const addClass = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { id, name, level, staffId, isActive } = req.body;
+
+  if (!name || name.trim() === '' || !level || level.trim() === '') {
+    return res.status(400).json({ success: false, error: 'Le nom et le niveau de la classe sont requis.' });
+  }
+
+  const cleanStaffId = (staffId && staffId.toString().trim() !== '') ? staffId : null;
 
   if (id) {
     const result = await query(`
       UPDATE public.school_classes
       SET name = $1, level = $2, staff_id = $3, is_active = $4
       WHERE id = $5 AND school_id = $6 RETURNING *
-    `, [name, level, staffId || null, isActive !== undefined ? isActive : true, id, school.rows[0].id]);
+    `, [name.trim(), level.trim(), cleanStaffId, isActive !== undefined ? isActive : true, id, school.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Classe introuvable.' });
+    }
     return res.json({ success: true, data: result.rows[0] });
   }
 
   const result = await query(`
     INSERT INTO public.school_classes (school_id, name, level, staff_id)
     VALUES ($1, $2, $3, $4) RETURNING *
-  `, [school.rows[0].id, name, level, staffId || null]);
+  `, [school.id, name.trim(), level.trim(), cleanStaffId]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });
@@ -307,11 +343,11 @@ const addClass = asyncHandler(async (req, res) => {
  */
 const deleteClass = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { id } = req.params;
-  await query('DELETE FROM public.school_classes WHERE id = $1 AND school_id = $2', [id, school.rows[0].id]);
+  await query('DELETE FROM public.school_classes WHERE id = $1 AND school_id = $2', [id, school.id]);
   res.json({ success: true, message: 'Classe supprimée' });
 });
 
@@ -320,11 +356,11 @@ const deleteClass = asyncHandler(async (req, res) => {
  */
 const deleteStudent = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { id } = req.params;
-  await query('DELETE FROM public.school_students WHERE id = $1 AND school_id = $2', [id, school.rows[0].id]);
+  await query('DELETE FROM public.school_students WHERE id = $1 AND school_id = $2', [id, school.id]);
   res.json({ success: true, message: 'Élève supprimé' });
 });
 
@@ -333,15 +369,15 @@ const deleteStudent = asyncHandler(async (req, res) => {
  */
 const getSchedules = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const result = await query(`
     SELECT sch.*, c.name as class_name
     FROM public.school_schedules sch
     JOIN public.school_classes c ON sch.class_id = c.id
     WHERE sch.school_id = $1 ORDER BY sch.day_of_week, sch.start_time
-  `, [school.rows[0].id]);
+  `, [school.id]);
 
   res.json({ success: true, data: result.rows });
 });
@@ -351,14 +387,18 @@ const getSchedules = asyncHandler(async (req, res) => {
  */
 const addSchedule = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { classId, dayOfWeek, startTime, endTime, subject, teacherName } = req.body;
+  if (!classId || !dayOfWeek || !startTime || !endTime || !subject) {
+    return res.status(400).json({ success: false, error: 'Veuillez remplir tous les champs obligatoires du cours.' });
+  }
+
   const result = await query(`
     INSERT INTO public.school_schedules (school_id, class_id, day_of_week, start_time, end_time, subject, teacher_name)
     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
-  `, [school.rows[0].id, classId, dayOfWeek, startTime, endTime, subject, teacherName]);
+  `, [school.id, classId, dayOfWeek, startTime, endTime, subject, teacherName || null]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });
@@ -368,15 +408,15 @@ const addSchedule = asyncHandler(async (req, res) => {
  */
 const getFees = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const result = await query(`
     SELECT f.*, s.full_name as student_name
     FROM public.school_fees f
     JOIN public.school_students s ON f.student_id = s.id
     WHERE f.school_id = $1 ORDER BY f.created_at DESC
-  `, [school.rows[0].id]);
+  `, [school.id]);
 
   res.json({ success: true, data: result.rows });
 });
@@ -386,14 +426,18 @@ const getFees = asyncHandler(async (req, res) => {
  */
 const addFeeInvoice = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { studentId, amountDue, amountPaid, dueDate, status } = req.body;
+  if (!studentId || amountDue === undefined) {
+    return res.status(400).json({ success: false, error: 'L\'élève et le montant dû sont requis.' });
+  }
+
   const result = await query(`
     INSERT INTO public.school_fees (school_id, student_id, amount_due, amount_paid, status, due_date)
     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-  `, [school.rows[0].id, studentId, amountDue, amountPaid || 0, status || 'non_paye', dueDate]);
+  `, [school.id, studentId, amountDue || 0, amountPaid || 0, status || 'non_paye', dueDate || null]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });
@@ -403,20 +447,20 @@ const addFeeInvoice = asyncHandler(async (req, res) => {
  */
 const addAccountRequest = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable ou non approuvée' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { fullName, email, role, phone } = req.body;
   if (!fullName || !email || !role) {
-    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants' });
+    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants (nom, email, rôle)' });
   }
 
   const generatedCode = 'SCH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
 
   const result = await query(`
-    INSERT INTO public.school_account_requests (school_id, full_name, email, role, phone, generated_code)
-    VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-  `, [school.rows[0].id, fullName, email, role, phone, generatedCode]);
+    INSERT INTO public.school_account_requests (school_id, full_name, email, role, phone, generated_code, status)
+    VALUES ($1, $2, $3, $4, $5, $6, 'approuve') RETURNING *
+  `, [school.id, fullName, email, role, phone, generatedCode]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });
@@ -426,10 +470,10 @@ const addAccountRequest = asyncHandler(async (req, res) => {
  */
 const getAccountRequests = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await query("SELECT id FROM public.school_requests WHERE user_id = $1 AND status = 'approuve'", [userId]);
-  if (school.rows.length === 0) return res.status(403).json({ success: false, error: 'École introuvable' });
+  const school = await getPromoterSchool(userId);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
-  const result = await query('SELECT * FROM public.school_account_requests WHERE school_id = $1 ORDER BY created_at DESC', [school.rows[0].id]);
+  const result = await query('SELECT * FROM public.school_account_requests WHERE school_id = $1 ORDER BY created_at DESC', [school.id]);
   res.json({ success: true, data: result.rows });
 });
 

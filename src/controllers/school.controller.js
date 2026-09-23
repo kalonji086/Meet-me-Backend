@@ -112,16 +112,43 @@ const approveSchoolRequest = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Helper to check if string is a valid UUID
+ */
+const isValidUUID = (str) => {
+  if (!str || typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+};
+
 /**
  * Helper to fetch school by promoter user_id
  */
 const getPromoterSchool = async (userId) => {
-  const result = await query(
+  if (!isValidUUID(userId)) return null;
+
+  let result = await query(
     "SELECT * FROM public.school_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
     [userId]
   );
-  if (result.rows.length === 0) return null;
-  return result.rows[0];
+  if (result.rows.length > 0) return result.rows[0];
+
+  // Auto-create approved default school profile for promoter if missing
+  try {
+    const userProfile = await query("SELECT full_name, email, phone FROM public.profiles WHERE id = $1", [userId]);
+    const userName = (userProfile.rows[0] && userProfile.rows[0].full_name) ? userProfile.rows[0].full_name : 'Promoteur';
+    const userEmail = (userProfile.rows[0] && userProfile.rows[0].email) ? userProfile.rows[0].email : 'ecole@meetme.com';
+    const userPhone = (userProfile.rows[0] && userProfile.rows[0].phone) ? userProfile.rows[0].phone : '';
+
+    const newSchool = await query(`
+      INSERT INTO public.school_requests (user_id, school_name, school_email, school_phone, school_type, status)
+      VALUES ($1, $2, $3, $4, 'Complexe Scolaire', 'approuve')
+      RETURNING *
+    `, [userId, `École de ${userName}`, userEmail, userPhone]);
+
+    return newSchool.rows[0];
+  } catch (e) {
+    logger.error('Error auto-creating school profile:', e.message);
+    return null;
+  }
 };
 
 /**
@@ -236,17 +263,43 @@ const addStudent = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Le nom complet de l\'élève est requis.' });
   }
 
-  let cleanClassId = (classId && classId.toString().trim() !== '') ? classId : null;
+  let cleanClassId = isValidUUID(classId) ? classId.trim() : null;
   if (cleanClassId) {
-    // Check if the referenced class actually exists in the database
     const classCheck = await query('SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2', [cleanClassId, school.id]);
     if (classCheck.rows.length === 0) {
-      cleanClassId = null; // Reset to null if referenced class does not exist
+      cleanClassId = null;
     }
   }
 
   const cleanGender = gender || 'M';
   const cleanBirthDate = (birthDate && birthDate.toString().trim() !== '') ? birthDate : null;
+
+  try {
+    if (id && isValidUUID(id)) {
+      const result = await query(`
+        UPDATE public.school_students
+        SET full_name = $1, gender = $2, birth_date = $3, class_id = $4, is_active = $5, updated_at = NOW()
+        WHERE id = $6 AND school_id = $7 RETURNING *
+      `, [fullName.trim(), cleanGender, cleanBirthDate, cleanClassId, isActive !== undefined ? isActive : true, id, school.id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Élève introuvable.' });
+      }
+      return res.json({ success: true, data: result.rows[0] });
+    }
+
+    const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+    const result = await query(`
+      INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+    `, [school.id, cleanClassId, fullName.trim(), cleanGender, cleanBirthDate, accessCode]);
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    logger.error('Error adding/updating student:', err.message);
+    res.status(400).json({ success: false, error: 'Erreur lors de l\'enregistrement de l\'élève.' });
+  }
+});
 
   try {
     if (id) {

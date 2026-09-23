@@ -68,14 +68,27 @@ BEGIN
   END IF;
 
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_students') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'full_name') THEN
+      ALTER TABLE public.school_students ADD COLUMN full_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'gender') THEN
+      ALTER TABLE public.school_students ADD COLUMN gender TEXT DEFAULT 'M';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'birth_date') THEN
       ALTER TABLE public.school_students ADD COLUMN birth_date TEXT;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'access_code') THEN
       ALTER TABLE public.school_students ADD COLUMN access_code TEXT UNIQUE;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'class_id') THEN
+      ALTER TABLE public.school_students ADD COLUMN class_id UUID REFERENCES public.school_classes(id) ON DELETE SET NULL;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'is_active') THEN
       ALTER TABLE public.school_students ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'name') THEN
+      UPDATE public.school_students SET full_name = name WHERE full_name IS NULL AND name IS NOT NULL;
     END IF;
   END IF;
 

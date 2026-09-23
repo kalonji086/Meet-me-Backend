@@ -239,14 +239,25 @@ const getStudents = asyncHandler(async (req, res) => {
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
-  const result = await query(`
-    SELECT s.*, c.name as class_name
-    FROM public.school_students s
-    LEFT JOIN public.school_classes c ON s.class_id = c.id
-    WHERE s.school_id = $1 ORDER BY s.full_name ASC
-  `, [school.id]);
+  await ensureSchoolColumns();
 
-  res.json({ success: true, data: result.rows });
+  try {
+    const result = await query(`
+      SELECT s.*, c.name as class_name
+      FROM public.school_students s
+      LEFT JOIN public.school_classes c ON s.class_id = c.id
+      WHERE s.school_id = $1 ORDER BY s.full_name ASC
+    `, [school.id]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (e) {
+    const result = await query(`
+      SELECT s.*
+      FROM public.school_students s
+      WHERE s.school_id = $1 ORDER BY s.full_name ASC
+    `, [school.id]);
+    res.json({ success: true, data: result.rows });
+  }
 });
 
 /**
@@ -256,6 +267,8 @@ const addStudent = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
+
+  await ensureSchoolColumns();
 
   const { id, fullName, gender, birthDate, classId, isActive } = req.body;
 
@@ -297,7 +310,32 @@ const addStudent = asyncHandler(async (req, res) => {
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     logger.error('Error adding/updating student:', err.message);
-    res.status(400).json({ success: false, error: 'Erreur lors de l\'enregistrement de l\'élève.' });
+
+    // Robust Fallback in case columns like birth_date or access_code are missing in older schema
+    try {
+      if (id && isValidUUID(id)) {
+        const result = await query(`
+          UPDATE public.school_students
+          SET full_name = $1, gender = $2, class_id = $3
+          WHERE id = $4 AND school_id = $5 RETURNING *
+        `, [fullName.trim(), cleanGender, cleanClassId, id, school.id]);
+        return res.json({ success: true, data: result.rows[0] });
+      }
+
+      const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const result = await query(`
+        INSERT INTO public.school_students (school_id, class_id, full_name, gender, access_code)
+        VALUES ($1, $2, $3, $4, $5) RETURNING *
+      `, [school.id, cleanClassId, fullName.trim(), cleanGender, accessCode]);
+
+      return res.status(201).json({ success: true, data: result.rows[0] });
+    } catch (fallbackErr) {
+      logger.error('Fallback error adding student:', fallbackErr.message);
+      return res.status(400).json({
+        success: false,
+        error: err.message || fallbackErr.message || 'Erreur lors de l\'enregistrement de l\'élève.'
+      });
+    }
   }
 });
 

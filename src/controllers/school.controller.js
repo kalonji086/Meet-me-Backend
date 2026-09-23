@@ -174,6 +174,12 @@ const ensureSchoolColumns = async () => {
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'full_name') THEN
             ALTER TABLE public.school_students ADD COLUMN full_name TEXT;
           END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'first_name') THEN
+            ALTER TABLE public.school_students ADD COLUMN first_name TEXT;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'last_name') THEN
+            ALTER TABLE public.school_students ADD COLUMN last_name TEXT;
+          END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'gender') THEN
             ALTER TABLE public.school_students ADD COLUMN gender TEXT DEFAULT 'M';
           END IF;
@@ -196,6 +202,15 @@ const ensureSchoolColumns = async () => {
         END IF;
 
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_account_requests') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_account_requests' AND column_name = 'full_name') THEN
+            ALTER TABLE public.school_account_requests ADD COLUMN full_name TEXT;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_account_requests' AND column_name = 'first_name') THEN
+            ALTER TABLE public.school_account_requests ADD COLUMN first_name TEXT;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_account_requests' AND column_name = 'last_name') THEN
+            ALTER TABLE public.school_account_requests ADD COLUMN last_name TEXT;
+          END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_account_requests' AND column_name = 'generated_code') THEN
             ALTER TABLE public.school_account_requests ADD COLUMN generated_code TEXT;
           END IF;
@@ -256,18 +271,21 @@ const getStudents = asyncHandler(async (req, res) => {
 
   try {
     const result = await query(`
-      SELECT s.*, c.name as class_name
+      SELECT s.*,
+             COALESCE(s.full_name, CONCAT(s.first_name, ' ', s.last_name), s.first_name, 'Élève') as full_name,
+             c.name as class_name
       FROM public.school_students s
       LEFT JOIN public.school_classes c ON s.class_id = c.id
-      WHERE s.school_id = $1 ORDER BY s.full_name ASC
+      WHERE s.school_id = $1 ORDER BY COALESCE(s.full_name, s.first_name) ASC
     `, [school.id]);
 
     res.json({ success: true, data: result.rows });
   } catch (e) {
     const result = await query(`
-      SELECT s.*
+      SELECT s.*,
+             COALESCE(s.full_name, CONCAT(s.first_name, ' ', s.last_name), s.first_name, 'Élève') as full_name
       FROM public.school_students s
-      WHERE s.school_id = $1 ORDER BY s.full_name ASC
+      WHERE s.school_id = $1 ORDER BY s.id ASC
     `, [school.id]);
     res.json({ success: true, data: result.rows });
   }
@@ -283,11 +301,16 @@ const addStudent = asyncHandler(async (req, res) => {
 
   await ensureSchoolColumns();
 
-  const { id, fullName, gender, birthDate, classId, isActive } = req.body;
+  const { id, fullName, firstName, lastName, gender, birthDate, classId, isActive } = req.body;
 
-  if (!fullName || fullName.trim() === '') {
-    return res.status(400).json({ success: false, error: 'Le nom complet de l\'élève est requis.' });
+  const rawName = (fullName || (firstName ? `${firstName} ${lastName || ''}`.trim() : '')).trim();
+  if (!rawName) {
+    return res.status(400).json({ success: false, error: 'Le nom de l\'élève est requis.' });
   }
+
+  const nameParts = rawName.split(' ');
+  const computedFirstName = firstName || nameParts[0] || '';
+  const computedLastName = lastName || nameParts.slice(1).join(' ') || '';
 
   let cleanClassId = isValidUUID(classId) ? classId.trim() : null;
   if (cleanClassId) {
@@ -304,9 +327,9 @@ const addStudent = asyncHandler(async (req, res) => {
     if (id && isValidUUID(id)) {
       const result = await query(`
         UPDATE public.school_students
-        SET full_name = $1, gender = $2, birth_date = $3, class_id = $4, is_active = $5, updated_at = NOW()
-        WHERE id = $6 AND school_id = $7 RETURNING *
-      `, [fullName.trim(), cleanGender, cleanBirthDate, cleanClassId, isActive !== undefined ? isActive : true, id, school.id]);
+        SET full_name = $1, first_name = $2, last_name = $3, gender = $4, birth_date = $5, class_id = $6, is_active = $7, updated_at = NOW()
+        WHERE id = $8 AND school_id = $9 RETURNING *
+      `, [rawName, computedFirstName, computedLastName, cleanGender, cleanBirthDate, cleanClassId, isActive !== undefined ? isActive : true, id, school.id]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: 'Élève introuvable.' });
@@ -316,22 +339,22 @@ const addStudent = asyncHandler(async (req, res) => {
 
     const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const result = await query(`
-      INSERT INTO public.school_students (school_id, class_id, full_name, gender, birth_date, access_code)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-    `, [school.id, cleanClassId, fullName.trim(), cleanGender, cleanBirthDate, accessCode]);
+      INSERT INTO public.school_students (school_id, class_id, full_name, first_name, last_name, gender, birth_date, access_code)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
+    `, [school.id, cleanClassId, rawName, computedFirstName, computedLastName, cleanGender, cleanBirthDate, accessCode]);
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     logger.error('Error adding/updating student:', err.message);
 
-    // Robust Fallback in case columns like birth_date or access_code are missing in older schema
+    // Robust Fallback in case columns like first_name or birth_date are missing in older schema
     try {
       if (id && isValidUUID(id)) {
         const result = await query(`
           UPDATE public.school_students
           SET full_name = $1, gender = $2, class_id = $3
           WHERE id = $4 AND school_id = $5 RETURNING *
-        `, [fullName.trim(), cleanGender, cleanClassId, id, school.id]);
+        `, [rawName, cleanGender, cleanClassId, id, school.id]);
         return res.json({ success: true, data: result.rows[0] });
       }
 
@@ -339,7 +362,7 @@ const addStudent = asyncHandler(async (req, res) => {
       const result = await query(`
         INSERT INTO public.school_students (school_id, class_id, full_name, gender, access_code)
         VALUES ($1, $2, $3, $4, $5) RETURNING *
-      `, [school.id, cleanClassId, fullName.trim(), cleanGender, accessCode]);
+      `, [school.id, cleanClassId, rawName, cleanGender, accessCode]);
 
       return res.status(201).json({ success: true, data: result.rows[0] });
     } catch (fallbackErr) {

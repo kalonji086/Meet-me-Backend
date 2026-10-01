@@ -46,22 +46,34 @@ class Server {
     });
 
     this.port = config.server.port;
+    if (!Number.isInteger(this.port) || this.port < 1 || this.port > 65535) {
+      throw new Error(`Invalid PORT value: ${process.env.PORT}`);
+    }
     this.nodeEnv = config.server.nodeEnv;
     this.pool = pool;
+    this.isReady = false;
 
     this.startServer();
   }
 
-  async startServer() {
-    await this.initializeDatabase();
+  startServer() {
     this.initializeMiddlewares();
     this.initializeRoutes();
     this.initializeSocketIO();
     this.initializeErrorHandling();
     this.initializeAutomation();
 
-    this.server.listen(this.port, () => {
-      logger.info(`🚀 Server on port ${this.port}`);
+    this.server.listen(this.port, '0.0.0.0', () => {
+      logger.info(`🚀 Server listening on port ${this.port}`);
+      this.initializeDatabase()
+        .then(() => {
+          this.isReady = true;
+          logger.info('✅ Server is ready');
+        })
+        .catch((error) => {
+          logger.error('❌ Server initialization failed:', error);
+          this.server.close(() => process.exit(1));
+        });
     });
   }
 
@@ -81,7 +93,7 @@ class Server {
       });
     } catch (error) {
       logger.error('❌ DB Error:', error.message);
-      setTimeout(() => process.exit(1), 1000);
+      throw error;
     }
   }
 
@@ -117,8 +129,13 @@ class Server {
 
   initializeRoutes() {
     this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me', version: '93.0.0' }));
-    this.app.get('/api/health', (req, res) => res.json({ status: 'healthy', version: '93.0.0' }));
-
+    this.app.get('/api/health', (req, res) => {
+      const statusCode = this.isReady ? 200 : 503;
+      res.status(statusCode).json({
+        status: this.isReady ? 'healthy' : 'starting',
+        version: '93.0.0'
+      });
+    });
     // Portfolio Public Route
     this.app.get('/portfolio', (req, res) => {
       res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'portfolio.html'));

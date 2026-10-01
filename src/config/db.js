@@ -9,6 +9,7 @@ const pool = new Pool({
   database: config.database.postgres.database,
   user: config.database.postgres.user,
   password: config.database.postgres.password,
+  connectionTimeoutMillis: 10000,
   ssl: {
     rejectUnauthorized: false
   }

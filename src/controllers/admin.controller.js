@@ -5,6 +5,7 @@ const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
 const mailService = require('../services/mail.service');
 const logger = require('../utils/logger');
+const employerController = require('./employer.controller');
 
 /**
  * Helper: Log admin action to Audit Logs
@@ -1691,8 +1692,90 @@ const deleteCampaign = asyncHandler(async (req, res) => {
 });
 
 const getAnalytics = asyncHandler(async (req, res) => {
-  // Logic to gather analytics
-  res.json({ success: true, data: {} });
+  await employerController.ensureEmployerTables();
+
+  const normalizedSchoolStatus = (column) => `translate(
+    regexp_replace(lower(COALESCE(${column}, '')), '[[:space:]_-]+', '', 'g'),
+    'áàâäãéèêëíìîïóòôöõúùûüç',
+    'aaaaaeeeeiiiiooooouuuuc'
+  )`;
+  const approvedStatus = (column = 'status') => `${normalizedSchoolStatus(column)} IN ('approuve', 'approuvee', 'approved', 'approve', 'valide', 'validee')`;
+  const pendingStatus = (column = 'status') => `${normalizedSchoolStatus(column)} IN ('enattente', 'attente', 'pending')`;
+
+  const [schoolTotals, schoolStudents, employmentTotals, monthlyTrend] = await Promise.all([
+    query(`
+      SELECT
+        COUNT(*) FILTER (WHERE ${approvedStatus()}) AS approved_schools,
+        COUNT(*) FILTER (WHERE ${pendingStatus()}) AS pending_school_requests
+      FROM public.school_requests
+    `),
+    query(`
+      SELECT sr.school_name, COUNT(ss.id)::int AS student_count
+      FROM public.school_requests sr
+      LEFT JOIN public.school_students ss ON ss.school_id = sr.id
+      WHERE ${approvedStatus('sr.status')}
+      GROUP BY sr.id, sr.school_name
+      ORDER BY student_count DESC, lower(sr.school_name) ASC
+    `),
+    query(`
+      SELECT
+        COUNT(*)::int AS applications,
+        COUNT(*) FILTER (WHERE lower(COALESCE(status, '')) = 'hired')::int AS hires
+      FROM public.job_applications
+    `),
+    query(`
+      WITH months AS (
+        SELECT generate_series(
+          date_trunc('month', CURRENT_DATE) - INTERVAL '5 months',
+          date_trunc('month', CURRENT_DATE),
+          INTERVAL '1 month'
+        ) AS month_start
+      )
+      SELECT
+        months.month_start,
+        COUNT(DISTINCT p.id)::int AS signups,
+        COUNT(DISTINCT sr.id)::int AS school_requests_created,
+        COUNT(DISTINCT ja.id)::int AS applications
+      FROM months
+      LEFT JOIN public.profiles p
+        ON p.is_global_admin = FALSE
+        AND p.created_at >= months.month_start
+        AND p.created_at < months.month_start + INTERVAL '1 month'
+      LEFT JOIN public.school_requests sr
+        ON sr.created_at >= months.month_start
+        AND sr.created_at < months.month_start + INTERVAL '1 month'
+      LEFT JOIN public.job_applications ja
+        ON ja.applied_at >= months.month_start
+        AND ja.applied_at < months.month_start + INTERVAL '1 month'
+      GROUP BY months.month_start
+      ORDER BY months.month_start ASC
+    `),
+  ]);
+
+  const schools = schoolStudents.rows.map((row) => ({
+    schoolName: row.school_name,
+    studentCount: Number(row.student_count) || 0,
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      approvedSchools: Number(schoolTotals.rows[0].approved_schools) || 0,
+      pendingSchoolRequests: Number(schoolTotals.rows[0].pending_school_requests) || 0,
+      totalStudents: schools.reduce((total, school) => total + school.studentCount, 0),
+      schoolStudents: schools,
+      employment: {
+        applications: Number(employmentTotals.rows[0].applications) || 0,
+        hires: Number(employmentTotals.rows[0].hires) || 0,
+      },
+      monthlyTrend: monthlyTrend.rows.map((row) => ({
+        month: row.month_start,
+        signups: Number(row.signups) || 0,
+        schoolRequestsCreated: Number(row.school_requests_created) || 0,
+        applications: Number(row.applications) || 0,
+      })),
+    },
+  });
 });
 
 const getAuditLogs = asyncHandler(async (req, res) => {

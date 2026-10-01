@@ -46,6 +46,22 @@
         }
         .mod-filter-btn { color: #9ca3af; }
         .mod-filter-btn.active { background-color: #111; color: #fff; box-shadow: 0 10px 20px -5px rgba(0,0,0,0.2); }
+        .stats-dashboard { --stats-ink: #172235; --stats-muted: #627087; --stats-line: #e5eaf0; --stats-brand: #673ab7; --stats-brand-green: #00a884; color: var(--stats-ink); }
+        .stats-header { position: relative; border-left: 4px solid var(--stats-brand); padding: .75rem 0 .75rem 1rem; }
+        .stats-header::after { position: absolute; bottom: .75rem; left: -4px; width: 4px; height: 1.5rem; background: var(--stats-brand-green); content: ""; }
+        .stats-header-copy { background: linear-gradient(100deg, rgba(103,58,183,.055), rgba(0,168,132,.025) 72%, transparent); }
+        .stats-panel { background: #fff; border: 1px solid var(--stats-line); border-radius: 1.25rem; box-shadow: 0 12px 30px rgba(23,34,53,.045); }
+        .stats-kpi { min-height: 112px; border-left: 3px solid var(--kpi-color, #7c3aed); }
+        .stats-chart-wrap { position: relative; height: 300px; }
+        .stats-chart-wrap.tall { height: 390px; }
+        .stats-chart-wrap.stats-school-chart-wrap { height: 390px; }
+        .stats-empty { display: flex; min-height: 160px; align-items: center; justify-content: center; text-align: center; color: var(--stats-muted); }
+        .stats-empty[hidden] { display: none; }
+        @media (max-width: 640px) {
+            .stats-chart-wrap, .stats-chart-wrap.tall { height: 270px; }
+            .stats-chart-wrap.stats-school-chart-wrap { height: var(--stats-school-chart-height, 270px); }
+            .stats-kpi { min-height: 96px; }
+        }
     </style>
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
@@ -849,43 +865,63 @@
                 </div>
             </div>
 
-            <div id="section-stats" class="animate-fade-in">
-                    <!-- Première rangée : Statistiques Globales existantes -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8 mb-6" id="stats-summary">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
-                            <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users" class="w-7 h-7 text-purple-600"></i></div>
-                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Utilisateurs</p><h4 id="stat-users" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
-                        </div>
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
-                            <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="zap" class="w-7 h-7 text-green-600"></i></div>
-                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">En ligne</p><h4 id="stat-online" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
-                        </div>
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
-                            <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="message-circle" class="w-7 h-7 text-blue-600"></i></div>
-                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Messages</p><h4 id="stat-messages" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
-                        </div>
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
-                            <div class="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="users-2" class="w-7 h-7 text-orange-600"></i></div>
-                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Groupes</p><h4 id="stat-groups" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
-                        </div>
+            <div id="section-stats" class="stats-dashboard animate-fade-in space-y-6">
+                <header class="stats-header flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div class="stats-header-copy rounded-r-xl py-2 pr-4">
+                        <p class="text-xs font-bold uppercase tracking-[.18em] text-indigo-600">Vue d'ensemble · Meet Me</p>
+                        <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">Statistiques globales</h2>
+                        <p class="mt-1 text-sm text-slate-500">Activité réelle de la plateforme, des écoles et de l'emploi.</p>
                     </div>
+                    <button id="stats-refresh" type="button" onclick="loadStats()" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-wait disabled:opacity-60">
+                        <i data-lucide="refresh-cw" class="h-4 w-4"></i><span>Actualiser</span>
+                    </button>
+                </header>
 
-                    <!-- Deuxième rangée : Nouvelles Statistiques d'Écosystème (Emplois, Markets) -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-8 mb-10">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
-                            <div class="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="briefcase" class="w-7 h-7 text-indigo-600"></i></div>
-                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Offres d'Emploi</p><h4 id="stat-jobs" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
-                        </div>
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center transition-all hover:scale-105">
-                            <div class="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mr-5"><i data-lucide="shopping-bag" class="w-7 h-7 text-amber-600"></i></div>
-                            <div><p class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Annonces Market</p><h4 id="stat-market" class="text-3xl font-black text-gray-900 tracking-tighter">0</h4></div>
-                        </div>
+                <div id="stats-error" class="hidden rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert"></div>
+                <div id="stats-loading" class="hidden rounded-xl border border-slate-200 bg-white px-4 py-5 text-sm text-slate-500" role="status">Chargement des statistiques…</div>
+
+                <section aria-label="Indicateurs clés">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-[.16em] text-slate-500">Indicateurs clés</h3>
+                        <span id="stats-freshness" class="text-xs font-medium text-slate-500" aria-live="polite">Données non chargées</span>
                     </div>
-                    <div class="bg-white p-6 lg:p-10 rounded-[2.5rem] lg:rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center">
-                         <div class="w-full max-w-[320px] md:max-w-[450px] aspect-square"><canvas id="overviewMasterChart"></canvas></div>
-                         <div id="master-legend" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 w-full max-w-2xl"></div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" id="stats-summary">
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#6957d5"><span class="grid h-11 w-11 place-items-center rounded-xl bg-violet-50 text-violet-700"><i data-lucide="users" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Utilisateurs</p><h4 id="stat-users" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#0b9876"><span class="grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="activity" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">En ligne</p><h4 id="stat-online" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#3486c5"><span class="grid h-11 w-11 place-items-center rounded-xl bg-sky-50 text-sky-700"><i data-lucide="message-circle" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Messages</p><h4 id="stat-messages" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#d08430"><span class="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-amber-700"><i data-lucide="users-round" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Groupes</p><h4 id="stat-groups" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#4d69b0"><span class="grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-indigo-700"><i data-lucide="briefcase-business" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Offres d'emploi</p><h4 id="stat-jobs" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#bc8130"><span class="grid h-11 w-11 place-items-center rounded-xl bg-orange-50 text-orange-700"><i data-lucide="store" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Annonces Market</p><h4 id="stat-market" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#17876c"><span class="grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-teal-700"><i data-lucide="school" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Écoles approuvées</p><h4 id="stat-schools-approved" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#cc8b26"><span class="grid h-11 w-11 place-items-center rounded-xl bg-yellow-50 text-yellow-800"><i data-lucide="hourglass" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Demandes en attente</p><h4 id="stat-schools-pending" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#3978a8"><span class="grid h-11 w-11 place-items-center rounded-xl bg-cyan-50 text-cyan-800"><i data-lucide="graduation-cap" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Élèves · écoles approuvées</p><h4 id="stat-students-total" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#6355be"><span class="grid h-11 w-11 place-items-center rounded-xl bg-violet-50 text-violet-700"><i data-lucide="file-user" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Candidatures</p><h4 id="stat-applications" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
+                        <article class="stats-panel stats-kpi flex items-center gap-4 p-5" style="--kpi-color:#24815e"><span class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-green-700"><i data-lucide="badge-check" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold text-slate-500">Recrutements</p><h4 id="stat-hires" class="mt-1 text-2xl font-extrabold tracking-tight">—</h4></div></article>
                     </div>
+                </section>
+
+                <section class="stats-panel p-5 sm:p-7" aria-labelledby="stats-trend-title">
+                    <div class="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div><h3 id="stats-trend-title" class="text-lg font-bold text-slate-900">Évolution sur six mois</h3><p class="text-sm text-slate-500">Inscriptions, demandes d'école créées et candidatures par mois.</p></div>
+                        <span class="text-xs font-medium text-slate-400">Mois calendaires · données réelles</span>
+                    </div>
+                    <div id="stats-trend-empty" class="stats-empty" hidden>Aucune inscription, demande d'école ou candidature enregistrée sur ces six mois.</div>
+                    <div id="stats-trend-wrap" class="stats-chart-wrap"><canvas id="stats-trend-chart" aria-label="Tendance mensuelle des inscriptions, demandes d'école créées et candidatures"></canvas></div>
+                </section>
+
+                <div class="grid grid-cols-1 gap-6 xl:grid-cols-5">
+                    <section class="stats-panel p-5 sm:p-7 xl:col-span-3" aria-labelledby="stats-school-title">
+                        <div class="mb-5"><h3 id="stats-school-title" class="text-lg font-bold text-slate-900">Effectifs par école</h3><p class="text-sm text-slate-500">Élèves inscrits dans chaque école approuvée, du plus grand au plus petit effectif.</p><p id="stats-school-meta" class="mt-2 text-xs font-medium text-slate-400"></p></div>
+                        <div id="stats-schools-empty" class="stats-empty hidden">Aucune école approuvée à comparer pour le moment.</div>
+                        <div class="stats-chart-wrap tall stats-school-chart-wrap"><canvas id="stats-school-chart" aria-label="Nombre d'élèves dans chaque école approuvée"></canvas></div>
+                    </section>
+                    <section class="stats-panel p-5 sm:p-7 xl:col-span-2" aria-labelledby="stats-employment-title">
+                        <div class="mb-5"><h3 id="stats-employment-title" class="text-lg font-bold text-slate-900">Parcours emploi</h3><p class="text-sm text-slate-500">Total des offres, candidatures reçues et embauches.</p></div>
+                        <div id="stats-employment-empty" class="stats-empty" hidden>Aucune offre, candidature ou embauche enregistrée pour le moment.</div>
+                        <div id="stats-employment-wrap" class="stats-chart-wrap"><canvas id="stats-employment-chart" aria-label="Comparaison des offres d'emploi, candidatures et embauches"></canvas></div>
+                    </section>
                 </div>
+            </div>
 
                 <div id="section-users" class="hidden animate-fade-in">
                     <div class="flex justify-between items-center mb-6">
@@ -1614,9 +1650,22 @@
         let token = localStorage.getItem('admin_token');
         let socket = null;
         let campaignEditor = null;
-        const charts = { master: null };
+        let statsLoadSequence = 0;
+        let lastStatsSuccessAt = null;
+        const charts = { trend: null, schools: null, employment: null };
+        let statsSchoolRows = [];
+        let statsSchoolMobileMode = null;
+        let statsSchoolResizeTimer = null;
         let notifications_list = [];
         let unread_notif_count = 0;
+
+        window.addEventListener('resize', () => {
+            window.clearTimeout(statsSchoolResizeTimer);
+            statsSchoolResizeTimer = window.setTimeout(() => {
+                const isMobile = window.matchMedia('(max-width: 640px)').matches;
+                if (statsSchoolRows.length && isMobile !== statsSchoolMobileMode) renderStatsSchoolChart();
+            }, 150);
+        });
 
         const getFullUrl = (url) => {
             if(!url || url === 'null') return 'https://placehold.co/100x100?text=None';
@@ -4067,39 +4116,187 @@
             } catch (e) { alert("Erreur."); }
         }
 
-        async function loadStats() {
-            try {
-                const res = await axios.get(`${API_URL}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } });
-                const d = res.data.data;
-                document.getElementById('stat-users').innerText = d.totalUsers;
-                document.getElementById('stat-online').innerText = d.onlineUsers;
-                document.getElementById('stat-messages').innerText = d.totalMessages;
-                document.getElementById('stat-groups').innerText = d.totalGroups;
+        function renderStatsSchoolChart() {
+            const allSchools = statsSchoolRows;
+            const isMobile = window.matchMedia('(max-width: 640px)').matches;
+            const topSchools = allSchools.slice(0, isMobile ? 8 : 20);
+            const schoolEmpty = document.getElementById('stats-schools-empty');
+            const schoolCanvas = document.getElementById('stats-school-chart');
+            const schoolWrap = schoolCanvas.parentElement;
+            const schoolMeta = document.getElementById('stats-school-meta');
+            const count = (value) => Number(value).toLocaleString('fr-FR');
 
-                // Assignation des 2 nouvelles statistiques d'écosystème avec sécurité
-                if (document.getElementById('stat-jobs')) document.getElementById('stat-jobs').innerText = d.totalJobs || 0;
-                if (document.getElementById('stat-market')) document.getElementById('stat-market').innerText = d.totalMarket || 0;
+            statsSchoolMobileMode = isMobile;
+            schoolEmpty.classList.toggle('hidden', allSchools.length > 0);
+            schoolWrap.classList.toggle('hidden', allSchools.length === 0);
+            schoolWrap.style.setProperty('--stats-school-chart-height', Math.max(140, topSchools.length * 34 + 54) + 'px');
+            if (schoolMeta) {
+                const totalStudents = allSchools.reduce((total, school) => total + (Number(school.studentCount) || 0), 0);
+                const schoolLabel = allSchools.length === 1 ? 'école' : 'écoles';
+                schoolMeta.textContent = 'Top ' + topSchools.length + ' sur ' + count(allSchools.length) + ' ' + schoolLabel + ' · ' + count(totalStudents) + ' élèves au total';
+            }
+            if (charts.schools) charts.schools.destroy();
+            charts.schools = null;
 
-                const ctx = document.getElementById('overviewMasterChart').getContext('2d');
-                if (charts.master) charts.master.destroy();
-                // Ajout des couleurs spécifiques pour inclure de manière fluide les nouvelles statistiques (Emplois, Market)
-                const colors = ['#8B5CF6', '#10B981', '#F97316', '#3B82F6', '#8B5CF6', '#F59E0B'];
-                charts.master = new Chart(ctx, {
-                    type: 'polarArea',
+            if (topSchools.length) {
+                charts.schools = new Chart(schoolCanvas, {
+                    type: 'bar',
                     data: {
-                        labels: ['Utilisateurs', 'En ligne', 'Groupes', 'Messages', 'Emplois', 'Market'],
-                        datasets: [{
-                            data: [d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalJobs || 0, d.totalMarket || 0],
-                            backgroundColor: colors.map(c => c + 'CC'),
-                            borderColor: '#fff',
-                            borderWidth: 4
-                        }]
+                        labels: topSchools.map((school) => school.schoolName),
+                        datasets: [{ label: 'Élèves inscrits', data: topSchools.map((school) => Number(school.studentCount) || 0), backgroundColor: '#673ab7', hoverBackgroundColor: '#00a884', borderRadius: 5, maxBarThickness: isMobile ? 18 : 22 }]
+                    },
+                    options: {
+                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { callbacks: { title: (items) => topSchools[items[0] && items[0].dataIndex] ? topSchools[items[0].dataIndex].schoolName : '', label: (item) => count(item.raw) + ' élèves' } } },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { precision: 0, color: '#627087' }, grid: { color: '#edf0f4' } },
+                            y: { grid: { display: false }, ticks: { color: '#425168', autoSkip: false } }
+                        }
                     }
                 });
-                const legend = document.getElementById('master-legend');
-                legend.innerHTML = ['Utilisateurs', 'Connectés', 'Groupes Chat', 'Messages', 'Offres d\'Emploi', 'Annonces Market'].map((l, i) => `<div class="bg-gray-50 p-6 rounded-3xl flex justify-between border border-gray-100 shadow-sm"><div><div class="w-3 h-3 rounded-full mb-1" style="background-color: ${colors[i]}"></div><p class="text-[10px] font-black uppercase text-gray-400">${l}</p></div><p class="text-2xl font-black text-gray-900">${[d.totalUsers, d.onlineUsers, d.totalGroups, d.totalMessages, d.totalJobs || 0, d.totalMarket || 0][i]}</p></div>`).join('');
+            }
+        }
+
+        async function loadStats() {
+            const requestId = ++statsLoadSequence;
+            const refreshButton = document.getElementById('stats-refresh');
+            const loadingState = document.getElementById('stats-loading');
+            const errorState = document.getElementById('stats-error');
+            const freshnessState = document.getElementById('stats-freshness');
+            if (refreshButton) refreshButton.disabled = true;
+            if (loadingState) loadingState.classList.remove('hidden');
+            if (errorState) {
+                errorState.classList.add('hidden');
+                errorState.textContent = '';
+            }
+
+            try {
+                const headers = { ['Author' + 'ization']: ['Bear' + 'er ', token].join('') };
+                const base = API_URL + '/admin/';
+                const [statsResponse, analyticsResponse] = await Promise.all([
+                    axios.get(base + 'stats', { headers }),
+                    axios.get(base + 'analytics', { headers })
+                ]);
+                const stats = statsResponse.data && statsResponse.data.data;
+                const analytics = analyticsResponse.data && analyticsResponse.data.data;
+                const requiredStats = ['totalUsers', 'onlineUsers', 'totalMessages', 'totalGroups', 'totalJobs', 'totalMarket'];
+                if (!statsResponse.data || !statsResponse.data.success || !analyticsResponse.data || !analyticsResponse.data.success || !stats || !analytics ||
+                    requiredStats.some((key) => !Number.isFinite(Number(stats[key]))) ||
+                    !Array.isArray(analytics.schoolStudents) || !Array.isArray(analytics.monthlyTrend) ||
+                    !analytics.employment ||
+                    ['approvedSchools', 'pendingSchoolRequests', 'totalStudents'].some((key) => !Number.isFinite(Number(analytics[key]))) ||
+                    ['applications', 'hires'].some((key) => !Number.isFinite(Number(analytics.employment[key]))) ||
+                    analytics.monthlyTrend.length !== 6 ||
+                    analytics.monthlyTrend.some((row) => !row || !Number.isFinite(Number(row.signups)) || !Number.isFinite(Number(row.schoolRequestsCreated)) || !Number.isFinite(Number(row.applications)) || !row.month) ||
+                    analytics.schoolStudents.some((school) => !school || typeof school.schoolName !== 'string' || !Number.isFinite(Number(school.studentCount)))) {
+                    throw new Error((statsResponse.data && statsResponse.data.error) || (analyticsResponse.data && analyticsResponse.data.error) || 'R\u00e9ponse de statistiques invalide.');
+                }
+                if (requestId !== statsLoadSequence) return;
+
+                const count = (value) => Number(value).toLocaleString('fr-FR');
+                document.getElementById('stat-users').textContent = count(stats.totalUsers);
+                document.getElementById('stat-online').textContent = count(stats.onlineUsers);
+                document.getElementById('stat-messages').textContent = count(stats.totalMessages);
+                document.getElementById('stat-groups').textContent = count(stats.totalGroups);
+                document.getElementById('stat-jobs').textContent = count(stats.totalJobs);
+                document.getElementById('stat-market').textContent = count(stats.totalMarket);
+                document.getElementById('stat-schools-approved').textContent = count(analytics.approvedSchools);
+                document.getElementById('stat-schools-pending').textContent = count(analytics.pendingSchoolRequests);
+                document.getElementById('stat-students-total').textContent = count(analytics.totalStudents);
+                document.getElementById('stat-applications').textContent = count(analytics.employment.applications);
+                document.getElementById('stat-hires').textContent = count(analytics.employment.hires);
+                Object.keys(charts).forEach((key) => {
+                    if (charts[key]) charts[key].destroy();
+                    charts[key] = null;
+                });
+
+                const trendRows = analytics.monthlyTrend;
+                const trendHasData = trendRows.some((row) => Number(row.signups) > 0 || Number(row.schoolRequestsCreated) > 0 || Number(row.applications) > 0);
+                document.getElementById('stats-trend-empty').hidden = trendHasData;
+                document.getElementById('stats-trend-wrap').classList.toggle('hidden', !trendHasData);
+                const trendLabels = trendRows.map((row) => {
+                    const monthKey = String(row.month).slice(0, 7);
+                    return new Intl.DateTimeFormat('fr-FR', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+                        .format(new Date(monthKey + '-01T00:00:00Z'));
+                });
+                if (trendHasData) {
+                    charts.trend = new Chart(document.getElementById('stats-trend-chart'), {
+                    type: 'line',
+                    data: {
+                        labels: trendLabels,
+                        datasets: [
+                            { label: 'Inscriptions', data: trendRows.map((row) => Number(row.signups) || 0), yAxisID: 'y', borderColor: '#6658c9', backgroundColor: 'rgba(102,88,201,.12)', pointBackgroundColor: '#6658c9', tension: .3, fill: true },
+                            { label: 'Demandes d’école créées', data: trendRows.map((row) => Number(row.schoolRequestsCreated) || 0), yAxisID: 'yRequests', borderColor: '#14866e', backgroundColor: 'rgba(20,134,110,.08)', pointBackgroundColor: '#14866e', tension: .3, fill: false },
+                            { label: 'Candidatures', data: trendRows.map((row) => Number(row.applications) || 0), yAxisID: 'y', borderColor: '#d18b32', backgroundColor: 'rgba(209,139,50,.08)', pointBackgroundColor: '#d18b32', tension: .3, fill: false }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 7, padding: 18, color: '#627087', font: { family: 'Inter', size: 11 } } } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: '#627087' } },
+                            y: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: 'Inscriptions et candidatures', color: '#627087' }, ticks: { precision: 0, color: '#627087' }, grid: { color: '#edf0f4' } },
+                            yRequests: { type: 'linear', position: 'right', beginAtZero: true, title: { display: true, text: 'Demandes d’école', color: '#14866e' }, ticks: { precision: 0, color: '#14866e' }, grid: { drawOnChartArea: false } }
+                        }
+                    }
+                    });
+                }
+
+                statsSchoolRows = analytics.schoolStudents.slice().sort((a, b) => Number(b.studentCount) - Number(a.studentCount));
+                renderStatsSchoolChart();
+
+                const employmentValues = [Number(stats.totalJobs), Number(analytics.employment.applications), Number(analytics.employment.hires)];
+                const employmentHasData = employmentValues.some((value) => value > 0);
+                document.getElementById('stats-employment-empty').hidden = employmentHasData;
+                document.getElementById('stats-employment-wrap').classList.toggle('hidden', !employmentHasData);
+                if (employmentHasData) {
+                    charts.employment = new Chart(document.getElementById('stats-employment-chart'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Offres (total)', 'Candidatures', 'Embauches'],
+                        datasets: [{ label: 'Total', data: employmentValues, backgroundColor: ['#526ba9', '#8069cc', '#2b8a65'], borderRadius: 6, maxBarThickness: 38 }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (item) => count(item.raw) + ' au total' } } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: '#627087', maxRotation: 0 } },
+                            y: { beginAtZero: true, ticks: { precision: 0, color: '#627087' }, grid: { color: '#edf0f4' } }
+                        }
+                    }
+                    });
+                }
                 lucide.createIcons();
-            } catch (e) {}
+                lastStatsSuccessAt = new Date();
+                if (freshnessState) {
+                    freshnessState.textContent = 'Mis à jour ' + lastStatsSuccessAt.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+                    freshnessState.classList.remove('text-amber-700');
+                    freshnessState.classList.add('text-slate-500');
+                }
+            } catch (e) {
+                if (requestId !== statsLoadSequence) return;
+                const message = (e.response && e.response.data && e.response.data.error) || e.message || 'Impossible de charger les statistiques.';
+                if (errorState) {
+                    errorState.textContent = "Les statistiques n'ont pas pu \u00eatre actualis\u00e9es : " + message;
+                    errorState.classList.remove('hidden');
+                }
+                if (freshnessState) {
+                    if (lastStatsSuccessAt) {
+                        freshnessState.textContent = 'Données potentiellement périmées · dernière mise à jour ' + lastStatsSuccessAt.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+                    } else {
+                        freshnessState.textContent = 'Données non chargées';
+                    }
+                    freshnessState.classList.remove('text-slate-500');
+                    freshnessState.classList.add('text-amber-700');
+                }
+                showToast('Erreur statistiques', 'Impossible de charger les statistiques.', 'circle-alert');
+            } finally {
+                if (requestId === statsLoadSequence) {
+                    if (loadingState) loadingState.classList.add('hidden');
+                    if (refreshButton) refreshButton.disabled = false;
+                }
+            }
         }
 
         function timeAgo(date) {

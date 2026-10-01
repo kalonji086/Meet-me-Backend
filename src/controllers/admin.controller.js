@@ -215,6 +215,8 @@ const ensureAdminTables = async () => {
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS collab_end_at TIMESTAMP WITH TIME ZONE');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS collab_deleted_at TIMESTAMP WITH TIME ZONE');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_collaborator BOOLEAN DEFAULT FALSE');
+  await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_number TEXT');
+  await query("ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS device_info JSONB DEFAULT '{}'::jsonb");
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS gender TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS country TEXT');
   await query('ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS province TEXT');

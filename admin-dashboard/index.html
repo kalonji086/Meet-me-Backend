@@ -4629,20 +4629,39 @@
         // --- GESTION DYNAMIQUE DES COLONNES UTILISATEURS ---
         const USER_COLUMNS = [
             { id: 'user', label: 'Utilisateur', alwaysVisible: true },
-            { id: 'phone', label: 'Téléphone' },
-            { id: 'gender', label: 'Sexe' },
-            { id: 'age', label: 'Âge' },
-            { id: 'country', label: 'Pays' },
-            { id: 'province', label: 'Province' },
-            { id: 'city', label: 'Ville' },
-            { id: 'commune', label: 'Commune' },
-            { id: 'device', label: 'Appareil' },
+            { id: 'phone', label: 'Téléphone', alwaysVisible: true },
+            { id: 'gender', label: 'Sexe', alwaysVisible: true },
+            { id: 'age', label: 'Âge', alwaysVisible: true },
+            { id: 'country', label: 'Pays', alwaysVisible: true },
+            { id: 'province', label: 'Province', alwaysVisible: true },
+            { id: 'city', label: 'Ville', alwaysVisible: true },
+            { id: 'commune', label: 'Commune', alwaysVisible: true },
+            { id: 'device', label: 'Appareil', alwaysVisible: true },
             { id: 'status', label: 'Statut' },
             { id: 'security', label: 'Sécurité' },
             { id: 'actions', label: 'Contrôle', alwaysVisible: true, align: 'right' }
         ];
 
-        let visibleColumns = JSON.parse(localStorage.getItem('admin_user_columns')) || USER_COLUMNS.map(c => c.id);
+        const savedUserColumns = (() => {
+            try {
+                const saved = JSON.parse(localStorage.getItem('admin_user_columns') || 'null');
+                return Array.isArray(saved) ? saved.filter(id => USER_COLUMNS.some(column => column.id === id)) : [];
+            } catch (error) {
+                console.warn('Préférences de colonnes utilisateur invalides; utilisation des valeurs par défaut.', error);
+                return [];
+            }
+        })();
+        let visibleColumns = [...new Set([
+            ...USER_COLUMNS.filter(column => column.alwaysVisible).map(column => column.id),
+            ...savedUserColumns
+        ])];
+        localStorage.setItem('admin_user_columns', JSON.stringify(visibleColumns));
+
+        function escapeUserCell(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+        }
 
         function toggleColumnSelector() {
             const selector = document.getElementById('column-selector');
@@ -4663,6 +4682,7 @@
         }
 
         function toggleColumnVisibility(columnId) {
+            if (USER_COLUMNS.some(column => column.id === columnId && column.alwaysVisible)) return;
             if (visibleColumns.includes(columnId)) {
                 visibleColumns = visibleColumns.filter(id => id !== columnId);
             } else {
@@ -4684,17 +4704,33 @@
             renderUsersTableHeader(); // Ensure header is correct
             try {
                 const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
-                document.getElementById('users-table-body').innerHTML = res.data.data.map(u => {
-                    const info = u.device_info || {};
-                    const deviceLabel = info.brand ? `${info.brand} ${info.model || ''}` : 'Appareil Inconnu';
+                const users = Array.isArray(res.data.data) ? res.data.data : [];
+                document.getElementById('users-table-body').innerHTML = users.map(u => {
+                    let info = u.device_info || {};
+                    if (typeof info === 'string') {
+                        try {
+                            info = JSON.parse(info);
+                        } catch (error) {
+                            console.warn(`Informations appareil invalides pour l'utilisateur ${u.id}.`, error);
+                            info = {};
+                        }
+                    }
+                    if (!info || typeof info !== 'object' || Array.isArray(info)) info = {};
+                    const deviceLabel = info.brand
+                        ? `${info.brand} ${info.model || ''}`.trim()
+                        : (info.model || 'Appareil Inconnu');
                     const osLabel = info.os ? `${info.os} ${info.version || ''}` : 'OS Inconnu';
 
                     // Calcul de l'âge
-                    let age = 'N/A';
+                    let age = 'Non renseigné';
                     if (u.birth_date) {
-                        const birth = new Date(u.birth_date);
-                        const diff = Date.now() - birth.getTime();
-                        age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)) + ' ans';
+                        const [year, month, day] = String(u.birth_date).slice(0, 10).split('-').map(Number);
+                        const today = new Date();
+                        if (year && month && day) {
+                            let years = today.getFullYear() - year;
+                            if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) years--;
+                            if (years >= 0) age = `${years} ans`;
+                        }
                     }
 
                     const cols = [];
@@ -4705,8 +4741,8 @@
                                 <div class="flex items-center">
                                     <img src="${getFullUrl(u.avatar_url)}" class="w-11 h-11 rounded-xl mr-4 shadow-md">
                                     <div>
-                                        <p class="font-bold text-sm text-gray-800">${u.full_name}</p>
-                                        <p class="text-[10px] text-gray-400 font-bold">${u.email}</p>
+                                        <p class="font-bold text-sm text-gray-800">${escapeUserCell(u.full_name)}</p>
+                                        <p class="text-[10px] text-gray-400 font-bold">${escapeUserCell(u.email)}</p>
                                         ${u.is_verified ? '<span class="flex items-center text-[8px] font-black text-blue-500 uppercase tracking-tighter mt-1"><i data-lucide="badge-check" class="w-2.5 h-2.5 mr-1 fill-blue-500 text-white"></i> Vérifié</span>' : ''}
                                     </div>
                                 </div>
@@ -4715,11 +4751,12 @@
                     }
 
                     if (visibleColumns.includes('phone')) {
-                        cols.push(`<td class="px-8 py-5"><p class="text-xs font-bold text-gray-700">${u.phone_number || 'N/A'}</p></td>`);
+                        cols.push(`<td class="px-8 py-5"><p class="text-xs font-bold text-gray-700">${escapeUserCell(u.phone_number || u.phone || 'Non renseigné')}</p></td>`);
                     }
 
                     if (visibleColumns.includes('gender')) {
-                        cols.push(`<td class="px-8 py-5"><span class="text-[10px] font-black uppercase ${u.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}">${u.gender === 'M' ? 'Homme' : (u.gender === 'F' ? 'Femme' : 'Inconnu')}</span></td>`);
+                        const gender = String(u.gender || '').toUpperCase();
+                        cols.push(`<td class="px-8 py-5"><span class="text-[10px] font-black uppercase ${gender === 'M' ? 'text-blue-500' : (gender === 'F' ? 'text-pink-500' : 'text-gray-400')}">${gender === 'M' ? 'Homme' : (gender === 'F' ? 'Femme' : 'Non renseigné')}</span></td>`);
                     }
 
                     if (visibleColumns.includes('age')) {
@@ -4727,19 +4764,19 @@
                     }
 
                     if (visibleColumns.includes('country')) {
-                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.country || 'N/A'}</td>`);
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${escapeUserCell(u.country || 'Non renseigné')}</td>`);
                     }
 
                     if (visibleColumns.includes('province')) {
-                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.province || 'N/A'}</td>`);
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${escapeUserCell(u.province || 'Non renseigné')}</td>`);
                     }
 
                     if (visibleColumns.includes('city')) {
-                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.city || 'N/A'}</td>`);
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${escapeUserCell(u.city || 'Non renseigné')}</td>`);
                     }
 
                     if (visibleColumns.includes('commune')) {
-                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${u.commune || 'N/A'}</td>`);
+                        cols.push(`<td class="px-8 py-5 text-[10px] font-black uppercase text-gray-800">${escapeUserCell(u.commune || 'Non renseigné')}</td>`);
                     }
 
                     if (visibleColumns.includes('device')) {
@@ -4748,8 +4785,8 @@
                                 <div class="flex items-center text-gray-600">
                                     <div class="p-2 bg-gray-50 rounded-lg mr-3"><i data-lucide="smartphone" class="w-4 h-4 text-gray-400"></i></div>
                                     <div>
-                                        <p class="text-[10px] font-black uppercase tracking-tight">${deviceLabel}</p>
-                                        <p class="text-[9px] font-bold text-gray-400 uppercase">${osLabel}</p>
+                                        <p class="text-[10px] font-black uppercase tracking-tight">${escapeUserCell(deviceLabel)}</p>
+                                        <p class="text-[9px] font-bold text-gray-400 uppercase">${escapeUserCell(osLabel)}</p>
                                     </div>
                                 </div>
                             </td>
@@ -4787,8 +4824,13 @@
                     }
 
                     return `<tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">${cols.join('')}</tr>`;
-                }).join(''); lucide.createIcons();
-            } catch (e) {}
+                }).join('') || `<tr><td colspan="${USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length}" class="px-8 py-10 text-center text-sm font-semibold text-gray-400">Aucun utilisateur trouvé.</td></tr>`;
+                lucide.createIcons();
+            } catch (e) {
+                console.error('Erreur lors du chargement des utilisateurs Admin:', e);
+                const body = document.getElementById('users-table-body');
+                body.innerHTML = `<tr><td colspan="${USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length}" class="px-8 py-10 text-center text-sm font-semibold text-red-500">Impossible de charger les utilisateurs. Vérifiez la connexion et les autorisations, puis réessayez.</td></tr>`;
+            }
         }
 
         async function toggleUserBadge(id, verify) {

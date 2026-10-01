@@ -301,24 +301,27 @@
                     <div class="p-8 border-b border-gray-50 bg-gray-50/30 flex gap-4">
                         <div class="flex-1 bg-white border border-gray-200 rounded-xl flex items-center px-4">
                             <i data-lucide="search" class="w-4 h-4 text-gray-400 mr-3"></i>
-                            <input type="text" placeholder="Rechercher un compte (Nom, Email)..." class="flex-1 py-3 text-sm font-bold outline-none">
+                            <input id="accounts-search" type="text" placeholder="Rechercher un compte (Nom, Email)..." oninput="renderManagedAccounts()" class="flex-1 py-3 text-sm font-bold outline-none">
                         </div>
-                        <select class="bg-white border border-gray-200 rounded-xl px-6 text-xs font-black uppercase outline-none">
-                            <option>Tous les rôles</option>
-                            <option>Étudiant</option>
-                            <option>Parent</option>
-                            <option>Enseignant</option>
-                            <option>Directeur</option>
-                            <option>Promoteur</option>
+                        <select id="accounts-role-filter" onchange="renderManagedAccounts()" class="bg-white border border-gray-200 rounded-xl px-6 text-xs font-black uppercase outline-none">
+                            <option value="">Toutes les catégories</option>
+                            <option value="member">Utilisateur</option>
+                            <option value="parent">Parent</option>
+                            <option value="student">Élève</option>
+                            <option value="school_staff">Personnel scolaire</option>
+                            <option value="school_promoter">Promoteur d’école</option>
+                            <option value="employer">Employeur</option>
+                            <option value="merchant">Commerçant</option>
+                            <option value="collaborator">Collaborateur Admin</option>
                         </select>
                     </div>
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-gray-50 border-b border-gray-100">
                             <tr>
                                 <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Utilisateur</th>
-                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Rôle principal</th>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Catégorie</th>
                                 <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Établissement</th>
-                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Modules Actifs</th>
+                                <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Statut</th>
                                 <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date Enrôlement</th>
                                 <th class="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
                             </tr>
@@ -4709,7 +4712,7 @@
             }
         }
 
-        async function showNewAccountModal() {
+        async function showNewAccountModalLegacy() {
             try {
                 const roles = [
                     { id: 'admin', label: 'Administrateur' },
@@ -4762,7 +4765,7 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Mot de passe temporaire</label>
-                                <input type="text" id="acc-pass" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" value="MeetMe2024">
+                                <input type="text" id="acc-pass" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" value="">
                             </div>
                         </div>
                     </div>
@@ -4792,7 +4795,7 @@
             } catch (e) { toast("Erreur chargement données", "error"); }
         }
 
-        async function loadAccounts() {
+        async function loadLegacyAccounts() {
             try {
                 const res = await axios.get(`${API_URL}/admin/accounts`, { headers: { Authorization: `Bearer ${token}` } });
                 const accounts = res.data.data;
@@ -4830,6 +4833,259 @@
                 `).join('');
                 lucide.createIcons();
             } catch (e) { toast("Erreur chargement comptes", "error"); }
+        }
+
+        let managedAccountsCache = [];
+
+        function getManagedAccountSelection() {
+            const [accountType, role] = (document.getElementById('managed-account-type')?.value || 'member').split(':');
+            return { accountType, role: role || '' };
+        }
+
+        function escapeManagedAccountHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[character]);
+        }
+
+        function renderManagedAccountFields() {
+            const { accountType, role } = getManagedAccountSelection();
+            document.querySelectorAll('[data-managed-fields]').forEach((section) => {
+                const types = section.dataset.managedFields.split(',');
+                section.classList.toggle('hidden', !types.includes(accountType));
+            });
+            const emailField = document.querySelector('[data-managed-email]');
+            if (emailField) emailField.classList.toggle('hidden', accountType === 'student');
+
+            if (accountType === 'collaborator') {
+                const modulesByRole = {
+                    admin: ['stats', 'users', 'groups', 'market', 'emploi'],
+                    moderator: ['users', 'groups', 'market'],
+                    support: ['support', 'users']
+                };
+                const allowedModules = modulesByRole[role] || [];
+                document.querySelectorAll('.acc-module-checkbox').forEach((checkbox) => {
+                    checkbox.checked = allowedModules.includes(checkbox.value);
+                });
+            }
+        }
+
+        async function showNewAccountModal() {
+            try {
+                const schoolRes = await axios.get(`${API_URL}/admin/school-requests`, { headers: { Authorization: 'Bearer ' + token } });
+                const approvedSchools = (schoolRes.data.data || []).filter((school) =>
+                    ['approuve', 'approuvé', 'approved'].includes(String(school.status || '').toLowerCase())
+                );
+                const schoolOptions = approvedSchools.map((school) =>
+                    `<option value="${escapeManagedAccountHtml(school.id)}">${escapeManagedAccountHtml(school.school_name)}</option>`
+                ).join('');
+                const modules = [
+                    { id: 'stats', label: 'Statistiques' }, { id: 'users', label: 'Utilisateurs' },
+                    { id: 'groups', label: 'Groupes' }, { id: 'support', label: 'Support' },
+                    { id: 'verifications', label: 'Vérifications' }, { id: 'collaboration', label: 'Collaboration' },
+                    { id: 'market', label: 'Marketplace' }, { id: 'emploi', label: 'Emploi' }
+                ];
+                const inputClass = 'w-full p-3 bg-white border border-gray-200 rounded-xl outline-none font-bold text-sm focus:border-emerald-500';
+                const labelClass = 'text-[9px] font-black text-gray-500 uppercase tracking-widest px-1 block mb-2';
+                const selectSchool = `<select id="managed-school-id" class="${inputClass}"><option value="">Choisir une école approuvée</option>${schoolOptions}</select>`;
+                const html = `
+                    <div class="space-y-5 text-left max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+                        <div class="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                            <label for="managed-account-type" class="${labelClass}">Rôle du compte</label>
+                            <select id="managed-account-type" onchange="renderManagedAccountFields()" class="${inputClass}">
+                                <option value="member">Utilisateur Meet Me</option>
+                                <option value="parent">Parent</option>
+                                <option value="student">Élève (accès par code scolaire)</option>
+                                <option value="school_staff:enseignant">Personnel scolaire — Enseignant</option>
+                                <option value="school_staff:professeur">Personnel scolaire — Professeur</option>
+                                <option value="school_staff:directeur">Personnel scolaire — Directeur</option>
+                                <option value="school_staff:prefet">Personnel scolaire — Préfet</option>
+                                <option value="school_promoter">Promoteur d’école</option>
+                                <option value="employer">Employeur</option>
+                                <option value="merchant">Commerçant / entreprise</option>
+                                <option value="collaborator:admin">Administrateur délégué (accès limité)</option>
+                                <option value="collaborator:moderator">Modérateur</option>
+                                <option value="collaborator:support">Support</option>
+                            </select>
+                            <p class="text-[10px] text-emerald-800 mt-2">Les accès scolaires, employeurs et commerces suivent leurs validations habituelles. Les mots de passe temporaires sont générés automatiquement.</p>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><label for="managed-full-name" class="${labelClass}">Nom complet</label><input id="managed-full-name" class="${inputClass}" placeholder="Ex. Jean Mukendi" required></div>
+                            <div data-managed-email><label for="managed-email" class="${labelClass}">Email</label><input id="managed-email" type="email" class="${inputClass}" placeholder="jean@exemple.com"></div>
+                            <div data-managed-fields="member,parent,school_staff,school_promoter,employer,merchant,collaborator"><label for="managed-phone" class="${labelClass}">Téléphone (facultatif)</label><input id="managed-phone" class="${inputClass}" placeholder="+243..."></div>
+                        </div>
+                        <div data-managed-fields="school_promoter" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 bg-gray-50 rounded-2xl">
+                            <div><label class="${labelClass}">Nom de l’école *</label><input id="managed-school-name" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Email de l’école</label><input id="managed-school-email" type="email" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Téléphone école</label><input id="managed-school-phone" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Type d’école</label><input id="managed-school-type" class="${inputClass}" placeholder="Primaire, secondaire..."></div>
+                            <div class="sm:col-span-2"><label class="${labelClass}">Adresse</label><input id="managed-school-address" class="${inputClass}"></div>
+                            <div class="sm:col-span-2"><label class="${labelClass}">Description</label><textarea id="managed-school-description" class="${inputClass}" rows="2"></textarea></div>
+                        </div>
+                        <div data-managed-fields="school_staff,student" class="hidden p-5 bg-gray-50 rounded-2xl space-y-4">
+                            <div><label class="${labelClass}">École *</label>${selectSchool}</div>
+                            <div data-managed-fields="student" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div><label class="${labelClass}">Sexe</label><select id="managed-student-gender" class="${inputClass}"><option value="">Non précisé</option><option value="M">Masculin</option><option value="F">Féminin</option></select></div>
+                                <div><label class="${labelClass}">Date de naissance</label><input id="managed-student-birth-date" type="date" class="${inputClass}"></div>
+                            </div>
+                        </div>
+                        <div data-managed-fields="employer" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 bg-gray-50 rounded-2xl">
+                            <div><label class="${labelClass}">Entreprise *</label><input id="managed-company-name" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Secteur *</label><input id="managed-industry" class="${inputClass}" placeholder="Technologie, santé..."></div>
+                            <div><label class="${labelClass}">Email professionnel</label><input id="managed-company-email" type="email" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Téléphone entreprise</label><input id="managed-company-phone" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Adresse</label><input id="managed-company-address" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Site web</label><input id="managed-company-website" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Taille</label><input id="managed-company-size" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Besoins de recrutement</label><input id="managed-hiring-needs" class="${inputClass}"></div>
+                        </div>
+                        <div data-managed-fields="merchant" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 bg-gray-50 rounded-2xl">
+                            <div><label class="${labelClass}">Nom du commerce *</label><input id="managed-business-name" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Catégorie *</label><input id="managed-business-category" class="${inputClass}" placeholder="Boutique, service..."></div>
+                            <div class="sm:col-span-2"><label class="${labelClass}">Description</label><textarea id="managed-business-description" class="${inputClass}" rows="2"></textarea></div>
+                            <div><label class="${labelClass}">Ville</label><input id="managed-business-city" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Commune</label><input id="managed-business-commune" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Province</label><input id="managed-business-province" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Quartier</label><input id="managed-business-quarter" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Code postal</label><input id="managed-business-postal-code" class="${inputClass}"></div>
+                            <div><label class="${labelClass}">Contact commercial</label><input id="managed-business-contact" class="${inputClass}"></div>
+                        </div>
+                        <div data-managed-fields="collaborator" class="hidden p-5 bg-gray-50 rounded-2xl">
+                            <p class="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Modules autorisés</p>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${modules.map((module) => `
+                                <label class="flex items-center p-3 bg-white rounded-xl cursor-pointer border border-gray-100"><input type="checkbox" value="${module.id}" class="acc-module-checkbox w-4 h-4 accent-emerald-600 mr-2"><span class="text-[9px] font-bold text-gray-700 uppercase">${module.label}</span></label>
+                            `).join('')}</div>
+                        </div>
+                    </div>
+                `;
+
+                Alert.show('Créer un compte plateforme', html, async () => {
+                    const value = (id) => document.getElementById(id)?.value?.trim() || '';
+                    const { accountType, role } = getManagedAccountSelection();
+                    const commonData = { fullName: value('managed-full-name'), email: value('managed-email'), phone: value('managed-phone') };
+                    if (!commonData.fullName) return toast('Le nom complet est obligatoire.', 'error');
+                    if (accountType !== 'student' && !commonData.email) return toast('L’adresse email est obligatoire.', 'error');
+
+                    try {
+                        let result;
+                        if (accountType === 'collaborator') {
+                            result = await axios.post(`${API_URL}/admin/collaborators`, {
+                                full_name: commonData.fullName,
+                                email: commonData.email,
+                                modules: Array.from(document.querySelectorAll('.acc-module-checkbox:checked')).map((checkbox) => checkbox.value),
+                                collabRole: role
+                            }, { headers: { Authorization: 'Bearer ' + token } });
+                        } else {
+                            const data = { ...commonData, accountType };
+                            if (['school_staff', 'student'].includes(accountType)) {
+                                data.schoolId = value('managed-school-id');
+                                if (accountType === 'school_staff') data.schoolRole = role;
+                                if (accountType === 'student') {
+                                    data.gender = value('managed-student-gender');
+                                    data.birthDate = value('managed-student-birth-date');
+                                }
+                            }
+                            if (accountType === 'school_promoter') Object.assign(data, {
+                                schoolName: value('managed-school-name'), schoolEmail: value('managed-school-email'),
+                                schoolPhone: value('managed-school-phone'), schoolAddress: value('managed-school-address'),
+                                schoolType: value('managed-school-type'), schoolDescription: value('managed-school-description')
+                            });
+                            if (accountType === 'employer') Object.assign(data, {
+                                companyName: value('managed-company-name'), companyEmail: value('managed-company-email'),
+                                companyPhone: value('managed-company-phone'), companyAddress: value('managed-company-address'),
+                                companyWebsite: value('managed-company-website'), industry: value('managed-industry'),
+                                companySize: value('managed-company-size'), hiringNeeds: value('managed-hiring-needs')
+                            });
+                            if (accountType === 'merchant') Object.assign(data, {
+                                businessName: value('managed-business-name'), businessCategory: value('managed-business-category'),
+                                businessDescription: value('managed-business-description'), businessContact: value('managed-business-contact'),
+                                businessCity: value('managed-business-city'), businessCommune: value('managed-business-commune'),
+                                businessProvince: value('managed-business-province'), businessQuarter: value('managed-business-quarter'),
+                                businessPostalCode: value('managed-business-postal-code')
+                            });
+                            result = await axios.post(`${API_URL}/admin/accounts/managed`, data, { headers: { Authorization: 'Bearer ' + token } });
+                        }
+
+                        if (result.data.data?.emailSent === false) {
+                            toast('Compte créé, mais le courriel n’a pas pu être envoyé. Vérifiez la configuration email.', 'error');
+                        } else {
+                            toast(result.data.message || 'Compte créé.', 'success');
+                        }
+                        if (result.data.data?.generatedCode) {
+                            alert(`Code d’accès : ${result.data.data.generatedCode}${result.data.data.status === 'en_attente' ? '\nCe compte doit être approuvé avant sa première connexion.' : ''}`);
+                        } else if (result.data.data?.emailSent === false && result.data.data?.temporaryPassword) {
+                            alert(`Le courriel n’a pas été transmis. Communiquez ces identifiants à l’utilisateur de manière sécurisée :\nEmail : ${commonData.email}\nMot de passe temporaire : ${result.data.data.temporaryPassword}`);
+                        }
+                        closeImpactModal();
+                        await loadAccounts();
+                    } catch (error) {
+                        toast(error.response?.data?.error || 'Erreur lors de la création du compte.', 'error');
+                    }
+                }, 'CRÉER LE COMPTE', 'emerald');
+                renderManagedAccountFields();
+                lucide.createIcons();
+            } catch (error) {
+                toast(error.response?.data?.error || 'Impossible de charger les écoles approuvées.', 'error');
+            }
+        }
+
+        function renderManagedAccounts() {
+            const search = (document.getElementById('accounts-search')?.value || '').trim().toLowerCase();
+            const categoryFilter = document.getElementById('accounts-role-filter')?.value || '';
+            const categoryLabels = {
+                member: 'Utilisateur', parent: 'Parent', student: 'Élève',
+                prefet: 'Personnel scolaire · Préfet', directeur: 'Personnel scolaire · Directeur',
+                enseignant: 'Personnel scolaire · Enseignant', professeur: 'Personnel scolaire · Professeur',
+                school_promoter: 'Promoteur d’école', employer: 'Employeur', merchant: 'Commerçant',
+                collaborator: 'Collaborateur Admin'
+            };
+            const statusLabels = {
+                active: 'Actif', disabled: 'Désactivé', pending: 'En attente', en_attente: 'En attente',
+                approuve: 'Approuvé', approved: 'Approuvé', rejete: 'Rejeté', rejected: 'Rejeté',
+                bloque: 'Bloqué', blocked: 'Bloqué'
+            };
+            const filtered = managedAccountsCache.filter((account) => {
+                const category = account.source_type === 'school_staff' ? 'school_staff' : account.category;
+                const text = `${account.full_name || ''} ${account.email || ''} ${account.organization || ''}`.toLowerCase();
+                return (!categoryFilter || category === categoryFilter) && (!search || text.includes(search));
+            });
+            const container = document.getElementById('accounts-table-body');
+            container.innerHTML = filtered.map((account) => {
+                const status = String(account.account_status || '').toLowerCase();
+                const statusClass = ['rejected', 'rejete', 'blocked', 'bloque', 'disabled'].includes(status)
+                    ? 'text-red-500'
+                    : ['active', 'approved', 'approuve'].includes(status) ? 'text-emerald-500' : 'text-amber-500';
+                const accountId = escapeManagedAccountHtml(account.id);
+                const actions = account.can_manage === true ? `
+                    <button onclick="openEditAccountModal('${accountId}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-all" title="Gérer les accès"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                    <button onclick="deleteAccountAction('${accountId}')" class="p-2 text-gray-400 hover:text-red-600 transition-all" title="Désactiver"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                ` : '<span class="text-[9px] text-gray-400 uppercase">Géré par son module</span>';
+                const avatarUrl = escapeManagedAccountHtml(getFullUrl(account.avatar_url));
+                return `
+                    <tr class="hover:bg-gray-50/50 transition-all border-b border-gray-50">
+                        <td class="px-8 py-5"><div class="flex items-center gap-4">
+                            <img src="${avatarUrl}" class="w-10 h-10 rounded-xl object-cover shadow-sm">
+                            <div><p class="text-sm font-black text-gray-800">${escapeManagedAccountHtml(account.full_name || 'Sans nom')}</p><p class="text-[10px] text-gray-400 font-bold">${escapeManagedAccountHtml(account.email || 'Connexion par code scolaire')}</p></div>
+                        </div></td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest">${escapeManagedAccountHtml(categoryLabels[account.category] || account.category)}</span></td>
+                        <td class="px-8 py-5 text-xs font-bold text-gray-500">${escapeManagedAccountHtml(account.organization || '—')}</td>
+                        <td class="px-8 py-5 text-center text-[10px] font-black uppercase tracking-widest ${statusClass}">${statusLabels[status] || status || '—'}</td>
+                        <td class="px-8 py-5 text-xs text-gray-400 font-bold">${account.created_at ? new Date(account.created_at).toLocaleDateString() : '—'}</td>
+                        <td class="px-8 py-5 text-right">${actions}</td>
+                    </tr>
+                `;
+            }).join('') || '<tr><td colspan="6" class="p-12 text-center text-gray-400 font-bold">Aucun compte ne correspond à la recherche.</td></tr>';
+            lucide.createIcons();
+        }
+
+        async function loadAccounts() {
+            try {
+                const res = await axios.get(`${API_URL}/admin/accounts/managed`, { headers: { Authorization: 'Bearer ' + token } });
+                managedAccountsCache = res.data.data || [];
+                renderManagedAccounts();
+            } catch (e) {
+                toast(e.response?.data?.error || 'Erreur chargement comptes', 'error');
+            }
         }
 
         async function openEditAccountModal(memberId) {
@@ -4884,8 +5140,9 @@
             }
         }
 
-        async function deleteAccountAction(id, name) {
-            if (!confirm(`Êtes-vous sûr de vouloir retirer ${name} de cet établissement ?`)) return;
+        async function deleteAccountAction(id) {
+            const name = managedAccountsCache.find((account) => account.id === id)?.full_name || 'ce compte';
+            if (!confirm(`Êtes-vous sûr de vouloir désactiver le compte de ${name} ?`)) return;
 
             try {
                 await axios.delete(`${API_URL}/admin/accounts/${id}`, { headers: { Authorization: `Bearer ${token}` } });

@@ -368,43 +368,56 @@ class MailService {
   /**
    * Envoyer l'email de création de compte collaborateur avec mot de passe temporaire
    */
-  async sendCollaboratorAccountEmail(email, name, tempPassword) {
-    const title = `Bienvenue {{name}}, votre compte Together Tech est prêt.`;
+  async sendCollaboratorAccountEmail(email, name, tempPassword, accountType = 'collaborator') {
+    const accountLabels = {
+      member: 'utilisateur',
+      parent: 'parent',
+      school_promoter: 'promoteur scolaire',
+      employer: 'employeur',
+      merchant: 'commerçant',
+      collaborator: 'collaborateur'
+    };
+    const accountLabel = accountLabels[accountType] || 'utilisateur';
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[character]);
+    const safeName = escapeHtml(name);
+    const safeEmail = escapeHtml(email);
+    const safePassword = escapeHtml(tempPassword);
     const content = `
       <div style="text-align: center; margin-bottom: 30px;">
         <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" style="width: 70px; height: 70px;" alt="Together Tech">
       </div>
-      <p>Bonjour <strong>${name}</strong>,</p>
-      <p>L'Administrateur Principal a créé votre compte officiel de collaborateur au sein de la <strong>Together Tech community</strong>.</p>
+      <p>Bonjour <strong>${safeName}</strong>,</p>
+      <p>Un compte Meet Me de type <strong>${accountLabel}</strong> a été créé pour vous au sein de la <strong>Together Tech community</strong>.</p>
       <p>Pour des raisons de sécurité, vous devez changer votre mot de passe lors de votre première connexion.</p>
 
       <div style="background-color: #f7f7f7; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #eee; text-align: center;">
         <p style="margin: 0; color: #666; font-size: 12px; text-transform: uppercase; font-weight: 900; letter-spacing: 1px;">Identifiants Temporaires</p>
-        <p style="margin: 15px 0; font-size: 18px; font-weight: bold; color: #111;">Email : ${email}</p>
+        <p style="margin: 15px 0; font-size: 18px; font-weight: bold; color: #111;">Email : ${safeEmail}</p>
         <div style="background-color: #fff; padding: 15px; border-radius: 10px; display: inline-block; border: 1px dashed #673AB7; margin-top: 10px;">
-          <p style="margin: 0; font-size: 24px; font-weight: 900; color: #673AB7; letter-spacing: 2px;">${tempPassword}</p>
+          <p style="margin: 0; font-size: 24px; font-weight: 900; color: #673AB7; letter-spacing: 2px;">${safePassword}</p>
         </div>
       </div>
 
       <div style="background-color: #fff8e1; padding: 20px; border-radius: 15px; margin: 25px 0; border: 1px solid #ffe082;">
         <p style="margin: 0; color: #f57c00; font-weight: bold; font-size: 14px;">🚨 ACTION REQUISE :</p>
         <ol style="margin: 10px 0 0 0; padding-left: 20px; font-size: 14px; line-height: 1.6;">
-          <li>Accédez au <strong>Panel Admin</strong> via le bouton ci-dessous.</li>
-          <li>Connectez-vous avec vos identifiants ci-dessus.</li>
+          <li>Ouvrez l’application Meet Me et connectez-vous avec les identifiants ci-dessus.</li>
           <li>Suivez les étapes pour <strong>définir votre mot de passe personnel</strong>.</li>
         </ol>
       </div>
 
-      <div style="text-align: center; margin-top: 35px;">
-        <a href="https://meet-me-backend-sg5c.onrender.com/admin-portal" class="btn" style="background-color: #673AB7; color: #ffffff !important;">CHANGER MON MOT DE PASSE</a>
-      </div>
-
       <p style="margin-top: 40px; font-size: 11px; color: #999; text-align: center; line-height: 1.6;">
-        <em>Ce compte vous permet également de vous connecter à l'application mobile Meet Me avec les mêmes identifiants. Vos droits d'administration sont limités aux modules qui vous ont été attribués.</em>
+        <em>Ne partagez jamais ce mot de passe temporaire. Les demandes pour une école, un emploi ou une activité commerciale restent soumises à validation lorsqu’elle est requise.</em>
       </p>
     `;
 
-    return this.sendSystemEmail(email, "Compte Collaborateur TOGETHE TECH", content, 'minimal', name);
+    return this.sendSystemEmail(email, "Votre compte Meet Me", content, 'minimal', name);
   }
 
   /**

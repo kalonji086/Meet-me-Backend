@@ -111,6 +111,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_collaborator') THEN
     ALTER TABLE public.profiles ADD COLUMN is_collaborator BOOLEAN DEFAULT FALSE;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='account_type') THEN
+    ALTER TABLE public.profiles ADD COLUMN account_type TEXT NOT NULL DEFAULT 'member';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='must_change_password') THEN
     ALTER TABLE public.profiles ADD COLUMN must_change_password BOOLEAN DEFAULT FALSE;
   END IF;

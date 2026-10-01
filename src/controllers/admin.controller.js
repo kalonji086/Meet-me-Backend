@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { query } = require('../config/db');
+const { query, pool } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
 const mailService = require('../services/mail.service');
@@ -1221,6 +1221,328 @@ const getDelegations = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+const getManagedAccounts = asyncHandler(async (req, res) => {
+  const result = await query(`
+    SELECT
+      p.id,
+      p.full_name,
+      p.email,
+      p.avatar_url,
+      CASE
+        WHEN p.is_collaborator THEN 'collaborator'
+        WHEN p.account_type = 'collaborator' THEN 'collaborator'
+        WHEN sr.id IS NOT NULL THEN 'school_promoter'
+        WHEN er.id IS NOT NULL THEN 'employer'
+        WHEN mb.id IS NOT NULL THEN 'merchant'
+        ELSE COALESCE(NULLIF(p.account_type, ''), 'member')
+      END AS category,
+      COALESCE(sr.school_name, er.company_name, mb.business_name, '') AS organization,
+      CASE
+        WHEN p.is_collaborator OR p.account_type = 'collaborator' THEN CASE WHEN p.is_collaborator AND COALESCE(ad.is_active, FALSE) THEN 'active' ELSE 'disabled' END
+        WHEN COALESCE(p.is_locked, FALSE) THEN 'disabled'
+        WHEN sr.id IS NOT NULL THEN sr.status
+        WHEN er.id IS NOT NULL THEN er.status
+        WHEN mb.id IS NOT NULL THEN mb.status
+        ELSE 'active'
+      END AS account_status,
+      COALESCE(ad.modules, ARRAY[]::TEXT[]) AS modules,
+      p.created_at,
+      'profile' AS source_type,
+      p.is_collaborator AS can_manage
+    FROM public.profiles p
+    LEFT JOIN public.admin_delegations ad ON ad.user_id = p.id
+    LEFT JOIN LATERAL (
+      SELECT id, school_name, status FROM public.school_requests
+      WHERE user_id = p.id ORDER BY created_at DESC LIMIT 1
+    ) sr ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT id, company_name, status FROM public.employer_requests
+      WHERE user_id = p.id ORDER BY created_at DESC LIMIT 1
+    ) er ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT id, business_name, status FROM public.market_businesses
+      WHERE user_id = p.id ORDER BY created_at DESC LIMIT 1
+    ) mb ON TRUE
+
+    UNION ALL
+
+    SELECT
+      sar.id,
+      sar.full_name,
+      sar.email,
+      NULL::TEXT AS avatar_url,
+      sar.role AS category,
+      sr.school_name AS organization,
+      sar.status AS account_status,
+      ARRAY[]::TEXT[] AS modules,
+      sar.created_at,
+      'school_staff' AS source_type,
+      FALSE AS can_manage
+    FROM public.school_account_requests sar
+    JOIN public.school_requests sr ON sr.id = sar.school_id
+
+    UNION ALL
+
+    SELECT
+      s.id,
+      s.full_name,
+      NULL::TEXT AS email,
+      NULL::TEXT AS avatar_url,
+      'student' AS category,
+      sr.school_name AS organization,
+      CASE WHEN COALESCE(s.is_active, TRUE) THEN 'active' ELSE 'disabled' END AS account_status,
+      ARRAY[]::TEXT[] AS modules,
+      s.created_at,
+      'student' AS source_type,
+      FALSE AS can_manage
+    FROM public.school_students s
+    JOIN public.school_requests sr ON sr.id = s.school_id
+
+    ORDER BY created_at DESC NULLS LAST
+  `);
+
+  res.json({ success: true, data: result.rows });
+});
+
+const createManagedAccount = asyncHandler(async (req, res) => {
+  const {
+    accountType,
+    fullName,
+    email,
+    phone,
+    schoolId,
+    schoolName,
+    schoolEmail,
+    schoolPhone,
+    schoolAddress,
+    schoolType,
+    schoolDescription,
+    schoolRole,
+    classId,
+    gender,
+    birthDate,
+    companyName,
+    companyEmail,
+    companyPhone,
+    companyAddress,
+    companyWebsite,
+    industry,
+    companySize,
+    hiringNeeds,
+    businessName,
+    businessCategory,
+    businessDescription,
+    businessContact,
+    businessCity,
+    businessCommune,
+    businessProvince,
+    businessQuarter,
+    businessPostalCode
+  } = req.body;
+
+  const supportedTypes = ['member', 'parent', 'school_promoter', 'school_staff', 'student', 'employer', 'merchant'];
+  if (!supportedTypes.includes(accountType)) {
+    return res.status(400).json({ success: false, error: 'Catégorie de compte non prise en charge.' });
+  }
+
+  const cleanName = typeof fullName === 'string' ? fullName.trim() : '';
+  const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  const accountNeedsProfile = ['member', 'parent', 'school_promoter', 'employer', 'merchant'].includes(accountType);
+
+  if (!cleanName || (accountNeedsProfile && !cleanEmail) || (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail))) {
+    return res.status(400).json({ success: false, error: 'Veuillez fournir un nom et une adresse email valide.' });
+  }
+  if (accountType === 'school_promoter' && (!schoolName?.trim() || !(schoolEmail || cleanEmail))) {
+    return res.status(400).json({ success: false, error: 'Le nom et l’email de l’école sont obligatoires.' });
+  }
+  if (accountType === 'school_promoter' && schoolEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(schoolEmail.trim())) {
+    return res.status(400).json({ success: false, error: 'L’email de l’école est invalide.' });
+  }
+  if (accountType === 'school_staff' && (!schoolId || !['prefet', 'directeur', 'enseignant', 'professeur'].includes(schoolRole))) {
+    return res.status(400).json({ success: false, error: 'Choisissez une école approuvée et un rôle scolaire valide.' });
+  }
+  if (accountType === 'school_staff' && (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail))) {
+    return res.status(400).json({ success: false, error: 'Un email valide est obligatoire pour le personnel scolaire.' });
+  }
+  if (accountType === 'student' && (!schoolId || !cleanName)) {
+    return res.status(400).json({ success: false, error: 'Choisissez une école et indiquez le nom de l’élève.' });
+  }
+  if (accountType === 'employer' && (!companyName?.trim() || !industry?.trim())) {
+    return res.status(400).json({ success: false, error: 'Le nom de l’entreprise et le secteur sont obligatoires.' });
+  }
+  if (accountType === 'employer' && companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmail.trim())) {
+    return res.status(400).json({ success: false, error: 'L’email professionnel est invalide.' });
+  }
+  if (accountType === 'merchant' && (!businessName?.trim() || !businessCategory?.trim())) {
+    return res.status(400).json({ success: false, error: 'Le nom et la catégorie du commerce sont obligatoires.' });
+  }
+
+  const client = await pool.connect();
+  let created;
+  let temporaryPassword = null;
+
+  try {
+    await client.query('BEGIN');
+
+    if (accountType === 'school_staff' || accountType === 'student') {
+      const schoolResult = await client.query(
+        `SELECT id, school_name FROM public.school_requests
+         WHERE id = $1 AND LOWER(status) IN ('approuve', 'approuvé', 'approved')
+         FOR SHARE`,
+        [schoolId]
+      );
+      if (schoolResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, error: 'Cette école est introuvable ou n’est pas approuvée.' });
+      }
+
+      if (accountType === 'school_staff') {
+        if (!cleanEmail) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ success: false, error: 'L’email du membre du personnel est obligatoire.' });
+        }
+        const duplicate = await client.query(
+          'SELECT id FROM public.school_account_requests WHERE school_id = $1 AND LOWER(email) = $2',
+          [schoolId, cleanEmail]
+        );
+        if (duplicate.rows.length) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ success: false, error: 'Cette adresse email est déjà enregistrée pour cette école.' });
+        }
+
+        const generatedCode = `SCH-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+        const staffResult = await client.query(
+          `INSERT INTO public.school_account_requests
+           (school_id, full_name, email, role, phone, generated_code, status)
+           VALUES ($1, $2, $3, $4, $5, $6, 'en_attente') RETURNING id, generated_code, status`,
+          [schoolId, cleanName, cleanEmail, schoolRole, phone?.trim() || null, generatedCode]
+        );
+        created = { id: staffResult.rows[0].id, status: staffResult.rows[0].status, generatedCode };
+      } else {
+        let validClassId = null;
+        if (classId) {
+          const classResult = await client.query(
+            'SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2',
+            [classId, schoolId]
+          );
+          if (classResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'La classe sélectionnée ne fait pas partie de cette école.' });
+          }
+          validClassId = classResult.rows[0].id;
+        }
+        const nameParts = cleanName.split(/\s+/);
+        const accessCode = `STU-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+        const studentResult = await client.query(
+          `INSERT INTO public.school_students
+           (school_id, class_id, full_name, first_name, last_name, gender, birth_date, access_code, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE) RETURNING id, access_code`,
+          [schoolId, validClassId, cleanName, nameParts[0], nameParts.slice(1).join(' '), gender || null, birthDate || null, accessCode]
+        );
+        created = { id: studentResult.rows[0].id, generatedCode: studentResult.rows[0].access_code };
+      }
+    } else {
+      const duplicate = await client.query(
+        'SELECT id FROM public.profiles WHERE LOWER(email) = $1 OR ($2 IS NOT NULL AND phone_number = $2)',
+        [cleanEmail, phone?.trim() || null]
+      );
+      if (duplicate.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ success: false, error: 'Un compte utilise déjà cette adresse email ou ce numéro de téléphone.' });
+      }
+
+      temporaryPassword = crypto.randomBytes(9).toString('base64url');
+      const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+      const userId = crypto.randomUUID();
+      const username = `${cleanEmail.split('@')[0]}_${userId.slice(0, 8)}`;
+      const profileResult = await client.query(
+        `INSERT INTO public.profiles
+         (id, full_name, email, password, username, phone_number, account_type, is_verified, must_change_password)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, TRUE) RETURNING id`,
+        [userId, cleanName, cleanEmail, hashedPassword, username, phone?.trim() || null, accountType]
+      );
+      created = { id: profileResult.rows[0].id };
+
+      if (accountType === 'school_promoter') {
+        const requestResult = await client.query(
+          `INSERT INTO public.school_requests
+           (user_id, school_name, school_email, school_phone, school_address, school_type, description, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'en_attente') RETURNING id`,
+          [userId, schoolName.trim(), (schoolEmail || cleanEmail).trim().toLowerCase(), schoolPhone?.trim() || null, schoolAddress?.trim() || null, schoolType?.trim() || null, schoolDescription?.trim() || null]
+        );
+        created.requestId = requestResult.rows[0].id;
+        created.status = 'en_attente';
+      } else if (accountType === 'employer') {
+        const requestResult = await client.query(
+          `INSERT INTO public.employer_requests
+           (user_id, company_name, company_email, company_phone, company_address, company_website, industry, company_size, hiring_needs, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending') RETURNING id`,
+          [userId, companyName.trim(), (companyEmail || cleanEmail).trim().toLowerCase(), companyPhone?.trim() || null, companyAddress?.trim() || null, companyWebsite?.trim() || null, industry.trim(), companySize?.trim() || null, hiringNeeds?.trim() || null]
+        );
+        created.requestId = requestResult.rows[0].id;
+        created.status = 'pending';
+      } else if (accountType === 'merchant') {
+        const businessResult = await client.query(
+          `INSERT INTO public.market_businesses
+           (user_id, category, business_name, short_description, contact_info, address_city, address_commune, address_province, address_quarter, address_postal_code, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending') RETURNING id`,
+          [userId, businessCategory.trim(), businessName.trim(), businessDescription?.trim() || null, businessContact?.trim() || phone?.trim() || null, businessCity?.trim() || null, businessCommune?.trim() || null, businessProvince?.trim() || null, businessQuarter?.trim() || null, businessPostalCode?.trim() || null]
+        );
+        created.requestId = businessResult.rows[0].id;
+        created.status = 'pending';
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error.code === '23505') {
+      return res.status(409).json({ success: false, error: 'Un compte ou un code d’accès existe déjà avec ces informations.' });
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  let emailSent = null;
+  if (temporaryPassword) {
+    emailSent = await mailService.sendCollaboratorAccountEmail(cleanEmail, cleanName, temporaryPassword, accountType);
+  }
+
+  if (accountType === 'school_promoter') {
+    socketService.broadcast('admin:new_school_request', { id: created.requestId, school_name: schoolName.trim(), user_id: created.id });
+  } else if (accountType === 'employer') {
+    socketService.broadcast('admin:new_employer_request', { id: created.requestId, company_name: companyName.trim(), user_id: created.id });
+  } else if (accountType === 'merchant') {
+    socketService.broadcast('admin:new_market', { id: created.requestId, business_name: businessName.trim(), owner_id: created.id });
+  }
+
+  await logAdminAction(req, 'create_managed_account', accountType, created.id, {
+    email: cleanEmail || null,
+    status: created.status || 'active'
+  });
+
+  const messages = {
+    member: 'Compte utilisateur créé.',
+    parent: 'Compte parent créé.',
+    school_promoter: 'Compte promoteur créé; la demande d’école reste en attente de validation.',
+    school_staff: 'Demande du personnel scolaire créée; elle doit être approuvée avant la connexion par code.',
+    student: 'Compte élève créé et code d’accès généré.',
+    employer: 'Compte employeur créé; la demande reste en attente de validation.',
+    merchant: 'Compte commerçant créé; la demande reste en attente de validation.'
+  };
+
+  res.status(201).json({
+    success: true,
+    message: messages[accountType],
+    data: {
+      ...created,
+      emailSent,
+      ...(emailSent === false ? { temporaryPassword } : {})
+    }
+  });
+});
+
 /**
  * @desc    Créer ou mettre à jour une délégation
  */
@@ -2257,13 +2579,18 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
     });
 
     const mailService = require('../services/mail.service');
-    await mailService.sendMarketApprovalEmail(
-      business.owner_email || '',
-      business.owner_name || 'Utilisateur',
-      business.business_name,
-      business.category,
-      groupName
-    );
+    const ownerRes = await query('SELECT full_name, email FROM public.profiles WHERE id = $1', [userId]);
+    if (ownerRes.rows.length > 0) {
+      await mailService.sendMarketApprovalEmail(
+        ownerRes.rows[0].email,
+        ownerRes.rows[0].full_name,
+        business.business_name,
+        business.category,
+        groupName
+      );
+    } else {
+      logger.warn(`Profil propriétaire introuvable pour le business approuvé ${id}.`);
+    }
 
   } else {
     await query(
@@ -2450,42 +2777,70 @@ const handleVerification = asyncHandler(async (req, res) => {
  * @desc    Créer un compte collaborateur complet
  */
 const createCollaborator = asyncHandler(async (req, res) => {
-  const { full_name, email, username, avatar_url, modules, collab_start_at, collab_end_at, collabAdminRights = {}, userAdminRights = {} } = req.body;
+  const {
+    full_name: providedName,
+    fullName,
+    email,
+    username,
+    avatar_url,
+    modules,
+    collab_start_at,
+    collab_end_at,
+    collabAdminRights = {},
+    userAdminRights = {}
+  } = req.body;
+  const cleanName = typeof providedName === 'string' ? providedName.trim() : (typeof fullName === 'string' ? fullName.trim() : '');
+  const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  const cleanUsername = typeof username === 'string' ? username.trim().toLowerCase() : '';
 
-  if (!email || !full_name) {
-    return res.status(400).json({ success: false, error: 'Champs obligatoires manquants.' });
+  if (!cleanEmail || !cleanName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    return res.status(400).json({ success: false, error: 'Un nom et une adresse email valide sont obligatoires.' });
   }
 
   // Vérifier si l'utilisateur existe déjà
-  const existing = await query('SELECT id FROM public.profiles WHERE email = $1 OR username = $2', [email, username]);
+  const existing = await query(
+    'SELECT id FROM public.profiles WHERE LOWER(email) = $1 OR ($2 <> \'\' AND LOWER(username) = $2)',
+    [cleanEmail, cleanUsername]
+  );
   if (existing.rows.length > 0) {
-    return res.status(400).json({ success: false, error: 'Cet email ou nom d\'utilisateur est déjà utilisé.' });
+    return res.status(409).json({ success: false, error: 'Cet email ou nom d’utilisateur est déjà utilisé.' });
   }
 
   // Générer un mot de passe temporaire
   const tempPassword = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8 caractères
   const hashedPassword = await bcrypt.hash(tempPassword, 10);
   const userId = crypto.randomUUID();
+  const client = await pool.connect();
 
-  // 1. Créer le profil avec l'obligation de changer de mot de passe
-  await query(
-    `INSERT INTO public.profiles (id, full_name, email, password, username, avatar_url, is_collaborator, collab_start_at, collab_end_at, is_verified, must_change_password)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [userId, full_name, email, hashedPassword, username || email.split('@')[0], avatar_url || null, true, collab_start_at || new Date(), collab_end_at || null, true, true]
-  );
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO public.profiles (id, full_name, email, password, username, avatar_url, is_collaborator, account_type, collab_start_at, collab_end_at, is_verified, must_change_password)
+       VALUES ($1, $2, $3, $4, $5, $6, TRUE, 'collaborator', $7, $8, TRUE, TRUE)`,
+      [userId, cleanName, cleanEmail, hashedPassword, cleanUsername || `${cleanEmail.split('@')[0]}_${userId.slice(0, 8)}`, avatar_url || null, collab_start_at || new Date(), collab_end_at || null]
+    );
 
-  // 2. Créer la délégation (Rôles et Accès)
-  await query(
-    `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, user_admin_rights)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [userId, modules || [], true, JSON.stringify(collabAdminRights), JSON.stringify(userAdminRights)]
-  );
+    await client.query(
+      `INSERT INTO public.admin_delegations (user_id, modules, is_active, collab_admin_rights, user_admin_rights)
+       VALUES ($1, $2, TRUE, $3, $4)`,
+      [userId, Array.isArray(modules) ? modules : [], JSON.stringify(collabAdminRights), JSON.stringify(userAdminRights)]
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error.code === '23505') {
+      return res.status(409).json({ success: false, error: 'Cet email ou nom d’utilisateur est déjà utilisé.' });
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 
   // 3. Envoyer l'email avec le mot de passe temporaire
-  await mailService.sendCollaboratorAccountEmail(email, full_name, tempPassword);
+  const emailSent = await mailService.sendCollaboratorAccountEmail(cleanEmail, cleanName, tempPassword, 'collaborator');
 
   // 4. Ajouter à l'équipe par défaut si le module collaboration est présent
-  if (modules && modules.includes('collaboration')) {
+  if (Array.isArray(modules) && modules.includes('collaboration')) {
     try {
       const defaultTeamRes = await query("SELECT id FROM public.collab_teams WHERE name = 'Together Tech Community' LIMIT 1");
       if (defaultTeamRes.rows.length > 0) {
@@ -2493,16 +2848,20 @@ const createCollaborator = asyncHandler(async (req, res) => {
           'INSERT INTO public.collab_team_members (team_id, user_id, role) VALUES ($1, $2, \'collaborator\') ON CONFLICT DO NOTHING',
           [defaultTeamRes.rows[0].id, userId]
         );
-        logger.info(`✅ Collaborateur ${full_name} ajouté à l'équipe par défaut.`);
+        logger.info(`✅ Collaborateur ${cleanName} ajouté à l'équipe par défaut.`);
       }
     } catch (err) {
       logger.error('Erreur lors de l\'ajout à l\'équipe par défaut:', err.message);
     }
   }
 
-  await logAdminAction(req, 'create_collaborator', 'user', userId, { email, full_name, tempPassword_sent: true });
+  await logAdminAction(req, 'create_collaborator', 'user', userId, { email: cleanEmail, full_name: cleanName, tempPassword_sent: emailSent });
 
-  res.status(201).json({ success: true, message: 'Compte collaborateur créé et email envoyé.', data: { id: userId } });
+  res.status(201).json({
+    success: true,
+    message: emailSent ? 'Compte collaborateur créé et email envoyé.' : 'Compte collaborateur créé, mais l’email n’a pas pu être envoyé.',
+    data: { id: userId, emailSent, ...(emailSent ? {} : { temporaryPassword: tempPassword }) }
+  });
 });
 
 /**
@@ -2777,6 +3136,8 @@ module.exports = {
   handlePendingAction,
   deletePendingAction,
   getDelegations,
+  getManagedAccounts,
+  createManagedAccount,
   saveDelegation,
   createCollaborator,
   updateCollaborator,

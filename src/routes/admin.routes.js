@@ -53,6 +53,8 @@ router.put('/verifications/:id', adminController.handleVerification);
 
 router.get('/accounts', adminController.getDelegations);
 router.post('/accounts', adminController.createCollaborator);
+router.get('/accounts/managed', adminController.getManagedAccounts);
+router.post('/accounts/managed', adminController.createManagedAccount);
 router.put('/accounts/:userId', adminController.updateCollaborator);
 router.delete('/accounts/:userId', adminController.deleteCollaborator);
 

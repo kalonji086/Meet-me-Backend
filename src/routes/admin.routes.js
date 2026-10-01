@@ -30,6 +30,7 @@ router.get('/reports', adminController.getReports);
 router.put('/reports/:id/resolve', adminController.resolveReport);
 
 router.get('/analytics', adminController.getAnalytics);
+router.get('/analytics/usage', adminController.getUsageAnalytics);
 
 router.get('/campaigns', adminController.getCampaigns);
 router.post('/campaigns', adminController.createCampaign);

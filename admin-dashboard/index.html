@@ -912,6 +912,28 @@
                     <div id="stats-trend-wrap" class="stats-chart-wrap"><canvas id="stats-trend-chart" aria-label="Tendance mensuelle des inscriptions, demandes d'école créées et candidatures"></canvas></div>
                 </section>
 
+                <section class="stats-panel p-5 sm:p-7" aria-labelledby="stats-cumulative-title">
+                    <div class="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div><h3 id="stats-cumulative-title" class="text-lg font-bold text-slate-900">Comptes inscrits cumulés</h3><p class="text-sm text-slate-500">Comptes utilisateur, hors administrateurs globaux : totaux de fin de mois clôturés; le mois en cours est indiqué à date.</p></div>
+                        <span id="stats-cumulative-total" class="text-sm font-semibold text-violet-700" aria-live="polite"></span>
+                    </div>
+                    <div id="stats-cumulative-loading" class="hidden text-sm text-slate-500" role="status">Chargement de l’historique…</div>
+                    <div id="stats-cumulative-error" class="hidden mb-3 text-sm text-rose-700" role="alert"></div>
+                    <div id="stats-cumulative-empty" class="stats-empty" hidden>Aucun compte inscrit à représenter pour le moment.</div>
+                    <p id="stats-cumulative-chart-description" class="sr-only">Nombre cumulé de comptes utilisateur par mois. Les mois clôturés montrent le total de fin de mois; le mois en cours, s’il apparaît, est un total provisoire à date.</p>
+                    <div id="stats-cumulative-wrap" class="stats-chart-wrap"><canvas id="stats-cumulative-chart" role="img" aria-label="Nombre cumulé de comptes enregistrés par mois" aria-describedby="stats-cumulative-chart-description"></canvas></div>
+                    <details id="stats-cumulative-data" class="mt-4 border-t border-slate-100 pt-3">
+                        <summary class="w-fit cursor-pointer rounded text-sm font-semibold text-indigo-700 hover:text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">Consulter les valeurs mois par mois</summary>
+                        <div class="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+                            <table class="w-full text-left text-sm">
+                                <caption class="sr-only">Comptes inscrits cumulés par mois; le mois en cours est un total à date.</caption>
+                                <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th scope="col" class="px-4 py-3">Mois</th><th scope="col" class="px-4 py-3 text-right">Comptes cumulés</th></tr></thead>
+                                <tbody id="stats-cumulative-data-body" class="divide-y divide-slate-100 bg-white"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                </section>
+
                 <div class="grid grid-cols-1 gap-6 xl:grid-cols-5">
                     <section class="stats-panel p-5 sm:p-7 xl:col-span-3" aria-labelledby="stats-school-title">
                         <div class="mb-5"><h3 id="stats-school-title" class="text-lg font-bold text-slate-900">Effectifs par école</h3><p class="text-sm text-slate-500">Élèves inscrits dans chaque école approuvée, du plus grand au plus petit effectif.</p><p id="stats-school-meta" class="mt-2 text-xs font-medium text-slate-400"></p></div>
@@ -924,6 +946,43 @@
                         <div id="stats-employment-wrap" class="stats-chart-wrap"><canvas id="stats-employment-chart" aria-label="Comparaison des offres d'emploi, candidatures et embauches"></canvas></div>
                     </section>
                 </div>
+
+                <section class="stats-panel p-5 sm:p-7" aria-labelledby="stats-activity-title">
+                    <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div class="max-w-3xl">
+                            <h3 id="stats-activity-title" class="text-lg font-bold text-slate-900">Actions observées par compte</h3>
+                            <p class="mt-1 text-sm text-slate-500">Comptages issus des messages, statuts, vues d’offres, candidatures et appels enregistrés. Ces événements ne mesurent ni la durée de session ni l’ensemble de l’utilisation de l’application.</p>
+                        </div>
+                        <label for="stats-usage-period" class="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-600">
+                            Période
+                            <select id="stats-usage-period" onchange="loadUserActivity(0)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="30d">30 derniers jours</option>
+                                <option value="90d">90 derniers jours</option>
+                                <option value="365d">365 derniers jours</option>
+                                <option value="all">Depuis toujours</option>
+                            </select>
+                        </label>
+                    </div>
+                    <p id="stats-usage-source-note" class="mb-3 text-xs text-slate-500">Les zéros signifient qu’aucune action correspondante n’a été observée pendant la période sélectionnée.</p>
+                    <p id="stats-usage-scroll-hint" class="mb-2 text-xs font-medium text-slate-600">Sur petit écran, faites défiler horizontalement pour consulter toutes les colonnes.</p>
+                    <div id="stats-usage-loading" class="hidden rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500" role="status">Chargement des actions observées…</div>
+                    <div id="stats-usage-error" class="hidden mb-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert"></div>
+                    <div id="stats-usage-empty" class="stats-empty" hidden>Aucun compte utilisateur enregistré.</div>
+                    <div id="stats-usage-table-wrap" class="hidden overflow-x-auto rounded-lg border border-slate-200" role="region" tabindex="0" aria-label="Actions observées par compte" aria-describedby="stats-usage-scroll-hint">
+                        <table class="w-full min-w-[900px] text-left text-sm">
+                            <caption id="stats-usage-table-caption" class="sr-only">Actions enregistrées par compte pour la période sélectionnée.</caption>
+                            <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><tr id="stats-usage-table-head"></tr></thead>
+                            <tbody id="stats-usage-table-body" class="divide-y divide-slate-100 bg-white"></tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p id="stats-usage-page-info" class="text-xs text-slate-500" aria-live="polite"></p>
+                        <div class="flex gap-2">
+                            <button id="stats-usage-previous" type="button" onclick="loadUserActivity(Math.max(0, usageActivityOffset - usageActivityPageSize))" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50" disabled>Précédent</button>
+                            <button id="stats-usage-next" type="button" onclick="loadUserActivity(usageActivityOffset + usageActivityPageSize)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50" disabled>Suivant</button>
+                        </div>
+                    </div>
+                </section>
             </div>
 
                 <div id="section-users" class="hidden animate-fade-in">
@@ -1655,7 +1714,10 @@
         let campaignEditor = null;
         let statsLoadSequence = 0;
         let lastStatsSuccessAt = null;
-        const charts = { trend: null, schools: null, employment: null };
+        let usageActivitySequence = 0;
+        let usageActivityOffset = 0;
+        const usageActivityPageSize = 50;
+        const charts = { trend: null, cumulativeUsers: null, schools: null, employment: null };
         let statsSchoolRows = [];
         let statsSchoolMobileMode = null;
         let statsSchoolResizeTimer = null;
@@ -4160,6 +4222,251 @@
             }
         }
 
+        const usageActionLabels = {
+            messagesSent: 'Messages envoyés',
+            statusesPosted: 'Statuts publiés',
+            statusViews: 'Vues de statuts',
+            jobViews: 'Vues d’offres',
+            jobApplications: 'Candidatures envoyées',
+            callsInitiated: 'Tentatives d’appel lancées'
+        };
+
+        function renderCumulativeUsersChart(rows) {
+            const empty = document.getElementById('stats-cumulative-empty');
+            const wrap = document.getElementById('stats-cumulative-wrap');
+            const summary = document.getElementById('stats-cumulative-total');
+            if (charts.cumulativeUsers) charts.cumulativeUsers.destroy();
+            charts.cumulativeUsers = null;
+            empty.hidden = rows.length > 0;
+            wrap.classList.toggle('hidden', rows.length === 0);
+            const dataBody = document.getElementById('stats-cumulative-data-body');
+            const dataDetails = document.getElementById('stats-cumulative-data');
+            dataBody.replaceChildren();
+            if (!rows.length) {
+                summary.textContent = '';
+                dataDetails.hidden = true;
+                return;
+            }
+            dataDetails.hidden = false;
+
+            const labels = rows.map((row) => {
+                const monthKey = String(row.month).slice(0, 7);
+                const label = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+                    .format(new Date(monthKey + '-01T00:00:00Z'));
+                return row.isCurrentMonth ? label + ' · mois en cours, à date' : label;
+            });
+            const values = rows.map((row) => Number(row.cumulativeUsers) || 0);
+            const count = (value) => Number(value).toLocaleString('fr-FR');
+            const latestLabel = rows[rows.length - 1].isCurrentMonth ? 'comptes à date' : 'comptes en fin de mois';
+            summary.textContent = count(values[values.length - 1]) + ' ' + latestLabel;
+            rows.forEach((row, index) => {
+                const tableRow = document.createElement('tr');
+                const monthCell = document.createElement('th');
+                monthCell.scope = 'row';
+                monthCell.className = 'px-4 py-3 font-medium text-slate-700';
+                monthCell.textContent = labels[index];
+                const valueCell = document.createElement('td');
+                valueCell.className = 'px-4 py-3 text-right tabular-nums text-slate-600';
+                valueCell.textContent = count(row.cumulativeUsers);
+                tableRow.append(monthCell, valueCell);
+                dataBody.appendChild(tableRow);
+            });
+            charts.cumulativeUsers = new Chart(document.getElementById('stats-cumulative-chart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Comptes enregistrés cumulés',
+                        data: values,
+                        borderColor: '#6658c9',
+                        backgroundColor: 'rgba(102,88,201,.12)',
+                        pointBackgroundColor: '#6658c9',
+                        pointRadius: rows.length > 48 ? 0 : 2,
+                        pointHoverRadius: 5,
+                        tension: .25,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (item) => count(item.raw) + ' comptes' } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#627087', maxTicksLimit: 12 } },
+                        y: { beginAtZero: true, ticks: { precision: 0, color: '#627087', callback: (value) => count(value) }, grid: { color: '#edf0f4' } }
+                    }
+                }
+            });
+        }
+
+        function renderUserActivityTable(activity) {
+            const header = document.getElementById('stats-usage-table-head');
+            const body = document.getElementById('stats-usage-table-body');
+            const tableWrap = document.getElementById('stats-usage-table-wrap');
+            const empty = document.getElementById('stats-usage-empty');
+            const pageInfo = document.getElementById('stats-usage-page-info');
+            const previous = document.getElementById('stats-usage-previous');
+            const next = document.getElementById('stats-usage-next');
+            const sourceNote = document.getElementById('stats-usage-source-note');
+            const availableActions = activity.availableActions.filter((key) => Object.prototype.hasOwnProperty.call(usageActionLabels, key));
+            const missingActions = Object.keys(usageActionLabels).filter((key) => !availableActions.includes(key));
+            const users = activity.users;
+            const count = (value) => Number(value).toLocaleString('fr-FR');
+
+            header.replaceChildren();
+            body.replaceChildren();
+            const addHeader = (label, extraClass) => {
+                const cell = document.createElement('th');
+                cell.scope = 'col';
+                cell.className = 'px-4 py-3 ' + (extraClass || '');
+                cell.textContent = label;
+                header.appendChild(cell);
+            };
+            addHeader('Compte');
+            availableActions.forEach((key) => addHeader(usageActionLabels[key], 'text-right'));
+            addHeader('Dernière action observée sur la période');
+
+            sourceNote.textContent = 'Les compteurs reflètent uniquement les actions observables pendant la période choisie; ils ne mesurent ni durée de session ni utilisation complète de l’application.'
+                + (missingActions.length ? ' Sources non disponibles dans cette base : ' + missingActions.map((key) => usageActionLabels[key]).join(', ') + '.' : '');
+            empty.hidden = activity.total > 0;
+            tableWrap.classList.toggle('hidden', activity.total === 0);
+            if (activity.total === 0) {
+                pageInfo.textContent = '0 compte utilisateur';
+            } else {
+                users.forEach((user) => {
+                    const row = document.createElement('tr');
+                    const identity = document.createElement('th');
+                    identity.scope = 'row';
+                    identity.className = 'px-4 py-3 font-medium text-slate-800';
+                    const name = document.createElement('span');
+                    name.className = 'block';
+                    name.textContent = user.displayName || 'Utilisateur';
+                    identity.appendChild(name);
+                    if (user.username) {
+                        const username = document.createElement('span');
+                        username.className = 'mt-0.5 block text-xs font-normal text-slate-500';
+                        username.textContent = '@' + user.username;
+                        identity.appendChild(username);
+                    }
+                    row.appendChild(identity);
+                    availableActions.forEach((key) => {
+                        const field = {
+                            messagesSent: 'messagesSent',
+                            statusesPosted: 'statusesPosted',
+                            statusViews: 'statusViews',
+                            jobViews: 'jobViews',
+                            jobApplications: 'jobApplications',
+                            callsInitiated: 'callsInitiated'
+                        }[key];
+                        const cell = document.createElement('td');
+                        cell.className = 'px-4 py-3 text-right tabular-nums text-slate-600';
+                        cell.textContent = count(user[field]);
+                        row.appendChild(cell);
+                    });
+                    const lastActivity = document.createElement('td');
+                    lastActivity.className = 'px-4 py-3 text-slate-600';
+                    lastActivity.textContent = user.lastActivityAt
+                        ? new Date(user.lastActivityAt).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+                        : 'Aucune action observée sur cette période';
+                    row.appendChild(lastActivity);
+                    body.appendChild(row);
+                });
+                const first = activity.offset + 1;
+                const last = Math.min(activity.offset + users.length, activity.total);
+                pageInfo.textContent = 'Affichage ' + count(first) + '–' + count(last) + ' sur ' + count(activity.total) + ' comptes';
+            }
+            previous.disabled = activity.offset <= 0;
+            next.disabled = activity.offset + users.length >= activity.total;
+        }
+
+        function clearUserAnalyticsResults() {
+            if (charts.cumulativeUsers) charts.cumulativeUsers.destroy();
+            charts.cumulativeUsers = null;
+            document.getElementById('stats-cumulative-wrap').classList.add('hidden');
+            document.getElementById('stats-cumulative-empty').hidden = true;
+            document.getElementById('stats-cumulative-total').textContent = '';
+            document.getElementById('stats-cumulative-data-body').replaceChildren();
+            document.getElementById('stats-cumulative-data').hidden = true;
+            document.getElementById('stats-usage-table-body').replaceChildren();
+            document.getElementById('stats-usage-table-head').replaceChildren();
+            document.getElementById('stats-usage-table-wrap').classList.add('hidden');
+            document.getElementById('stats-usage-empty').hidden = true;
+            document.getElementById('stats-usage-page-info').textContent = '';
+        }
+
+        async function loadUserActivity(offset = 0) {
+            const requestId = ++usageActivitySequence;
+            const periodSelect = document.getElementById('stats-usage-period');
+            const period = periodSelect ? periodSelect.value : '30d';
+            const loading = document.getElementById('stats-usage-loading');
+            const error = document.getElementById('stats-usage-error');
+            const trendLoading = document.getElementById('stats-cumulative-loading');
+            const trendError = document.getElementById('stats-cumulative-error');
+            const previous = document.getElementById('stats-usage-previous');
+            const next = document.getElementById('stats-usage-next');
+            if (loading) loading.classList.remove('hidden');
+            if (trendLoading) trendLoading.classList.remove('hidden');
+            if (error) {
+                error.textContent = '';
+                error.classList.add('hidden');
+            }
+            if (trendError) {
+                trendError.textContent = '';
+                trendError.classList.add('hidden');
+            }
+            clearUserAnalyticsResults();
+            if (previous) previous.disabled = true;
+            if (next) next.disabled = true;
+
+            try {
+                const headers = { ['Author' + 'ization']: ['Bear' + 'er ', token].join('') };
+                const response = await axios.get(
+                    API_URL + '/admin/analytics/usage?period=' + encodeURIComponent(period) + '&offset=' + encodeURIComponent(Math.max(0, offset)),
+                    { headers }
+                );
+                const data = response.data && response.data.data;
+                const activity = data && data.userActivity;
+                if (!response.data || !response.data.success || !data || !Array.isArray(data.registeredUsersTrend) ||
+                    !activity || !Array.isArray(activity.availableActions) || !Array.isArray(activity.users) ||
+                    !Number.isFinite(Number(activity.total)) || !Number.isFinite(Number(activity.offset))) {
+                    throw new Error((response.data && response.data.error) || 'Réponse d’activité invalide.');
+                }
+                if (requestId !== usageActivitySequence) return;
+                data.registeredUsersTrend.forEach((row) => {
+                    if (!row || !row.month || typeof row.isCurrentMonth !== 'boolean' || !Number.isFinite(Number(row.cumulativeUsers))) throw new Error('Historique cumulé invalide.');
+                });
+                activity.users.forEach((user) => {
+                    if (!user || typeof user.displayName !== 'string') throw new Error('Résumé de compte invalide.');
+                });
+                usageActivityOffset = Number(activity.offset) || 0;
+                renderCumulativeUsersChart(data.registeredUsersTrend);
+                renderUserActivityTable(activity);
+            } catch (e) {
+                if (requestId !== usageActivitySequence) return;
+                const message = (e.response && e.response.data && e.response.data.error) || e.message || 'Impossible de charger les actions observées.';
+                if (error) {
+                    error.textContent = 'Les actions observées n’ont pas pu être chargées : ' + message;
+                    error.classList.remove('hidden');
+                }
+                if (trendError) {
+                    trendError.textContent = 'L’historique cumulatif n’a pas pu être chargé.';
+                    trendError.classList.remove('hidden');
+                }
+                clearUserAnalyticsResults();
+                if (previous) previous.disabled = usageActivityOffset <= 0;
+                if (next) next.disabled = true;
+            } finally {
+                if (requestId === usageActivitySequence) {
+                    if (loading) loading.classList.add('hidden');
+                    if (trendLoading) trendLoading.classList.add('hidden');
+                }
+            }
+        }
+
         async function loadStats() {
             const requestId = ++statsLoadSequence;
             const refreshButton = document.getElementById('stats-refresh');
@@ -4180,6 +4487,7 @@
                     axios.get(base + 'stats', { headers }),
                     axios.get(base + 'analytics', { headers })
                 ]);
+                loadUserActivity(0);
                 const stats = statsResponse.data && statsResponse.data.data;
                 const analytics = analyticsResponse.data && analyticsResponse.data.data;
                 const requiredStats = ['totalUsers', 'onlineUsers', 'totalMessages', 'totalGroups', 'totalJobs', 'totalMarket'];
@@ -4208,7 +4516,7 @@
                 document.getElementById('stat-students-total').textContent = count(analytics.totalStudents);
                 document.getElementById('stat-applications').textContent = count(analytics.employment.applications);
                 document.getElementById('stat-hires').textContent = count(analytics.employment.hires);
-                Object.keys(charts).forEach((key) => {
+                ['trend', 'schools', 'employment'].forEach((key) => {
                     if (charts[key]) charts[key].destroy();
                     charts[key] = null;
                 });

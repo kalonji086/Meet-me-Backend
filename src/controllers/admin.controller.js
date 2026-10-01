@@ -2100,6 +2100,145 @@ const getAnalytics = asyncHandler(async (req, res) => {
   });
 });
 
+const getUsageAnalytics = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin && (!Array.isArray(req.user.allowed_modules) || !req.user.allowed_modules.includes('stats'))) {
+    return res.status(403).json({ success: false, error: 'Permission insuffisante : stats' });
+  }
+
+  const period = ['30d', '90d', '365d', 'all'].includes(req.query.period) ? req.query.period : '30d';
+  const parsedOffset = Number.parseInt(req.query.offset, 10);
+  const offset = Number.isFinite(parsedOffset) && parsedOffset > 0 ? Math.min(parsedOffset, 1000000) : 0;
+  const limit = 50;
+  const periodStart = period === 'all' ? null : new Date(Date.now() - Number.parseInt(period, 10) * 24 * 60 * 60 * 1000);
+
+  const actionSources = [
+    { table: 'messages', userColumn: 'sender_id', timeColumn: 'created_at', key: 'messagesSent' },
+    { table: 'statuses', userColumn: 'user_id', timeColumn: 'created_at', key: 'statusesPosted' },
+    { table: 'status_views', userColumn: 'user_id', timeColumn: 'viewed_at', key: 'statusViews' },
+    { table: 'job_views', userColumn: 'viewer_id', timeColumn: 'viewed_at', key: 'jobViews' },
+    { table: 'job_applications', userColumn: 'applicant_id', timeColumn: 'applied_at', key: 'jobApplications' },
+    { table: 'calls', userColumn: 'caller_id', timeColumn: 'created_at', key: 'callsInitiated' },
+  ];
+  const sourceColumns = await query(
+    `SELECT table_name, column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
+    [actionSources.map((source) => source.table)]
+  );
+  const columnsByTable = new Map();
+  sourceColumns.rows.forEach((row) => {
+    if (!columnsByTable.has(row.table_name)) columnsByTable.set(row.table_name, new Set());
+    columnsByTable.get(row.table_name).add(row.column_name);
+  });
+  const availableSources = actionSources.filter((source) => {
+    const columns = columnsByTable.get(source.table);
+    return columns && columns.has(source.userColumn) && columns.has(source.timeColumn);
+  });
+  const availableActions = availableSources.map((source) => source.key);
+  const actionQueries = availableSources.map((source) => (
+    `SELECT ${source.userColumn} AS user_id, ${source.timeColumn} AS action_at, '${source.key}'::text AS action_type
+     FROM public.${source.table}
+     WHERE ${source.userColumn} IS NOT NULL ${periodStart ? `AND ${source.timeColumn} >= $1` : ''}`
+  ));
+  const observedActions = actionQueries.length
+    ? actionQueries.join('\nUNION ALL\n')
+    : 'SELECT NULL::uuid AS user_id, NULL::timestamptz AS action_at, NULL::text AS action_type WHERE FALSE';
+  const pagingParameters = periodStart ? [periodStart, limit, offset] : [limit, offset];
+  const limitParameter = periodStart ? '$2' : '$1';
+  const offsetParameter = periodStart ? '$3' : '$2';
+
+  const [registeredUsersTrend, totalUsers, userRows] = await Promise.all([
+    query(`
+      WITH bounds AS (
+        SELECT date_trunc('month', MIN(created_at)) AS first_month
+        FROM public.profiles
+        WHERE is_global_admin = FALSE AND created_at IS NOT NULL
+      ),
+      months AS (
+        SELECT generate_series(first_month, date_trunc('month', CURRENT_DATE), INTERVAL '1 month') AS month_start
+        FROM bounds
+        WHERE first_month IS NOT NULL
+      ),
+      monthly_signups AS (
+        SELECT date_trunc('month', created_at) AS month_start, COUNT(*) AS signups
+        FROM public.profiles
+        WHERE is_global_admin = FALSE AND created_at IS NOT NULL
+        GROUP BY 1
+      )
+      SELECT months.month_start::date AS month,
+             (months.month_start = date_trunc('month', CURRENT_DATE)) AS is_current_month,
+             SUM(COALESCE(monthly_signups.signups, 0)) OVER (ORDER BY months.month_start)::int AS cumulative_users
+      FROM months
+      LEFT JOIN monthly_signups USING (month_start)
+      ORDER BY months.month_start
+    `),
+    query('SELECT COUNT(*)::int AS total FROM public.profiles WHERE is_global_admin = FALSE'),
+    query(`
+      WITH observed_actions AS (
+        ${observedActions}
+      ),
+      activity_by_user AS (
+        SELECT user_id,
+          COUNT(*) FILTER (WHERE action_type = 'messagesSent')::int AS messages_sent,
+          COUNT(*) FILTER (WHERE action_type = 'statusesPosted')::int AS statuses_posted,
+          COUNT(*) FILTER (WHERE action_type = 'statusViews')::int AS status_views,
+          COUNT(*) FILTER (WHERE action_type = 'jobViews')::int AS job_views,
+          COUNT(*) FILTER (WHERE action_type = 'jobApplications')::int AS job_applications,
+          COUNT(*) FILTER (WHERE action_type = 'callsInitiated')::int AS calls_initiated,
+          MAX(action_at) AS last_activity_at
+        FROM observed_actions
+        GROUP BY user_id
+      )
+      SELECT p.id AS user_id,
+        COALESCE(NULLIF(BTRIM(p.full_name), ''), NULLIF(BTRIM(p.username), ''), 'Utilisateur') AS display_name,
+        p.username,
+        COALESCE(a.messages_sent, 0) AS messages_sent,
+        COALESCE(a.statuses_posted, 0) AS statuses_posted,
+        COALESCE(a.status_views, 0) AS status_views,
+        COALESCE(a.job_views, 0) AS job_views,
+        COALESCE(a.job_applications, 0) AS job_applications,
+        COALESCE(a.calls_initiated, 0) AS calls_initiated,
+        a.last_activity_at
+      FROM public.profiles p
+      LEFT JOIN activity_by_user a ON a.user_id = p.id
+      WHERE p.is_global_admin = FALSE
+      ORDER BY a.last_activity_at DESC NULLS LAST, p.created_at DESC NULLS LAST, p.id
+      LIMIT ${limitParameter} OFFSET ${offsetParameter}
+    `, pagingParameters),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      period,
+      periodStart: periodStart ? periodStart.toISOString() : null,
+      registeredUsersTrend: registeredUsersTrend.rows.map((row) => ({
+        month: row.month,
+        isCurrentMonth: row.is_current_month,
+        cumulativeUsers: Number(row.cumulative_users) || 0,
+      })),
+      userActivity: {
+        availableActions,
+        users: userRows.rows.map((row) => ({
+          userId: row.user_id,
+          displayName: row.display_name,
+          username: row.username,
+          messagesSent: Number(row.messages_sent) || 0,
+          statusesPosted: Number(row.statuses_posted) || 0,
+          statusViews: Number(row.status_views) || 0,
+          jobViews: Number(row.job_views) || 0,
+          jobApplications: Number(row.job_applications) || 0,
+          callsInitiated: Number(row.calls_initiated) || 0,
+          lastActivityAt: row.last_activity_at,
+        })),
+        total: Number(totalUsers.rows[0].total) || 0,
+        offset,
+        limit,
+      },
+    },
+  });
+});
+
 const getAuditLogs = asyncHandler(async (req, res) => {
   await ensureAdminTables();
   const result = await query(`
@@ -3102,6 +3241,7 @@ module.exports = {
   getAppeals,
   replyToAppeal,
   getAnalytics,
+  getUsageAnalytics,
   getCampaigns,
   createCampaign,
   updateCampaign,

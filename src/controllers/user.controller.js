@@ -47,7 +47,8 @@ const getMe = asyncHandler(async (req, res) => {
 const updateProfile = asyncHandler(async (req, res) => {
   const {
     name, status, avatar_url, username,
-    gender, country, province, city, commune, birth_date
+    gender, country, province, city, commune, birth_date,
+    phone_number, preferred_language, auto_translate
   } = req.body;
   const userId = req.userId;
 
@@ -73,6 +74,7 @@ const updateProfile = asyncHandler(async (req, res) => {
          status = COALESCE($2, status),
          avatar_url = CASE WHEN $8 THEN $3 ELSE avatar_url END,
          username = COALESCE($4, username),
+         phone_number = COALESCE($9, phone_number),
          accepted_legal_version = COALESCE($5, accepted_legal_version),
          accepted_tos_version = COALESCE($6, accepted_tos_version),
          accepted_privacy_version = COALESCE($7, accepted_privacy_version),
@@ -82,9 +84,11 @@ const updateProfile = asyncHandler(async (req, res) => {
          city = COALESCE($13, city),
          commune = COALESCE($14, commune),
          birth_date = COALESCE($15, birth_date),
+         preferred_language = COALESCE($16, preferred_language),
+         auto_translate = COALESCE($17, auto_translate),
          updated_at = NOW()
-     WHERE id = $9
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, is_verified, accepted_tos_version, accepted_privacy_version, accepted_legal_version, gender, country, province, city, commune, birth_date`,
+     WHERE id = $18
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, is_global_admin, push_token, is_verified, accepted_tos_version, accepted_privacy_version, accepted_legal_version, gender, country, province, city, commune, birth_date, preferred_language, auto_translate`,
     [
       name,
       status,
@@ -94,13 +98,16 @@ const updateProfile = asyncHandler(async (req, res) => {
       req.body.accepted_tos_version,
       req.body.accepted_privacy_version,
       avatarIsPresent,
-      userId,
+      phone_number,
       gender,
       country,
       province,
       city,
       commune,
-      birth_date
+      birth_date,
+      preferred_language,
+      auto_translate,
+      userId
     ]
   );
 

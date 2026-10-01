@@ -47,6 +47,31 @@ const checkAvailability = asyncHandler(async (req, res) => {
  * @route   POST /api/auth/register
  * @access  Public
  */
+const normalizeProfileUser = (user) => {
+  if (!user) return null;
+
+  const { password, otp_code, otp_expires_at, reset_token, ...safeUser } = user;
+
+  return {
+    ...safeUser,
+    id: user.id,
+    full_name: user.full_name || user.name || null,
+    name: user.full_name || user.name || null,
+    avatar_url: user.avatar_url || user.avatar || null,
+    avatar: user.avatar_url || user.avatar || null,
+    username: user.username || null,
+    phone_number: user.phone_number || null,
+    gender: user.gender || null,
+    country: user.country || null,
+    province: user.province || null,
+    city: user.city || null,
+    commune: user.commune || null,
+    birth_date: user.birth_date || null,
+    preferred_language: user.preferred_language || 'fr',
+    auto_translate: user.auto_translate ?? false
+  };
+};
+
 const register = asyncHandler(async (req, res) => {
   const {
     name, email, password, phone_number, username,
@@ -103,7 +128,7 @@ const register = asyncHandler(async (req, res) => {
     'SELECT id FROM public.profiles WHERE email = $1 OR (phone_number IS NOT NULL AND phone_number = $2)',
     [emailLower, phone_number || null]
   );
-  
+
   if (existingUser.rows.length > 0) {
     return res.status(400).json({
       success: false,
@@ -140,7 +165,7 @@ const register = asyncHandler(async (req, res) => {
     ]
   );
 
-  const user = result.rows[0];
+  const user = normalizeProfileUser(result.rows[0]);
 
   // Informer l'admin qu'un nouvel utilisateur s'est inscrit avec les détails complets
   const socketService = require('../services/socket.service');
@@ -166,9 +191,11 @@ const register = asyncHandler(async (req, res) => {
       refreshToken,
       user: {
         ...user,
+        isGlobalAdmin: user.is_global_admin,
         name: user.full_name,
+        full_name: user.full_name,
         avatar: user.avatar_url,
-        isGlobalAdmin: user.is_global_admin
+        avatar_url: user.avatar_url,
       }
     }
   });
@@ -233,21 +260,23 @@ const login = asyncHandler(async (req, res) => {
     const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
     const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
 
+    const safeUser = normalizeProfileUser(user);
+
     return res.json({
       success: true,
       data: {
         token,
         refreshToken,
         user: {
-          id: user.id,
-          name: user.full_name,
-          email: user.email,
-          username: user.username,
-          avatar: user.avatar_url,
+          ...safeUser,
           status: 'online',
           isGlobalAdmin: user.is_global_admin,
           push_token: user.push_token,
-          mustChangePassword: user.must_change_password
+          mustChangePassword: user.must_change_password,
+          name: user.full_name,
+          full_name: user.full_name,
+          avatar: user.avatar_url,
+          avatar_url: user.avatar_url,
         },
       }
     });

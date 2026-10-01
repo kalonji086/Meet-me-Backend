@@ -8,6 +8,18 @@ const socketService = require('../services/socket.service');
  * @route   POST /api/school/request
  * @access  Private
  */
+const normalizeSchoolStatus = (status) => {
+  if (status === null || status === undefined) return null;
+  const normalized = String(status).trim().toLowerCase();
+
+  if (normalized === 'approuve' || normalized === 'approuvé') return 'approuve';
+  if (normalized === 'rejete' || normalized === 'rejeté') return 'rejete';
+  if (normalized === 'en attente' || normalized === 'en_attente') return 'en_attente';
+  if (normalized === 'bloque' || normalized === 'bloqué' || normalized === 'bloquee' || normalized === 'bloquée') return 'bloque';
+
+  return normalized;
+};
+
 const submitSchoolRequest = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const {
@@ -29,9 +41,10 @@ const submitSchoolRequest = asyncHandler(async (req, res) => {
   // Check if a request already exists for this promoter
   const existing = await query('SELECT id, status FROM public.school_requests WHERE user_id = $1', [userId]);
   if (existing.rows.length > 0) {
+    const existingStatus = normalizeSchoolStatus(existing.rows[0].status);
     return res.status(400).json({
       success: false,
-      error: `Une demande pour votre école est déjà ${existing.rows[0].status === 'en_attente' ? 'en cours d\'examen' : 'enregistrée'}.`
+      error: `Une demande pour votre école est déjà ${existingStatus === 'en_attente' ? 'en cours d\'examen' : 'enregistrée'}.`
     });
   }
 
@@ -80,10 +93,13 @@ const getSchoolStatus = asyncHandler(async (req, res) => {
     });
   }
 
+  const request = { ...result.rows[0] };
+  request.status = normalizeSchoolStatus(request.status);
+
   res.json({
     success: true,
     hasRequest: true,
-    data: result.rows[0]
+    data: request
   });
 });
 
@@ -112,11 +128,24 @@ const approveSchoolRequest = asyncHandler(async (req, res) => {
 });
 
 /**
- * Helper to check if string is a valid UUID
+ * Helper to check if string is a valid UUID (plus robuste)
  */
 const isValidUUID = (str) => {
   if (!str || typeof str !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+  const trimmed = str.trim();
+  if (trimmed.length === 0) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
+};
+
+/**
+ * Helper to check if string is a valid ID (UUID ou autre format)
+ */
+const isValidId = (str) => {
+  if (!str || typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  if (trimmed.length === 0) return false;
+  // Accepte UUID ou ID numérique
+  return /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d+)$/i.test(trimmed);
 };
 
 /**
@@ -324,6 +353,8 @@ const addStudent = asyncHandler(async (req, res) => {
   const cleanBirthDate = (birthDate && birthDate.toString().trim() !== '') ? birthDate : null;
 
   try {
+    await ensureSchoolColumns(); // S'assurer que les colonnes existent
+
     if (id && isValidUUID(id)) {
       const result = await query(`
         UPDATE public.school_students
@@ -339,39 +370,17 @@ const addStudent = asyncHandler(async (req, res) => {
 
     const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const result = await query(`
-      INSERT INTO public.school_students (school_id, class_id, full_name, first_name, last_name, gender, birth_date, access_code)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
-    `, [school.id, cleanClassId, rawName, computedFirstName, computedLastName, cleanGender, cleanBirthDate, accessCode]);
+      INSERT INTO public.school_students (school_id, class_id, full_name, first_name, last_name, gender, birth_date, access_code, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
+    `, [school.id, cleanClassId, rawName, computedFirstName, computedLastName, cleanGender, cleanBirthDate, accessCode, true]);
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     logger.error('Error adding/updating student:', err.message);
-
-    // Robust Fallback in case columns like first_name or birth_date are missing in older schema
-    try {
-      if (id && isValidUUID(id)) {
-        const result = await query(`
-          UPDATE public.school_students
-          SET full_name = $1, gender = $2, class_id = $3
-          WHERE id = $4 AND school_id = $5 RETURNING *
-        `, [rawName, cleanGender, cleanClassId, id, school.id]);
-        return res.json({ success: true, data: result.rows[0] });
-      }
-
-      const accessCode = 'STU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-      const result = await query(`
-        INSERT INTO public.school_students (school_id, class_id, full_name, gender, access_code)
-        VALUES ($1, $2, $3, $4, $5) RETURNING *
-      `, [school.id, cleanClassId, rawName, cleanGender, accessCode]);
-
-      return res.status(201).json({ success: true, data: result.rows[0] });
-    } catch (fallbackErr) {
-      logger.error('Fallback error adding student:', fallbackErr.message);
-      return res.status(400).json({
-        success: false,
-        error: err.message || fallbackErr.message || 'Erreur lors de l\'enregistrement de l\'élève.'
-      });
-    }
+    res.status(400).json({
+      success: false,
+      error: err.message || 'Erreur lors de l\'enregistrement de l\'élève.'
+    });
   }
 });
 
@@ -392,7 +401,8 @@ const loginByCode = asyncHandler(async (req, res) => {
 
   if (staffCheck.rows.length > 0) {
     const staff = staffCheck.rows[0];
-    if (staff.school_status !== 'approuve' && staff.school_status !== 'approuvé') {
+    const schoolStatus = normalizeSchoolStatus(staff.school_status);
+    if (schoolStatus !== 'approuve') {
       return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
     }
 
@@ -420,7 +430,8 @@ const loginByCode = asyncHandler(async (req, res) => {
 
   if (studentCheck.rows.length > 0) {
     const student = studentCheck.rows[0];
-    if (student.school_status !== 'approuve' && student.school_status !== 'approuvé') {
+    const schoolStatus = normalizeSchoolStatus(student.school_status);
+    if (schoolStatus !== 'approuve') {
       return res.status(403).json({ success: false, error: 'L\'école est actuellement suspendue.' });
     }
 

@@ -819,6 +819,28 @@ const ensureAdminTables = async () => {
   }
 };
 
+const ensureScheduledUserDeletionsTable = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.admin_scheduled_user_deletions (
+      id BIGSERIAL PRIMARY KEY,
+      user_id UUID NOT NULL,
+      user_name TEXT,
+      scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
+      status TEXT NOT NULL DEFAULT 'scheduled'
+        CHECK (status IN ('scheduled', 'processing', 'deleted', 'cancelled', 'failed')),
+      requested_by UUID,
+      last_error TEXT,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS admin_scheduled_user_deletions_active_user_idx
+    ON public.admin_scheduled_user_deletions (user_id)
+    WHERE status IN ('scheduled', 'processing')
+  `);
+};
+
 const logAdminAction = async (req, action, entityType, entityId, details = {}) => {
   const adminId = req.user?.id || null;
   const adminName = req.user?.full_name || 'Admin';
@@ -846,6 +868,7 @@ const logAdminAction = async (req, action, entityType, entityId, details = {}) =
  */
 const getUsers = asyncHandler(async (req, res) => {
   await ensureAdminTables();
+  await ensureScheduledUserDeletionsTable();
   // Security check: only global admin or authorized delegate can see users
   const hasViewPerm = req.user.is_global_admin || (req.user.granular_permissions && req.user.granular_permissions.users && req.user.granular_permissions.users.includes('view'));
 
@@ -855,12 +878,21 @@ const getUsers = asyncHandler(async (req, res) => {
 
   // We hide Global Admins from the management lists (User List & Directory)
   const result = await query(`
-    SELECT id, email, full_name, username, avatar_url, status, status_updated_at, phone_number, is_locked,
-           login_attempts, created_at, is_global_admin, last_login_at, device_info, is_verified,
-           gender, country, province, city, commune, birth_date
-    FROM public.profiles
-    WHERE is_global_admin = FALSE
-    ORDER BY status = 'online' DESC, status_updated_at DESC NULLS LAST
+    SELECT p.id, p.email, p.full_name, p.username, p.avatar_url, p.status, p.status_updated_at, p.phone_number, p.is_locked,
+           p.login_attempts, p.created_at, p.is_global_admin, p.last_login_at, p.device_info, p.is_verified,
+           p.gender, p.country, p.province, p.city, p.commune, p.birth_date,
+           scheduled_deletion.scheduled_at AS deletion_scheduled_at,
+           scheduled_deletion.status AS deletion_schedule_status
+    FROM public.profiles p
+    LEFT JOIN LATERAL (
+      SELECT scheduled_at, status
+      FROM public.admin_scheduled_user_deletions
+      WHERE user_id = p.id AND status <> 'cancelled'
+      ORDER BY created_at DESC
+      LIMIT 1
+    ) scheduled_deletion ON TRUE
+    WHERE p.is_global_admin = FALSE
+    ORDER BY p.status = 'online' DESC, p.status_updated_at DESC NULLS LAST
   `);
 
   res.json({ success: true, data: result.rows });
@@ -1005,6 +1037,36 @@ const handlePendingAction = asyncHandler(async (req, res) => {
           await query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [action.target_id]);
           await query('DELETE FROM public.profiles WHERE id = $1', [action.target_id]);
           break;
+        case 'schedule_delete_user': {
+          const scheduledAt = new Date(action.details.scheduledAt);
+          if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+            throw new Error('La date programmée est passée. Demandez une nouvelle planification.');
+          }
+          await saveScheduledUserDeletion(action.target_id, action.requested_by, scheduledAt.toISOString());
+          break;
+        }
+        case 'cancel_scheduled_delete':
+          await query(
+            `UPDATE public.admin_scheduled_user_deletions
+             SET status = 'cancelled', updated_at = NOW()
+             WHERE id = $1 AND status = 'scheduled'`,
+            [action.details.scheduleId]
+          );
+          break;
+        case 'send_security_notice': {
+          const targetUser = await query(
+            'SELECT email, full_name FROM public.profiles WHERE id = $1 AND is_global_admin = FALSE',
+            [action.target_id]
+          );
+          if (!targetUser.rows[0]) throw new Error('Utilisateur non trouvé');
+          const sent = await mailService.sendSecurityNoticeEmail(
+            targetUser.rows[0].email,
+            targetUser.rows[0].full_name,
+            action.details.message
+          );
+          if (!sent) throw new Error('L’e-mail de sécurité n’a pas pu être envoyé.');
+          break;
+        }
         case 'toggle_user_lock':
           await query('UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3', [action.details.isLocked, action.details.isLocked ? 3 : 0, action.target_id]);
           break;
@@ -1606,6 +1668,173 @@ const deleteUser = asyncHandler(async (req, res) => {
 
   await logAdminAction(req, 'delete_user', 'user', userId, { deleted: true });
   res.json({ success: true, message: 'Utilisateur supprimé' });
+});
+
+const saveScheduledUserDeletion = async (userId, requestedBy, scheduledAt) => {
+  await ensureScheduledUserDeletionsTable();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const userResult = await client.query(
+      'SELECT full_name, is_global_admin FROM public.profiles WHERE id = $1 FOR UPDATE',
+      [userId]
+    );
+    if (!userResult.rows[0]) throw new Error('Utilisateur non trouvé');
+    if (userResult.rows[0].is_global_admin) throw new Error('Impossible de supprimer un administrateur global');
+
+    const current = await client.query(
+      `SELECT id, status FROM public.admin_scheduled_user_deletions
+       WHERE user_id = $1 AND status IN ('scheduled', 'processing')
+       FOR UPDATE`,
+      [userId]
+    );
+    if (current.rows[0]?.status === 'processing') {
+      throw new Error('La suppression de ce compte est déjà en cours.');
+    }
+
+    let result;
+    if (current.rows[0]) {
+      result = await client.query(
+        `UPDATE public.admin_scheduled_user_deletions
+         SET scheduled_at = $1, requested_by = $2, user_name = $3, status = 'scheduled',
+             last_error = NULL, updated_at = NOW()
+         WHERE id = $4 RETURNING id, scheduled_at, status`,
+        [scheduledAt, requestedBy, userResult.rows[0].full_name, current.rows[0].id]
+      );
+    } else {
+      result = await client.query(
+        `INSERT INTO public.admin_scheduled_user_deletions (user_id, user_name, scheduled_at, requested_by)
+         VALUES ($1, $2, $3, $4) RETURNING id, scheduled_at, status`,
+        [userId, userResult.rows[0].full_name, scheduledAt, requestedBy]
+      );
+    }
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const scheduleUserDeletion = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const requestedAt = req.body?.scheduledAt;
+  const scheduledAt = new Date(requestedAt);
+  if (typeof requestedAt !== 'string' || Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+    return res.status(400).json({ success: false, error: 'Choisissez une date et une heure futures valides.' });
+  }
+  const userResult = await query(
+    'SELECT full_name, is_global_admin FROM public.profiles WHERE id = $1',
+    [userId]
+  );
+  const user = userResult.rows[0];
+  if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  if (user.is_global_admin) return res.status(403).json({ success: false, error: 'Impossible de supprimer un administrateur global' });
+  if (!req.user.is_global_admin && !req.user.granular_permissions?.users?.includes('delete')) {
+    return res.status(403).json({ success: false, error: 'Vous ne pouvez pas programmer la suppression de comptes.' });
+  }
+
+  const canExecute = await processSensitiveAction(
+    req,
+    'schedule_delete_user',
+    userId,
+    user.full_name,
+    { scheduledAt: scheduledAt.toISOString() },
+    'users',
+    'delete'
+  );
+  if (!canExecute) {
+    return res.json({ success: true, pending: true, message: 'La planification a été envoyée à l’administrateur principal pour approbation.' });
+  }
+
+  try {
+    const scheduled = await saveScheduledUserDeletion(userId, req.userId, scheduledAt.toISOString());
+    await logAdminAction(req, 'schedule_delete_user', 'user', userId, { scheduledAt: scheduled.scheduled_at });
+    res.json({ success: true, data: scheduled, message: 'Suppression programmée.' });
+  } catch (error) {
+    if (error.message === 'Utilisateur non trouvé') return res.status(404).json({ success: false, error: error.message });
+    if (error.message.includes('administrateur global')) return res.status(403).json({ success: false, error: error.message });
+    if (error.message.includes('déjà en cours')) return res.status(409).json({ success: false, error: error.message });
+    throw error;
+  }
+});
+
+const cancelScheduledUserDeletion = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  await ensureScheduledUserDeletionsTable();
+  const userResult = await query(
+    `SELECT p.full_name, sd.id
+     FROM public.profiles p
+     JOIN public.admin_scheduled_user_deletions sd ON sd.user_id = p.id AND sd.status = 'scheduled'
+     WHERE p.id = $1
+     ORDER BY sd.created_at DESC LIMIT 1`,
+    [userId]
+  );
+  if (!userResult.rows[0]) return res.status(404).json({ success: false, error: 'Aucune suppression programmée à annuler.' });
+  if (!req.user.is_global_admin && !req.user.granular_permissions?.users?.includes('delete')) {
+    return res.status(403).json({ success: false, error: 'Vous ne pouvez pas annuler la suppression programmée.' });
+  }
+
+  const canExecute = await processSensitiveAction(
+    req,
+    'cancel_scheduled_delete',
+    userId,
+    userResult.rows[0].full_name,
+    { scheduleId: userResult.rows[0].id },
+    'users',
+    'delete'
+  );
+  if (!canExecute) {
+    return res.json({ success: true, pending: true, message: 'La demande d’annulation a été envoyée à l’administrateur principal.' });
+  }
+
+  const result = await query(
+    `UPDATE public.admin_scheduled_user_deletions
+     SET status = 'cancelled', updated_at = NOW()
+     WHERE id = $1 AND status = 'scheduled'`,
+    [userResult.rows[0].id]
+  );
+  if (result.rowCount === 0) return res.status(409).json({ success: false, error: 'La suppression est déjà en cours ou terminée.' });
+  await logAdminAction(req, 'cancel_scheduled_delete', 'user', userId, { scheduleId: userResult.rows[0].id });
+  res.json({ success: true, message: 'Suppression programmée annulée.' });
+});
+
+const sendUserSecurityNotice = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const message = String(req.body?.message || '').trim();
+  if (!message || message.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Le message doit contenir entre 1 et 2000 caractères.' });
+  }
+  const userResult = await query(
+    'SELECT full_name, email FROM public.profiles WHERE id = $1 AND is_global_admin = FALSE',
+    [userId]
+  );
+  const user = userResult.rows[0];
+  if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  if (!user.email) return res.status(400).json({ success: false, error: 'Aucune adresse e-mail enregistrée pour ce compte.' });
+  if (!req.user.is_global_admin && !req.user.granular_permissions?.users?.includes('notify')) {
+    return res.status(403).json({ success: false, error: 'Vous ne pouvez pas envoyer les avis de sécurité.' });
+  }
+
+  const canExecute = await processSensitiveAction(
+    req,
+    'send_security_notice',
+    userId,
+    user.full_name,
+    { message },
+    'users',
+    'notify'
+  );
+  if (!canExecute) {
+    return res.json({ success: true, pending: true, message: 'L’avis de sécurité a été envoyé à l’administrateur principal pour approbation.' });
+  }
+
+  const sent = await mailService.sendSecurityNoticeEmail(user.email, user.full_name, message);
+  if (!sent) return res.status(502).json({ success: false, error: 'L’e-mail n’a pas pu être envoyé. Vérifiez le service de messagerie.' });
+  await logAdminAction(req, 'send_security_notice', 'user', userId, { email: user.email });
+  res.json({ success: true, message: 'Notification de sécurité envoyée par e-mail.' });
 });
 
 /**
@@ -3229,6 +3458,9 @@ module.exports = {
   getReports,
   resolveReport,
   deleteUser,
+  scheduleUserDeletion,
+  cancelScheduledUserDeletion,
+  sendUserSecurityNotice,
   toggleUserLock,
   toggleUserBadge,
   getGroups,
@@ -3290,5 +3522,6 @@ module.exports = {
   handleEmployerRequest,
   resetUserPassword,
   ensureAdminTables,
+  ensureScheduledUserDeletionsTable,
   processSensitiveAction
 };

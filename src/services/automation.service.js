@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { query } = require('../config/db');
+const { query, pool } = require('../config/db');
 const mailService = require('./mail.service');
 const socketService = require('./socket.service');
 const logger = require('../utils/logger');
@@ -15,6 +15,10 @@ class AutomationService {
     // 1. Chaque minute : Vérifier les envois programmés (Scheduled)
     cron.schedule('* * * * *', () => {
       this.processScheduledCampaigns();
+    });
+
+    cron.schedule('* * * * *', () => {
+      this.processScheduledUserDeletions();
     });
 
     // 2. Chaque jour à 10h00 : Relancer les utilisateurs inactifs (Retention)
@@ -91,6 +95,85 @@ class AutomationService {
       }
     } catch (error) {
       logger.error('Erreur processScheduledCampaigns:', error);
+    }
+  }
+
+  async processScheduledUserDeletions() {
+    try {
+      const adminController = require('../controllers/admin.controller');
+      await adminController.ensureAdminTables();
+      await adminController.ensureScheduledUserDeletionsTable();
+      await query(`
+        UPDATE public.admin_scheduled_user_deletions
+        SET status = 'scheduled', updated_at = NOW(),
+            last_error = 'Reprise après interruption du processus.'
+        WHERE status = 'processing' AND updated_at < NOW() - INTERVAL '10 minutes'
+      `);
+      const due = await query(`
+        WITH due AS (
+          SELECT id
+          FROM public.admin_scheduled_user_deletions
+          WHERE status = 'scheduled' AND scheduled_at <= NOW()
+          ORDER BY scheduled_at
+          LIMIT 10
+          FOR UPDATE SKIP LOCKED
+        )
+        UPDATE public.admin_scheduled_user_deletions AS schedule
+        SET status = 'processing', updated_at = NOW(), last_error = NULL
+        FROM due
+        WHERE schedule.id = due.id
+        RETURNING schedule.id, schedule.user_id, schedule.user_name, schedule.requested_by
+      `);
+
+      for (const schedule of due.rows) {
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          const user = await client.query(
+            'SELECT id, is_global_admin FROM public.profiles WHERE id = $1 FOR UPDATE',
+            [schedule.user_id]
+          );
+          if (user.rows.length && user.rows[0].is_global_admin) {
+            throw new Error('Refus de supprimer un administrateur global.');
+          }
+          if (user.rows.length) {
+            await client.query('DELETE FROM public.messages WHERE sender_id = $1', [schedule.user_id]);
+            await client.query('DELETE FROM public.chat_participants WHERE user_id = $1', [schedule.user_id]);
+            await client.query('UPDATE public.chats SET created_by = NULL WHERE created_by = $1', [schedule.user_id]);
+            await client.query('DELETE FROM public.profiles WHERE id = $1', [schedule.user_id]);
+          }
+          await client.query(
+            `UPDATE public.admin_scheduled_user_deletions
+             SET status = 'deleted', updated_at = NOW(), last_error = NULL
+             WHERE id = $1`,
+            [schedule.id]
+          );
+          await client.query(
+            `INSERT INTO public.admin_audit_logs (admin_id, action, entity_type, entity_id, details)
+             VALUES ($1, 'scheduled_delete_user', 'user', $2, $3)`,
+            [
+              schedule.requested_by,
+              schedule.user_id,
+              JSON.stringify({ scheduledDeletionId: schedule.id, userName: schedule.user_name })
+            ]
+          );
+          await client.query('COMMIT');
+          logger.info(`Compte ${schedule.user_id} supprimé selon sa planification ${schedule.id}.`);
+        } catch (error) {
+          await client.query('ROLLBACK');
+          await query(
+            `UPDATE public.admin_scheduled_user_deletions
+             SET status = 'failed', updated_at = NOW(), last_error = $2
+             WHERE id = $1 AND status = 'processing'`,
+            [schedule.id, error.message]
+          );
+          logger.error(`Échec de la suppression programmée ${schedule.id}:`, error);
+        } finally {
+          client.release();
+        }
+      }
+    } catch (error) {
+      logger.error('Erreur processScheduledUserDeletions:', error);
     }
   }
 

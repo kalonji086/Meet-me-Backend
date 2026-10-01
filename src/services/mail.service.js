@@ -288,6 +288,43 @@ class MailService {
       return false;
     }
   }
+
+  async sendSecurityNoticeEmail(email, name, message) {
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[char]);
+    const safeName = escapeHtml(name || 'Utilisateur');
+    const safeMessage = escapeHtml(message).replace(/\r?\n/g, '<br>');
+    const title = 'Avis de sécurité concernant votre compte Meet Me';
+    const content = `
+      <p>Bonjour <strong>${safeName}</strong>,</p>
+      <p>Notre équipe vous contacte au sujet de la sécurité de votre compte Meet Me.</p>
+      <div style="background:#fff7ed;border-left:4px solid #ea580c;padding:18px 20px;margin:22px 0;border-radius:8px;">
+        <p style="margin:0 0 8px;font-weight:bold;color:#9a3412;">Message de l’équipe de sécurité</p>
+        <p style="margin:0;line-height:1.6;">${safeMessage}</p>
+      </div>
+      <p>Si vous pensez que cet avis ne vous concerne pas, contactez notre équipe d’assistance.</p>
+    `;
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = title;
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, 'Avis de sécurité de votre compte Meet Me.');
+    sendSmtpEmail.sender = { name: 'Together Tech community official', email: config.email.emailFrom };
+    sendSmtpEmail.to = [{ email, name: name || 'Utilisateur' }];
+
+    try {
+      await apiInstance.sendTransacEmail(sendSmtpEmail);
+      logger.info(`Notification de sécurité envoyée à: ${email}`);
+      return true;
+    } catch (error) {
+      logger.error(`Erreur notification de sécurité pour ${email}:`, error.response?.body || error);
+      return false;
+    }
+  }
+
   /**
    * Envoyer un email de privilège Admin (Délégation)
    */

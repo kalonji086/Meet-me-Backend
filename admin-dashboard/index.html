@@ -4744,6 +4744,8 @@
                                         <p class="font-bold text-sm text-gray-800">${escapeUserCell(u.full_name)}</p>
                                         <p class="text-[10px] text-gray-400 font-bold">${escapeUserCell(u.email)}</p>
                                         ${u.is_verified ? '<span class="flex items-center text-[8px] font-black text-blue-500 uppercase tracking-tighter mt-1"><i data-lucide="badge-check" class="w-2.5 h-2.5 mr-1 fill-blue-500 text-white"></i> Vérifié</span>' : ''}
+                                        ${u.deletion_schedule_status === 'scheduled' ? `<span class="block text-[9px] font-bold text-orange-600 mt-1">Suppression prévue : ${escapeUserCell(new Date(u.deletion_scheduled_at).toLocaleString())}</span>` : ''}
+                                        ${u.deletion_schedule_status === 'failed' ? '<span class="block text-[9px] font-bold text-red-600 mt-1">Échec de la suppression programmée</span>' : ''}
                                     </div>
                                 </div>
                             </td>
@@ -4812,13 +4814,18 @@
                     }
 
                     if (visibleColumns.includes('actions')) {
+                        const userNameArg = encodeURIComponent(u.full_name || '').replace(/'/g, '%27');
+                        const hasScheduledDeletion = u.deletion_schedule_status === 'scheduled';
+                        const scheduledAtArg = encodeURIComponent(hasScheduledDeletion ? u.deletion_scheduled_at || '' : '');
                         cols.push(`
                             <td class="px-8 py-5 text-right flex items-center justify-end gap-2">
                                 <button onclick="resetUserPasswordAction('${u.id}', '${u.full_name.replace(/'/g, "\\'")}')" class="p-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all ${hasPerm('users', 'reset_pass') ? '' : 'hidden'}" title="Réinitialiser MDP"><i data-lucide="key-round" class="w-4 h-4"></i></button>
                                 <button onclick="toggleUserBadge('${u.id}', ${!u.is_verified})" class="p-3 ${u.is_verified ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'} rounded-xl hover:shadow-lg transition-all ${hasPerm('users', 'verify') ? '' : 'hidden'}" title="${u.is_verified ? 'Retirer Badge' : 'Accorder Badge'}"><i data-lucide="${u.is_verified ? 'shield-off' : 'shield-check'}" class="w-4 h-4"></i></button>
                                 <button onclick="inviteToCollab('${u.id}', '${u.full_name}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all ${hasPerm('collaboration', 'manage_members') ? '' : 'hidden'}" title="Inviter Together Tech"><i data-lucide="user-plus" class="w-4 h-4"></i></button>
                                 <button onclick="toggleUserLock('${u.id}', ${!u.is_locked})" class="p-3 bg-gray-50 rounded-xl hover:bg-black hover:text-white transition-all ${hasPerm('users', 'lock') ? '' : 'hidden'}"><i data-lucide="${u.is_locked ? 'unlock' : 'lock'}" class="w-4 h-4"></i></button>
-                                <button onclick="confirmDeleteUser('${u.id}', '${u.full_name}')" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all ${hasPerm('users', 'delete') ? '' : 'hidden'}" title="Supprimer définitivement"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                <button onclick="notifyUserSecurity('${u.id}', '${userNameArg}')" class="p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all ${hasPerm('users', 'notify') ? '' : 'hidden'}" title="Envoyer un avertissement de sécurité par e-mail"><i data-lucide="mail-warning" class="w-4 h-4"></i></button>
+                                ${hasScheduledDeletion ? `<button onclick="cancelScheduledUserDeletion('${u.id}', '${userNameArg}')" class="p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-600 hover:text-white transition-all ${hasPerm('users', 'delete') ? '' : 'hidden'}" title="Annuler la suppression prévue le ${escapeUserCell(new Date(u.deletion_scheduled_at).toLocaleString())}"><i data-lucide="calendar-x" class="w-4 h-4"></i></button>` : ''}
+                                <button onclick="confirmDeleteUser('${u.id}', '${userNameArg}', '${scheduledAtArg}')" class="p-3 ${hasScheduledDeletion ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-500'} rounded-xl hover:bg-red-600 hover:text-white transition-all ${hasPerm('users', 'delete') ? '' : 'hidden'}" title="${hasScheduledDeletion ? 'Modifier la suppression programmée' : 'Programmer la suppression'}"><i data-lucide="${hasScheduledDeletion ? 'calendar-clock' : 'calendar-plus'}" class="w-4 h-4"></i></button>
                             </td>
                         `);
                     }
@@ -4845,7 +4852,84 @@
             }
         }
 
-        function confirmDeleteUser(id, name) {
+        function formatLocalDateTimeInput(value) {
+            const date = value ? new Date(value) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+            const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+            return localDate.toISOString().slice(0, 16);
+        }
+
+        function confirmDeleteUser(id, encodedName, encodedScheduledAt = '') {
+            const name = decodeURIComponent(encodedName);
+            const scheduledAt = encodedScheduledAt ? decodeURIComponent(encodedScheduledAt) : '';
+            Alert.show("Programmer la suppression", `
+                <p class="text-sm text-gray-600 mb-5">Le compte de <strong>${escapeUserCell(name)}</strong> sera supprimé à la date et à l’heure locales choisies. Cette action est définitive.</p>
+                <label for="scheduled-user-deletion-at" class="block text-xs font-bold text-gray-700 mb-2">Date et heure de suppression</label>
+                <input id="scheduled-user-deletion-at" type="datetime-local" min="${formatLocalDateTimeInput(new Date())}" value="${formatLocalDateTimeInput(scheduledAt)}" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-400">
+                <p class="text-[11px] text-gray-500 mt-3">L’heure choisie utilise le fuseau horaire de votre appareil. Le serveur l’enregistrera comme un instant précis.</p>
+                ${scheduledAt ? '<p class="text-xs font-bold text-orange-600 mt-3">Une planification existe déjà. La confirmer la remplacera.</p>' : ''}
+            `, async () => {
+                const value = document.getElementById('scheduled-user-deletion-at')?.value;
+                const selectedDate = value ? new Date(value) : null;
+                if (!selectedDate || Number.isNaN(selectedDate.getTime()) || selectedDate.getTime() <= Date.now()) {
+                    alert("Choisissez une date et une heure futures.");
+                    return;
+                }
+                try {
+                    const res = await axios.post(`${API_URL}/admin/users/${id}/schedule-deletion`, {
+                        scheduledAt: selectedDate.toISOString()
+                    }, { headers: { Authorization: 'Bearer ' + token } });
+                    if (res.data.pending) alert(res.data.message);
+                    else toast("Suppression programmée à la date choisie.", "success");
+                    closeImpactModal();
+                    loadUsers();
+                } catch (e) {
+                    alert(e.response?.data?.error || "Erreur lors de la programmation de la suppression.");
+                }
+            }, scheduledAt ? "Modifier la date" : "Programmer", "red");
+        }
+
+        async function cancelScheduledUserDeletion(id, encodedName) {
+            const name = decodeURIComponent(encodedName);
+            if (!confirm(`Annuler la suppression programmée du compte de ${name} ?`)) return;
+            try {
+                const res = await axios.delete(`${API_URL}/admin/users/${id}/schedule-deletion`, {
+                    headers: { Authorization: 'Bearer ' + token }
+                });
+                if (res.data.pending) alert(res.data.message);
+                else toast("Suppression programmée annulée.", "success");
+                loadUsers();
+            } catch (e) {
+                alert(e.response?.data?.error || "Erreur lors de l’annulation de la suppression.");
+            }
+        }
+
+        function notifyUserSecurity(id, encodedName) {
+            const name = decodeURIComponent(encodedName);
+            Alert.show("Avertissement de sécurité", `
+                <p class="text-sm text-gray-600 mb-4">Rédigez le motif de sécurité à envoyer à <strong>${escapeUserCell(name)}</strong> par e-mail.</p>
+                <label for="user-security-notice" class="sr-only">Message de sécurité</label>
+                <textarea id="user-security-notice" maxlength="2000" rows="5" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" placeholder="Expliquez le problème de sécurité et les mesures attendues..."></textarea>
+                <p class="text-[11px] text-gray-500 mt-2">Maximum 2000 caractères. L’envoi sera enregistré dans le journal Admin.</p>
+            `, async () => {
+                const message = document.getElementById('user-security-notice')?.value.trim();
+                if (!message) {
+                    alert("Veuillez saisir le message de sécurité.");
+                    return;
+                }
+                try {
+                    const res = await axios.post(`${API_URL}/admin/users/${id}/security-notice`, { message }, {
+                        headers: { Authorization: 'Bearer ' + token }
+                    });
+                    if (res.data.pending) alert(res.data.message);
+                    else toast("E-mail de sécurité envoyé.", "success");
+                    closeImpactModal();
+                } catch (e) {
+                    alert(e.response?.data?.error || "L’e-mail n’a pas pu être envoyé.");
+                }
+            }, "Envoyer le mail", "amber");
+        }
+
+        function confirmDeleteUserLegacy(id, name) {
             Alert.show("Suppression", `Désintégration de <b>${name}</b> ?`, async () => {
                 try {
                     const res = await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -6445,7 +6529,7 @@
         function editDelegation(userId, userName, modules = "", active = true, collabRightsStr = "", userRightsStr = "", granularPermsStr = "", requiresApproval = true) {
             const allModules = [
                 { id: 'stats', label: 'Stats Globales', icon: 'bar-chart-3', perms: [{id:'view', label:'Consulter', icon:'eye'}] },
-                { id: 'users', label: 'Utilisateurs', icon: 'users', perms: [{id:'view', label:'Consulter', icon:'eye'}, {id:'lock', label:'Bloquer', icon:'lock'}, {id:'delete', label:'Supprimer', icon:'trash-2'}, {id:'verify', label:'Vérifier', icon:'check-circle'}, {id:'reset_pass', label:'Reset MDP', icon:'key'}] },
+                { id: 'users', label: 'Utilisateurs', icon: 'users', perms: [{id:'view', label:'Consulter', icon:'eye'}, {id:'lock', label:'Bloquer', icon:'lock'}, {id:'delete', label:'Supprimer', icon:'trash-2'}, {id:'verify', label:'Vérifier', icon:'check-circle'}, {id:'reset_pass', label:'Reset MDP', icon:'key'}, {id:'notify', label:'Avis sécurité par e-mail', icon:'mail-warning'}] },
                 { id: 'groups', label: 'Groupes', icon: 'message-square', perms: [{id:'read', label:'Lire', icon:'book-open'}, {id:'moderate', label:'Modérer', icon:'shield-alert'}, {id:'settings', label:'Gérer', icon:'settings'}, {id:'ban', label:'Bannir', icon:'user-x'}] },
                 { id: 'support', label: 'Support & Appeals', icon: 'help-circle', perms: [{id:'read', label:'Lire', icon:'eye'}, {id:'reply', label:'Répondre', icon:'message-circle'}, {id:'resolve', label:'Résoudre', icon:'check-square'}] },
                 { id: 'market-requests', label: 'Market & Boutiques', icon: 'shopping-bag', perms: [{id:'read', label:'Consulter', icon:'search'}, {id:'approve', label:'Approuver', icon:'check'}, {id:'boost', label:'Mettre en avant', icon:'zap'}, {id:'delete', label:'Supprimer', icon:'x-circle'}] },

@@ -4890,6 +4890,7 @@
                                 <button onclick="notifyUserSecurity('${u.id}', '${userNameArg}')" class="p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all ${hasPerm('users', 'notify') ? '' : 'hidden'}" title="Envoyer un avertissement de sécurité par e-mail"><i data-lucide="mail-warning" class="w-4 h-4"></i></button>
                                 ${hasScheduledDeletion ? `<button onclick="cancelScheduledUserDeletion('${u.id}', '${userNameArg}')" class="p-3 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-600 hover:text-white transition-all ${hasPerm('users', 'delete') ? '' : 'hidden'}" title="Annuler la suppression prévue le ${escapeUserCell(new Date(u.deletion_scheduled_at).toLocaleString())}"><i data-lucide="calendar-x" class="w-4 h-4"></i></button>` : ''}
                                 <button onclick="confirmDeleteUser('${u.id}', '${userNameArg}', '${scheduledAtArg}')" class="p-3 ${hasScheduledDeletion ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-500'} rounded-xl hover:bg-red-600 hover:text-white transition-all ${hasPerm('users', 'delete') ? '' : 'hidden'}" title="${hasScheduledDeletion ? 'Modifier la suppression programmée' : 'Programmer la suppression'}"><i data-lucide="${hasScheduledDeletion ? 'calendar-clock' : 'calendar-plus'}" class="w-4 h-4"></i></button>
+                                <button onclick="confirmImmediateUserDeletion('${u.id}', '${userNameArg}')" class="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all ${hasPerm('users', 'delete') ? '' : 'hidden'}" title="Supprimer immédiatement"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </td>
                         `);
                     }
@@ -5005,6 +5006,26 @@
                     alert(e.response?.data?.error || "Erreur lors de la suppression.");
                 }
             }, "Supprimer", "red");
+        }
+
+        function confirmImmediateUserDeletion(id, encodedName) {
+            const name = decodeURIComponent(encodedName);
+            Alert.show("Supprimer immédiatement", `
+                <p class="text-sm text-gray-600">Supprimer définitivement le compte de <strong>${escapeUserCell(name)}</strong> maintenant ?</p>
+                <p class="text-xs font-bold text-red-600 mt-3">Cette action est irréversible et ne modifie pas une éventuelle suppression programmée.</p>
+            `, async () => {
+                try {
+                    const res = await axios.delete(`${API_URL}/admin/users/${id}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (res.data.pending) alert(res.data.message);
+                    else toast("Utilisateur supprimé.", "success");
+                    closeImpactModal();
+                    loadUsers();
+                } catch (e) {
+                    alert(e.response?.data?.error || "Erreur lors de la suppression.");
+                }
+            }, "Supprimer maintenant", "red");
         }
 
         function resetUserPasswordAction(id, name) {

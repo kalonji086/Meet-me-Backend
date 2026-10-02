@@ -2160,6 +2160,9 @@ const createCampaign = asyncHandler(async (req, res) => {
   // Si scheduledAt est fourni et est dans le futur, on enregistre seulement
   const now = new Date();
   const scheduledDate = scheduledAt ? new Date(scheduledAt) : now;
+  if (scheduledAt && (Number.isNaN(scheduledDate.getTime()) || scheduledDate <= now)) {
+    return res.status(400).json({ success: false, error: 'Choisissez une date et une heure futures valides.' });
+  }
   const isFuture = scheduledDate > now;
 
   const campaign = await query(
@@ -2203,6 +2206,12 @@ const createCampaign = asyncHandler(async (req, res) => {
 const updateCampaign = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { title, message, scheduledAt, theme, ctaText, ctaUrl } = req.body;
+  if (scheduledAt) {
+    const nextDate = new Date(scheduledAt);
+    if (Number.isNaN(nextDate.getTime()) || nextDate <= new Date()) {
+      return res.status(400).json({ success: false, error: 'Choisissez une date et une heure futures valides.' });
+    }
+  }
 
   const result = await query(
     `UPDATE public.notification_campaigns

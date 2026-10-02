@@ -1128,9 +1128,10 @@
                                         <option value="scheduled">Programmer l'envoi</option>
                                     </select>
                                 </div>
-                                <div id="campaign-schedule-container" class="hidden">
-                                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Date et heure d'envoi</label>
+                                <div id="campaign-schedule-container" class="block">
+                                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2 block">Date et heure d'envoi programmé</label>
                                     <input id="campaign-scheduled-at" type="datetime-local" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                                    <p class="text-[10px] text-gray-400 font-bold mt-2">Choisissez une date future lorsque le mode « Programmer l'envoi » est sélectionné.</p>
                                 </div>
                             </div>
                             <div class="p-6 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
@@ -6010,7 +6011,6 @@
 
             function toggleCampaignSchedule() {
                 const isScheduled = document.getElementById('campaign-send-mode').value === 'scheduled';
-                document.getElementById('campaign-schedule-container').className = isScheduled ? 'block' : 'hidden';
                 document.getElementById('campaign-btn').innerText = isScheduled ? 'PROGRAMMER LA CAMPAGNE' : 'DIFFUSER LA CAMPAGNE';
             }
 

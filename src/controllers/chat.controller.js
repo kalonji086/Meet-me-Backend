@@ -421,7 +421,7 @@ const getChatDetails = asyncHandler(async (req, res) => {
 
   // Récupérer les infos du chat
   const chatResult = await query(
-    `SELECT c.*, cp.role as my_role
+    `SELECT c.*, cp.role as my_role, cp.is_favorite
      FROM public.chats c
      JOIN public.chat_participants cp ON c.id = cp.chat_id
      WHERE c.id = $1 AND cp.user_id = $2`,

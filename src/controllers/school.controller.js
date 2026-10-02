@@ -247,6 +247,36 @@ const ensureSchoolColumns = async () => {
             ALTER TABLE public.school_account_requests ADD COLUMN status TEXT DEFAULT 'en_attente';
           END IF;
         END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_schedules') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_schedules' AND column_name = 'school_id') THEN
+            ALTER TABLE public.school_schedules ADD COLUMN school_id UUID REFERENCES public.school_requests(id) ON DELETE CASCADE;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_schedules' AND column_name = 'teacher_name') THEN
+            ALTER TABLE public.school_schedules ADD COLUMN teacher_name TEXT;
+          END IF;
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_fees') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'school_id') THEN
+            ALTER TABLE public.school_fees ADD COLUMN school_id UUID REFERENCES public.school_requests(id) ON DELETE CASCADE;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'student_id') THEN
+            ALTER TABLE public.school_fees ADD COLUMN student_id UUID REFERENCES public.school_students(id) ON DELETE CASCADE;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'amount_due') THEN
+            ALTER TABLE public.school_fees ADD COLUMN amount_due NUMERIC DEFAULT 0;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'amount_paid') THEN
+            ALTER TABLE public.school_fees ADD COLUMN amount_paid NUMERIC DEFAULT 0;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'status') THEN
+            ALTER TABLE public.school_fees ADD COLUMN status TEXT DEFAULT 'non_paye';
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'due_date') THEN
+            ALTER TABLE public.school_fees ADD COLUMN due_date TEXT;
+          END IF;
+        END IF;
       END $$;
     `);
     columnsEnsured = true;
@@ -286,6 +316,73 @@ const getSchoolDashboardData = asyncHandler(async (req, res) => {
       monthlyRevenue: (revenueSum.rows[0].sum || 0) + ' $'
     }
   });
+});
+
+/**
+ * @desc    Get school settings for the current promoter
+ * @route   GET /api/school/settings
+ * @access  Private
+ */
+const getSchoolSettings = asyncHandler(async (req, res) => {
+  const school = await getPromoterSchool(req.userId);
+  if (!school) {
+    return res.status(403).json({ success: false, error: 'École introuvable.' });
+  }
+
+  res.json({ success: true, data: school });
+});
+
+/**
+ * @desc    Update school settings for the current promoter
+ * @route   PUT /api/school/settings
+ * @access  Private
+ */
+const updateSchoolSettings = asyncHandler(async (req, res) => {
+  const school = await getPromoterSchool(req.userId);
+  if (!school) {
+    return res.status(403).json({ success: false, error: 'École introuvable.' });
+  }
+
+  const {
+    schoolName,
+    schoolEmail,
+    schoolPhone,
+    schoolAddress,
+    schoolType,
+    description
+  } = req.body;
+
+  if (!schoolName?.trim() || !schoolEmail?.trim() || !schoolType?.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Le nom, l’e-mail et le type de l’école sont requis.'
+    });
+  }
+
+  const result = await query(
+    `UPDATE public.school_requests
+     SET school_name = $1,
+         school_email = $2,
+         school_phone = $3,
+         school_address = $4,
+         school_type = $5,
+         description = $6,
+         updated_at = NOW()
+     WHERE id = $7 AND user_id = $8
+     RETURNING *`,
+    [
+      schoolName.trim(),
+      schoolEmail.trim(),
+      schoolPhone?.trim() || null,
+      schoolAddress?.trim() || null,
+      schoolType.trim(),
+      description?.trim() || null,
+      school.id,
+      req.userId
+    ]
+  );
+
+  res.json({ success: true, data: result.rows[0], message: 'Paramètres de l’école mis à jour.' });
 });
 
 /**
@@ -599,6 +696,8 @@ const getSchedules = asyncHandler(async (req, res) => {
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
+  await ensureSchoolColumns();
+
   const result = await query(`
     SELECT sch.*, c.name as class_name
     FROM public.school_schedules sch
@@ -616,6 +715,8 @@ const addSchedule = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
+
+  await ensureSchoolColumns();
 
   const { classId, dayOfWeek, startTime, endTime, subject, teacherName } = req.body;
   if (!classId || !dayOfWeek || !startTime || !endTime || !subject) {
@@ -638,6 +739,8 @@ const getFees = asyncHandler(async (req, res) => {
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
+  await ensureSchoolColumns();
+
   const result = await query(`
     SELECT f.*, s.full_name as student_name
     FROM public.school_fees f
@@ -655,6 +758,8 @@ const addFeeInvoice = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const school = await getPromoterSchool(userId);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
+
+  await ensureSchoolColumns();
 
   const { studentId, amountDue, amountPaid, dueDate, status } = req.body;
   if (!studentId || amountDue === undefined) {
@@ -709,6 +814,8 @@ module.exports = {
   getSchoolStatus,
   approveSchoolRequest,
   getSchoolDashboardData,
+  getSchoolSettings,
+  updateSchoolSettings,
   getStudents,
   addStudent,
   getClasses,

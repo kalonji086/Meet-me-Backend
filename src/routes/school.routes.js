@@ -7,6 +7,8 @@ const { authenticate, isAdmin } = require('../middleware/auth.middleware');
 router.post('/request', authenticate, schoolController.submitSchoolRequest);
 router.get('/status', authenticate, schoolController.getSchoolStatus);
 router.get('/dashboard', authenticate, schoolController.getSchoolDashboardData);
+router.get('/settings', authenticate, schoolController.getSchoolSettings);
+router.put('/settings', authenticate, schoolController.updateSchoolSettings);
 
 // Sub-modules École existants
 router.get('/students', authenticate, schoolController.getStudents);

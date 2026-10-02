@@ -1710,6 +1710,8 @@
         const API_URL = BASE_URL + "/api";
         const API_PORTFOLIO = API_URL + "/portfolio";
         let token = localStorage.getItem('admin_token');
+        let adminRefreshPromise = null;
+        let adminSessionExpiredHandled = false;
         let socket = null;
         let campaignEditor = null;
         let statsLoadSequence = 0;
@@ -1723,6 +1725,65 @@
         let statsSchoolResizeTimer = null;
         let notifications_list = [];
         let unread_notif_count = 0;
+
+        async function refreshAdminAccessToken() {
+            const refreshToken = localStorage.getItem('admin_refresh_token');
+            if (!refreshToken) throw new Error('Votre session Admin a expiré. Veuillez vous reconnecter.');
+            if (!adminRefreshPromise) {
+                adminRefreshPromise = axios.post(`${API_URL}/auth/refresh`, { refreshToken })
+                    .then(response => {
+                        const newToken = response.data?.data?.token;
+                        if (!response.data?.success || !newToken) {
+                            throw new Error(response.data?.error || 'Impossible de renouveler la session Admin.');
+                        }
+                        token = newToken;
+                        localStorage.setItem('admin_token', newToken);
+                        return newToken;
+                    })
+                    .finally(() => {
+                        adminRefreshPromise = null;
+                    });
+            }
+            return adminRefreshPromise;
+        }
+
+        function expireAdminSession() {
+            if (adminSessionExpiredHandled) return;
+            adminSessionExpiredHandled = true;
+            token = null;
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_refresh_token');
+            localStorage.removeItem('admin_user');
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            document.getElementById('main-container')?.classList.add('hidden');
+            document.getElementById('login-container')?.classList.remove('hidden');
+            showToast('Session expirée', 'Veuillez vous reconnecter au panneau Admin.', 'lock-keyhole');
+        }
+
+        axios.interceptors.response.use(
+            response => response,
+            async error => {
+                const request = error.config;
+                const requestUrl = String(request?.url || '');
+                const isAuthEndpoint = /\/auth\/(login|refresh|logout)(?:$|[?#])/.test(requestUrl);
+                if (error.response?.status !== 401 || !request || request._adminAuthRetry || isAuthEndpoint) {
+                    return Promise.reject(error);
+                }
+                request._adminAuthRetry = true;
+                try {
+                    const renewedToken = await refreshAdminAccessToken();
+                    request.headers = request.headers || {};
+                    request.headers.Authorization = `Bearer ${renewedToken}`;
+                    return axios(request);
+                } catch (refreshError) {
+                    expireAdminSession();
+                    return Promise.reject(refreshError);
+                }
+            }
+        );
 
         window.addEventListener('resize', () => {
             window.clearTimeout(statsSchoolResizeTimer);
@@ -1934,8 +1995,10 @@
                 if (res.data.success) {
                     const data = res.data.data;
                     localStorage.setItem('admin_token', data.token);
+                    if (data.refreshToken) localStorage.setItem('admin_refresh_token', data.refreshToken);
                     localStorage.setItem('admin_user', JSON.stringify(data.user));
                     token = data.token;
+                    adminSessionExpiredHandled = false;
 
                     console.log("Login successful, user:", data.user.email);
 
@@ -4587,6 +4650,7 @@
                 }
             } catch (e) {
                 if (requestId !== statsLoadSequence) return;
+                if (!token) return;
                 const message = (e.response && e.response.data && e.response.data.error) || e.message || 'Impossible de charger les statistiques.';
                 if (errorState) {
                     errorState.textContent = "Les statistiques n'ont pas pu \u00eatre actualis\u00e9es : " + message;
@@ -4834,6 +4898,7 @@
                 }).join('') || `<tr><td colspan="${USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length}" class="px-8 py-10 text-center text-sm font-semibold text-gray-400">Aucun utilisateur trouvé.</td></tr>`;
                 lucide.createIcons();
             } catch (e) {
+                if (!token) return;
                 console.error('Erreur lors du chargement des utilisateurs Admin:', e);
                 const body = document.getElementById('users-table-body');
                 body.innerHTML = `<tr><td colspan="${USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length}" class="px-8 py-10 text-center text-sm font-semibold text-red-500">Impossible de charger les utilisateurs. Vérifiez la connexion et les autorisations, puis réessayez.</td></tr>`;

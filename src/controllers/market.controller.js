@@ -29,9 +29,8 @@ const registerBusiness = asyncHandler(async (req, res) => {
     capitalAmount
   } = req.body;
 
-  // Validation minimaliste (à renforcer selon les besoins)
-  if (!category || !businessName) {
-    return res.status(400).json({ success: false, error: 'La catégorie et le nom du business sont requis' });
+  if (!category || !businessName?.trim() || !shortDescription?.trim() || !contactInfo?.trim() || !addressCity?.trim()) {
+    return res.status(400).json({ success: false, error: 'La catégorie, le nom, la description, le contact et la ville sont requis.' });
   }
 
   // Vérifier si déjà enregistré
@@ -49,7 +48,7 @@ const registerBusiness = asyncHandler(async (req, res) => {
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     RETURNING *`,
     [
-      userId, category, businessName, shortDescription, fullDescription,
+      userId, category, businessName.trim(), shortDescription.trim(), fullDescription?.trim() || null,
       logoUrl, bannerUrl, contactInfo, addressCity, addressCommune,
       addressProvince, addressQuarter, addressPostalCode, idCardUrl,
       nationalIdNumber, rccmNumber, employeeCount, capitalAmount
@@ -575,24 +574,94 @@ const createQuote = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Get business chats
+ * @desc    Get Market conversations for a business owner or customer.
+ *          These conversations never use public.chats or public.messages.
  */
 const getBusinessChats = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const result = await query(
-    `SELECT c.*, p.full_name as other_name, p.avatar_url as other_avatar,
-     (SELECT content FROM public.messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-     (SELECT created_at FROM public.messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_at
-     FROM public.chats c
-     JOIN public.chat_participants cp1 ON c.id = cp1.chat_id AND cp1.user_id = $1
-     JOIN public.chat_participants cp2 ON c.id = cp2.chat_id AND cp2.user_id != $1
-     JOIN public.profiles p ON cp2.user_id = p.id
-     WHERE c.type = 'private'
-     ORDER BY c.last_message_at DESC NULLS LAST LIMIT 20`,
+    `SELECT c.id, c.business_id, c.customer_id, c.updated_at,
+       b.business_name, b.logo_url,
+       CASE WHEN b.user_id = $1 THEN customer.full_name ELSE b.business_name END AS other_name,
+       CASE WHEN b.user_id = $1 THEN customer.avatar_url ELSE b.logo_url END AS other_avatar,
+       (SELECT content FROM public.market_messages m WHERE m.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS last_message,
+       (SELECT created_at FROM public.market_messages m WHERE m.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS last_message_at
+     FROM public.market_conversations c
+     JOIN public.market_businesses b ON b.id = c.business_id
+     JOIN public.profiles customer ON customer.id = c.customer_id
+     WHERE c.customer_id = $1 OR b.user_id = $1
+     ORDER BY COALESCE((SELECT MAX(created_at) FROM public.market_messages m WHERE m.conversation_id = c.id), c.updated_at) DESC
+     LIMIT 50`,
     [userId]
   );
 
   res.json({ success: true, data: result.rows });
+});
+
+const createMarketConversation = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { businessId } = req.body;
+  if (!businessId) return res.status(400).json({ success: false, error: 'Business requis.' });
+
+  const businessResult = await query(
+    'SELECT id, user_id, business_name FROM public.market_businesses WHERE id = $1 AND status = $2',
+    [businessId, 'approved']
+  );
+  if (businessResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Business introuvable ou indisponible.' });
+  if (businessResult.rows[0].user_id === userId) return res.status(400).json({ success: false, error: 'Vous ne pouvez pas vous contacter vous-même.' });
+
+  const result = await query(
+    `INSERT INTO public.market_conversations (business_id, customer_id)
+     VALUES ($1, $2)
+     ON CONFLICT (business_id, customer_id) DO UPDATE SET updated_at = NOW()
+     RETURNING id, business_id, customer_id`,
+    [businessId, userId]
+  );
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+
+const getMarketMessages = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { conversationId } = req.params;
+  const access = await query(
+    `SELECT c.id FROM public.market_conversations c
+     JOIN public.market_businesses b ON b.id = c.business_id
+     WHERE c.id = $1 AND (c.customer_id = $2 OR b.user_id = $2)`,
+    [conversationId, userId]
+  );
+  if (access.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé à cette conversation Market.' });
+
+  const messages = await query(
+    `SELECT m.*, p.full_name, p.avatar_url FROM public.market_messages m
+     JOIN public.profiles p ON p.id = m.sender_id
+     WHERE m.conversation_id = $1 ORDER BY m.created_at ASC`,
+    [conversationId]
+  );
+  res.json({ success: true, data: messages.rows });
+});
+
+const sendMarketMessage = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const { conversationId } = req.params;
+  const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+  if (!content) return res.status(400).json({ success: false, error: 'Le message ne peut pas être vide.' });
+  if (content.length > 4000) return res.status(400).json({ success: false, error: 'Le message est trop long.' });
+
+  const access = await query(
+    `SELECT c.id FROM public.market_conversations c
+     JOIN public.market_businesses b ON b.id = c.business_id
+     WHERE c.id = $1 AND (c.customer_id = $2 OR b.user_id = $2)`,
+    [conversationId, userId]
+  );
+  if (access.rows.length === 0) return res.status(403).json({ success: false, error: 'Accès refusé à cette conversation Market.' });
+
+  const message = await query(
+    `INSERT INTO public.market_messages (conversation_id, sender_id, content)
+     VALUES ($1, $2, $3) RETURNING *`,
+    [conversationId, userId, content]
+  );
+  await query('UPDATE public.market_conversations SET updated_at = NOW() WHERE id = $1', [conversationId]);
+  res.status(201).json({ success: true, data: message.rows[0] });
 });
 
 /**
@@ -646,6 +715,9 @@ module.exports = {
   getInventoryLogs,
   updateInventory,
   getBusinessChats,
+  createMarketConversation,
+  getMarketMessages,
+  sendMarketMessage,
   getDocuments,
   uploadDocument,
   getPostComments,

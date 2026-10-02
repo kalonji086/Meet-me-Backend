@@ -111,6 +111,9 @@ router.delete('/inventory/:itemId', marketController.deleteInventoryItem);
  * @route   GET /api/market/chats
  */
 router.get('/chats', marketController.getBusinessChats);
+router.post('/conversations', marketController.createMarketConversation);
+router.get('/conversations/:conversationId/messages', marketController.getMarketMessages);
+router.post('/conversations/:conversationId/messages', marketController.sendMarketMessage);
 
 /**
  * @route   GET /api/market/documents

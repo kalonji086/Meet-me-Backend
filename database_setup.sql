@@ -591,6 +591,28 @@ CREATE TABLE IF NOT EXISTS public.market_quotes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Conversations Market: intentionally independent from Meet Me chats/messages.
+CREATE TABLE IF NOT EXISTS public.market_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID NOT NULL REFERENCES public.market_businesses(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (business_id, customer_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.market_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES public.market_conversations(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT NOT NULL CHECK (char_length(trim(content)) > 0),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_conversations_business ON public.market_conversations(business_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_conversations_customer ON public.market_conversations(customer_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_messages_conversation ON public.market_messages(conversation_id, created_at ASC);
+
 -- Admin Delegations (Atributions)
 CREATE TABLE IF NOT EXISTS public.admin_delegations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

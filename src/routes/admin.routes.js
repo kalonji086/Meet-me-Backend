@@ -39,6 +39,7 @@ router.get('/campaigns', adminController.getCampaigns);
 router.post('/campaigns', adminController.createCampaign);
 router.put('/campaigns/:id', adminController.updateCampaign);
 router.delete('/campaigns/:id', adminController.deleteCampaign);
+router.post('/campaigns/:id/resend', adminController.resendCampaign);
 
 router.get('/audit-logs', adminController.getAuditLogs);
 

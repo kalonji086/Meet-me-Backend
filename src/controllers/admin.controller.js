@@ -2253,6 +2253,69 @@ const deleteCampaign = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Campagne supprimée' });
 });
 
+const resendCampaign = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { title, message, target, targetValue, scheduledAt } = req.body;
+  const scheduledDate = new Date(scheduledAt);
+
+  if (!title?.trim() || !message?.trim()) {
+    return res.status(400).json({ success: false, error: 'Titre et message requis.' });
+  }
+  if (Number.isNaN(scheduledDate.getTime()) || scheduledDate <= new Date()) {
+    return res.status(400).json({ success: false, error: 'Choisissez une date et une heure futures valides.' });
+  }
+  if (!['all', 'specific'].includes(target)) {
+    return res.status(400).json({ success: false, error: 'Cible de campagne invalide.' });
+  }
+  if (target === 'specific' && !targetValue?.trim()) {
+    return res.status(400).json({ success: false, error: 'Indiquez au moins une adresse e-mail destinataire.' });
+  }
+
+  const originalResult = await query(
+    `SELECT id, metadata FROM public.notification_campaigns
+     WHERE id = $1 AND status = 'sent'`,
+    [id]
+  );
+  if (originalResult.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Campagne envoyée introuvable.' });
+  }
+
+  const canExecute = await processSensitiveAction(
+    req,
+    'resend_campaign',
+    id,
+    title.trim(),
+    { sourceCampaignId: id, scheduledAt: scheduledDate.toISOString() },
+    'campaigns',
+    'create'
+  );
+  if (!canExecute) {
+    return res.json({ success: true, pending: true, message: 'La demande de renvoi a été envoyée pour approbation.' });
+  }
+
+  const campaign = await query(
+    `INSERT INTO public.notification_campaigns
+       (title, message, target, target_value, created_by, status, scheduled_at, sent_count, metadata)
+     VALUES ($1, $2, $3, $4, $5, 'scheduled', $6, 0, $7)
+     RETURNING *`,
+    [
+      title.trim(),
+      message.trim(),
+      target,
+      target === 'specific' ? targetValue.trim() : null,
+      req.user?.id || null,
+      scheduledDate.toISOString(),
+      JSON.stringify(originalResult.rows[0].metadata || {})
+    ]
+  );
+
+  await logAdminAction(req, 'resend_campaign', 'campaign', campaign.rows[0].id, {
+    sourceCampaignId: id,
+    scheduledAt: scheduledDate.toISOString()
+  });
+  res.status(201).json({ success: true, data: campaign.rows[0], message: 'Nouvelle campagne de renvoi programmée.' });
+});
+
 const getAnalytics = asyncHandler(async (req, res) => {
   await employerController.ensureEmployerTables();
 
@@ -3489,6 +3552,7 @@ module.exports = {
   createCampaign,
   updateCampaign,
   deleteCampaign,
+  resendCampaign,
   getAuditLogs,
   broadcastMessage,
   getAppConfig,

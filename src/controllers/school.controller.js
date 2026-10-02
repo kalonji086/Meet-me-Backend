@@ -484,6 +484,90 @@ const addStudent = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Return data scoped to a staff or student school-code session
+ * @route   GET /api/school/portal/dashboard
+ * @access  School session
+ */
+const getSchoolPortalDashboard = asyncHandler(async (req, res) => {
+  const session = req.schoolSession;
+
+  if (session.principalType === 'student') {
+    const studentResult = await query(
+      `SELECT s.id, s.full_name, s.class_id, c.name AS class_name, sr.school_name
+       FROM public.school_students s
+       JOIN public.school_requests sr ON sr.id = s.school_id
+       LEFT JOIN public.school_classes c ON c.id = s.class_id
+       WHERE s.id = $1 AND s.school_id = $2`,
+      [session.principalId, session.schoolId]
+    );
+    if (studentResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Élève introuvable.' });
+    }
+
+    const student = studentResult.rows[0];
+    const [schedules, grades, attendance, fees, resources] = await Promise.all([
+      query(`SELECT day_of_week, start_time, end_time, subject, teacher_name
+             FROM public.school_schedules WHERE school_id = $1 AND class_id = $2
+             ORDER BY day_of_week, start_time`, [session.schoolId, student.class_id]),
+      query(`SELECT g.score, g.comment, e.title, e.type, e.max_score, e.evaluation_date, sub.name AS subject_name
+             FROM public.school_grades g
+             JOIN public.school_evaluations e ON e.id = g.evaluation_id
+             LEFT JOIN public.school_subjects sub ON sub.id = e.subject_id
+             WHERE g.student_id = $1 AND e.school_id = $2 AND e.is_published = TRUE
+             ORDER BY e.evaluation_date DESC`, [student.id, session.schoolId]),
+      query(`SELECT date, status, reason FROM public.school_attendance
+             WHERE student_id = $1 AND school_id = $2 ORDER BY date DESC LIMIT 20`, [student.id, session.schoolId]),
+      query(`SELECT amount_due, amount_paid, status, due_date FROM public.school_fees
+             WHERE student_id = $1 AND school_id = $2 ORDER BY created_at DESC`, [student.id, session.schoolId]),
+      query(`SELECT title, description, file_url, file_type, created_at FROM public.school_resources
+             WHERE school_id = $1 AND (is_public = TRUE OR class_id = $2)
+             ORDER BY created_at DESC LIMIT 20`, [session.schoolId, student.class_id])
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        type: 'student', student, schedules: schedules.rows, grades: grades.rows,
+        attendance: attendance.rows, fees: fees.rows, resources: resources.rows
+      }
+    });
+  }
+
+  const staffResult = await query(
+    `SELECT sar.id, sar.full_name, sar.role, sr.school_name
+     FROM public.school_account_requests sar
+     JOIN public.school_requests sr ON sr.id = sar.school_id
+     WHERE sar.id = $1 AND sar.school_id = $2 AND sar.status = 'approuve'`,
+    [session.principalId, session.schoolId]
+  );
+  if (staffResult.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Personnel introuvable.' });
+  }
+
+  const [classes, schedules, studentsCount, attendanceStats] = await Promise.all([
+    query(`SELECT id, name, level FROM public.school_classes
+           WHERE school_id = $1 AND (staff_id = $2 OR $3 IN ('directeur', 'prefet')) ORDER BY name`,
+    [session.schoolId, session.principalId, session.role]),
+    query('SELECT day_of_week, start_time, end_time, subject, teacher_name FROM public.school_schedules WHERE school_id = $1 ORDER BY day_of_week, start_time LIMIT 30', [session.schoolId]),
+    query('SELECT COUNT(*)::int AS count FROM public.school_students WHERE school_id = $1 AND is_active = TRUE', [session.schoolId]),
+    query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'absent')::int AS absent
+           FROM public.school_attendance WHERE school_id = $1 AND date >= CURRENT_DATE - INTERVAL '30 days'`, [session.schoolId])
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      type: 'staff', staff: staffResult.rows[0], classes: classes.rows, schedules: schedules.rows,
+      stats: {
+        totalStudents: studentsCount.rows[0].count || 0,
+        attendanceRecords: attendanceStats.rows[0].total || 0,
+        absences: attendanceStats.rows[0].absent || 0
+      }
+    }
+  });
+});
+
+/**
  * @desc    Universal school login by unique code
  */
 const loginByCode = asyncHandler(async (req, res) => {

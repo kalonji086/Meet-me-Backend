@@ -42,6 +42,29 @@ const authenticate = async (req, res, next) => {
 };
 
 /**
+ * Authentifie une session temporaire créée par un code d'accès scolaire.
+ * Cette session ne remplace jamais la session utilisateur principale.
+ */
+const authenticateSchoolSession = (req, res, next) => {
+  try {
+    const token = req.headers['x-school-session'];
+    if (!token || typeof token !== 'string') {
+      return res.status(401).json({ success: false, error: 'Session scolaire manquante.' });
+    }
+
+    const decoded = jwt.verify(token, config.jwt.secret);
+    if (!decoded.schoolSession || !decoded.schoolId || !decoded.principalId || !decoded.role) {
+      return res.status(401).json({ success: false, error: 'Session scolaire invalide.' });
+    }
+
+    req.schoolSession = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, error: 'Session scolaire expirée ou invalide.' });
+  }
+};
+
+/**
  * Middleware pour vérifier si un utilisateur participe à un chat
  */
 const checkChatParticipation = async (req, res, next) => {
@@ -134,4 +157,4 @@ const authenticateAllowLocked = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticate, authenticateAllowLocked, isAdmin, rateLimitAuth, checkChatParticipation };
+module.exports = { authenticate, authenticateAllowLocked, authenticateSchoolSession, isAdmin, rateLimitAuth, checkChatParticipation };

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const schoolController = require('../controllers/school.extended.controller');
-const { authenticate, isAdmin } = require('../middleware/auth.middleware');
+const { authenticate, authenticateSchoolSession, isAdmin } = require('../middleware/auth.middleware');
 
 // Routes privées (Utilisateurs connectés)
 router.post('/request', authenticate, schoolController.submitSchoolRequest);
@@ -49,6 +49,7 @@ router.get('/export', authenticate, schoolController.exportSchoolData);
 
 // Login Universel par Code (Public)
 router.post('/login-by-code', schoolController.loginByCode);
+router.get('/portal/dashboard', authenticateSchoolSession, schoolController.getSchoolPortalDashboard);
 
 // Route Admin d'approbation
 router.put('/approve/:requestId', authenticate, isAdmin, schoolController.approveSchoolRequest);

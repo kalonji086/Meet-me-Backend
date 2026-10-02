@@ -34,6 +34,33 @@ CREATE TABLE IF NOT EXISTS public.school_grades (
   UNIQUE(evaluation_id, student_id)
 );
 
+-- Compatibility for deployments where school_grades predates evaluations.
+-- Existing rows are preserved; new grade writes supply evaluation_id.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'school_grades'
+  ) THEN
+    ALTER TABLE public.school_grades ADD COLUMN IF NOT EXISTS evaluation_id UUID;
+    ALTER TABLE public.school_grades ADD COLUMN IF NOT EXISTS student_id UUID;
+    ALTER TABLE public.school_grades ADD COLUMN IF NOT EXISTS score NUMERIC;
+    ALTER TABLE public.school_grades ADD COLUMN IF NOT EXISTS comment TEXT;
+    ALTER TABLE public.school_grades ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT TRUE;
+    ALTER TABLE public.school_grades ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'school_grades_evaluation_id_fkey'
+        AND conrelid = 'public.school_grades'::regclass
+    ) THEN
+      ALTER TABLE public.school_grades
+        ADD CONSTRAINT school_grades_evaluation_id_fkey
+        FOREIGN KEY (evaluation_id) REFERENCES public.school_evaluations(id) ON DELETE CASCADE NOT VALID;
+    END IF;
+  END IF;
+END $$;
+
 -- Migration pour les absences
 CREATE TABLE IF NOT EXISTS public.school_attendance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

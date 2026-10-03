@@ -447,23 +447,19 @@ const getSchoolDashboardData = asyncHandler(async (req, res) => {
     });
   }
 
-  await ensureSchoolColumns();
-
-  const [studentsCount, teachersCount, classesCount, revenueSum] = await Promise.all([
-    query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1 AND is_active = TRUE', [school.id]),
-    query("SELECT COUNT(*) FROM public.school_account_requests WHERE school_id = $1 AND status = 'approuve'", [school.id]),
-    query('SELECT COUNT(*) FROM public.school_classes WHERE school_id = $1 AND is_active = TRUE', [school.id]),
-    query('SELECT COALESCE(SUM(amount_paid), 0) AS total FROM public.school_fees WHERE school_id = $1', [school.id])
-  ]);
+  // Requêtes réelles pour mettre à jour les métriques à la volée
+  const studentsCount = await query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1', [school.id]);
+  const classesCount = await query('SELECT COUNT(*) FROM public.school_classes WHERE school_id = $1', [school.id]);
+  const revenueSum = await query("SELECT SUM(amount_paid) FROM public.school_fees WHERE school_id = $1", [school.id]);
 
   res.json({
     success: true,
     school: school,
     stats: {
       totalStudents: parseInt(studentsCount.rows[0].count) || 0,
-      totalTeachers: parseInt(teachersCount.rows[0].count) || 0,
+      totalTeachers: school.total_teachers || 0,
       totalClasses: parseInt(classesCount.rows[0].count) || 0,
-      monthlyRevenue: (revenueSum.rows[0].total || 0) + ' $'
+      monthlyRevenue: (revenueSum.rows[0].sum || 0) + ' $'
     }
   });
 });

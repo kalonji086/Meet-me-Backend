@@ -2937,14 +2937,22 @@ const approveAdminSchoolAccountRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { action } = req.body; // approuve or rejete
 
-  if (action === 'rejete') {
-    await query("UPDATE public.school_account_requests SET status = 'rejete' WHERE id = $1", [id]);
-    return res.json({ success: true, message: 'Demande rejetée.' });
+  if (!['approuve', 'rejete'].includes(action)) {
+    return res.status(400).json({ success: false, error: 'Action d’approbation invalide.' });
   }
 
   const check = await query('SELECT * FROM public.school_account_requests WHERE id = $1', [id]);
   if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Demande introuvable' });
   const staff = check.rows[0];
+
+  if (staff.status !== 'en_attente') {
+    return res.status(409).json({ success: false, error: 'Cette demande a déjà été traitée.' });
+  }
+
+  if (action === 'rejete') {
+    await query("UPDATE public.school_account_requests SET status = 'rejete' WHERE id = $1", [id]);
+    return res.json({ success: true, message: 'Demande rejetée.' });
+  }
 
   // Mettre à jour le statut
   await query("UPDATE public.school_account_requests SET status = 'approuve' WHERE id = $1", [id]);

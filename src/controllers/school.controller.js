@@ -356,6 +356,17 @@ const ensureSchoolColumns = async () => {
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_schedules' AND column_name = 'teacher_name') THEN
             ALTER TABLE public.school_schedules ADD COLUMN teacher_name TEXT;
           END IF;
+          IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'school_schedules'
+              AND column_name = 'teacher_name'
+              AND data_type = 'uuid'
+          ) THEN
+            ALTER TABLE public.school_schedules
+              ALTER COLUMN teacher_name TYPE TEXT USING teacher_name::TEXT;
+          END IF;
         END IF;
 
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_fees') THEN
@@ -1071,22 +1082,32 @@ const addSchedule = asyncHandler(async (req, res) => {
   if (!isValidUUID(classId)) {
     return res.status(400).json({ success: false, error: 'La classe sélectionnée est invalide.' });
   }
-  const cleanClassId = classId.trim();
 
   const classCheck = await query(
     'SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2',
-    [cleanClassId, school.id]
+    [classId, school.id]
   );
   if (classCheck.rows.length === 0) {
     return res.status(404).json({ success: false, error: 'La classe sélectionnée n’existe pas dans cette école.' });
   }
 
-  const result = await query(`
-    INSERT INTO public.school_schedules (school_id, class_id, day_of_week, start_time, end_time, subject, teacher_name)
-    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
-  `, [school.id, cleanClassId, dayOfWeek, startTime, endTime, subject, teacherName || null]);
+  try {
+    const result = await query(`
+      INSERT INTO public.school_schedules (school_id, class_id, day_of_week, start_time, end_time, subject, teacher_name)
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+    `, [school.id, classId.trim(), dayOfWeek.trim(), startTime.trim(), endTime.trim(), subject.trim(), teacherName?.trim() || null]);
 
-  res.status(201).json({ success: true, data: result.rows[0] });
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    logger.error('Error adding school schedule:', error.message);
+    if (error.code === '22P02') {
+      return res.status(400).json({
+        success: false,
+        error: 'Une ancienne référence d’horaire est invalide. Réessayez après le redémarrage du service.'
+      });
+    }
+    throw error;
+  }
 });
 
 /**
@@ -1160,10 +1181,21 @@ const addAccountRequest = asyncHandler(async (req, res) => {
 
   const result = await query(`
     INSERT INTO public.school_account_requests (school_id, full_name, email, role, phone, generated_code, status)
-    VALUES ($1, $2, $3, $4, $5, $6, 'approuve') RETURNING *
+    VALUES ($1, $2, $3, $4, $5, $6, 'en_attente') RETURNING *
   `, [school.id, fullName, email, role, phone, generatedCode]);
 
-  res.status(201).json({ success: true, data: result.rows[0] });
+  socketService.broadcast('admin:new_school_account_request', {
+    id: result.rows[0].id,
+    schoolName: school.school_name,
+    fullName: result.rows[0].full_name,
+    role: result.rows[0].role
+  });
+
+  res.status(201).json({
+    success: true,
+    data: result.rows[0],
+    message: 'La demande a été envoyée à l’Admin principal pour approbation.'
+  });
 });
 
 /**

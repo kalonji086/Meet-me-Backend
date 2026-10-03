@@ -76,7 +76,17 @@ const config = {
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024, // 50MB
     maxAudioDuration: parseInt(process.env.MAX_AUDIO_DURATION) || 300, // 5 minutes
     allowedImageTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    allowedAudioTypes: ['audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/wav', 'audio/ogg'],
+    allowedAudioTypes: [
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/m4a',
+      'audio/mp4',
+      'audio/x-m4a',
+      'audio/aac',
+      'audio/wav',
+      'audio/ogg',
+      'audio/webm'
+    ],
     allowedVideoTypes: ['video/mp4', 'video/quicktime'],
     allowedDocumentTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
   },

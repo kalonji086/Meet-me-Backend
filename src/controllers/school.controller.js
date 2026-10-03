@@ -193,8 +193,45 @@ const ensureSchoolColumns = async () => {
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_classes') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_classes' AND column_name = 'school_id') THEN
+            ALTER TABLE public.school_classes ADD COLUMN school_id UUID;
+          END IF;
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_classes_school_id_fkey'
+              AND conrelid = 'public.school_classes'::regclass
+              AND confrelid <> 'public.school_requests'::regclass
+          ) THEN
+            ALTER TABLE public.school_classes DROP CONSTRAINT school_classes_school_id_fkey;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_classes_school_id_fkey'
+              AND conrelid = 'public.school_classes'::regclass
+          ) THEN
+            ALTER TABLE public.school_classes
+              ADD CONSTRAINT school_classes_school_id_fkey
+              FOREIGN KEY (school_id) REFERENCES public.school_requests(id) ON DELETE CASCADE NOT VALID;
+          END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_classes' AND column_name = 'staff_id') THEN
             ALTER TABLE public.school_classes ADD COLUMN staff_id UUID REFERENCES public.school_account_requests(id) ON DELETE SET NULL;
+          END IF;
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_classes_staff_id_fkey'
+              AND conrelid = 'public.school_classes'::regclass
+              AND confrelid <> 'public.school_account_requests'::regclass
+          ) THEN
+            ALTER TABLE public.school_classes DROP CONSTRAINT school_classes_staff_id_fkey;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_classes_staff_id_fkey'
+              AND conrelid = 'public.school_classes'::regclass
+          ) THEN
+            ALTER TABLE public.school_classes
+              ADD CONSTRAINT school_classes_staff_id_fkey
+              FOREIGN KEY (staff_id) REFERENCES public.school_account_requests(id) ON DELETE SET NULL NOT VALID;
           END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_classes' AND column_name = 'is_active') THEN
             ALTER TABLE public.school_classes ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
@@ -202,6 +239,28 @@ const ensureSchoolColumns = async () => {
         END IF;
 
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_students') THEN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'school_id') THEN
+            ALTER TABLE public.school_students ADD COLUMN school_id UUID;
+          END IF;
+          IF EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'school_students_school_id_fkey'
+              AND conrelid = 'public.school_students'::regclass
+              AND confrelid <> 'public.school_requests'::regclass
+          ) THEN
+            ALTER TABLE public.school_students DROP CONSTRAINT school_students_school_id_fkey;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'school_students_school_id_fkey'
+              AND conrelid = 'public.school_students'::regclass
+          ) THEN
+            ALTER TABLE public.school_students
+              ADD CONSTRAINT school_students_school_id_fkey
+              FOREIGN KEY (school_id) REFERENCES public.school_requests(id) ON DELETE CASCADE NOT VALID;
+          END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'full_name') THEN
             ALTER TABLE public.school_students ADD COLUMN full_name TEXT;
           END IF;
@@ -252,7 +311,44 @@ const ensureSchoolColumns = async () => {
 
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_schedules') THEN
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_schedules' AND column_name = 'school_id') THEN
-            ALTER TABLE public.school_schedules ADD COLUMN school_id UUID REFERENCES public.school_requests(id) ON DELETE CASCADE;
+            ALTER TABLE public.school_schedules ADD COLUMN school_id UUID;
+          END IF;
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_schedules_school_id_fkey'
+              AND conrelid = 'public.school_schedules'::regclass
+              AND confrelid <> 'public.school_requests'::regclass
+          ) THEN
+            ALTER TABLE public.school_schedules DROP CONSTRAINT school_schedules_school_id_fkey;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_schedules_school_id_fkey'
+              AND conrelid = 'public.school_schedules'::regclass
+          ) THEN
+            ALTER TABLE public.school_schedules
+              ADD CONSTRAINT school_schedules_school_id_fkey
+              FOREIGN KEY (school_id) REFERENCES public.school_requests(id) ON DELETE CASCADE NOT VALID;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_schedules' AND column_name = 'class_id') THEN
+            ALTER TABLE public.school_schedules ADD COLUMN class_id UUID;
+          END IF;
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_schedules_class_id_fkey'
+              AND conrelid = 'public.school_schedules'::regclass
+              AND confrelid <> 'public.school_classes'::regclass
+          ) THEN
+            ALTER TABLE public.school_schedules DROP CONSTRAINT school_schedules_class_id_fkey;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_schedules_class_id_fkey'
+              AND conrelid = 'public.school_schedules'::regclass
+          ) THEN
+            ALTER TABLE public.school_schedules
+              ADD CONSTRAINT school_schedules_class_id_fkey
+              FOREIGN KEY (class_id) REFERENCES public.school_classes(id) ON DELETE CASCADE NOT VALID;
           END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_schedules' AND column_name = 'teacher_name') THEN
             ALTER TABLE public.school_schedules ADD COLUMN teacher_name TEXT;
@@ -261,10 +357,44 @@ const ensureSchoolColumns = async () => {
 
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'school_fees') THEN
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'school_id') THEN
-            ALTER TABLE public.school_fees ADD COLUMN school_id UUID REFERENCES public.school_requests(id) ON DELETE CASCADE;
+            ALTER TABLE public.school_fees ADD COLUMN school_id UUID;
+          END IF;
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_fees_school_id_fkey'
+              AND conrelid = 'public.school_fees'::regclass
+              AND confrelid <> 'public.school_requests'::regclass
+          ) THEN
+            ALTER TABLE public.school_fees DROP CONSTRAINT school_fees_school_id_fkey;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_fees_school_id_fkey'
+              AND conrelid = 'public.school_fees'::regclass
+          ) THEN
+            ALTER TABLE public.school_fees
+              ADD CONSTRAINT school_fees_school_id_fkey
+              FOREIGN KEY (school_id) REFERENCES public.school_requests(id) ON DELETE CASCADE NOT VALID;
           END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'student_id') THEN
-            ALTER TABLE public.school_fees ADD COLUMN student_id UUID REFERENCES public.school_students(id) ON DELETE CASCADE;
+            ALTER TABLE public.school_fees ADD COLUMN student_id UUID;
+          END IF;
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_fees_student_id_fkey'
+              AND conrelid = 'public.school_fees'::regclass
+              AND confrelid <> 'public.school_students'::regclass
+          ) THEN
+            ALTER TABLE public.school_fees DROP CONSTRAINT school_fees_student_id_fkey;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'school_fees_student_id_fkey'
+              AND conrelid = 'public.school_fees'::regclass
+          ) THEN
+            ALTER TABLE public.school_fees
+              ADD CONSTRAINT school_fees_student_id_fkey
+              FOREIGN KEY (student_id) REFERENCES public.school_students(id) ON DELETE CASCADE NOT VALID;
           END IF;
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_fees' AND column_name = 'amount_due') THEN
             ALTER TABLE public.school_fees ADD COLUMN amount_due NUMERIC DEFAULT 0;
@@ -931,6 +1061,17 @@ const addSchedule = asyncHandler(async (req, res) => {
   if (!classId || !dayOfWeek || !startTime || !endTime || !subject) {
     return res.status(400).json({ success: false, error: 'Veuillez remplir tous les champs obligatoires du cours.' });
   }
+  if (!isValidUUID(classId)) {
+    return res.status(400).json({ success: false, error: 'La classe sélectionnée est invalide.' });
+  }
+
+  const classCheck = await query(
+    'SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2',
+    [classId, school.id]
+  );
+  if (classCheck.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'La classe sélectionnée n’existe pas dans cette école.' });
+  }
 
   const result = await query(`
     INSERT INTO public.school_schedules (school_id, class_id, day_of_week, start_time, end_time, subject, teacher_name)
@@ -973,6 +1114,17 @@ const addFeeInvoice = asyncHandler(async (req, res) => {
   const { studentId, amountDue, amountPaid, dueDate, status } = req.body;
   if (!studentId || amountDue === undefined) {
     return res.status(400).json({ success: false, error: 'L\'élève et le montant dû sont requis.' });
+  }
+  if (!isValidUUID(studentId)) {
+    return res.status(400).json({ success: false, error: 'L’élève sélectionné est invalide.' });
+  }
+
+  const studentCheck = await query(
+    'SELECT id FROM public.school_students WHERE id = $1 AND school_id = $2',
+    [studentId, school.id]
+  );
+  if (studentCheck.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'L’élève sélectionné n’existe pas dans cette école.' });
   }
 
   const result = await query(`

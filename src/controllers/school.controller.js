@@ -285,6 +285,9 @@ const ensureSchoolColumns = async () => {
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'is_active') THEN
             ALTER TABLE public.school_students ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
           END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'updated_at') THEN
+            ALTER TABLE public.school_students ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+          END IF;
 
           IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'school_students' AND column_name = 'name') THEN
             UPDATE public.school_students SET full_name = name WHERE full_name IS NULL AND name IS NOT NULL;
@@ -433,19 +436,23 @@ const getSchoolDashboardData = asyncHandler(async (req, res) => {
     });
   }
 
-  // Requêtes réelles pour mettre à jour les métriques à la volée
-  const studentsCount = await query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1', [school.id]);
-  const classesCount = await query('SELECT COUNT(*) FROM public.school_classes WHERE school_id = $1', [school.id]);
-  const revenueSum = await query("SELECT SUM(amount_paid) FROM public.school_fees WHERE school_id = $1", [school.id]);
+  await ensureSchoolColumns();
+
+  const [studentsCount, teachersCount, classesCount, revenueSum] = await Promise.all([
+    query('SELECT COUNT(*) FROM public.school_students WHERE school_id = $1 AND is_active = TRUE', [school.id]),
+    query("SELECT COUNT(*) FROM public.school_account_requests WHERE school_id = $1 AND status = 'approuve'", [school.id]),
+    query('SELECT COUNT(*) FROM public.school_classes WHERE school_id = $1 AND is_active = TRUE', [school.id]),
+    query('SELECT COALESCE(SUM(amount_paid), 0) AS total FROM public.school_fees WHERE school_id = $1', [school.id])
+  ]);
 
   res.json({
     success: true,
     school: school,
     stats: {
       totalStudents: parseInt(studentsCount.rows[0].count) || 0,
-      totalTeachers: school.total_teachers || 0,
+      totalTeachers: parseInt(teachersCount.rows[0].count) || 0,
       totalClasses: parseInt(classesCount.rows[0].count) || 0,
-      monthlyRevenue: (revenueSum.rows[0].sum || 0) + ' $'
+      monthlyRevenue: (revenueSum.rows[0].total || 0) + ' $'
     }
   });
 });
@@ -1064,10 +1071,11 @@ const addSchedule = asyncHandler(async (req, res) => {
   if (!isValidUUID(classId)) {
     return res.status(400).json({ success: false, error: 'La classe sélectionnée est invalide.' });
   }
+  const cleanClassId = classId.trim();
 
   const classCheck = await query(
     'SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2',
-    [classId, school.id]
+    [cleanClassId, school.id]
   );
   if (classCheck.rows.length === 0) {
     return res.status(404).json({ success: false, error: 'La classe sélectionnée n’existe pas dans cette école.' });
@@ -1076,7 +1084,7 @@ const addSchedule = asyncHandler(async (req, res) => {
   const result = await query(`
     INSERT INTO public.school_schedules (school_id, class_id, day_of_week, start_time, end_time, subject, teacher_name)
     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
-  `, [school.id, classId, dayOfWeek, startTime, endTime, subject, teacherName || null]);
+  `, [school.id, cleanClassId, dayOfWeek, startTime, endTime, subject, teacherName || null]);
 
   res.status(201).json({ success: true, data: result.rows[0] });
 });

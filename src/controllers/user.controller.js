@@ -195,7 +195,8 @@ const deleteAccount = asyncHandler(async (req, res) => {
 const searchUsers = asyncHandler(async (req, res) => {
   const { query: searchQuery, onlyContacts } = req.query;
   const userId = req.userId;
-  const isOnlyContacts = onlyContacts === 'true' || !searchQuery || searchQuery.trim() === '';
+  const normalizedQuery = typeof searchQuery === 'string' ? searchQuery.trim() : '';
+  const isOnlyContacts = onlyContacts === 'true' || !normalizedQuery;
 
   const contactIdsQuery = `
     SELECT contact_id FROM public.contacts WHERE user_id = $1
@@ -206,7 +207,6 @@ const searchUsers = asyncHandler(async (req, res) => {
   `;
 
   if (isOnlyContacts) {
-    const searchTerm = searchQuery ? `%${searchQuery.toLowerCase()}%` : null;
     let sql = `
       SELECT p.id, p.full_name, p.avatar_url, p.status, p.username, p.is_verified
       FROM public.profiles p
@@ -216,9 +216,23 @@ const searchUsers = asyncHandler(async (req, res) => {
     `;
     const params = [userId];
 
-    if (searchTerm) {
-      sql += ` AND (LOWER(p.full_name) LIKE $2 OR LOWER(p.username) LIKE $2 OR p.phone_number LIKE $2)`;
-      params.push(searchTerm);
+    if (normalizedQuery) {
+      const emailQuery = normalizedQuery.includes('@') && !normalizedQuery.startsWith('@');
+      const phoneQuery = /^[+\d\s().-]+$/.test(normalizedQuery) && normalizedQuery.replace(/\D/g, '').length >= 5;
+
+      if (emailQuery) {
+        sql += ' AND LOWER(p.email) = LOWER($2)';
+        params.push(normalizedQuery);
+      } else if (phoneQuery) {
+        sql += ` AND regexp_replace(COALESCE(p.phone_number, ''), '[^0-9]', '', 'g') = $2`;
+        params.push(normalizedQuery.replace(/\D/g, ''));
+      } else if (normalizedQuery.startsWith('@')) {
+        sql += ' AND LOWER(p.username) = LOWER($2)';
+        params.push(normalizedQuery.slice(1));
+      } else {
+        sql += ' AND (LOWER(p.username) = LOWER($2) OR LOWER(p.full_name) LIKE $3)';
+        params.push(normalizedQuery, `%${normalizedQuery.toLowerCase()}%`);
+      }
     }
 
     sql += ` ORDER BY p.full_name ASC LIMIT 50`;
@@ -226,12 +240,34 @@ const searchUsers = asyncHandler(async (req, res) => {
     return res.json({ success: true, data: contactsRes.rows });
   }
 
-  const searchTerm = `%${searchQuery.toLowerCase()}%`;
+  const isEmail = normalizedQuery.includes('@') && !normalizedQuery.startsWith('@');
+  const isPhone = /^[+\d\s().-]+$/.test(normalizedQuery) && normalizedQuery.replace(/\D/g, '').length >= 5;
+  const usernameQuery = normalizedQuery.startsWith('@') ? normalizedQuery.slice(1) : normalizedQuery;
+  let matchCondition;
+  let queryParams;
+
+  if (isEmail) {
+    matchCondition = 'LOWER(email) = LOWER($1)';
+    queryParams = [normalizedQuery, userId];
+  } else if (isPhone) {
+    matchCondition = `regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g') = $1`;
+    queryParams = [normalizedQuery.replace(/\D/g, ''), userId];
+  } else if (normalizedQuery.startsWith('@')) {
+    matchCondition = 'LOWER(username) = LOWER($1)';
+    queryParams = [usernameQuery, userId];
+  } else {
+    matchCondition = '(LOWER(username) = LOWER($1) OR LOWER(full_name) LIKE $2)';
+    queryParams = [normalizedQuery, `%${normalizedQuery.toLowerCase()}%`, userId];
+  }
+
+  const userIdParameter = queryParams.length;
   const result = await query(
     `SELECT id, full_name, avatar_url, status, username, last_seen, is_verified FROM public.profiles
-     WHERE (LOWER(full_name) LIKE $1 OR LOWER(username) LIKE $1 OR phone_number LIKE $1 OR LOWER(email) LIKE $1)
-     AND id != $2 AND is_locked = FALSE AND is_global_admin = FALSE LIMIT 50`,
-    [searchTerm, userId]
+     WHERE ${matchCondition}
+     AND id != $${userIdParameter} AND is_locked = FALSE AND is_global_admin = FALSE
+     ORDER BY CASE WHEN LOWER(username) = LOWER($1) THEN 0 ELSE 1 END, full_name ASC
+     LIMIT 50`,
+    queryParams
   );
   res.json({ success: true, data: result.rows });
 });
@@ -243,13 +279,21 @@ const searchUsers = asyncHandler(async (req, res) => {
 const checkUserByPhone = asyncHandler(async (req, res) => {
   const { phone } = req.params;
   const userId = req.userId;
+  const phoneDigits = typeof phone === 'string' ? phone.replace(/\D/g, '') : '';
 
-  if (!phone) return res.status(400).json({ success: false, error: 'Numéro requis' });
+  if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+    return res.status(400).json({ success: false, error: 'Numéro de téléphone invalide' });
+  }
 
   // On cherche l'utilisateur, en ignorant l'admin
   const result = await query(
-    'SELECT id, full_name, avatar_url, username, is_verified FROM public.profiles WHERE phone_number = $1 AND is_global_admin = FALSE',
-    [phone]
+    `SELECT id, full_name, avatar_url, username, is_verified
+     FROM public.profiles
+     WHERE regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g') = $1
+       AND is_global_admin = FALSE
+       AND is_locked = FALSE
+       AND id != $2`,
+    [phoneDigits, userId]
   );
 
   if (result.rows.length > 0) {
@@ -274,8 +318,28 @@ const syncContacts = asyncHandler(async (req, res) => {
 });
 
 const updatePrivacy = asyncHandler(async (req, res) => {
-  await query('UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2', [JSON.stringify(req.body.privacySettings), req.userId]);
-  res.json({ success: true });
+  const { privacySettings } = req.body;
+  if (!privacySettings || typeof privacySettings !== 'object' || Array.isArray(privacySettings)) {
+    return res.status(400).json({ success: false, error: 'Paramètres de confidentialité invalides' });
+  }
+
+  const allowedVisibility = ['everyone', 'contacts', 'nobody'];
+  if (
+    (privacySettings.last_seen !== undefined && !allowedVisibility.includes(privacySettings.last_seen)) ||
+    (privacySettings.profile_photo !== undefined && !allowedVisibility.includes(privacySettings.profile_photo)) ||
+    (privacySettings.read_receipts !== undefined && typeof privacySettings.read_receipts !== 'boolean')
+  ) {
+    return res.status(400).json({ success: false, error: 'Valeur de confidentialité invalide' });
+  }
+
+  const existing = await query('SELECT privacy_settings FROM public.profiles WHERE id = $1', [req.userId]);
+  if (existing.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  }
+
+  const settings = { ...(existing.rows[0].privacy_settings || {}), ...privacySettings };
+  await query('UPDATE public.profiles SET privacy_settings = $1 WHERE id = $2', [JSON.stringify(settings), req.userId]);
+  res.json({ success: true, data: settings });
 });
 
 const updatePushToken = asyncHandler(async (req, res) => {

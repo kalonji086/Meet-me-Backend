@@ -2522,6 +2522,7 @@
             socket.on('admin_new_user', (data) => {
                 addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus');
                 loadStats();
+                if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
 
             socket.on('admin_user_login', (data) => {

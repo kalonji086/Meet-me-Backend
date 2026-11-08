@@ -6,11 +6,22 @@ const { validate } = require('../middleware/error.middleware');
 const Joi = require('joi');
 
 const registerSchema = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().email().required(),
+  name: Joi.string().trim().required(),
+  email: Joi.string().email().trim().required(),
   password: Joi.string().min(8).required(),
   phone_number: Joi.string().allow(null, ''),
-  username: Joi.string().allow(null, '')
+  username: Joi.string().allow(null, ''),
+  gender: Joi.string().valid('M', 'F').required(),
+  country: Joi.string().trim().required(),
+  province: Joi.string().trim().required(),
+  city: Joi.string().trim().required(),
+  commune: Joi.string().allow(null, ''),
+  birth_date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
+  device_info: Joi.object().unknown(true).default({}),
+  appVersion: Joi.string().allow(null, ''),
+  accepted_legal_version: Joi.string().required(),
+  accepted_tos_version: Joi.string().required(),
+  accepted_privacy_version: Joi.string().required()
 });
 
 const loginSchema = Joi.object({

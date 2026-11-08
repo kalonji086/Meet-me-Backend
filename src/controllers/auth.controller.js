@@ -76,7 +76,8 @@ const register = asyncHandler(async (req, res) => {
   const {
     name, email, password, phone_number, username,
     device_info, appVersion, gender, country, province,
-    city, commune, birth_date
+    city, commune, birth_date, accepted_legal_version,
+    accepted_tos_version, accepted_privacy_version
   } = req.body;
 
   logger.info(`Nouvelle tentative d'inscription: ${email} (${name})`);
@@ -144,9 +145,15 @@ const register = asyncHandler(async (req, res) => {
   const finalUsername = usernameLower || (emailLower.split('@')[0] + Math.floor(1000 + Math.random() * 9000));
 
   const result = await query(
-    `INSERT INTO public.profiles (id, full_name, email, password, username, phone_number, last_login_at, device_info, app_version, gender, country, province, city, commune, birth_date)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, $13, $14)
-     RETURNING id, full_name, email, username, avatar_url, status, phone_number, app_version, gender, country, province, city, commune, birth_date`,
+    `INSERT INTO public.profiles (
+       id, full_name, email, password, username, phone_number, last_login_at,
+       device_info, app_version, gender, country, province, city, commune, birth_date,
+       accepted_legal_version, accepted_tos_version, accepted_privacy_version
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+     RETURNING id, full_name, email, username, avatar_url, status, phone_number, app_version,
+       gender, country, province, city, commune, birth_date,
+       accepted_legal_version, accepted_tos_version, accepted_privacy_version`,
     [
       userId,
       name,
@@ -161,7 +168,10 @@ const register = asyncHandler(async (req, res) => {
       province || null,
       city || null,
       commune || null,
-      birth_date || null
+      birth_date || null,
+      accepted_legal_version,
+      accepted_tos_version,
+      accepted_privacy_version
     ]
   );
 

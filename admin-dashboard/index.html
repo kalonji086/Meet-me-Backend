@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TOGETHE TECH - Dashboard Premium</title>
+    <title>Meet Me · Administration</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -57,10 +57,135 @@
         .stats-chart-wrap.stats-school-chart-wrap { height: 390px; }
         .stats-empty { display: flex; min-height: 160px; align-items: center; justify-content: center; text-align: center; color: var(--stats-muted); }
         .stats-empty[hidden] { display: none; }
+        :root {
+            --admin-ink: #172033;
+            --admin-muted: #68758a;
+            --admin-line: #e7ebf2;
+            --admin-brand: #6d4bd1;
+            --admin-surface: #ffffff;
+        }
+        body { background: #f4f6fb; color: var(--admin-ink); }
+        #main-container { background: #f4f6fb; }
+        #sidebar {
+            background: linear-gradient(180deg, #172033 0%, #111827 100%);
+            border-right: 1px solid rgba(255,255,255,.07);
+            box-shadow: 12px 0 32px rgba(17,24,39,.08);
+        }
+        #sidebar > div:first-child { padding: 1.5rem 1.25rem; }
+        #sidebar nav { padding: .5rem .85rem 1rem; }
+        .admin-nav-label {
+            margin: 1.25rem .75rem .45rem;
+            color: #8490a4;
+            font-size: .64rem;
+            font-weight: 800;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+        }
+        .sidebar-item {
+            min-height: 2.8rem;
+            color: #c4ccda;
+            border: 1px solid transparent;
+            border-radius: .8rem;
+        }
+        .sidebar-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+        .sidebar-item.active {
+            background: linear-gradient(110deg, #704fe0, #5c43bb);
+            border-color: rgba(255,255,255,.12);
+            box-shadow: 0 8px 18px rgba(75,53,154,.25);
+        }
+        #admin-workspace { min-width: 0; background: #f4f6fb; }
+        #admin-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            min-height: 5rem;
+            background: rgba(255,255,255,.94);
+            border-color: var(--admin-line);
+            box-shadow: 0 4px 18px rgba(23,32,51,.035);
+            backdrop-filter: blur(14px);
+        }
+        #admin-section-heading { min-width: 0; }
+        #section-title {
+            color: var(--admin-ink);
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            font-weight: 750;
+            letter-spacing: -.025em;
+            line-height: 1.25;
+            text-transform: none;
+        }
+        #section-subtitle { color: var(--admin-muted); }
+        #admin-main {
+            width: 100%;
+            padding: clamp(1rem, 2.4vw, 2.25rem);
+            scroll-behavior: smooth;
+        }
+        #admin-main > div[id^="section-"] { width: 100%; margin-inline: auto; }
+        #admin-main .bg-white[class*="rounded"] {
+            border-color: var(--admin-line);
+            box-shadow: 0 8px 24px rgba(23,32,51,.045);
+        }
+        #admin-main .overflow-x-auto {
+            border: 1px solid var(--admin-line);
+            border-radius: 1rem;
+            background: var(--admin-surface);
+            box-shadow: 0 8px 24px rgba(23,32,51,.04);
+            scrollbar-width: thin;
+        }
+        #admin-main table { border-collapse: separate; border-spacing: 0; }
+        #admin-main table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f7f8fc;
+            border-bottom: 1px solid var(--admin-line);
+            color: #667187;
+            font-size: .66rem;
+            letter-spacing: .08em;
+            white-space: nowrap;
+        }
+        #admin-main table tbody tr { transition: background-color .16s ease; }
+        #admin-main table tbody tr:hover { background-color: #f8f9fd; }
+        #admin-main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        #admin-main select,
+        #admin-main textarea {
+            max-width: 100%;
+            border-color: #dfe4ed;
+            border-radius: .8rem;
+            color: var(--admin-ink);
+        }
+        #admin-main input:focus,
+        #admin-main select:focus,
+        #admin-main textarea:focus,
+        #admin-main button:focus-visible,
+        #sidebar a:focus-visible {
+            outline: 3px solid rgba(109,75,209,.25);
+            outline-offset: 2px;
+        }
+        #admin-main button { transition: box-shadow .16s ease, transform .16s ease, background-color .16s ease; }
+        #admin-main button:hover:not(:disabled) { box-shadow: 0 5px 14px rgba(23,32,51,.1); }
+        #admin-main button:active:not(:disabled) { transform: translateY(1px); }
+        #admin-name { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        @media (max-width: 1024px) {
+            #sidebar { position: fixed; height: 100dvh; }
+            #sidebar-overlay.active { display: block; }
+        }
         @media (max-width: 640px) {
             .stats-chart-wrap, .stats-chart-wrap.tall { height: 270px; }
             .stats-chart-wrap.stats-school-chart-wrap { height: var(--stats-school-chart-height, 270px); }
             .stats-kpi { min-height: 96px; }
+            #admin-topbar { min-height: 4.25rem; padding: .65rem .85rem; }
+            #admin-main { padding: 1rem .75rem 1.5rem; }
+            #admin-main > div[id^="section-"] { padding-bottom: 1.5rem; }
+            #admin-main .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr); }
+            #admin-main .flex.justify-between.items-center,
+            #admin-main .flex.items-center.justify-between { flex-wrap: wrap; gap: .75rem; }
+            #admin-main .overflow-x-auto { border-radius: .85rem; }
+            #admin-main table th, #admin-main table td { padding: .8rem .9rem; }
+            #admin-name { max-width: 7rem; font-size: .65rem; padding-inline: .65rem; }
+            #notif-dropdown { position: fixed; top: 4.25rem; right: .75rem; left: .75rem; width: auto; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
         }
     </style>
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
@@ -142,10 +267,11 @@
                 </div>
                 <p class="text-[9px] text-purple-400 uppercase tracking-[0.2em] font-black">COMMUNITY V93</p>
             </div>
-            <nav id="admin-sidebar-nav" class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll custom-scrollbar">
+            <nav id="admin-sidebar-nav" aria-label="Navigation de l’administration" class="flex-1 mt-4 px-4 overflow-y-auto sidebar-scroll custom-scrollbar">
                 <a href="#" onclick="showSection('stats')" id="nav-stats" class="sidebar-item active flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="layout-dashboard" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vue d'ensemble</span>
                 </a>
+                <p class="admin-nav-label" id="nav-label-community">Communauté</p>
                 <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="users" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Utilisateurs</span>
                 </a>
@@ -156,6 +282,7 @@
                     <i data-lucide="briefcase" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Collaboration</span>
                     <span id="collab-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
                 </a>
+                <p class="admin-nav-label" id="nav-label-requests">Demandes & services</p>
                 <a href="#" onclick="showSection('appeals')" id="nav-appeals" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="life-buoy" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Support & Appeals</span>
                 </a>
@@ -171,12 +298,14 @@
                 <a href="#" onclick="showSection('employer-requests')" id="nav-employer-requests" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="briefcase" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Demandes Emploi</span>
                 </a>
+                <p class="admin-nav-label" id="nav-label-security">Sécurité & contenu</p>
                 <a href="#" onclick="showSection('verifications')" id="nav-verifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="check-circle" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Vérifications</span>
                 </a>
                 <a href="#" onclick="showSection('audit')" id="nav-audit" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="shield-check" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Audit (Logs)</span>
                 </a>
+                <p class="admin-nav-label" id="nav-label-platform">Plateforme</p>
                 <a href="#" onclick="showSection('campaigns')" id="nav-campaigns" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="send" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Campagnes Push</span>
                 </a>
@@ -186,6 +315,7 @@
                 <a href="#" onclick="showSection('config')" id="nav-config" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="settings" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Config App</span>
                 </a>
+                <p class="admin-nav-label" id="nav-label-tools">Outils & contenus</p>
                 <a href="#" onclick="showSection('moderation')" id="nav-moderation" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="zap" class="w-5 h-5 mr-4 text-yellow-400"></i><span class="font-medium text-sm">Boost & Modération</span>
                 </a>
@@ -199,6 +329,7 @@
                     <i data-lucide="layers" class="w-5 h-5 mr-4 text-blue-400"></i><span class="font-medium text-sm">Portefeuilles Clients</span>
                 </a>
                 <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
+                    <p class="admin-nav-label">Administration</p>
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
                         <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Atribus (Délégués)</span>
                     </a>
@@ -221,13 +352,17 @@
         </aside>
 
         <!-- Content Area -->
-        <div class="flex-1 flex flex-col overflow-hidden bg-gray-50">
-            <header class="bg-white border-b border-gray-200 px-4 lg:px-8 py-5 flex justify-between items-center shadow-sm">
-                <div class="flex items-center">
-                    <button onclick="toggleSidebar()" class="mr-4 lg:hidden p-2 bg-gray-50 rounded-lg text-gray-500">
+        <div id="admin-workspace" class="flex-1 flex flex-col overflow-hidden bg-gray-50">
+            <header id="admin-topbar" class="bg-white border-b border-gray-200 px-4 lg:px-8 py-5 flex justify-between items-center shadow-sm">
+                <div id="admin-section-heading" class="flex items-center">
+                    <button type="button" aria-label="Ouvrir la navigation" onclick="toggleSidebar()" class="mr-4 lg:hidden p-2 bg-gray-50 rounded-lg text-gray-500">
                         <i data-lucide="menu" class="w-6 h-6"></i>
                     </button>
-                    <h2 id="section-title" class="text-lg lg:text-xl font-black text-gray-800 tracking-tighter uppercase truncate">Tableau de bord</h2>
+                    <div class="min-w-0">
+                        <p class="hidden sm:block text-[10px] font-bold uppercase tracking-[.16em] text-purple-600">Administration · Meet Me</p>
+                        <h2 id="section-title" class="text-lg lg:text-xl font-black text-gray-800 tracking-tighter uppercase truncate">Vue d'ensemble</h2>
+                        <p id="section-subtitle" class="hidden sm:block mt-1 text-xs text-gray-500">Indicateurs et activité de la plateforme.</p>
+                    </div>
                 </div>
 
                 <div class="flex items-center space-x-3 lg:space-x-6">
@@ -263,7 +398,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto p-4 lg:p-8 custom-scrollbar">
+            <main id="admin-main" class="flex-1 overflow-y-auto p-4 lg:p-8 custom-scrollbar">
                 <!-- SECTION STATS -->
                 <!-- MODERATION & BOOST SECTION -->
             <div id="section-moderation" class="hidden animate-fade-in">
@@ -2460,6 +2595,25 @@
                 const first = sectionMap[allowed[0]] || allowed[0] || 'my-requests';
                 showSection(first);
             }
+            updateAdminNavGroups();
+        }
+
+        function updateAdminNavGroups() {
+            document.querySelectorAll('#admin-sidebar-nav > .admin-nav-label').forEach(label => {
+                let sibling = label.nextElementSibling;
+                let hasVisibleLink = false;
+                while (sibling && !sibling.classList.contains('admin-nav-label')) {
+                    const links = sibling.matches('a.sidebar-item')
+                        ? [sibling]
+                        : Array.from(sibling.querySelectorAll('a.sidebar-item'));
+                    if (links.some(link => !link.classList.contains('hidden') && !link.closest('.hidden'))) {
+                        hasVisibleLink = true;
+                        break;
+                    }
+                    sibling = sibling.nextElementSibling;
+                }
+                label.classList.toggle('hidden', !hasVisibleLink);
+            });
         }
 
         async function loadMyRequestsCount() {
@@ -2803,6 +2957,29 @@
         }
 
         function showSection(name) {
+            const sectionDetails = {
+                stats: ['Vue d’ensemble', 'Indicateurs et activité de la plateforme.'],
+                users: ['Utilisateurs', 'Consultez et gérez les comptes de la communauté.'],
+                groups: ['Groupes de discussion', 'Gérez les groupes et leurs membres.'],
+                collaboration: ['Collaboration', 'Suivez les demandes et les accès de collaboration.'],
+                appeals: ['Support & recours', 'Examinez les demandes et répondez aux utilisateurs.'],
+                'market-requests': ['Demandes Market', 'Traitez les demandes liées aux activités commerciales.'],
+                'school-requests': ['Demandes des écoles', 'Consultez et gérez les établissements.'],
+                'school-account-requests': ['Comptes scolaires', 'Examinez les créations de comptes scolaires.'],
+                'employer-requests': ['Demandes employeur', 'Traitez les demandes des entreprises.'],
+                verifications: ['Vérifications', 'Examinez les demandes de vérification des comptes.'],
+                audit: ['Journal d’audit', 'Consultez les opérations administratives enregistrées.'],
+                campaigns: ['Campagnes', 'Rédigez et planifiez les notifications aux utilisateurs.'],
+                legal: ['Documents légaux', 'Gérez les conditions d’utilisation et la confidentialité.'],
+                config: ['Configuration de l’application', 'Publiez les versions et suivez leur adoption.'],
+                moderation: ['Modération', 'Gérez les contenus et leur visibilité.'],
+                accounts: ['Gestion des comptes', 'Créez et administrez les comptes et leurs rôles.'],
+                portfolio: ['Portfolio Web', 'Gérez le contenu et les demandes du site vitrine.'],
+                'portfolios-saas': ['Portefeuilles clients', 'Gérez les demandes et les sites des clients.'],
+                delegations: ['Délégations', 'Gérez les permissions des administrateurs délégués.'],
+                approvals: ['Approbations', 'Examinez les actions en attente d’approbation.'],
+                'my-requests': ['Mes requêtes', 'Suivez le statut de vos demandes administratives.'],
+            };
             ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
                 const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'school-account-requests' ? 'nav-school-account-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s))))));
@@ -2812,7 +2989,10 @@
             if (target) target.classList.remove('hidden');
             const navId = (name === 'market-requests') ? 'nav-market-requests' : (name === 'school-requests' ? 'nav-school-requests' : (name === 'school-account-requests' ? 'nav-school-account-requests' : (name === 'employer-requests' ? 'nav-employer-requests' : (name === 'accounts' ? 'nav-accounts' : (name === 'portfolio' ? 'nav-portfolio' : (name === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + name))))));
             const nav = document.getElementById(navId); if (nav) nav.classList.add('active');
-            document.getElementById('section-title').innerText = name.replace('-', ' ').toUpperCase();
+            const [title, subtitle] = sectionDetails[name] || [name.replace(/-/g, ' '), 'Gérez les informations et les actions de ce module.'];
+            document.getElementById('section-title').textContent = title;
+            document.getElementById('section-subtitle').textContent = subtitle;
+            if (window.innerWidth <= 1024 && document.getElementById('sidebar').classList.contains('sidebar-open')) toggleSidebar();
 
             if (name === 'stats') loadStats();
             if (name === 'campaigns') loadCampaigns();
@@ -2838,6 +3018,10 @@
 
             lucide.createIcons();
         }
+
+        document.getElementById('admin-sidebar-nav')?.addEventListener('click', event => {
+            if (event.target.closest('a[onclick]')) event.preventDefault();
+        });
 
         // --- MODERATION & BOOST SYSTEM ---
         let currentModerationData = { social: [], market: [], jobs: [] };

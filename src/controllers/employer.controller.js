@@ -754,7 +754,19 @@ module.exports = {
   ensureEmployerTables
 };
 
-async function ensureEmployerTables() {
+let employerTablesInitialization;
+
+function ensureEmployerTables() {
+  if (!employerTablesInitialization) {
+    employerTablesInitialization = initializeEmployerTables().catch((error) => {
+      employerTablesInitialization = null;
+      throw error;
+    });
+  }
+  return employerTablesInitialization;
+}
+
+async function initializeEmployerTables() {
   try {
     // Split queries to ensure compatibility
     await query(`
@@ -810,12 +822,15 @@ async function ensureEmployerTables() {
         await query('ALTER TABLE public.employer_schedules ADD COLUMN IF NOT EXISTS candidate_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL');
         await query('ALTER TABLE public.employer_schedules DROP CONSTRAINT IF EXISTS employer_schedules_type_check');
         await query('ALTER TABLE public.employer_schedules ADD CONSTRAINT employer_schedules_type_check CHECK (type IN (\'interview\', \'meeting\', \'onboarding\', \'other\'))');
-    } catch (e) {}
+    } catch (e) {
+        logger.warn('Unable to update employer schedule constraints:', e.message);
+    }
 
     // S'assurer que tous les profils employeurs sont actifs
     await query('UPDATE public.employer_profiles SET is_active = TRUE WHERE is_active IS NULL');
 
   } catch (e) {
     logger.error('Error ensuring employer tables:', e.message);
+    throw e;
   }
 }

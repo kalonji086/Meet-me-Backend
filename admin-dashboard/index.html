@@ -953,15 +953,18 @@
                             <h3 id="stats-activity-title" class="text-lg font-bold text-slate-900">Actions observées par compte</h3>
                             <p class="mt-1 text-sm text-slate-500">Comptages issus des messages, statuts, vues d’offres, candidatures et appels enregistrés. Ces événements ne mesurent ni la durée de session ni l’ensemble de l’utilisation de l’application.</p>
                         </div>
-                        <label for="stats-usage-period" class="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-600">
-                            Période
-                            <select id="stats-usage-period" onchange="loadUserActivity(0)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="30d">30 derniers jours</option>
-                                <option value="90d">90 derniers jours</option>
-                                <option value="365d">365 derniers jours</option>
-                                <option value="all">Depuis toujours</option>
-                            </select>
-                        </label>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <label for="stats-usage-period" class="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-600">
+                                Période
+                                <select id="stats-usage-period" onchange="loadUserActivity(0)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="30d">30 derniers jours</option>
+                                    <option value="90d">90 derniers jours</option>
+                                    <option value="365d">365 derniers jours</option>
+                                    <option value="all">Depuis toujours</option>
+                                </select>
+                            </label>
+                            <button type="button" onclick="loadUserActivity(0)" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Charger les actions observées</button>
+                        </div>
                     </div>
                     <p id="stats-usage-source-note" class="mb-3 text-xs text-slate-500">Les zéros signifient qu’aucune action correspondante n’a été observée pendant la période sélectionnée.</p>
                     <p id="stats-usage-scroll-hint" class="mb-2 text-xs font-medium text-slate-600">Sur petit écran, faites défiler horizontalement pour consulter toutes les colonnes.</p>
@@ -991,6 +994,15 @@
                         <button onclick="toggleColumnSelector()" class="flex items-center px-5 py-2.5 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase text-gray-600 hover:bg-gray-50 transition-all shadow-sm">
                             <i data-lucide="columns" class="w-4 h-4 mr-2"></i> Colonnes
                         </button>
+                    </div>
+
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                        <input id="admin-users-search" type="search" oninput="scheduleAdminUsersSearch()" placeholder="Rechercher par nom, pseudo, e-mail ou téléphone…" class="w-full sm:max-w-md p-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-purple-400">
+                        <div class="flex items-center gap-2">
+                            <span id="admin-users-page-info" class="text-xs text-gray-500" aria-live="polite"></span>
+                            <button id="admin-users-previous" type="button" onclick="loadUsers(adminUsersPage - 1)" class="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm disabled:opacity-50" disabled>Précédent</button>
+                            <button id="admin-users-next" type="button" onclick="loadUsers(adminUsersPage + 1)" class="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm disabled:opacity-50" disabled>Suivant</button>
+                        </div>
                     </div>
 
                     <div id="column-selector" class="hidden bg-white p-6 rounded-2xl shadow-xl border border-gray-100 mb-6 animate-pop-in">
@@ -1058,6 +1070,13 @@
                 </div>
 
                 <div id="section-groups" class="hidden animate-fade-in">
+                    <div class="flex items-center justify-between mb-4">
+                        <p id="admin-groups-page-info" class="text-xs text-gray-500" aria-live="polite"></p>
+                        <div class="flex items-center gap-2">
+                            <button id="admin-groups-previous" type="button" onclick="loadGroups(adminGroupsPage - 1)" class="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm disabled:opacity-50" disabled>Précédent</button>
+                            <button id="admin-groups-next" type="button" onclick="loadGroups(adminGroupsPage + 1)" class="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm disabled:opacity-50" disabled>Suivant</button>
+                        </div>
+                    </div>
                     <div class="bg-white rounded-[2rem] lg:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-x-auto custom-scrollbar">
                         <table class="w-full text-left min-w-[600px]">
                             <thead class="bg-gray-50 border-b border-gray-100">
@@ -2521,7 +2540,7 @@
 
             socket.on('admin_new_user', (data) => {
                 addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus');
-                loadStats();
+                scheduleAdminStatsRefresh();
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
 
@@ -2530,31 +2549,31 @@
                 if (user && user.isGlobalAdmin) {
                     addNotification('user', 'Utilisateur Connecté', `${data.name} est maintenant en ligne.`, 'zap');
                 }
-                loadStats();
+                scheduleAdminStatsRefresh();
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
 
             socket.on('admin_user_logout', () => {
-                loadStats();
+                scheduleAdminStatsRefresh();
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
-            socket.on('admin_user_deleted', () => loadStats());
-            socket.on('admin:new_message', () => loadStats());
+            socket.on('admin_user_deleted', () => scheduleAdminStatsRefresh());
+            socket.on('admin:new_message', () => scheduleAdminStatsRefresh());
 
             socket.on('admin:new_appeal', (data) => {
                 addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy');
-                loadStats();
+                scheduleAdminStatsRefresh();
             });
 
             socket.on('admin:new_market', (data) => {
                 addNotification('market', 'Nouveau Business', `Une demande boutique reçue de ${data.business_name}`, 'shopping-bag');
-                loadStats();
+                scheduleAdminStatsRefresh();
             });
 
             socket.on('admin:new_group', (data) => {
                 if(!document.getElementById('section-groups').classList.contains('hidden')) loadGroups();
                 addNotification('groups', 'Nouveau Groupe', `Le groupe ${data.name} vient d'être créé par un utilisateur.`, 'users-2');
-                loadStats();
+                scheduleAdminStatsRefresh();
             });
 
             socket.on('admin:collaborator_login', (data) => {
@@ -2562,7 +2581,7 @@
                 if (user && user.isGlobalAdmin) {
                     addNotification('security', 'Collaborateur Connecté', `${data.name} vient d'entrer dans le panel.`, 'user-check');
                 }
-                loadStats();
+                scheduleAdminStatsRefresh();
             });
 
             socket.on('admin:user_verification_updated', (data) => {
@@ -4558,6 +4577,15 @@
             }
         }
 
+        let adminStatsRefreshTimer;
+
+        function scheduleAdminStatsRefresh() {
+            clearTimeout(adminStatsRefreshTimer);
+            adminStatsRefreshTimer = setTimeout(() => {
+                if (!document.getElementById('section-stats')?.classList.contains('hidden')) loadStats();
+            }, 750);
+        }
+
         async function loadStats() {
             const requestId = ++statsLoadSequence;
             const refreshButton = document.getElementById('stats-refresh');
@@ -4578,7 +4606,6 @@
                     axios.get(base + 'stats', { headers }),
                     axios.get(base + 'analytics', { headers })
                 ]);
-                loadUserActivity(0);
                 const stats = statsResponse.data && statsResponse.data.data;
                 const analytics = analyticsResponse.data && analyticsResponse.data.data;
                 const requiredStats = ['totalUsers', 'onlineUsers', 'totalMessages', 'totalGroups', 'totalJobs', 'totalMarket'];
@@ -4747,12 +4774,27 @@
             ...USER_COLUMNS.filter(column => column.alwaysVisible).map(column => column.id),
             ...savedUserColumns
         ])];
+        let adminUsersPage = 1;
+        let adminUsersSearchTimer;
+        let adminUsersRequestId = 0;
+        const adminUsersPageSize = 50;
+        let adminGroupsPage = 1;
+        let adminGroupsRequestId = 0;
+        const adminGroupsPageSize = 50;
         localStorage.setItem('admin_user_columns', JSON.stringify(visibleColumns));
 
         function escapeUserCell(value) {
             return String(value ?? '').replace(/[&<>"']/g, char => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             })[char]);
+        }
+
+        function renderAdminTableError(bodyId, error, columnCount, retryAction) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            const message = error?.response?.data?.error || error?.message || 'Une erreur est survenue pendant le chargement.';
+            console.error(`Admin loading error (${bodyId}):`, error);
+            body.innerHTML = `<tr><td colspan="${columnCount}" class="px-8 py-10 text-center text-sm font-semibold text-red-500">${escapeUserCell(message)} <button type="button" onclick="${retryAction}" class="ml-2 underline">Réessayer</button></td></tr>`;
         }
 
         function toggleColumnSelector() {
@@ -4792,11 +4834,28 @@
             `).join('');
         }
 
-        async function loadUsers() {
+        function scheduleAdminUsersSearch() {
+            clearTimeout(adminUsersSearchTimer);
+            adminUsersSearchTimer = setTimeout(() => loadUsers(1), 300);
+        }
+
+        async function loadUsers(page = adminUsersPage) {
             renderUsersTableHeader(); // Ensure header is correct
+            adminUsersPage = Math.max(1, Number(page) || 1);
+            const requestId = ++adminUsersRequestId;
+            const search = document.getElementById('admin-users-search')?.value.trim() || '';
+            const body = document.getElementById('users-table-body');
+            body.innerHTML = `<tr><td colspan="${USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length}" class="px-8 py-10 text-center text-sm font-semibold text-gray-400">Chargement des utilisateurs…</td></tr>`;
             try {
-                const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.get(`${API_URL}/admin/users`, { params: { page: adminUsersPage, limit: adminUsersPageSize, search }, headers: { Authorization: `Bearer ${token}` } });
+                if (requestId !== adminUsersRequestId) return;
                 const users = Array.isArray(res.data.data) ? res.data.data : [];
+                const total = Number(res.data.pagination?.total) || 0;
+                const first = total === 0 ? 0 : (adminUsersPage - 1) * adminUsersPageSize + 1;
+                const last = Math.min(adminUsersPage * adminUsersPageSize, total);
+                document.getElementById('admin-users-page-info').textContent = `${first}–${last} sur ${total}`;
+                document.getElementById('admin-users-previous').disabled = adminUsersPage <= 1;
+                document.getElementById('admin-users-next').disabled = last >= total;
                 document.getElementById('users-table-body').innerHTML = users.map(u => {
                     let info = u.device_info || {};
                     if (typeof info === 'string') {
@@ -4927,10 +4986,10 @@
                 }).join('') || `<tr><td colspan="${USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length}" class="px-8 py-10 text-center text-sm font-semibold text-gray-400">Aucun utilisateur trouvé.</td></tr>`;
                 lucide.createIcons();
             } catch (e) {
+                if (requestId !== adminUsersRequestId) return;
                 if (!token) return;
-                console.error('Erreur lors du chargement des utilisateurs Admin:', e);
-                const body = document.getElementById('users-table-body');
-                body.innerHTML = `<tr><td colspan="${USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length}" class="px-8 py-10 text-center text-sm font-semibold text-red-500">Impossible de charger les utilisateurs. Vérifiez la connexion et les autorisations, puis réessayez.</td></tr>`;
+                document.getElementById('admin-users-page-info').textContent = '';
+                renderAdminTableError('users-table-body', e, USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length, 'loadUsers()');
             }
         }
 
@@ -5237,7 +5296,9 @@
 
                 modal.classList.remove('hidden');
                 lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                toast(e.response?.data?.error || "Erreur lors du chargement de la demande employeur.", "error");
+            }
         }
 
         async function handleEmployerAction(id, status, btn = null) {
@@ -5886,7 +5947,9 @@
                         </tr>
                     `;
                 }).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucun ticket</div>'; lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                renderAdminTableError('appeals-table-body', e, 4, 'loadAppeals()');
+            }
         }
 
         function examineAppeal(id) {
@@ -6111,9 +6174,20 @@
             }, 'Programmer le renvoi', 'blue');
         }
 
-        async function loadGroups() {
+        async function loadGroups(page = adminGroupsPage) {
+            adminGroupsPage = Math.max(1, Number(page) || 1);
+            const requestId = ++adminGroupsRequestId;
+            const body = document.getElementById('groups-table-body');
+            body.innerHTML = '<tr><td colspan="4" class="px-8 py-10 text-center text-sm font-semibold text-gray-400">Chargement des groupes…</td></tr>';
             try {
-                const res = await axios.get(`${API_URL}/admin/groups`, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.get(`${API_URL}/admin/groups`, { params: { page: adminGroupsPage, limit: adminGroupsPageSize }, headers: { Authorization: `Bearer ${token}` } });
+                if (requestId !== adminGroupsRequestId) return;
+                const total = Number(res.data.pagination?.total) || 0;
+                const first = total === 0 ? 0 : (adminGroupsPage - 1) * adminGroupsPageSize + 1;
+                const last = Math.min(adminGroupsPage * adminGroupsPageSize, total);
+                document.getElementById('admin-groups-page-info').textContent = `${first}–${last} sur ${total}`;
+                document.getElementById('admin-groups-previous').disabled = adminGroupsPage <= 1;
+                document.getElementById('admin-groups-next').disabled = last >= total;
                 document.getElementById('groups-table-body').innerHTML = res.data.data.map(g => `
                     <tr class="border-b border-gray-50 hover:bg-gray-50 transition-all">
                         <td class="px-8 py-5 flex items-center">
@@ -6133,7 +6207,11 @@
                     </tr>
                 `).join('') || '<tr class="p-20 text-center text-gray-400 font-bold uppercase text-xs"><td colspan="4">Aucun groupe trouvé</td></tr>';
                 lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                if (requestId !== adminGroupsRequestId) return;
+                document.getElementById('admin-groups-page-info').textContent = '';
+                renderAdminTableError('groups-table-body', e, 4, 'loadGroups()');
+            }
         }
 
         async function viewMembers(chatId) {
@@ -6200,7 +6278,9 @@
                     </tr>
                 `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucune demande de badge</div>';
                 lucide.createIcons();
-            } catch (e) {}
+            } catch (e) {
+                renderAdminTableError('verif-table-body', e, 4, 'loadVerifications()');
+            }
         }
 
         async function examineVerification(id) {
@@ -6221,7 +6301,9 @@
                     await axios.put(`${API_URL}/admin/verifications/${id}`, { status: 'approved' }, { headers: { Authorization: `Bearer ${token}` } });
                     alert("Utilisateur vérifié !"); closeImpactModal(); loadVerifications();
                 }, "Accorder le Badge", "blue");
-            } catch (e) {}
+            } catch (e) {
+                toast(e.response?.data?.error || "Erreur lors du chargement de la vérification.", "error");
+            }
         }
 
         async function loadAuditLogs() {
@@ -6240,7 +6322,9 @@
                         <td class="px-8 py-5 text-xs text-gray-400 font-bold">${new Date(l.created_at).toLocaleString()}</td>
                     </tr>
                 `).join('') || '<div class="p-20 text-center text-gray-400 font-bold uppercase text-xs">Aucun log d\'audit</div>';
-            } catch (e) {}
+            } catch (e) {
+                renderAdminTableError('audit-table-body', e, 4, 'loadAuditLogs()');
+            }
         }
 
         async function toggleUserLock(id, lock) {
@@ -6254,6 +6338,7 @@
         }
 
         async function loadLegal() {
+            try {
             const res = await axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } });
             const type = document.getElementById('legal-type').value;
             const doc = res.data.data.find(d => d.type === type);
@@ -6261,6 +6346,9 @@
                 document.getElementById('legal-content').value = doc.content;
                 document.getElementById('legal-version').value = doc.version;
                 document.getElementById('legal-force').checked = doc.force_acceptance;
+            }
+            } catch (error) {
+                toast(error.response?.data?.error || "Erreur lors du chargement des documents légaux.", "error");
             }
         }
 

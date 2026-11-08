@@ -66,14 +66,14 @@ const checkPermOrRequest = async (req, res, moduleId, permission, actionData) =>
  */
 const getStats = asyncHandler(async (req, res) => {
   await ensureAdminTables();
-  const usersCount = await query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE');
-  const messagesCount = await query('SELECT COUNT(*) FROM public.messages');
-  const chatsCount = await query('SELECT COUNT(*) FROM public.chats WHERE type = \'group\'');
-  const onlineCount = await query("SELECT COUNT(*) FROM public.profiles WHERE status = 'online' AND is_global_admin = FALSE");
-
-  // Nouvelles statistiques indépendantes demandées sans impacter l'existant
-  const jobsCount = await query('SELECT COUNT(*) FROM public.job_postings');
-  const marketCount = await query('SELECT COUNT(*) FROM public.market_posts');
+  const [usersCount, messagesCount, chatsCount, onlineCount, jobsCount, marketCount] = await Promise.all([
+    query('SELECT COUNT(*) FROM public.profiles WHERE is_global_admin = FALSE'),
+    query('SELECT COUNT(*) FROM public.messages'),
+    query("SELECT COUNT(*) FROM public.chats WHERE type = 'group'"),
+    query("SELECT COUNT(*) FROM public.profiles WHERE status = 'online' AND is_global_admin = FALSE"),
+    query('SELECT COUNT(*) FROM public.job_postings'),
+    query('SELECT COUNT(*) FROM public.market_posts'),
+  ]);
 
   res.json({
     success: true,
@@ -88,7 +88,19 @@ const getStats = asyncHandler(async (req, res) => {
   });
 });
 
-const ensureAdminTables = async () => {
+let adminTablesInitialization;
+
+const ensureAdminTables = () => {
+  if (!adminTablesInitialization) {
+    adminTablesInitialization = initializeAdminTables().catch((error) => {
+      adminTablesInitialization = null;
+      throw error;
+    });
+  }
+  return adminTablesInitialization;
+};
+
+const initializeAdminTables = async () => {
   // SÉCURITÉ : Forcer les colonnes critiques si elles manquent
   try {
     await query('ALTER TABLE public.web_portfolio_requests ADD COLUMN IF NOT EXISTS logo_url TEXT');
@@ -816,10 +828,23 @@ const ensureAdminTables = async () => {
   } catch (err) {
     logger.error('❌ Schema Migration Error:', err.message);
     logger.warn('⚠️ Some schema migrations were skipped or failed.');
+    throw err;
   }
 };
 
-const ensureScheduledUserDeletionsTable = async () => {
+let scheduledUserDeletionsInitialization;
+
+const ensureScheduledUserDeletionsTable = () => {
+  if (!scheduledUserDeletionsInitialization) {
+    scheduledUserDeletionsInitialization = initializeScheduledUserDeletionsTable().catch((error) => {
+      scheduledUserDeletionsInitialization = null;
+      throw error;
+    });
+  }
+  return scheduledUserDeletionsInitialization;
+};
+
+const initializeScheduledUserDeletionsTable = async () => {
   await query(`
     CREATE TABLE IF NOT EXISTS public.admin_scheduled_user_deletions (
       id BIGSERIAL PRIMARY KEY,
@@ -877,7 +902,20 @@ const getUsers = asyncHandler(async (req, res) => {
   }
 
   // We hide Global Admins from the management lists (User List & Directory)
-  const result = await query(`
+  const isPaginated = req.query.page !== undefined;
+  const parsedPage = Number.parseInt(req.query.page, 10);
+  const parsedLimit = Number.parseInt(req.query.limit, 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+  const offset = (page - 1) * limit;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  const whereClause = search
+    ? `WHERE p.is_global_admin = FALSE
+       AND (p.full_name ILIKE $1 OR p.email ILIKE $1 OR p.username ILIKE $1 OR p.phone_number ILIKE $1)`
+    : 'WHERE p.is_global_admin = FALSE';
+  const queryParams = search ? [`%${search}%`] : [];
+  const [result, totalResult] = await Promise.all([
+    query(`
     SELECT p.id, p.email, p.full_name, p.username, p.avatar_url, p.status, p.status_updated_at, p.phone_number, p.is_locked,
            p.login_attempts, p.created_at, p.is_global_admin, p.last_login_at, p.device_info, p.is_verified,
            p.gender, p.country, p.province, p.city, p.commune, p.birth_date,
@@ -891,11 +929,26 @@ const getUsers = asyncHandler(async (req, res) => {
       ORDER BY created_at DESC
       LIMIT 1
     ) scheduled_deletion ON TRUE
-    WHERE p.is_global_admin = FALSE
-    ORDER BY p.status = 'online' DESC, p.status_updated_at DESC NULLS LAST
-  `);
+    ${whereClause}
+    ORDER BY p.status = 'online' DESC, p.status_updated_at DESC NULLS LAST, p.id
+    ${isPaginated ? `LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}` : ''}
+  `, isPaginated ? [...queryParams, limit, offset] : queryParams),
+    isPaginated
+      ? query(`SELECT COUNT(*)::int AS total FROM public.profiles p ${whereClause}`, queryParams)
+      : Promise.resolve(null),
+  ]);
 
-  res.json({ success: true, data: result.rows });
+  res.json({
+    success: true,
+    data: result.rows,
+    ...(isPaginated && {
+      pagination: {
+        page,
+        limit,
+        total: Number(totalResult.rows[0].total) || 0,
+      },
+    }),
+  });
 });
 
 const getReports = asyncHandler(async (req, res) => {
@@ -1917,15 +1970,37 @@ const getGroups = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, error: 'Accès refusé : Vous n\'avez pas le droit de voir la liste des groupes.' });
   }
 
-  const result = await query(`
+  const isPaginated = req.query.page !== undefined;
+  const parsedPage = Number.parseInt(req.query.page, 10);
+  const parsedLimit = Number.parseInt(req.query.limit, 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+  const offset = (page - 1) * limit;
+  const [result, totalResult] = await Promise.all([
+    query(`
     SELECT c.*, p.full_name as creator_name,
     (SELECT COUNT(*) FROM public.chat_participants WHERE chat_id = c.id) as members_count
     FROM public.chats c
     LEFT JOIN public.profiles p ON c.created_by = p.id
     WHERE c.type = 'group'
-    ORDER BY c.created_at DESC
-  `);
-  res.json({ success: true, data: result.rows });
+    ORDER BY c.created_at DESC, c.id
+    ${isPaginated ? 'LIMIT $1 OFFSET $2' : ''}
+  `, isPaginated ? [limit, offset] : []),
+    isPaginated
+      ? query("SELECT COUNT(*)::int AS total FROM public.chats WHERE type = 'group'")
+      : Promise.resolve(null),
+  ]);
+  res.json({
+    success: true,
+    data: result.rows,
+    ...(isPaginated && {
+      pagination: {
+        page,
+        limit,
+        total: Number(totalResult.rows[0].total) || 0,
+      },
+    }),
+  });
 });
 
 /**

@@ -55,6 +55,9 @@ const runMigrations = async () => {
     // Initialisation des tables admin et du compte admin principal
     const adminController = require('../controllers/admin.controller');
     await adminController.ensureAdminTables();
+    await adminController.ensureScheduledUserDeletionsTable();
+    const employerController = require('../controllers/employer.controller');
+    await employerController.ensureEmployerTables();
 
     logger.info('✅ Migrations et initialisation Admin terminées avec succès');
   } catch (error) {

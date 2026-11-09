@@ -287,7 +287,16 @@
         #section-approvals .admin-approval-card { align-items: flex-start; gap: 1rem; padding: 1.25rem; }
         #section-approvals .admin-approval-actions { flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
         #section-approvals .admin-approval-actions button { min-height: 2.5rem; }
-        #section-legal .admin-legal-title { margin-bottom: 1.5rem; text-align: left; }
+        #section-legal { width: 100%; max-width: none; }
+        #section-legal .admin-legal-title { margin-bottom: .75rem; text-align: left; }
+        #section-legal .admin-legal-tabs { display: flex; gap: .65rem; overflow-x: auto; padding: .35rem; border: 1px solid var(--admin-line); border-radius: 1rem; background: #fff; }
+        #section-legal .admin-legal-tab { display: inline-flex; min-height: 2.8rem; flex: 1 0 auto; align-items: center; justify-content: center; gap: .55rem; padding: .65rem 1rem; border: 1px solid transparent; border-radius: .75rem; background: transparent; color: var(--admin-muted); font-size: .75rem; font-weight: 750; transition: background .15s, color .15s, box-shadow .15s; }
+        #section-legal .admin-legal-tab.active { border-color: #e6e0fb; background: #f4f0ff; color: #6546c4; box-shadow: 0 3px 8px rgba(101,70,196,.08); }
+        #section-legal .admin-legal-page { min-width: 0; }
+        #section-legal .admin-legal-page-description { margin: 0 0 1.5rem; color: var(--admin-muted); font-size: .82rem; line-height: 1.5; }
+        #section-legal .admin-legal-content { min-height: 20rem; resize: vertical; }
+        #section-legal .admin-legal-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; }
+        #section-legal .admin-legal-actions button { min-height: 3.25rem; }
         #section-config .admin-config-heading { margin-bottom: .25rem; }
         .admin-module-status {
             display: inline-flex;
@@ -394,6 +403,10 @@
             #section-approvals .admin-approval-actions { justify-content: flex-start; }
             #section-approvals .admin-approval-actions button { flex: 1 1 auto; padding-inline: .75rem; }
             #section-legal .admin-legal-title { font-size: 1.45rem; }
+            #section-legal .admin-legal-tabs { gap: .35rem; }
+            #section-legal .admin-legal-tab { justify-content: flex-start; padding-inline: .75rem; font-size: .68rem; }
+            #section-legal .admin-legal-content { min-height: 15rem; }
+            #section-legal .admin-legal-actions { grid-template-columns: minmax(0, 1fr); }
             #section-legal .admin-legal-force { align-items: flex-start; padding-inline: 0; }
             #section-legal .admin-legal-remove-actions { grid-template-columns: minmax(0, 1fr); }
             #section-config .admin-config-panel { padding: 1rem; border-radius: 1.15rem; }
@@ -1597,52 +1610,63 @@
                     <div class="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden" id="my-requests-list"></div>
                 </div>
 
-                <div id="section-legal" class="hidden animate-fade-in max-w-4xl mx-auto space-y-8 pb-20">
+                <div id="section-legal" class="hidden animate-fade-in space-y-6 pb-20">
                     <header class="admin-control-hero">
                         <div class="admin-control-hero-copy">
                             <span class="admin-control-hero-icon"><i data-lucide="scale" class="h-5 w-5"></i></span>
-                            <div class="min-w-0"><h3>Légal & confidentialité</h3><p>Publiez et gérez les documents légaux de l’application.</p></div>
+                            <div class="min-w-0"><h3>Documents légaux</h3><p>Gérez séparément les conditions générales et la politique de confidentialité.</p></div>
                         </div>
                         <button type="button" class="admin-module-refresh" onclick="loadLegal()"><i data-lucide="refresh-cw" class="h-4 w-4"></i><span>Actualiser</span></button>
                     </header>
-                    <div class="admin-legal-form bg-white shadow-xl border border-gray-100">
-                        <h3 class="admin-legal-title text-3xl font-black uppercase tracking-tighter">Document à publier</h3>
-
-                        <div class="grid grid-cols-2 gap-6 mb-8">
-                            <div>
-                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Type de Document</label>
-                                <select id="legal-type" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
-                                    <option value="tos">Conditions Générales (TOS)</option>
-                                    <option value="privacy">Politique de Confidentialité</option>
-                                </select>
+                    <nav class="admin-legal-tabs" role="tablist" aria-label="Documents légaux">
+                        <button type="button" id="legal-tab-tos" class="admin-legal-tab active" role="tab" aria-selected="true" aria-controls="legal-page-tos" onclick="showLegalPage('tos')">
+                            <i data-lucide="file-text" class="h-4 w-4"></i><span>Conditions générales</span>
+                        </button>
+                        <button type="button" id="legal-tab-privacy" class="admin-legal-tab" role="tab" aria-selected="false" aria-controls="legal-page-privacy" onclick="showLegalPage('privacy')">
+                            <i data-lucide="shield-check" class="h-4 w-4"></i><span>Politique de confidentialité</span>
+                        </button>
+                    </nav>
+                    <div id="legal-page-tos" class="admin-legal-page" role="tabpanel" aria-labelledby="legal-tab-tos">
+                        <div class="admin-legal-form bg-white shadow-xl border border-gray-100">
+                            <h3 class="admin-legal-title text-3xl font-black uppercase tracking-tighter">Conditions générales</h3>
+                            <p class="admin-legal-page-description">Rédigez et publiez les conditions d’utilisation de l’application.</p>
+                            <div class="mb-6">
+                                <label for="legal-version-tos" class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Version</label>
+                                <input type="text" id="legal-version-tos" value="93.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
                             </div>
-                            <div>
-                                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Version</label>
-                                <input type="text" id="legal-version" value="93.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
+                            <div class="mb-6">
+                                <label for="legal-content-tos" class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Contenu des conditions (texte brut ou HTML)</label>
+                                <textarea id="legal-content-tos" class="admin-legal-content w-full p-6 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium text-sm leading-relaxed" placeholder="Rédigez les conditions générales..."></textarea>
+                            </div>
+                            <div class="admin-legal-force flex items-center mb-6 px-4">
+                                <input type="checkbox" id="legal-force-tos" checked class="w-6 h-6 accent-purple-600 mr-4">
+                                <div><p class="text-xs font-black text-gray-800 uppercase tracking-tight">Forcer l’acceptation</p><p class="text-[10px] text-gray-400 font-bold uppercase">Les utilisateurs devront accepter cette mise à jour pour continuer</p></div>
+                            </div>
+                            <div class="admin-legal-actions">
+                                <button onclick="publishLegal('tos')" class="bg-purple-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 transition-all flex items-center justify-center"><i data-lucide="send" class="w-4 h-4 mr-2"></i>Publier les conditions</button>
+                                <button onclick="removeLegal('tos')" class="bg-red-50 text-red-600 px-4 py-4 rounded-2xl font-black uppercase text-[10px] border border-red-100 hover:bg-red-600 hover:text-white transition-all">Retirer la mise à jour</button>
                             </div>
                         </div>
-
-                        <div class="mb-8">
-                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Contenu du Document (Texte brut ou HTML)</label>
-                            <textarea id="legal-content" class="w-full h-80 p-6 bg-gray-50 border border-gray-200 rounded-[2rem] outline-none font-medium text-sm leading-relaxed" placeholder="Écrivez le contenu ici..."></textarea>
-                        </div>
-
-                        <div class="admin-legal-force flex items-center mb-10 px-4">
-                            <input type="checkbox" id="legal-force" checked class="w-6 h-6 accent-purple-600 mr-4">
-                            <div>
-                                <p class="text-xs font-black text-gray-800 uppercase tracking-tight">Forcer l'acceptation (Mise à jour bloquante)</p>
-                                <p class="text-[10px] text-gray-400 font-bold uppercase">Les utilisateurs devront accepter pour continuer</p>
+                    </div>
+                    <div id="legal-page-privacy" class="admin-legal-page hidden" role="tabpanel" aria-labelledby="legal-tab-privacy">
+                        <div class="admin-legal-form bg-white shadow-xl border border-gray-100">
+                            <h3 class="admin-legal-title text-3xl font-black uppercase tracking-tighter">Politique de confidentialité</h3>
+                            <p class="admin-legal-page-description">Expliquez comment les données personnelles sont collectées, utilisées et protégées.</p>
+                            <div class="mb-6">
+                                <label for="legal-version-privacy" class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Version</label>
+                                <input type="text" id="legal-version-privacy" value="93.0.0" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold text-sm">
                             </div>
-                        </div>
-
-                        <div class="space-y-4">
-                            <button onclick="publishLegal()" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 transition-all flex items-center justify-center">
-                                <i data-lucide="send" class="w-4 h-4 mr-3"></i> DIFFUSER LA MISE À JOUR EN TEMPS RÉEL
-                            </button>
-
-                            <div class="admin-legal-remove-actions grid grid-cols-2 gap-4">
-                                <button onclick="removeLegal('tos')" class="bg-red-50 text-red-600 py-4 rounded-2xl font-black uppercase text-[10px] border border-red-100 hover:bg-red-600 hover:text-white transition-all">Retirer MAJ TOS</button>
-                                <button onclick="removeLegal('privacy')" class="bg-red-50 text-red-600 py-4 rounded-2xl font-black uppercase text-[10px] border border-red-100 hover:bg-red-600 hover:text-white transition-all">Retirer MAJ Privacy</button>
+                            <div class="mb-6">
+                                <label for="legal-content-privacy" class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 block mb-2">Contenu de la politique (texte brut ou HTML)</label>
+                                <textarea id="legal-content-privacy" class="admin-legal-content w-full p-6 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium text-sm leading-relaxed" placeholder="Rédigez la politique de confidentialité..."></textarea>
+                            </div>
+                            <div class="admin-legal-force flex items-center mb-6 px-4">
+                                <input type="checkbox" id="legal-force-privacy" checked class="w-6 h-6 accent-purple-600 mr-4">
+                                <div><p class="text-xs font-black text-gray-800 uppercase tracking-tight">Forcer l’acceptation</p><p class="text-[10px] text-gray-400 font-bold uppercase">Les utilisateurs devront accepter cette mise à jour pour continuer</p></div>
+                            </div>
+                            <div class="admin-legal-actions">
+                                <button onclick="publishLegal('privacy')" class="bg-purple-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 transition-all flex items-center justify-center"><i data-lucide="send" class="w-4 h-4 mr-2"></i>Publier la politique</button>
+                                <button onclick="removeLegal('privacy')" class="bg-red-50 text-red-600 px-4 py-4 rounded-2xl font-black uppercase text-[10px] border border-red-100 hover:bg-red-600 hover:text-white transition-all">Retirer la mise à jour</button>
                             </div>
                         </div>
                     </div>
@@ -6946,30 +6970,41 @@
             }
         }
 
+        function showLegalPage(type) {
+            ['tos', 'privacy'].forEach(documentType => {
+                const isActive = documentType === type;
+                document.getElementById(`legal-page-${documentType}`).classList.toggle('hidden', !isActive);
+                const tab = document.getElementById(`legal-tab-${documentType}`);
+                tab.classList.toggle('active', isActive);
+                tab.setAttribute('aria-selected', String(isActive));
+            });
+        }
+
         async function loadLegal() {
             try {
             const res = await axios.get(`${API_URL}/admin/legal`, { headers: { Authorization: `Bearer ${token}` } });
-            const type = document.getElementById('legal-type').value;
-            const doc = res.data.data.find(d => d.type === type);
-            if (doc) {
-                document.getElementById('legal-content').value = doc.content;
-                document.getElementById('legal-version').value = doc.version;
-                document.getElementById('legal-force').checked = doc.force_acceptance;
-            }
+            ['tos', 'privacy'].forEach(type => {
+                const doc = res.data.data.find(document => document.type === type);
+                document.getElementById(`legal-content-${type}`).value = doc?.content || '';
+                document.getElementById(`legal-version-${type}`).value = doc?.version || '93.0.0';
+                document.getElementById(`legal-force-${type}`).checked = doc ? doc.force_acceptance : true;
+            });
             } catch (error) {
                 toast(error.response?.data?.error || "Erreur lors du chargement des documents légaux.", "error");
             }
         }
 
-        document.getElementById('legal-type')?.addEventListener('change', loadLegal);
+        async function publishLegal(type) {
+            if (!['tos', 'privacy'].includes(type)) {
+                toast("Type de document légal invalide.", "error");
+                return;
+            }
 
-        async function publishLegal() {
-            const type = document.getElementById('legal-type').value;
-            const content = document.getElementById('legal-content').value;
-            const version = document.getElementById('legal-version').value;
-            const force_acceptance = document.getElementById('legal-force').checked;
+            const content = document.getElementById(`legal-content-${type}`).value;
+            const version = document.getElementById(`legal-version-${type}`).value;
+            const force_acceptance = document.getElementById(`legal-force-${type}`).checked;
 
-            if (!content || !version) return alert("Veuillez remplir tous les champs.");
+            if (!content.trim() || !version.trim()) return alert("Veuillez remplir tous les champs.");
 
             if (!confirm(`Voulez-vous vraiment DIFFUSER cette mise à jour (${type.toUpperCase()} v${version}) en temps réel à TOUS les utilisateurs ?`)) return;
 
@@ -6978,7 +7013,7 @@
                 if (res.data.success) {
                     alert("✅ Diffusion en temps réel réussie ! L'écran de blocage s'affichera chez les utilisateurs connectés.");
                 }
-            } catch (e) { alert("Erreur de publication."); }
+            } catch (error) { alert(error.response?.data?.error || "Erreur de publication."); }
         }
 
         async function removeLegal(type) {

@@ -1,4 +1,4 @@
-# Résumé du Backend Meet Me
+# Résumé du Backend Acemia
 
 ## 🎯 **Backend Node.js/Express - COMPLÈTEMENT IMPLÉMENTÉ**
 
@@ -319,7 +319,7 @@ socket.on('user_chats', (data) => {})
 
 ## 🏆 **Conclusion**
 
-Le backend Meet Me est **complètement fonctionnel avec Supabase (Postgres)** :
+Le backend Acemia est **complètement fonctionnel avec Supabase (Postgres)** :
 
 ### **✅ Prêt pour la production :**
 - Architecture modulaire et maintenable

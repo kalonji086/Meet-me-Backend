@@ -106,7 +106,7 @@ const config = {
 
   // Application Constants
   constants: {
-    appName: 'Meet Me',
+    appName: 'Acemia',
     appVersion: '89.0.0',
     defaultLanguage: 'fr',
     supportedLanguages: ['fr', 'en', 'es', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar'],

@@ -195,7 +195,7 @@ class AutomationService {
 
       if (result.rows.length === 0) return;
 
-      const title = "Tu nous manques sur Meet Me ! 👋";
+      const title = "Tu nous manques sur Acemia ! 👋";
       const message = "Salut {{name}}, tes amis t'attendent ! Reviens voir ce qu'il y a de nouveau et continue tes conversations.";
 
       for (const user of result.rows) {
@@ -226,7 +226,7 @@ class AutomationService {
 
       if (result.rows.length === 0) return;
 
-      const title = "Complète ton profil Meet Me ✨";
+      const title = "Complète ton profil Acemia ✨";
       const message = "Salut {{name}}, ajoute une photo et un pseudo pour que tes amis puissent te reconnaître plus facilement.";
 
       for (const user of result.rows) {

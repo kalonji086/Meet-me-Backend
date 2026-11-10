@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Script de configuration du backend Meet Me
+ * Script de configuration du backend Acemia
  * Ce script vérifie les prérequis et configure l'environnement pour Supabase (Postgres)
  */
 
@@ -15,7 +15,7 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-console.log('🔧 Configuration du Backend Meet Me\n');
+console.log('🔧 Configuration du Backend Acemia\n');
 
 // Vérifier Node.js
 try {

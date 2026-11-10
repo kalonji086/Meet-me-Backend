@@ -128,7 +128,7 @@ class Server {
   }
 
   initializeRoutes() {
-    this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Meet Me', version: '93.0.0' }));
+    this.app.get('/', (req, res) => res.json({ status: 'online', app: 'Acemia', version: '93.0.0' }));
     this.app.get('/api/health', (req, res) => {
       const statusCode = this.isReady ? 200 : 503;
       res.status(statusCode).json({

@@ -591,7 +591,7 @@ CREATE TABLE IF NOT EXISTS public.market_quotes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Conversations Market: intentionally independent from Meet Me chats/messages.
+-- Conversations Market: intentionally independent from Acemia chats/messages.
 CREATE TABLE IF NOT EXISTS public.market_conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL REFERENCES public.market_businesses(id) ON DELETE CASCADE,

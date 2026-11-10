@@ -1,7 +1,7 @@
 {
   "name": "meetme-backend",
   "version": "1.0.0",
-  "description": "Backend API pour l'application Meet Me - Chat avec traduction et messages vocaux",
+  "description": "Backend API pour l'application Acemia - Chat avec traduction et messages vocaux",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -23,7 +23,7 @@
     "express",
     "socket.io"
   ],
-  "author": "Meet Me Team",
+  "author": "Acemia Team",
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

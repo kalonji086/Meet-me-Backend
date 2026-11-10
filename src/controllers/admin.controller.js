@@ -196,7 +196,7 @@ const initializeAdminTables = async () => {
       await query(
         `INSERT INTO public.profiles (id, full_name, email, password, username, is_global_admin, is_verified, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [crypto.randomUUID(), 'Administrateur Meet Me', adminEmail, hashedPass, 'admin_meetme', true, true, 'offline']
+        [crypto.randomUUID(), 'Administrateur Acemia', adminEmail, hashedPass, 'admin_meetme', true, true, 'offline']
       );
       logger.info('✅ Compte Admin principal créé.');
     } else {
@@ -1669,7 +1669,7 @@ const saveDelegation = asyncHandler(async (req, res) => {
   const { userId, modules, isActive = true, collabAdminRights = {}, userAdminRights = {}, granularPermissions = {}, requiresApproval = true } = req.body;
 
   const userRes = await query('SELECT id, full_name, email FROM public.profiles WHERE id = $1', [userId]);
-  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Meet Me non trouvé' });
+  if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur Acemia non trouvé' });
 
   const user = userRes.rows[0];
 
@@ -2183,8 +2183,8 @@ const replyToAppeal = asyncHandler(async (req, res) => {
 
   if (action === 'delete_confirmed' && user_id) {
     // 1. Envoyer le mail de confirmation de suppression (Template Amazon)
-    const finalReply = reply || "Votre demande de suppression de compte Meet Me a été traitée. Toutes vos données ont été effacées de nos serveurs conformément aux politiques de Google Play.";
-    await mailService.sendSystemEmail(email, "Confirmation de suppression de votre compte Meet Me", finalReply);
+    const finalReply = reply || "Votre demande de suppression de compte Acemia a été traitée. Toutes vos données ont été effacées de nos serveurs conformément aux politiques de Google Play.";
+    await mailService.sendSystemEmail(email, "Confirmation de suppression de votre compte Acemia", finalReply);
 
     // 2. Supprimer définitivement l'utilisateur (CASCADE supprimera l'appel et tout le reste)
     await query('DELETE FROM public.profiles WHERE id = $1', [user_id]);
@@ -2202,7 +2202,7 @@ const replyToAppeal = asyncHandler(async (req, res) => {
 
   await logAdminAction(req, 'reply_appeal', 'appeal', id, { action });
 
-  await mailService.sendSystemEmail(email, "Réponse à votre demande Meet Me", reply);
+  await mailService.sendSystemEmail(email, "Réponse à votre demande Acemia", reply);
 
   res.json({ success: true, message: 'Réponse envoyée par e-mail.' });
 });
@@ -3072,7 +3072,7 @@ const handleMarketRequest = asyncHandler(async (req, res) => {
     );
 
     // --- NOUVELLE LOGIQUE D'AJOUT AUTOMATIQUE AU GROUPE ---
-    const groupName = `${business.category} Meet Me`;
+    const groupName = `${business.category} Acemia`;
 
     // Vérifier si le groupe de catégorie existe déjà
     let groupRes = await query("SELECT id FROM public.chats WHERE name = $1 AND type = 'group'", [groupName]);
@@ -3201,7 +3201,7 @@ const deleteMarketBusiness = asyncHandler(async (req, res) => {
  */
 const createOfficialGroup = asyncHandler(async (req, res) => {
   const { category, businessId } = req.body;
-  const groupName = `${category} Meet Me`;
+  const groupName = `${category} Acemia`;
 
   // 1. Trouver le business pour avoir le user_id
   const businessRes = await query('SELECT user_id, business_name FROM public.market_businesses WHERE id = $1', [businessId]);
@@ -3237,7 +3237,7 @@ const createOfficialGroup = asyncHandler(async (req, res) => {
  */
 const getMarketGroupMembers = asyncHandler(async (req, res) => {
   const { category } = req.query;
-  const groupName = `${category} Meet Me`;
+  const groupName = `${category} Acemia`;
 
   const groupRes = await query("SELECT id FROM public.chats WHERE name = $1 AND type = 'group'", [groupName]);
   if (groupRes.rows.length === 0) return res.json({ success: true, data: [] });
@@ -3259,7 +3259,7 @@ const getMarketGroupMembers = asyncHandler(async (req, res) => {
  */
 const removeMarketGroupMember = asyncHandler(async (req, res) => {
   const { businessId, category } = req.body;
-  const groupName = `${category} Meet Me`;
+  const groupName = `${category} Acemia`;
 
   const business = await query('SELECT user_id FROM public.market_businesses WHERE id = $1', [businessId]);
   const group = await query("SELECT id FROM public.chats WHERE name = $1", [groupName]);

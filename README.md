@@ -1,6 +1,6 @@
-# Meet Me - Backend API
+# Acemia - Backend API
 
-Backend Node.js/Express pour l'application de chat Meet Me avec traduction en temps réel, messages vocaux et notifications push.
+Backend Node.js/Express pour l'application de chat Acemia avec traduction en temps réel, messages vocaux et notifications push.
 
 ## 🚀 Fonctionnalités
 
@@ -323,10 +323,10 @@ Pour le support, ouvrez une issue sur le repository ou contactez l'équipe de d�
 
 ## 📞 Contact
 
-Équipe Meet Me - contact@meetme.com
+Équipe Acemia - contact@meetme.com
 
 ---
 
-**Note:** Ce backend est conçu pour fonctionner avec le frontend React Native/Expo Meet Me. Assurez-vous que les deux projets sont correctement configurés et communiquent entre eux.
+**Note:** Ce backend est conçu pour fonctionner avec le frontend React Native/Expo Acemia. Assurez-vous que les deux projets sont correctement configurés et communiquent entre eux.
 
 # Meet-me-Backend

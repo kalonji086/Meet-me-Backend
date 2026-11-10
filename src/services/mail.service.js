@@ -104,10 +104,10 @@ class MailService {
    * Envoyer un email de bienvenue
    */
   async sendWelcomeEmail(email, name) {
-    const title = `Bonjour ${name}, bienvenue sur Meet Me !`;
+    const title = `Bonjour ${name}, bienvenue sur Acemia !`;
     const content = `
-      <p>Nous sommes ravis de vous accueillir dans la communauté <strong>Meet Me</strong>. Votre compte a été créé avec succès.</p>
-      <p>Meet Me vous permet de rester connecté avec vos proches partout dans le monde, avec une traduction intelligente de vos messages en temps réel.</p>
+      <p>Nous sommes ravis de vous accueillir dans la communauté <strong>Acemia</strong>. Votre compte a été créé avec succès.</p>
+      <p>Acemia vous permet de rester connecté avec vos proches partout dans le monde, avec une traduction intelligente de vos messages en temps réel.</p>
       <p><strong>Voici ce que vous pouvez faire dès maintenant :</strong></p>
       <ul>
         <li>Personnaliser votre profil (photo, pseudo, actu)</li>
@@ -118,12 +118,12 @@ class MailService {
         <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">DÉCOUVRIR L'APPLICATION</a>
       </div>
       <p style="margin-top: 30px;">Si vous avez des questions, n'hésitez pas à répondre à cet email ou à nous contacter sur WhatsApp.</p>
-      <p>L'équipe Meet Me</p>
+      <p>L'équipe Acemia</p>
     `;
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = "Bienvenue sur Meet Me !";
-    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre aventure Meet Me commence ici.");
+    sendSmtpEmail.subject = "Bienvenue sur Acemia !";
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre aventure Acemia commence ici.");
     sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
@@ -141,7 +141,7 @@ class MailService {
   async sendOTPEmail(email, otp) {
     const title = "Vérification de votre compte";
     const content = `
-      <p>Vous avez demandé un code de vérification pour votre compte Meet Me.</p>
+      <p>Vous avez demandé un code de vérification pour votre compte Acemia.</p>
       <p>Veuillez utiliser le code ci-dessous pour confirmer votre identité. Pour votre sécurité, ne partagez jamais ce code avec personne.</p>
       <div class="otp-box">${otp}</div>
       <p>Ce code est <strong>valable pendant 15 minutes</strong>.</p>
@@ -149,12 +149,12 @@ class MailService {
       <div style="text-align: center;">
         <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">OUVRIR L'APPLICATION</a>
       </div>
-      <p>À bientôt,<br>L'équipe de sécurité Meet Me</p>
+      <p>À bientôt,<br>L'équipe de sécurité Acemia</p>
     `;
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = `${otp} est votre code Meet Me`;
-    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre code de sécurité Meet Me.");
+    sendSmtpEmail.subject = `${otp} est votre code Acemia`;
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre code de sécurité Acemia.");
     sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email }];
 
@@ -172,7 +172,7 @@ class MailService {
   async sendMarketApprovalEmail(email, name, businessName, category, groupName) {
     const title = `Félicitations {{name}} ! Votre business "${businessName}" est approuvé.`;
     const content = `
-      <p>Nous avons le plaisir de vous informer que votre demande pour rejoindre le <strong>Market Meet Me</strong> a été acceptée !</p>
+      <p>Nous avons le plaisir de vous informer que votre demande pour rejoindre le <strong>Market Acemia</strong> a été acceptée !</p>
       <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #25D366;">
         <p style="margin: 0;"><strong>Business :</strong> ${businessName}</p>
         <p style="margin: 5px 0;"><strong>Catégorie :</strong> ${category}</p>
@@ -182,9 +182,9 @@ class MailService {
       <ul>
         <li>Votre <strong>Business Dashboard</strong> est désormais débloqué dans l'onglet Market.</li>
         <li>Vous avez été automatiquement ajouté au groupe <strong>"${groupName}"</strong> pour échanger avec d'autres pros.</li>
-        <li>Vos annonces sont désormais visibles par tous les utilisateurs de Meet Me.</li>
+        <li>Vos annonces sont désormais visibles par tous les utilisateurs d’Acemia.</li>
       </ul>
-      <p>Nous sommes impatients de voir votre activité grandir sur Meet Me !</p>
+      <p>Nous sommes impatients de voir votre activité grandir sur Acemia !</p>
       <div style="text-align: center;">
         <a href="https://play.google.com/apps/internaltest/4701609113157308277" class="btn">ACCÉDER À MON DASHBOARD</a>
       </div>
@@ -203,7 +203,7 @@ class MailService {
         <img src="https://cdn-icons-png.flaticon.com/512/1161/1161388.png" style="width: 70px; height: 70px;" alt="Avertissement">
       </div>
       <p>Bonjour <strong>${name}</strong>,</p>
-      <p>Nous avons examiné avec attention votre demande pour rejoindre le <strong>Market Meet Me</strong> avec le business "${businessName}".</p>
+      <p>Nous avons examiné avec attention votre demande pour rejoindre le <strong>Market Acemia</strong> avec le business "${businessName}".</p>
       <p>Malheureusement, nous ne pouvons pas approuver votre demande dans son état actuel pour la raison suivante :</p>
 
       <div style="background-color: #fff5f5; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #feb2b2; color: #c53030;">
@@ -225,7 +225,7 @@ class MailService {
       </div>
 
       <p style="margin-top: 40px; font-size: 11px; color: #999; text-align: center;">
-        L'équipe de modération Meet Me
+        L'équipe de modération Acemia
       </p>
     `;
 
@@ -299,10 +299,10 @@ class MailService {
     })[char]);
     const safeName = escapeHtml(name || 'Utilisateur');
     const safeMessage = escapeHtml(message).replace(/\r?\n/g, '<br>');
-    const title = 'Avis de sécurité concernant votre compte Meet Me';
+    const title = 'Avis de sécurité concernant votre compte Acemia';
     const content = `
       <p>Bonjour <strong>${safeName}</strong>,</p>
-      <p>Notre équipe vous contacte au sujet de la sécurité de votre compte Meet Me.</p>
+      <p>Notre équipe vous contacte au sujet de la sécurité de votre compte Acemia.</p>
       <div style="background:#fff7ed;border-left:4px solid #ea580c;padding:18px 20px;margin:22px 0;border-radius:8px;">
         <p style="margin:0 0 8px;font-weight:bold;color:#9a3412;">Message de l’équipe de sécurité</p>
         <p style="margin:0;line-height:1.6;">${safeMessage}</p>
@@ -311,7 +311,7 @@ class MailService {
     `;
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = title;
-    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, 'Avis de sécurité de votre compte Meet Me.');
+    sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, 'Avis de sécurité de votre compte Acemia.');
     sendSmtpEmail.sender = { name: 'Together Tech community official', email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email, name: name || 'Utilisateur' }];
 
@@ -332,7 +332,7 @@ class MailService {
     const modulesList = modules.map(m => `<li><strong>${m.toUpperCase()}</strong></li>`).join('');
     const content = `
       <p>Bonjour ${name},</p>
-      <p>L'administrateur principal de <strong>Meet Me</strong> vous a accordé des privilèges d'administration sur le panneau de contrôle Web officiel.</p>
+      <p>L'administrateur principal de <strong>Acemia</strong> vous a accordé des privilèges d'administration sur le panneau de contrôle Web officiel.</p>
 
       <div style="background-color: #f9f9f9; padding: 25px; border-radius: 15px; margin: 20px 0; border-left: 5px solid #FF9900;">
         <p style="margin-top: 0;"><strong>Vos accès autorisés :</strong></p>
@@ -344,7 +344,7 @@ class MailService {
       <p><strong>Comment vous connecter ?</strong></p>
       <ol>
         <li>Cliquez sur le bouton ci-dessous pour accéder à la page de connexion Admin.</li>
-        <li>Utilisez votre <strong>e-mail habituel</strong> (${email}) et votre mot de passe Meet Me habituel.</li>
+        <li>Utilisez votre <strong>e-mail habituel</strong> (${email}) et votre mot de passe Acemia habituel.</li>
         <li>Une fois connecté, vous ne verrez que les modules listés ci-dessus.</li>
       </ol>
 
@@ -357,7 +357,7 @@ class MailService {
       </p>
     `;
 
-    return this.sendSystemEmail(email, "Invitation : Vous avez des privilèges Admin sur Meet Me", content, 'minimal', name);
+    return this.sendSystemEmail(email, "Invitation : Vous avez des privilèges Admin sur Acemia", content, 'minimal', name);
   }
 
   /**
@@ -390,7 +390,7 @@ class MailService {
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = "OFFICIEL : Invitation à rejoindre Together Tech community";
-    sendSmtpEmail.htmlContent = this._getBaseTemplate("Invitation Collaboration", content, "Rejoignez l'élite technologique de Meet Me.", "minimal");
+    sendSmtpEmail.htmlContent = this._getBaseTemplate("Invitation Collaboration", content, "Rejoignez l'élite technologique d’Acemia.", "minimal");
     sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
@@ -430,7 +430,7 @@ class MailService {
         <img src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" style="width: 70px; height: 70px;" alt="Together Tech">
       </div>
       <p>Bonjour <strong>${safeName}</strong>,</p>
-      <p>Un compte Meet Me de type <strong>${accountLabel}</strong> a été créé pour vous au sein de la <strong>Together Tech community</strong>.</p>
+      <p>Un compte Acemia de type <strong>${accountLabel}</strong> a été créé pour vous au sein de la <strong>Together Tech community</strong>.</p>
       <p>Pour des raisons de sécurité, vous devez changer votre mot de passe lors de votre première connexion.</p>
 
       <div style="background-color: #f7f7f7; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #eee; text-align: center;">
@@ -444,7 +444,7 @@ class MailService {
       <div style="background-color: #fff8e1; padding: 20px; border-radius: 15px; margin: 25px 0; border: 1px solid #ffe082;">
         <p style="margin: 0; color: #f57c00; font-weight: bold; font-size: 14px;">🚨 ACTION REQUISE :</p>
         <ol style="margin: 10px 0 0 0; padding-left: 20px; font-size: 14px; line-height: 1.6;">
-          <li>Ouvrez l’application Meet Me et connectez-vous avec les identifiants ci-dessus.</li>
+          <li>Ouvrez l’application Acemia et connectez-vous avec les identifiants ci-dessus.</li>
           <li>Suivez les étapes pour <strong>définir votre mot de passe personnel</strong>.</li>
         </ol>
       </div>
@@ -454,14 +454,14 @@ class MailService {
       </p>
     `;
 
-    return this.sendSystemEmail(email, "Votre compte Meet Me", content, 'minimal', name);
+    return this.sendSystemEmail(email, "Votre compte Acemia", content, 'minimal', name);
   }
 
   /**
    * Envoyer un mot de passe temporaire suite à un reset admin
    */
   async sendPasswordResetEmail(email, name, tempPassword) {
-    const title = `Réinitialisation de votre mot de passe Meet Me`;
+    const title = `Réinitialisation de votre mot de passe Acemia`;
     const dashboardUrl = `https://meet-me-backend-sg5c.onrender.com/admin-portal`;
 
     const content = `
@@ -496,7 +496,7 @@ class MailService {
       <div style="text-align: center; margin-bottom: 30px;">
         <img src="https://cdn-icons-png.flaticon.com/512/1063/1063376.png" style="width: 80px; height: 80px;" alt="Employeur Approuvé">
       </div>
-      <p>Nous avons le plaisir de vous informer que votre demande d'accès au <strong>Dashboard Employeur Meet Me</strong> a été validée par notre équipe !</p>
+      <p>Nous avons le plaisir de vous informer que votre demande d'accès au <strong>Dashboard Employeur Acemia</strong> a été validée par notre équipe !</p>
 
       <div style="background-color: #f0fdf4; padding: 25px; border-radius: 20px; margin: 25px 0; border: 1px solid #bbf7d0;">
         <p style="margin: 0; color: #166534; font-weight: bold; font-size: 16px;">BIENVENUE PARMI NOS PARTENAIRES</p>
@@ -506,7 +506,7 @@ class MailService {
       <p><strong>Vos nouveaux avantages :</strong></p>
       <ul>
         <li>Publication illimitée d'offres style "Amazon Job"</li>
-        <li>Visibilité accrue auprès de toute la communauté Meet Me</li>
+        <li>Visibilité accrue auprès de toute la communauté Acemia</li>
         <li>Interface simplifiée pour le suivi des postulants</li>
       </ul>
 
@@ -515,7 +515,7 @@ class MailService {
       </div>
 
       <p style="margin-top: 40px; font-size: 12px; color: #888; text-align: center;">
-        <em>L'équipe Partenariats Meet Me.</em>
+        <em>L'équipe Partenariats Acemia.</em>
       </p>
     `;
 
@@ -539,7 +539,7 @@ class MailService {
       icon = "https://cdn-icons-png.flaticon.com/512/1039/1039328.png";
     }
 
-    const title = `Information importante concernant votre contenu sur Meet Me`;
+    const title = `Information importante concernant votre contenu sur Acemia`;
     const content = `
       <div style="text-align: center; margin-bottom: 30px;">
         <img src="${icon}" style="width: 80px; height: 80px;" alt="Modération">
@@ -552,7 +552,7 @@ class MailService {
         <p style="margin: 15px 0 0 0; font-size: 15px; line-height: 1.6; color: #4a5568;">"${reason}"</p>
       </div>
 
-      <p>Conformément à nos standards de la communauté, nous veillons à ce que Meet Me reste un espace sûr et professionnel pour tous.</p>
+      <p>Conformément à nos standards de la communauté, nous veillons à ce que l’application Acemia reste un espace sûr et professionnel pour tous.</p>
 
       ${action === 'correction_required' ? `
       <div style="background-color: #ebf8ff; padding: 20px; border-radius: 15px; margin: 20px 0; border: 1px solid #bee3f8;">
@@ -566,11 +566,11 @@ class MailService {
       </div>
 
       <p style="margin-top: 40px; font-size: 12px; color: #999; text-align: center;">
-        L'équipe de sécurité et modération Meet Me.
+        L'équipe de sécurité et modération Acemia.
       </p>
     `;
 
-    return this.sendSystemEmail(email, `Modération Meet Me : ${contentTitle}`, content, 'amazon', name);
+    return this.sendSystemEmail(email, `Modération Acemia : ${contentTitle}`, content, 'amazon', name);
   }
 
   /**
@@ -609,7 +609,7 @@ class MailService {
             <p style="margin-top: 10px; font-size: 11px; color: #f59e0b; font-weight: bold;">⚠️ Vous devrez obligatoirement changer ce mot de passe lors de votre première connexion.</p>
           </div>
         ` : `
-          <p style="font-size: 13px; color: #64748b;">Utilisez votre compte Meet Me habituel pour vous connecter.</p>
+          <p style="font-size: 13px; color: #64748b;">Utilisez votre compte Acemia habituel pour vous connecter.</p>
         `}
       </div>
 

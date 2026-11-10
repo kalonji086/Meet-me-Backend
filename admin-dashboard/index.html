@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meet Me · Administration</title>
+    <title>Acemia · Administration</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -595,7 +595,7 @@
                         <i data-lucide="menu" class="w-6 h-6"></i>
                     </button>
                     <div class="min-w-0">
-                        <p class="hidden sm:block text-[10px] font-bold uppercase tracking-[.16em] text-purple-600">Administration · Meet Me</p>
+                        <p class="hidden sm:block text-[10px] font-bold uppercase tracking-[.16em] text-purple-600">Administration · Acemia</p>
                         <h2 id="section-title" class="text-lg lg:text-xl font-black text-gray-800 tracking-tighter uppercase truncate">Vue d'ensemble</h2>
                         <p id="section-subtitle" class="hidden sm:block mt-1 text-xs text-gray-500">Indicateurs et activité de la plateforme.</p>
                     </div>
@@ -667,7 +667,7 @@
                 <div class="flex items-center justify-between mb-10">
                     <div>
                         <h2 class="text-3xl font-black text-gray-900 tracking-tighter uppercase">Gestion des Comptes</h2>
-                        <p class="text-gray-500 font-medium mt-1">Créez et configurez les accès pour les différents rôles Meet Me.</p>
+                        <p class="text-gray-500 font-medium mt-1">Créez et configurez les accès pour les différents rôles Acemia.</p>
                     </div>
                     <button onclick="showNewAccountModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl font-black text-xs shadow-xl shadow-emerald-100 uppercase tracking-widest transition-all flex items-center gap-3">
                         <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer un nouveau compte
@@ -1251,7 +1251,7 @@
             <div id="section-stats" class="stats-dashboard animate-fade-in space-y-6">
                 <header class="stats-header flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div class="stats-header-copy rounded-r-xl py-2 pr-4">
-                        <p class="text-xs font-bold uppercase tracking-[.18em] text-indigo-600">Vue d'ensemble · Meet Me</p>
+                        <p class="text-xs font-bold uppercase tracking-[.18em] text-indigo-600">Vue d'ensemble · Acemia</p>
                         <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">Statistiques globales</h2>
                         <p class="mt-1 text-sm text-slate-500">Activité réelle de la plateforme, des écoles et de l'emploi.</p>
                     </div>
@@ -1514,7 +1514,7 @@
                                 <div class="admin-campaign-field">
                                     <label for="campaign-target">Destinataires</label>
                                     <select id="campaign-target" class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm">
-                                        <option value="all">Tous les utilisateurs Meet Me</option>
+                                        <option value="all">Tous les utilisateurs Acemia</option>
                                         <option value="specific">Adresse e-mail spécifique</option>
                                     </select>
                                 </div>
@@ -2997,7 +2997,7 @@
             });
 
             socket.on('admin_new_user', (data) => {
-                addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Meet Me`, 'user-plus');
+                addNotification('user', 'Nouveau Membre', `${data.user.name} a rejoint Acemia`, 'user-plus');
                 scheduleAdminStatsRefresh();
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
             });
@@ -6131,7 +6131,7 @@
                         <div class="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
                             <label for="managed-account-type" class="${labelClass}">Rôle du compte</label>
                             <select id="managed-account-type" onchange="renderManagedAccountFields()" class="${inputClass}">
-                                <option value="member">Utilisateur Meet Me</option>
+                                <option value="member">Utilisateur Acemia</option>
                                 <option value="parent">Parent</option>
                                 <option value="student">Élève (accès par code scolaire)</option>
                                 <option value="school_staff:enseignant">Personnel scolaire — Enseignant</option>
@@ -6778,7 +6778,7 @@
                 <textarea id="campaign-resend-message" rows="6" class="w-full p-3 mb-4 bg-gray-50 border border-gray-200 rounded-xl outline-none">${escapeUserCell(campaign.message)}</textarea>
                 <label class="block text-xs font-bold text-gray-700 mb-2" for="campaign-resend-target">Destinataires</label>
                 <select id="campaign-resend-target" class="w-full p-3 mb-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
-                    <option value="all" ${targetAll ? 'selected' : ''}>Tous les utilisateurs Meet Me</option>
+                    <option value="all" ${targetAll ? 'selected' : ''}>Tous les utilisateurs Acemia</option>
                     <option value="specific" ${targetAll ? '' : 'selected'}>E-mails spécifiques</option>
                 </select>
                 <input id="campaign-resend-target-value" value="${escapeUserCell(campaign.target_value || '')}" placeholder="email1@exemple.com, email2@exemple.com" class="w-full p-3 mb-4 bg-gray-50 border border-gray-200 rounded-xl outline-none">

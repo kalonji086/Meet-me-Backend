@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const config = require('../../config/config');
 
 /**
@@ -153,7 +154,16 @@ const isValidId = (str) => {
 /**
  * Helper to fetch school by promoter user_id
  */
-const getPromoterSchool = async (userId) => {
+const getPromoterSchool = async (userId, schoolSession) => {
+  if (schoolSession) {
+    if (!isValidUUID(schoolSession.schoolId)) return null;
+    const result = await query(
+      'SELECT * FROM public.school_requests WHERE id = $1 AND LOWER(status) IN (\'approuve\', \'approuvé\')',
+      [schoolSession.schoolId]
+    );
+    return result.rows[0] || null;
+  }
+
   if (!isValidUUID(userId)) return null;
 
   let result = await query(
@@ -431,6 +441,30 @@ const ensureSchoolColumns = async () => {
   }
 };
 
+let parentAccountsEnsured = false;
+const ensureSchoolParentAccounts = async () => {
+  if (parentAccountsEnsured) return;
+  await ensureSchoolColumns();
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.school_parent_accounts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      school_id UUID NOT NULL REFERENCES public.school_requests(id) ON DELETE CASCADE,
+      student_id UUID NOT NULL REFERENCES public.school_students(id) ON DELETE CASCADE,
+      full_name TEXT NOT NULL,
+      phone TEXT,
+      generated_code TEXT NOT NULL UNIQUE,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_school_parent_accounts_school_student
+    ON public.school_parent_accounts (school_id, student_id)
+  `);
+  parentAccountsEnsured = true;
+};
+
 /**
  * @desc    Get metrics / dashboard details for an approved school
  * @route   GET /api/school/dashboard
@@ -439,7 +473,7 @@ const ensureSchoolColumns = async () => {
 const getSchoolDashboardData = asyncHandler(async (req, res) => {
   const userId = req.userId;
 
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) {
     return res.status(403).json({
       success: false,
@@ -470,7 +504,7 @@ const getSchoolDashboardData = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const getSchoolSettings = asyncHandler(async (req, res) => {
-  const school = await getPromoterSchool(req.userId);
+  const school = await getPromoterSchool(req.userId, req.schoolSession);
   if (!school) {
     return res.status(403).json({ success: false, error: 'École introuvable.' });
   }
@@ -484,7 +518,7 @@ const getSchoolSettings = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const updateSchoolSettings = asyncHandler(async (req, res) => {
-  const school = await getPromoterSchool(req.userId);
+  const school = await getPromoterSchool(req.userId, req.schoolSession);
   if (!school) {
     return res.status(403).json({ success: false, error: 'École introuvable.' });
   }
@@ -536,12 +570,35 @@ const updateSchoolSettings = asyncHandler(async (req, res) => {
  */
 const getStudents = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
 
   try {
+    if (req.schoolSession && ['enseignant', 'professeur'].includes(req.schoolSession.role)) {
+      const result = await query(`
+        SELECT s.id, s.full_name, s.class_id, s.is_active, c.name as class_name
+        FROM public.school_students s
+        LEFT JOIN public.school_classes c ON s.class_id = c.id
+        WHERE s.school_id = $1 AND s.is_active = TRUE
+          AND c.staff_id = $2
+        ORDER BY s.full_name ASC
+      `, [school.id, req.schoolSession.principalId]);
+      return res.json({ success: true, data: result.rows });
+    }
+
+    if (req.schoolSession && req.schoolSession.role === 'prefet') {
+      const result = await query(`
+        SELECT s.id, s.full_name, s.class_id, s.is_active, c.name as class_name
+        FROM public.school_students s
+        LEFT JOIN public.school_classes c ON s.class_id = c.id
+        WHERE s.school_id = $1 AND s.is_active = TRUE
+        ORDER BY s.full_name ASC
+      `, [school.id]);
+      return res.json({ success: true, data: result.rows });
+    }
+
     const result = await query(`
       SELECT s.*,
              COALESCE(s.full_name, CONCAT(s.first_name, ' ', s.last_name), s.first_name, 'Élève') as full_name,
@@ -568,7 +625,7 @@ const getStudents = asyncHandler(async (req, res) => {
  */
 const addStudent = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
@@ -635,14 +692,31 @@ const addStudent = asyncHandler(async (req, res) => {
 const getSchoolPortalDashboard = asyncHandler(async (req, res) => {
   const session = req.schoolSession;
 
-  if (session.principalType === 'student') {
+  if (session.principalType === 'student' || session.principalType === 'parent') {
+    let studentId = session.principalId;
+    let parentAccount = null;
+    if (session.principalType === 'parent') {
+      await ensureSchoolParentAccounts();
+      const parentResult = await query(
+        `SELECT id, full_name, phone, student_id
+         FROM public.school_parent_accounts
+         WHERE id = $1 AND school_id = $2 AND is_active = TRUE`,
+        [session.principalId, session.schoolId]
+      );
+      if (parentResult.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Compte Parent introuvable.' });
+      }
+      parentAccount = parentResult.rows[0];
+      studentId = parentAccount.student_id;
+    }
+
     const studentResult = await query(
       `SELECT s.id, s.full_name, s.class_id, c.name AS class_name, sr.school_name
        FROM public.school_students s
        JOIN public.school_requests sr ON sr.id = s.school_id
        LEFT JOIN public.school_classes c ON c.id = s.class_id
        WHERE s.id = $1 AND s.school_id = $2`,
-      [session.principalId, session.schoolId]
+      [studentId, session.schoolId]
     );
     if (studentResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Élève introuvable.' });
@@ -671,17 +745,20 @@ const getSchoolPortalDashboard = asyncHandler(async (req, res) => {
     return res.json({
       success: true,
       data: {
-        type: 'student', student, schedules: schedules.rows, grades: grades.rows,
+        type: session.principalType, parent: parentAccount, student, child: parentAccount ? student : undefined,
+        schedules: schedules.rows, grades: grades.rows,
         attendance: attendance.rows, fees: fees.rows, resources: resources.rows
       }
     });
   }
 
+  await ensureSchoolColumns();
+
   const staffResult = await query(
     `SELECT sar.id, sar.full_name, sar.role, sr.school_name
      FROM public.school_account_requests sar
      JOIN public.school_requests sr ON sr.id = sar.school_id
-     WHERE sar.id = $1 AND sar.school_id = $2 AND sar.status = 'approuve'`,
+     WHERE sar.id = $1 AND sar.school_id = $2 AND LOWER(sar.status) IN ('approuve', 'approuvé')`,
     [session.principalId, session.schoolId]
   );
   if (staffResult.rows.length === 0) {
@@ -692,10 +769,27 @@ const getSchoolPortalDashboard = asyncHandler(async (req, res) => {
     query(`SELECT id, name, level FROM public.school_classes
            WHERE school_id = $1 AND (staff_id = $2 OR $3 IN ('directeur', 'prefet')) ORDER BY name`,
     [session.schoolId, session.principalId, session.role]),
-    query('SELECT day_of_week, start_time, end_time, subject, teacher_name FROM public.school_schedules WHERE school_id = $1 ORDER BY day_of_week, start_time LIMIT 30', [session.schoolId]),
-    query('SELECT COUNT(*)::int AS count FROM public.school_students WHERE school_id = $1 AND is_active = TRUE', [session.schoolId]),
-    query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'absent')::int AS absent
-           FROM public.school_attendance WHERE school_id = $1 AND date >= CURRENT_DATE - INTERVAL '30 days'`, [session.schoolId])
+    query(`SELECT sch.day_of_week, sch.start_time, sch.end_time, sch.subject, sch.teacher_name
+           FROM public.school_schedules sch
+           WHERE sch.school_id = $1
+             AND ($2 IN ('directeur', 'prefet') OR sch.class_id IN (
+               SELECT id FROM public.school_classes WHERE school_id = $1 AND staff_id = $3
+             ))
+           ORDER BY sch.day_of_week, sch.start_time LIMIT 30`,
+    [session.schoolId, session.role, session.principalId]),
+    query(`SELECT COUNT(*)::int AS count FROM public.school_students s
+           WHERE s.school_id = $1 AND s.is_active = TRUE
+             AND ($2 IN ('directeur', 'prefet') OR s.class_id IN (
+               SELECT id FROM public.school_classes WHERE school_id = $1 AND staff_id = $3
+             ))`,
+    [session.schoolId, session.role, session.principalId]),
+    query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE a.status = 'absent')::int AS absent
+           FROM public.school_attendance a
+           WHERE a.school_id = $1 AND a.date >= CURRENT_DATE - INTERVAL '30 days'
+             AND ($2 IN ('directeur', 'prefet') OR a.class_id IN (
+               SELECT id FROM public.school_classes WHERE school_id = $1 AND staff_id = $3
+             ))`,
+    [session.schoolId, session.role, session.principalId])
   ]);
 
   res.json({
@@ -717,6 +811,7 @@ const getSchoolPortalDashboard = asyncHandler(async (req, res) => {
 const loginByCode = asyncHandler(async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ success: false, error: 'Code requis' });
+  await ensureSchoolParentAccounts();
 
   // 1. Check if it's a staff member
   const staffCheck = await query(`
@@ -751,6 +846,46 @@ const loginByCode = asyncHandler(async (req, res) => {
         fullName: staff.full_name,
         schoolName: staff.school_name,
         schoolId: staff.school_id
+      }
+    });
+  }
+
+  const parentCheck = await query(`
+    SELECT pa.id, pa.full_name, pa.student_id, sr.id AS school_id,
+           sr.school_name, sr.status AS school_status, s.full_name AS student_name
+    FROM public.school_parent_accounts pa
+    JOIN public.school_requests sr ON sr.id = pa.school_id
+    JOIN public.school_students s ON s.id = pa.student_id AND s.school_id = pa.school_id
+    WHERE UPPER(pa.generated_code) = UPPER($1)
+      AND pa.is_active = TRUE
+      AND COALESCE(s.is_active, TRUE) = TRUE
+  `, [code.trim()]);
+
+  if (parentCheck.rows.length > 0) {
+    const parent = parentCheck.rows[0];
+    if (normalizeSchoolStatus(parent.school_status) !== 'approuve') {
+      return res.status(403).json({ success: false, error: 'L’école est actuellement suspendue.' });
+    }
+
+    const schoolSessionToken = jwt.sign({
+      schoolSession: true,
+      principalType: 'parent',
+      principalId: parent.id,
+      schoolId: parent.school_id,
+      role: 'parent'
+    }, config.jwt.secret, { expiresIn: '8h' });
+
+    return res.json({
+      success: true,
+      type: 'parent',
+      role: 'parent',
+      schoolSessionToken,
+      user: {
+        id: parent.id,
+        fullName: parent.full_name,
+        studentName: parent.student_name,
+        schoolName: parent.school_name,
+        schoolId: parent.school_id
       }
     });
   }
@@ -907,12 +1042,24 @@ const loginByCode = asyncHandler(async (req, res) => {
  */
 const getClasses = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
 
   try {
+    if (req.schoolSession && ['enseignant', 'professeur'].includes(req.schoolSession.role)) {
+      const result = await query(`
+        SELECT c.*, sar.full_name as staff_name, sar.role as staff_role,
+               (SELECT COUNT(*) FROM public.school_students s WHERE s.class_id = c.id) as student_count
+        FROM public.school_classes c
+        LEFT JOIN public.school_account_requests sar ON c.staff_id = sar.id
+        WHERE c.school_id = $1 AND c.staff_id = $2
+        ORDER BY c.name ASC
+      `, [school.id, req.schoolSession.principalId]);
+      return res.json({ success: true, data: result.rows });
+    }
+
     const result = await query(`
       SELECT c.*, sar.full_name as staff_name, sar.role as staff_role,
              (SELECT COUNT(*) FROM public.school_students s WHERE s.class_id = c.id) as student_count
@@ -938,7 +1085,7 @@ const getClasses = asyncHandler(async (req, res) => {
  */
 const addClass = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
@@ -1020,7 +1167,7 @@ const addClass = asyncHandler(async (req, res) => {
  */
 const deleteClass = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { id } = req.params;
@@ -1033,7 +1180,7 @@ const deleteClass = asyncHandler(async (req, res) => {
  */
 const deleteStudent = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { id } = req.params;
@@ -1046,7 +1193,7 @@ const deleteStudent = asyncHandler(async (req, res) => {
  */
 const getSchedules = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
@@ -1055,8 +1202,10 @@ const getSchedules = asyncHandler(async (req, res) => {
     SELECT sch.*, c.name as class_name
     FROM public.school_schedules sch
     JOIN public.school_classes c ON sch.class_id = c.id
-    WHERE sch.school_id = $1 ORDER BY sch.day_of_week, sch.start_time
-  `, [school.id]);
+    WHERE sch.school_id = $1
+      AND ($2::uuid IS NULL OR c.staff_id = $2)
+    ORDER BY sch.day_of_week, sch.start_time
+  `, [school.id, req.schoolSession && ['enseignant', 'professeur'].includes(req.schoolSession.role) ? req.schoolSession.principalId : null]);
 
   res.json({ success: true, data: result.rows });
 });
@@ -1066,7 +1215,7 @@ const getSchedules = asyncHandler(async (req, res) => {
  */
 const addSchedule = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
@@ -1111,7 +1260,7 @@ const addSchedule = asyncHandler(async (req, res) => {
  */
 const getFees = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
@@ -1131,7 +1280,7 @@ const getFees = asyncHandler(async (req, res) => {
  */
 const addFeeInvoice = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   await ensureSchoolColumns();
@@ -1165,7 +1314,7 @@ const addFeeInvoice = asyncHandler(async (req, res) => {
  */
 const addAccountRequest = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { fullName, email, role, phone } = req.body;
@@ -1199,11 +1348,86 @@ const addAccountRequest = asyncHandler(async (req, res) => {
  */
 const getAccountRequests = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const result = await query('SELECT * FROM public.school_account_requests WHERE school_id = $1 ORDER BY created_at DESC', [school.id]);
   res.json({ success: true, data: result.rows });
+});
+
+const getSchoolParents = asyncHandler(async (req, res) => {
+  const school = await getPromoterSchool(req.userId, req.schoolSession);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
+  await ensureSchoolParentAccounts();
+
+  const result = await query(
+    `SELECT pa.id, pa.full_name, pa.phone, pa.generated_code, pa.is_active, pa.created_at,
+            s.id AS student_id, s.full_name AS student_name, c.name AS class_name
+     FROM public.school_parent_accounts pa
+     JOIN public.school_students s ON s.id = pa.student_id
+     LEFT JOIN public.school_classes c ON c.id = s.class_id
+     WHERE pa.school_id = $1
+     ORDER BY pa.created_at DESC`,
+    [school.id]
+  );
+  res.json({ success: true, data: result.rows });
+});
+
+const addSchoolParent = asyncHandler(async (req, res) => {
+  const school = await getPromoterSchool(req.userId, req.schoolSession);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
+  await ensureSchoolParentAccounts();
+
+  const fullName = typeof req.body.fullName === 'string' ? req.body.fullName.trim() : '';
+  const phone = typeof req.body.phone === 'string' ? req.body.phone.trim() : '';
+  const studentId = req.body.studentId;
+  if (!fullName || !isValidUUID(studentId)) {
+    return res.status(400).json({ success: false, error: 'Le nom du parent et un élève valide sont requis.' });
+  }
+
+  const student = await query(
+    'SELECT id FROM public.school_students WHERE id = $1 AND school_id = $2 AND COALESCE(is_active, TRUE) = TRUE',
+    [studentId, school.id]
+  );
+  if (student.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Élève introuvable dans cette école.' });
+  }
+
+  let created;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const generatedCode = `PAR-${crypto.randomBytes(12).toString('hex').toUpperCase()}`;
+    try {
+      created = await query(
+        `INSERT INTO public.school_parent_accounts (school_id, student_id, full_name, phone, generated_code)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, full_name, phone, generated_code, is_active, student_id`,
+        [school.id, studentId, fullName, phone || null, generatedCode]
+      );
+      break;
+    } catch (error) {
+      if (error.code !== '23505' || attempt === 2) throw error;
+    }
+  }
+
+  res.status(201).json({ success: true, data: created.rows[0] });
+});
+
+const deactivateSchoolParent = asyncHandler(async (req, res) => {
+  const school = await getPromoterSchool(req.userId, req.schoolSession);
+  if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
+  await ensureSchoolParentAccounts();
+
+  const result = await query(
+    `UPDATE public.school_parent_accounts
+     SET is_active = FALSE, updated_at = NOW()
+     WHERE id = $1 AND school_id = $2 AND is_active = TRUE
+     RETURNING id`,
+    [req.params.id, school.id]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Compte Parent introuvable ou déjà désactivé.' });
+  }
+  res.json({ success: true, message: 'Code Parent désactivé.' });
 });
 
 module.exports = {
@@ -1226,5 +1450,8 @@ module.exports = {
   loginByCode,
   getSchoolPortalDashboard,
   deleteClass,
-  deleteStudent
+  deleteStudent,
+  getSchoolParents,
+  addSchoolParent,
+  deactivateSchoolParent
 };

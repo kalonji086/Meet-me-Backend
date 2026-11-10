@@ -707,21 +707,21 @@ class SocketService {
     });
   }
 
-  async persistAdminNotification(sourceType, title, body) {
+  async persistAdminNotification(sourceType, title, body, sourceId = null, metadata = {}) {
     const inserted = await query(
       `WITH inserted AS (
-         INSERT INTO public.admin_notifications (admin_id, source_type, title, body, metadata)
-         SELECT id, $1, $2, $3, $4::jsonb
+         INSERT INTO public.admin_notifications (admin_id, source_type, source_id, title, body, metadata)
+         SELECT id, $1, COALESCE($2::uuid, gen_random_uuid()), $3, $4, $5::jsonb
          FROM public.profiles
          WHERE is_global_admin = TRUE
-         RETURNING id, admin_id
+         RETURNING id, admin_id, source_id
        )
-       SELECT i.id, i.admin_id, p.push_token,
+       SELECT i.id, i.admin_id, i.source_id, p.push_token,
          (SELECT COUNT(*) FROM public.admin_notifications n
           WHERE n.admin_id = i.admin_id AND n.read_at IS NULL)::int AS unread_count
        FROM inserted i
        JOIN public.profiles p ON p.id = i.admin_id`,
-      [sourceType, title, body, JSON.stringify({ event: sourceType })]
+      [sourceType, sourceId, title, body, JSON.stringify({ event: sourceType, ...metadata })]
     );
 
     for (const notification of inserted.rows) {
@@ -729,6 +729,7 @@ class SocketService {
         adminNotificationId: notification.id,
         type: 'admin_event',
         sourceType,
+        sourceId: notification.source_id,
       };
       this.sendToUser(notification.admin_id, 'admin_notification', {
         id: notification.id,

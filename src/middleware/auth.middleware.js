@@ -45,23 +45,128 @@ const authenticate = async (req, res, next) => {
  * Authentifie une session temporaire créée par un code d'accès scolaire.
  * Cette session ne remplace jamais la session utilisateur principale.
  */
-const authenticateSchoolSession = (req, res, next) => {
+const authenticateSchoolSession = async (req, res, next) => {
+  const token = req.headers['x-school-session'];
+  if (!token || typeof token !== 'string') {
+    return res.status(401).json({ success: false, error: 'Session scolaire manquante.' });
+  }
+
+  let decoded;
   try {
-    const token = req.headers['x-school-session'];
-    if (!token || typeof token !== 'string') {
-      return res.status(401).json({ success: false, error: 'Session scolaire manquante.' });
-    }
-
-    const decoded = jwt.verify(token, config.jwt.secret);
-    if (!decoded.schoolSession || !decoded.schoolId || !decoded.principalId || !decoded.role) {
-      return res.status(401).json({ success: false, error: 'Session scolaire invalide.' });
-    }
-
-    req.schoolSession = decoded;
-    next();
+    decoded = jwt.verify(token, config.jwt.secret);
   } catch (error) {
     return res.status(401).json({ success: false, error: 'Session scolaire expirée ou invalide.' });
   }
+
+  if (!decoded.schoolSession || !decoded.schoolId || !decoded.principalId || !decoded.role) {
+    return res.status(401).json({ success: false, error: 'Session scolaire invalide.' });
+  }
+
+  try {
+    const schoolResult = await query(
+      'SELECT status FROM public.school_requests WHERE id = $1',
+      [decoded.schoolId]
+    );
+    const approvedStatuses = ['approuve', 'approuvé'];
+    if (!approvedStatuses.includes(String(schoolResult.rows[0]?.status || '').trim().toLowerCase())) {
+      return res.status(403).json({ success: false, error: 'L’école n’est pas approuvée ou est suspendue.' });
+    }
+
+    const principalTable = decoded.principalType === 'staff'
+      ? 'school_account_requests'
+      : decoded.principalType === 'student'
+        ? 'school_students'
+        : decoded.principalType === 'parent'
+          ? 'school_parent_accounts'
+        : null;
+    if (!principalTable) {
+      return res.status(401).json({ success: false, error: 'Type de compte scolaire invalide.' });
+    }
+    if (decoded.principalType === 'parent' && decoded.role !== 'parent') {
+      return res.status(401).json({ success: false, error: 'Session Parent invalide.' });
+    }
+
+    const principalResult = await query(
+      `SELECT id${decoded.principalType === 'staff' ? ', role' : ''}
+       FROM public.${principalTable}
+       WHERE id = $1 AND school_id = $2${decoded.principalType === 'staff' ? " AND LOWER(status) IN ('approuve', 'approuvé')" : " AND COALESCE(is_active, TRUE) = TRUE"}`,
+      [decoded.principalId, decoded.schoolId]
+    );
+    if (principalResult.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'Ce compte scolaire n’est plus actif.' });
+    }
+    if (decoded.principalType === 'staff' && principalResult.rows[0].role !== decoded.role) {
+      return res.status(403).json({ success: false, error: 'Les droits de ce compte scolaire ont changé. Reconnectez-vous.' });
+    }
+    if (decoded.principalType === 'parent') {
+      const childResult = await query(
+        `SELECT id FROM public.school_students
+         WHERE id = (
+           SELECT student_id FROM public.school_parent_accounts WHERE id = $1 AND school_id = $2
+         ) AND school_id = $2 AND COALESCE(is_active, TRUE) = TRUE`,
+        [decoded.principalId, decoded.schoolId]
+      );
+      if (childResult.rows.length === 0) {
+        return res.status(403).json({ success: false, error: 'Le compte de l’élève associé n’est plus actif.' });
+      }
+    }
+
+    req.schoolSession = decoded;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const authenticateSchoolAccess = async (req, res, next) => {
+  const token = req.headers['x-school-session'];
+  if (!token) return authenticate(req, res, next);
+  if (typeof token !== 'string') {
+    return res.status(401).json({ success: false, error: 'Session scolaire invalide.' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, config.jwt.secret);
+    if (!decoded.schoolSession || decoded.principalType !== 'staff' || !decoded.schoolId || !decoded.principalId || !decoded.role) {
+      return res.status(403).json({ success: false, error: 'Ce compte scolaire ne peut pas accéder à ce module.' });
+    }
+  } catch (error) {
+    return res.status(401).json({ success: false, error: 'Session scolaire expirée ou invalide.' });
+  }
+
+  let result;
+  try {
+    result = await query(
+      `SELECT sr.id, sr.status AS school_status, sar.status AS staff_status, sar.role AS staff_role
+       FROM public.school_requests sr
+       JOIN public.school_account_requests sar ON sar.school_id = sr.id
+       WHERE sr.id = $1 AND sar.id = $2`,
+      [decoded.schoolId, decoded.principalId]
+    );
+  } catch (error) {
+    return next(error);
+  }
+  const school = result.rows[0];
+  const approvedStatuses = ['approuve', 'approuvé'];
+  if (!school || !approvedStatuses.includes(String(school.school_status || '').trim().toLowerCase())) {
+    return res.status(403).json({ success: false, error: 'L’école n’est pas approuvée ou est suspendue.' });
+  }
+  if (!approvedStatuses.includes(String(school.staff_status || '').trim().toLowerCase())) {
+    return res.status(403).json({ success: false, error: 'Ce compte scolaire n’est plus actif.' });
+  }
+  if (school.staff_role !== decoded.role) {
+    return res.status(403).json({ success: false, error: 'Les droits de ce compte scolaire ont changé. Reconnectez-vous.' });
+  }
+
+  req.schoolSession = decoded;
+  req.userId = decoded.principalId;
+  return next();
+};
+
+const authorizeSchoolRoles = (...roles) => (req, res, next) => {
+  if (!req.schoolSession || roles.includes(req.schoolSession.role)) return next();
+  return res.status(403).json({ success: false, error: 'Votre rôle ne permet pas cette action.' });
 };
 
 /**
@@ -157,4 +262,13 @@ const authenticateAllowLocked = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticate, authenticateAllowLocked, authenticateSchoolSession, isAdmin, rateLimitAuth, checkChatParticipation };
+module.exports = {
+  authenticate,
+  authenticateAllowLocked,
+  authenticateSchoolSession,
+  authenticateSchoolAccess,
+  authorizeSchoolRoles,
+  isAdmin,
+  rateLimitAuth,
+  checkChatParticipation
+};

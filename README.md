@@ -130,6 +130,29 @@ AWS_S3_BUCKET=votre_bucket
 - `POST /api/translate` - Traduire un texte
 - `GET /api/translate/languages` - Langues supportées
 
+### Répertoire mondial des écoles
+- `GET /api/school/directory/search?location=Kinshasa` - Rechercher les établissements scolaires OpenStreetMap autour d'une ville (session utilisateur requise)
+- `POST /api/school/directory/proposals` - Proposer un établissement absent; nom, ville et pays sont obligatoires.
+- `PUT /api/school/directory/proposals/:proposalId` - Accepter ou refuser une proposition (administrateur principal uniquement).
+- `POST /api/school/directory/:schoolRef/claim` - Demander la réclamation d'une école avec coordonnées professionnelles et informations de vérification.
+- `GET /api/school/directory/:schoolRef/claim-status` - Consulter le statut de sa propre demande.
+- `PUT /api/school/directory/claims/:claimId` - Vérifier, puis accepter ou refuser une réclamation (administrateur principal uniquement).
+- `POST /api/school/directory/:schoolRef/admissions` - Envoyer une candidature à une école partenaire vérifiée.
+- `GET /api/school/admissions/mine` - Consulter ses candidatures, leur historique et le code scolaire après acceptation.
+- `PUT /api/school/admissions/:applicationId/respond` - Répondre à une demande d’informations complémentaires.
+- `GET /api/school/admissions/inbox` - Consulter les candidatures de son école (directeur uniquement).
+- `PUT /api/school/admissions/:applicationId/decision` - Demander des informations, accepter ou refuser (directeur uniquement).
+- `GET /api/school/admissions/notifications` et `PUT /api/school/admissions/notifications/:notificationId/read` - Consulter et marquer comme lues les notifications persistantes.
+- Les résultats sont limités à environ 12 km et mis en cache côté serveur; la couverture dépend des données OSM locales.
+- Les résultats OSM sont synchronisés dans `schools`; les propositions acceptées sont ajoutées au répertoire et réapparaissent dans les recherches de leur ville.
+- Les nouvelles écoles proposées génèrent une notification Admin persistante avec les actions d’approbation et de refus.
+- La migration `scripts/migration_school_directory.sql` est exécutée au démarrage du backend.
+- Une réclamation acceptée associe l'école au compte demandeur et active son espace École existant; la vérification d'identité et du mandat reste une étape humaine obligatoire.
+- Les candidatures sont séparées des demandes de création d'école, réservées aux écoles partenaires réclamées et vérifiées, et leur accès est limité au candidat et au directeur de l'établissement.
+- L'historique des échanges et les notifications de candidature sont conservés. Une acceptation rattache le profil existant et crée un code d'accès scolaire; les pièces jointes et paiements ne sont pas inclus.
+- Les données proviennent de Nominatim et de l'instance publique Overpass; configurez `OSM_CONTACT_EMAIL` pour identifier l'application auprès de Nominatim.
+- Respectez l'attribution OpenStreetMap et gardez à l'esprit que les services publics sont soumis à une politique d'usage raisonnable et ne garantissent pas de disponibilité.
+
 ### Santé
 - `GET /api/health` - Vérifier l'état du serveur
 - `GET /api/docs` - Documentation API

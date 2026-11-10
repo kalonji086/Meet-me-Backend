@@ -9,7 +9,15 @@ const schoolController = require('./school.controller');
 /**
  * Helper pour obtenir l'école du promoteur (réutilisé du contrôleur original)
  */
-const getPromoterSchool = async (userId) => {
+const getPromoterSchool = async (userId, schoolSession) => {
+  if (schoolSession) {
+    const result = await query(
+      'SELECT * FROM public.school_requests WHERE id = $1 AND LOWER(status) IN (\'approuve\', \'approuvé\')',
+      [schoolSession.schoolId]
+    );
+    return result.rows[0] || null;
+  }
+
   const isValidUUID = (str) => {
     if (!str || typeof str !== 'string') return false;
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
@@ -33,7 +41,7 @@ const getPromoterSchool = async (userId) => {
  */
 const getSubjects = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const result = await query(
@@ -51,7 +59,7 @@ const getSubjects = asyncHandler(async (req, res) => {
  */
 const addSubject = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { id, name, code, teacherName, isActive } = req.body;
@@ -98,7 +106,7 @@ const addSubject = asyncHandler(async (req, res) => {
  */
 const getEvaluations = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { classId, subjectId } = req.query;
@@ -113,8 +121,12 @@ const getEvaluations = asyncHandler(async (req, res) => {
     LEFT JOIN public.school_subjects s ON e.subject_id = s.id
     WHERE e.school_id = $1
   `;
-  const params = [school.id];
-  let paramCount = 1;
+  const staffClassId = req.schoolSession?.role === 'professeur' ? req.schoolSession.principalId : null;
+  const params = [school.id, staffClassId];
+  let paramCount = 2;
+  queryStr += ` AND ($2::uuid IS NULL OR e.class_id IN (
+    SELECT id FROM public.school_classes WHERE school_id = $1 AND staff_id = $2
+  ))`;
 
   if (classId) {
     paramCount++;
@@ -141,7 +153,7 @@ const getEvaluations = asyncHandler(async (req, res) => {
  */
 const addEvaluation = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { title, type, classId, subjectId, maxScore, evaluationDate, description } = req.body;
@@ -150,11 +162,17 @@ const addEvaluation = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Titre, type et date d\'évaluation sont requis.' });
   }
 
+  if (req.schoolSession?.role === 'professeur' && !classId) {
+    return res.status(403).json({ success: false, error: 'Une classe attribuée est requise pour créer une évaluation.' });
+  }
+
   // Vérifier que la classe existe dans cette école
   if (classId) {
     const classCheck = await query(
-      'SELECT id FROM public.school_classes WHERE id = $1 AND school_id = $2',
-      [classId, school.id]
+      `SELECT id FROM public.school_classes
+       WHERE id = $1 AND school_id = $2
+         AND ($3::uuid IS NULL OR staff_id = $3)`,
+      [classId, school.id, req.schoolSession?.role === 'professeur' ? req.schoolSession.principalId : null]
     );
     if (classCheck.rows.length === 0) {
       return res.status(400).json({ success: false, error: 'Classe invalide.' });
@@ -189,15 +207,19 @@ const addEvaluation = asyncHandler(async (req, res) => {
  */
 const getEvaluationGrades = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { evaluationId } = req.params;
 
   // Vérifier que l'évaluation appartient à cette école
   const evalCheck = await query(
-    'SELECT id FROM public.school_evaluations WHERE id = $1 AND school_id = $2',
-    [evaluationId, school.id]
+    `SELECT id FROM public.school_evaluations
+     WHERE id = $1 AND school_id = $2
+       AND ($3::uuid IS NULL OR class_id IN (
+         SELECT id FROM public.school_classes WHERE school_id = $2 AND staff_id = $3
+       ))`,
+    [evaluationId, school.id, req.schoolSession?.role === 'professeur' ? req.schoolSession.principalId : null]
   );
   if (evalCheck.rows.length === 0) {
     return res.status(404).json({ success: false, error: 'Évaluation introuvable.' });
@@ -226,7 +248,7 @@ const getEvaluationGrades = asyncHandler(async (req, res) => {
  */
 const addEvaluationGrades = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { evaluationId } = req.params;
@@ -238,8 +260,12 @@ const addEvaluationGrades = asyncHandler(async (req, res) => {
 
   // Vérifier que l'évaluation appartient à cette école
   const evalCheck = await query(
-    'SELECT id, max_score FROM public.school_evaluations WHERE id = $1 AND school_id = $2',
-    [evaluationId, school.id]
+    `SELECT id, max_score, class_id FROM public.school_evaluations
+     WHERE id = $1 AND school_id = $2
+       AND ($3::uuid IS NULL OR class_id IN (
+         SELECT id FROM public.school_classes WHERE school_id = $2 AND staff_id = $3
+       ))`,
+    [evaluationId, school.id, req.schoolSession?.role === 'professeur' ? req.schoolSession.principalId : null]
   );
   if (evalCheck.rows.length === 0) {
     return res.status(404).json({ success: false, error: 'Évaluation introuvable.' });
@@ -253,8 +279,10 @@ const addEvaluationGrades = asyncHandler(async (req, res) => {
 
     // Vérifier que l'élève appartient à cette école
     const studentCheck = await query(
-      'SELECT id FROM public.school_students WHERE id = $1 AND school_id = $2',
-      [studentId, school.id]
+      `SELECT id FROM public.school_students
+       WHERE id = $1 AND school_id = $2
+         AND ($3::uuid IS NULL OR class_id = $4)`,
+      [studentId, school.id, req.schoolSession?.role === 'professeur' ? evalCheck.rows[0].class_id : null, evalCheck.rows[0].class_id]
     );
     if (studentCheck.rows.length === 0) {
       results.push({ studentId, error: 'Élève introuvable dans cette école' });
@@ -316,7 +344,7 @@ const addEvaluationGrades = asyncHandler(async (req, res) => {
  */
 const getAttendance = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { startDate, endDate, classId, studentId } = req.query;
@@ -330,8 +358,12 @@ const getAttendance = asyncHandler(async (req, res) => {
     LEFT JOIN public.school_classes c ON a.class_id = c.id
     WHERE a.school_id = $1
   `;
-  const params = [school.id];
-  let paramCount = 1;
+  const staffClassId = req.schoolSession?.role === 'enseignant' ? req.schoolSession.principalId : null;
+  const params = [school.id, staffClassId];
+  let paramCount = 2;
+  queryStr += ` AND ($2::uuid IS NULL OR a.class_id IN (
+    SELECT id FROM public.school_classes WHERE school_id = $1 AND staff_id = $2
+  ))`;
 
   if (startDate) {
     paramCount++;
@@ -370,7 +402,7 @@ const getAttendance = asyncHandler(async (req, res) => {
  */
 const recordAttendance = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { date, records } = req.body; // Array de { studentId, status, reason }
@@ -385,16 +417,25 @@ const recordAttendance = asyncHandler(async (req, res) => {
     const { studentId, status, reason, classId } = record;
 
     // Vérifier que l'élève appartient à cette école
+    const assignedStaffId = req.schoolSession?.role === 'enseignant' ? req.schoolSession.principalId : null;
     const studentCheck = await query(
-      'SELECT id, class_id FROM public.school_students WHERE id = $1 AND school_id = $2',
-      [studentId, school.id]
+      `SELECT id, class_id FROM public.school_students
+       WHERE id = $1 AND school_id = $2
+         AND ($3::uuid IS NULL OR class_id IN (
+           SELECT id FROM public.school_classes WHERE school_id = $2 AND staff_id = $3
+         ))`,
+      [studentId, school.id, assignedStaffId]
     );
     if (studentCheck.rows.length === 0) {
       results.push({ studentId, error: 'Élève introuvable dans cette école' });
       continue;
     }
 
-    const studentClassId = classId || studentCheck.rows[0].class_id;
+    const studentClassId = studentCheck.rows[0].class_id;
+    if (classId && classId !== studentClassId) {
+      results.push({ studentId, error: 'La classe ne correspond pas à celle de l’élève.' });
+      continue;
+    }
 
     // Vérifier que le statut est valide
     const validStatuses = ['present', 'absent', 'excused', 'late'];
@@ -450,12 +491,27 @@ const recordAttendance = asyncHandler(async (req, res) => {
  */
 const getAttendanceStats = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { startDate, endDate } = req.query;
 
   // Calculer les statistiques de présence
+  const staffClassId = req.schoolSession?.role === 'enseignant' ? req.schoolSession.principalId : null;
+  const params = [school.id, staffClassId];
+  let paramCount = 2;
+  let dateFilters = '';
+  if (startDate) {
+    paramCount++;
+    dateFilters += ` AND date >= $${paramCount}`;
+    params.push(startDate);
+  }
+  if (endDate) {
+    paramCount++;
+    dateFilters += ` AND date <= $${paramCount}`;
+    params.push(endDate);
+  }
+
   const statsQuery = `
     SELECT
       COUNT(*) as total_records,
@@ -465,13 +521,11 @@ const getAttendanceStats = asyncHandler(async (req, res) => {
       SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_count
     FROM public.school_attendance
     WHERE school_id = $1
-    ${startDate ? 'AND date >= $2' : ''}
-    ${endDate ? 'AND date <= $3' : ''}
+      AND ($2::uuid IS NULL OR class_id IN (
+        SELECT id FROM public.school_classes WHERE school_id = $1 AND staff_id = $2
+      ))
+      ${dateFilters}
   `;
-
-  const params = [school.id];
-  if (startDate) params.push(startDate);
-  if (endDate) params.push(endDate);
 
   const statsResult = await query(statsQuery, params);
   const stats = statsResult.rows[0];
@@ -484,12 +538,15 @@ const getAttendanceStats = asyncHandler(async (req, res) => {
     JOIN public.school_students s ON a.student_id = s.id
     LEFT JOIN public.school_classes c ON s.class_id = c.id
     WHERE a.school_id = $1 AND a.status = 'absent'
+      AND ($2::uuid IS NULL OR a.class_id IN (
+        SELECT id FROM public.school_classes WHERE school_id = $1 AND staff_id = $2
+      ))
     GROUP BY s.id, s.full_name, c.name
     ORDER BY absences_count DESC
     LIMIT 10
   `;
 
-  const frequentAbsences = await query(frequentAbsencesQuery, [school.id]);
+  const frequentAbsences = await query(frequentAbsencesQuery, [school.id, staffClassId]);
 
   res.json({
     success: true,
@@ -513,7 +570,7 @@ const getAttendanceStats = asyncHandler(async (req, res) => {
  */
 const getResources = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { classId, subjectId, fileType } = req.query;
@@ -561,7 +618,7 @@ const getResources = asyncHandler(async (req, res) => {
  */
 const addResource = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { title, description, fileUrl, fileType, fileSize, classId, subjectId, isPublic } = req.body;
@@ -609,10 +666,16 @@ const addResource = asyncHandler(async (req, res) => {
  */
 const getSchoolReports = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { reportType, startDate, endDate } = req.query;
+  if (
+    req.schoolSession?.role === 'prefet' &&
+    !['academic_performance', 'attendance_summary'].includes(reportType)
+  ) {
+    return res.status(403).json({ success: false, error: 'Ce rapport n’est pas accessible à votre rôle.' });
+  }
 
   switch (reportType) {
     case 'academic_performance':
@@ -747,7 +810,7 @@ const getSchoolReports = asyncHandler(async (req, res) => {
  */
 const exportSchoolData = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  const school = await getPromoterSchool(userId);
+  const school = await getPromoterSchool(userId, req.schoolSession);
   if (!school) return res.status(403).json({ success: false, error: 'École introuvable' });
 
   const { dataType } = req.query;

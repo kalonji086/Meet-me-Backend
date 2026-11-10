@@ -280,6 +280,65 @@
         #section-campaigns .admin-campaign-history-head { gap: 1rem; padding: 1.25rem clamp(1rem, 2.5vw, 2rem); }
         #section-campaigns .admin-campaign-history-head h3 { font-size: 1rem; line-height: 1.4; }
         #section-campaigns #campaigns-list > div { min-width: 0; }
+        #section-announcements { width: 100%; max-width: none; }
+        #section-announcements .admin-control-hero { margin-bottom: 1rem; padding: 1.35rem 1.6rem; }
+        .announcement-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
+        .announcement-stat { display: flex; min-width: 0; align-items: center; gap: .85rem; padding: 1rem 1.15rem; border: 1px solid var(--admin-line); border-radius: 1rem; background: #fff; box-shadow: 0 8px 24px rgba(23,32,51,.035); }
+        .announcement-stat-icon { display: grid; width: 2.6rem; height: 2.6rem; flex: 0 0 auto; place-items: center; border-radius: .85rem; background: #f2edff; color: #6546c4; }
+        .announcement-stat-icon.is-live { background: #eaf8f1; color: #16835d; }
+        .announcement-stat-icon.is-muted { background: #f1f3f7; color: #68758a; }
+        .announcement-stat-label { margin: 0; color: var(--admin-muted); font-size: .68rem; font-weight: 700; }
+        .announcement-stat-value { margin: .15rem 0 0; color: var(--admin-ink); font-size: 1.35rem; font-weight: 800; line-height: 1.15; }
+        .announcement-compose { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(17rem, .8fr); gap: 1rem; align-items: start; }
+        .announcement-panel { min-width: 0; overflow: hidden; border: 1px solid var(--admin-line); border-radius: 1.15rem; background: #fff; box-shadow: 0 10px 28px rgba(23,32,51,.04); }
+        .announcement-panel-head { padding: 1.1rem 1.35rem; border-bottom: 1px solid #edf0f5; }
+        .announcement-panel-head h4 { margin: 0; color: var(--admin-ink); font-size: .92rem; font-weight: 800; }
+        .announcement-panel-head p { margin: .3rem 0 0; color: var(--admin-muted); font-size: .74rem; line-height: 1.5; }
+        .announcement-panel-body { display: flex; flex-direction: column; gap: 1rem; padding: 1.25rem 1.35rem; }
+        .announcement-field { min-width: 0; }
+        .announcement-field > label { display: block; margin-bottom: .42rem; color: #59667b; font-size: .7rem; font-weight: 750; }
+        .announcement-field input, .announcement-field select, .announcement-field textarea { width: 100%; min-height: 2.8rem; padding: .7rem .8rem; border: 1px solid #dfe4ed; border-radius: .7rem; outline: none; background: #fafbfc; color: var(--admin-ink); font-size: .82rem; transition: border-color .15s, box-shadow .15s, background .15s; }
+        .announcement-field textarea { min-height: 9.5rem; resize: vertical; line-height: 1.55; }
+        .announcement-field input:focus, .announcement-field select:focus, .announcement-field textarea:focus { border-color: #9a84e6; background: #fff; box-shadow: 0 0 0 3px rgba(101,70,196,.1); }
+        .announcement-field-foot { display: flex; justify-content: flex-end; margin-top: .35rem; color: #8993a5; font-size: .66rem; }
+        .announcement-settings-body { gap: .85rem; }
+        .announcement-publish-toggle { display: flex; align-items: flex-start; gap: .75rem; padding: .9rem; border: 1px solid #e6e1f4; border-radius: .85rem; background: #faf9ff; cursor: pointer; }
+        .announcement-publish-toggle input { width: 1.1rem; height: 1.1rem; flex: 0 0 auto; margin: .12rem 0 0; accent-color: #6546c4; }
+        .announcement-publish-toggle strong { display: block; color: var(--admin-ink); font-size: .76rem; }
+        .announcement-publish-toggle span { display: block; margin-top: .2rem; color: var(--admin-muted); font-size: .68rem; line-height: 1.4; }
+        .announcement-info { display: flex; align-items: flex-start; gap: .6rem; padding: .8rem; border: 1px solid #e4ecfb; border-radius: .8rem; background: #f7faff; color: #536987; font-size: .69rem; line-height: 1.5; }
+        .announcement-info svg { flex: 0 0 auto; margin-top: .1rem; color: #5478bd; }
+        .announcement-form-actions { display: flex; flex-direction: column; gap: .55rem; margin-top: .1rem; }
+        .announcement-form-actions button { min-height: 2.8rem; border-radius: .75rem; }
+        .announcement-history { overflow: hidden; border: 1px solid var(--admin-line); border-radius: 1.15rem; background: #fff; box-shadow: 0 10px 28px rgba(23,32,51,.04); }
+        .announcement-history-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.35rem; border-bottom: 1px solid #edf0f5; }
+        .announcement-history-head h3 { margin: 0; color: var(--admin-ink); font-size: .95rem; font-weight: 800; }
+        .announcement-history-head p { margin: .25rem 0 0; color: var(--admin-muted); font-size: .7rem; }
+        .announcement-toolbar { display: flex; align-items: center; gap: .65rem; padding: .85rem 1.1rem; border-bottom: 1px solid #edf0f5; background: #fbfcfe; }
+        .announcement-toolbar input, .announcement-toolbar select { min-height: 2.5rem; border: 1px solid #e1e6ee; border-radius: .7rem; background: #fff; color: #445168; font-size: .75rem; }
+        .announcement-toolbar input { min-width: 0; flex: 1; padding: .55rem .75rem; }
+        .announcement-toolbar select { padding: .55rem .7rem; }
+        .announcement-count { flex: 0 0 auto; color: var(--admin-muted); font-size: .68rem; font-weight: 700; }
+        .announcement-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; padding: 1.15rem 1.35rem; border-bottom: 1px solid #edf0f5; }
+        .announcement-card:last-child { border-bottom: 0; }
+        .announcement-card-main { min-width: 0; }
+        .announcement-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .55rem; }
+        .announcement-pill { display: inline-flex; align-items: center; min-height: 1.45rem; padding: .22rem .55rem; border-radius: 999px; font-size: .6rem; font-weight: 800; letter-spacing: .035em; }
+        .announcement-pill.status-live { background: #eaf8f1; color: #16835d; }
+        .announcement-pill.status-hidden { background: #f1f3f7; color: #68758a; }
+        .announcement-pill.status-expired { background: #fff4e8; color: #aa641c; }
+        .announcement-pill.type-pill { background: #f2edff; color: #6546c4; }
+        .announcement-date { color: #8993a5; font-size: .65rem; }
+        .announcement-card h4 { margin: 0; color: var(--admin-ink); font-size: .88rem; font-weight: 800; line-height: 1.4; overflow-wrap: anywhere; }
+        .announcement-card-copy { margin: .35rem 0 0; color: #667287; font-size: .76rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .announcement-card-actions { display: flex; align-items: flex-start; gap: .4rem; }
+        .announcement-card-actions button { display: inline-flex; min-height: 2.25rem; align-items: center; justify-content: center; gap: .35rem; padding: .5rem .65rem; border: 1px solid transparent; border-radius: .65rem; font-size: .65rem; font-weight: 750; white-space: nowrap; }
+        .announcement-action-edit { border-color: #e7e1f7 !important; background: #faf9ff; color: #6546c4; }
+        .announcement-action-toggle { border-color: #f1e4ce !important; background: #fffaf1; color: #9b681f; }
+        .announcement-action-toggle:disabled { cursor: not-allowed; opacity: .55; }
+        .announcement-action-delete { border-color: #f3dddd !important; background: #fff8f8; color: #b94a4a; }
+        .announcement-empty { padding: 2.5rem 1rem; color: var(--admin-muted); text-align: center; font-size: .78rem; }
+        .announcement-empty svg { display: block; width: 1.6rem; height: 1.6rem; margin: 0 auto .65rem; color: #a4adbb; }
         #section-delegations .admin-delegation-card { min-width: 0; gap: 1rem; padding: 1.15rem; }
         #section-delegations .admin-delegation-identity { min-width: 0; }
         #section-delegations .admin-delegation-identity p { overflow-wrap: anywhere; }
@@ -394,6 +453,20 @@
             #section-campaigns .admin-campaign-history-head { align-items: flex-start; }
             #section-campaigns .admin-campaign-history-head > div { min-width: 0; }
             #section-campaigns #campaign-file-preview { width: 2.75rem; height: 2.75rem; }
+            #section-announcements .admin-control-hero { align-items: flex-start; padding: .95rem; }
+            .announcement-stats { grid-template-columns: minmax(0, 1fr); gap: .55rem; }
+            .announcement-stat { padding: .75rem .85rem; }
+            .announcement-stat-icon { width: 2.3rem; height: 2.3rem; }
+            .announcement-compose { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+            .announcement-panel-head, .announcement-panel-body { padding: .9rem; }
+            .announcement-history-head { align-items: flex-start; padding: .9rem; }
+            .announcement-toolbar { flex-wrap: wrap; padding: .75rem; }
+            .announcement-toolbar input { flex-basis: 100%; }
+            .announcement-toolbar select { flex: 1; }
+            .announcement-count { width: 100%; }
+            .announcement-card { grid-template-columns: minmax(0, 1fr); gap: .8rem; padding: .9rem; }
+            .announcement-card-actions { flex-wrap: wrap; }
+            .announcement-card-actions button { flex: 1 1 auto; }
             #section-delegations .admin-delegation-card { align-items: flex-start; flex-direction: column; }
             #section-delegations .admin-delegation-identity { width: 100%; align-items: flex-start; }
             #section-delegations .admin-delegation-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
@@ -1585,58 +1658,100 @@
                     </div>
                 </div>
 
-                <div id="section-announcements" class="hidden animate-fade-in max-w-5xl mx-auto space-y-6 pb-20">
+                <div id="section-announcements" class="hidden animate-fade-in space-y-4 pb-20">
                     <header class="admin-control-hero">
                         <div class="admin-control-hero-copy">
                             <span class="admin-control-hero-icon"><i data-lucide="megaphone" class="h-5 w-5"></i></span>
-                            <div class="min-w-0"><h3>Annonces Acemia</h3><p>Publiez en temps réel les nouveautés, mises à jour et changements visibles en haut de l’accueil.</p></div>
+                            <div class="min-w-0"><h3>Annonces Acemia</h3><p>Créez et gérez les informations affichées en haut de l’accueil de l’application.</p></div>
                         </div>
                         <button type="button" class="admin-module-refresh" onclick="loadAnnouncements()"><i data-lucide="refresh-cw" class="h-4 w-4"></i><span>Actualiser</span></button>
                     </header>
-                    <form id="announcement-form" class="admin-campaign-form bg-white shadow-xl border border-gray-100" onsubmit="saveAnnouncement(event)">
-                        <input type="hidden" id="announcement-id">
-                        <div class="admin-campaign-form-heading">
-                            <h3 id="announcement-form-title" class="admin-campaign-title text-gray-800 font-black uppercase">Créer une annonce</h3>
-                            <p class="admin-campaign-form-description">Les utilisateurs connectés la verront immédiatement sur la page d’accueil.</p>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="admin-campaign-field">
-                                <label for="announcement-title">Titre</label>
-                                <input id="announcement-title" type="text" maxlength="160" required placeholder="Ex. : Une nouvelle version est disponible" class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm">
-                            </div>
-                            <div class="admin-campaign-field">
-                                <label for="announcement-type">Type d’annonce</label>
-                                <select id="announcement-type" class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm">
-                                    <option value="info">Information</option>
-                                    <option value="update">Mise à jour</option>
-                                    <option value="maintenance">Maintenance</option>
-                                    <option value="important">Important</option>
-                                </select>
-                            </div>
-                            <div class="admin-campaign-field md:col-span-2">
-                                <label for="announcement-content">Message</label>
-                                <textarea id="announcement-content" maxlength="4000" rows="5" required placeholder="Décrivez clairement la nouveauté ou le changement..." class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm p-4"></textarea>
-                            </div>
-                            <div class="admin-campaign-field">
-                                <label for="announcement-expires">Expiration facultative</label>
-                                <input id="announcement-expires" type="datetime-local" class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm">
-                            </div>
-                            <label class="flex items-center gap-3 text-sm font-bold text-gray-700">
-                                <input id="announcement-active" type="checkbox" checked class="h-5 w-5 accent-purple-600">
-                                Publier immédiatement
-                            </label>
-                        </div>
-                        <div class="mt-5 flex flex-wrap gap-3">
-                            <button id="announcement-submit" type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg transition-all">Publier l’annonce</button>
-                            <button id="announcement-cancel" type="button" onclick="resetAnnouncementForm()" class="hidden bg-gray-100 text-gray-600 px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest">Annuler la modification</button>
-                        </div>
-                    </form>
-                    <div class="admin-campaign-history bg-white shadow-xl border border-gray-100 overflow-hidden">
-                        <div class="admin-campaign-history-head border-b border-gray-100 flex items-center justify-between">
-                            <div><h3 class="text-xl font-black text-gray-800 uppercase tracking-tighter">Historique des annonces</h3><p class="text-[10px] font-bold text-gray-400 uppercase mt-1">Activation et modifications diffusées en temps réel</p></div>
-                        </div>
-                        <div id="announcements-list" class="divide-y divide-gray-100"></div>
+
+                    <div class="announcement-stats" aria-label="Résumé des annonces">
+                        <article class="announcement-stat">
+                            <span class="announcement-stat-icon"><i data-lucide="megaphone" class="h-5 w-5"></i></span>
+                            <div><p class="announcement-stat-label">Total des annonces</p><p id="announcement-stat-total" class="announcement-stat-value">0</p></div>
+                        </article>
+                        <article class="announcement-stat">
+                            <span class="announcement-stat-icon is-live"><i data-lucide="radio" class="h-5 w-5"></i></span>
+                            <div><p class="announcement-stat-label">Actuellement publiées</p><p id="announcement-stat-live" class="announcement-stat-value">0</p></div>
+                        </article>
+                        <article class="announcement-stat">
+                            <span class="announcement-stat-icon is-muted"><i data-lucide="archive" class="h-5 w-5"></i></span>
+                            <div><p class="announcement-stat-label">Masquées ou expirées</p><p id="announcement-stat-inactive" class="announcement-stat-value">0</p></div>
+                        </article>
                     </div>
+
+                    <form id="announcement-form" class="announcement-compose" onsubmit="saveAnnouncement(event)">
+                        <input type="hidden" id="announcement-id">
+                        <section class="announcement-panel">
+                            <div class="announcement-panel-head">
+                                <h4 id="announcement-form-title">Rédiger une annonce</h4>
+                                <p>Un titre clair et un message concis permettent aux utilisateurs de comprendre rapidement l’information.</p>
+                            </div>
+                            <div class="announcement-panel-body">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="announcement-field">
+                                        <label for="announcement-title">Titre de l’annonce</label>
+                                        <input id="announcement-title" type="text" maxlength="160" required placeholder="Ex. : Une nouvelle version est disponible">
+                                    </div>
+                                    <div class="announcement-field">
+                                        <label for="announcement-type">Catégorie</label>
+                                        <select id="announcement-type">
+                                            <option value="info">Information</option>
+                                            <option value="update">Mise à jour</option>
+                                            <option value="maintenance">Maintenance</option>
+                                            <option value="important">Important</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="announcement-field">
+                                    <label for="announcement-content">Message</label>
+                                    <textarea id="announcement-content" maxlength="4000" rows="6" required placeholder="Décrivez clairement la nouveauté, le changement ou l’information à communiquer..." oninput="updateAnnouncementContentCount()"></textarea>
+                                    <div class="announcement-field-foot"><span id="announcement-content-count">0 / 4 000 caractères</span></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <aside class="announcement-panel">
+                            <div class="announcement-panel-head">
+                                <h4>Publication</h4>
+                                <p>Choisissez quand l’annonce sera visible et définissez sa durée d’affichage.</p>
+                            </div>
+                            <div class="announcement-panel-body announcement-settings-body">
+                                <label class="announcement-publish-toggle" for="announcement-active">
+                                    <input id="announcement-active" type="checkbox" checked>
+                                    <span><strong>Publier immédiatement</strong><span>Décochez pour enregistrer l’annonce sans l’afficher.</span></span>
+                                </label>
+                                <div class="announcement-field">
+                                    <label for="announcement-expires">Date d’expiration <span class="font-normal text-gray-400">(facultative)</span></label>
+                                    <input id="announcement-expires" type="datetime-local">
+                                </div>
+                                <div class="announcement-info"><i data-lucide="info" class="h-4 w-4"></i><span>Les changements sont diffusés en temps réel. Une annonce expirée n’apparaît plus dans l’application.</span></div>
+                                <div class="announcement-form-actions">
+                                    <button id="announcement-submit" type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 font-black uppercase text-[11px] tracking-wider shadow-lg shadow-purple-100 transition-all">Publier l’annonce</button>
+                                    <button id="announcement-cancel" type="button" onclick="resetAnnouncementForm()" class="hidden border border-gray-200 bg-white text-gray-600 px-5 py-3 font-bold text-xs hover:bg-gray-50">Annuler la modification</button>
+                                </div>
+                            </div>
+                        </aside>
+                    </form>
+
+                    <section class="announcement-history">
+                        <header class="announcement-history-head">
+                            <div><h3>Historique des annonces</h3><p>Consultez, modifiez ou retirez les annonces de l’application.</p></div>
+                            <span class="announcement-count"><span id="announcement-list-count">0 annonce</span></span>
+                        </header>
+                        <div class="announcement-toolbar">
+                            <input id="announcement-search" type="search" placeholder="Rechercher une annonce..." aria-label="Rechercher dans les annonces" oninput="renderAnnouncements()">
+                            <select id="announcement-status-filter" aria-label="Filtrer les annonces" onchange="renderAnnouncements()">
+                                <option value="all">Tous les statuts</option>
+                                <option value="published">Publiées</option>
+                                <option value="hidden">Masquées</option>
+                                <option value="expired">Expirées</option>
+                            </select>
+                        </div>
+                        <div id="announcements-list"></div>
+                    </section>
                 </div>
 
                 <div id="section-delegations" class="hidden animate-fade-in max-w-5xl mx-auto">
@@ -6715,10 +6830,28 @@
 
         let loadedAnnouncements = [];
 
+        function getAnnouncementStatus(announcement) {
+            const expired = announcement.expires_at && new Date(announcement.expires_at) <= new Date();
+            if (expired) return 'expired';
+            return announcement.is_active ? 'published' : 'hidden';
+        }
+
+        function updateAnnouncementSummary() {
+            const publishedCount = loadedAnnouncements.filter(announcement => getAnnouncementStatus(announcement) === 'published').length;
+            document.getElementById('announcement-stat-total').innerText = loadedAnnouncements.length;
+            document.getElementById('announcement-stat-live').innerText = publishedCount;
+            document.getElementById('announcement-stat-inactive').innerText = loadedAnnouncements.length - publishedCount;
+        }
+
+        function updateAnnouncementContentCount() {
+            const content = document.getElementById('announcement-content');
+            document.getElementById('announcement-content-count').innerText = `${content.value.length.toLocaleString('fr-FR')} / 4 000 caractères`;
+        }
+
         async function loadAnnouncements() {
             const container = document.getElementById('announcements-list');
             if (!container) return;
-            container.innerHTML = '<div class="p-8 text-center text-sm font-bold text-gray-400">Chargement des annonces…</div>';
+            container.innerHTML = '<div class="announcement-empty"><i data-lucide="loader-circle" class="animate-spin"></i>Chargement des annonces…</div>';
             try {
                 const res = await axios.get(`${API_URL}/admin/announcements`, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -6733,8 +6866,24 @@
         function renderAnnouncements() {
             const container = document.getElementById('announcements-list');
             if (!container) return;
+            updateAnnouncementSummary();
+            const query = document.getElementById('announcement-search').value.trim().toLocaleLowerCase('fr-FR');
+            const statusFilter = document.getElementById('announcement-status-filter').value;
+            const announcements = loadedAnnouncements.filter(announcement => {
+                const status = getAnnouncementStatus(announcement);
+                const matchesStatus = statusFilter === 'all' || status === statusFilter;
+                const matchesQuery = !query || `${announcement.title} ${announcement.content}`.toLocaleLowerCase('fr-FR').includes(query);
+                return matchesStatus && matchesQuery;
+            });
+            document.getElementById('announcement-list-count').innerText = `${announcements.length.toLocaleString('fr-FR')} ${announcements.length === 1 ? 'annonce' : 'annonces'}`;
             if (!loadedAnnouncements.length) {
-                container.innerHTML = '<div class="p-10 text-center text-sm font-bold text-gray-400">Aucune annonce publiée.</div>';
+                container.innerHTML = '<div class="announcement-empty"><i data-lucide="megaphone"></i>Aucune annonce pour le moment. Utilisez le formulaire ci-dessus pour en créer une.</div>';
+                lucide.createIcons();
+                return;
+            }
+            if (!announcements.length) {
+                container.innerHTML = '<div class="announcement-empty"><i data-lucide="search-x"></i>Aucune annonce ne correspond à ces critères.</div>';
+                lucide.createIcons();
                 return;
             }
 
@@ -6744,26 +6893,34 @@
                 maintenance: 'Maintenance',
                 important: 'Important'
             };
-            container.innerHTML = loadedAnnouncements.map(announcement => {
-                const active = announcement.is_active && (!announcement.expires_at || new Date(announcement.expires_at) > new Date());
+            const statuses = {
+                published: { label: 'Publiée', className: 'status-live' },
+                hidden: { label: 'Masquée', className: 'status-hidden' },
+                expired: { label: 'Expirée', className: 'status-expired' }
+            };
+            container.innerHTML = announcements.map(announcement => {
+                const status = getAnnouncementStatus(announcement);
+                const statusInfo = statuses[status];
+                const createdAt = new Date(announcement.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
                 const expiration = announcement.expires_at
-                    ? ` · Expire le ${new Date(announcement.expires_at).toLocaleString('fr-FR')}`
-                    : '';
+                    ? new Date(announcement.expires_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+                    : 'Aucune expiration';
                 return `
-                    <article class="p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-4">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2 mb-2">
-                                <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}">${active ? 'Publiée' : 'Masquée'}</span>
-                                <span class="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-[9px] font-black uppercase tracking-wider">${types[announcement.type] || 'Information'}</span>
-                                <span class="text-[10px] text-gray-400">${new Date(announcement.created_at).toLocaleString('fr-FR')}${expiration}</span>
+                    <article class="announcement-card">
+                        <div class="announcement-card-main">
+                            <div class="announcement-card-meta">
+                                <span class="announcement-pill ${statusInfo.className}">${statusInfo.label}</span>
+                                <span class="announcement-pill type-pill">${types[announcement.type] || 'Information'}</span>
+                                <span class="announcement-date">Créée le ${createdAt}</span>
                             </div>
-                            <h4 class="text-base font-black text-gray-800">${escapeUserCell(announcement.title)}</h4>
-                            <p class="mt-1 text-sm leading-relaxed text-gray-500 whitespace-pre-wrap">${escapeUserCell(announcement.content)}</p>
+                            <h4>${escapeUserCell(announcement.title)}</h4>
+                            <p class="announcement-card-copy">${escapeUserCell(announcement.content)}</p>
+                            <p class="announcement-date mt-2">${announcement.expires_at ? `Expiration : ${expiration}` : expiration}</p>
                         </div>
-                        <div class="flex shrink-0 flex-wrap gap-2">
-                            <button type="button" onclick="editAnnouncement(${Number(announcement.id)})" class="rounded-xl bg-purple-50 px-4 py-2.5 text-[10px] font-black uppercase text-purple-700 hover:bg-purple-100">Modifier</button>
-                            <button type="button" onclick="toggleAnnouncement(${Number(announcement.id)})" class="rounded-xl ${active ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-green-50 text-green-700 hover:bg-green-100'} px-4 py-2.5 text-[10px] font-black uppercase">${active ? 'Masquer' : 'Publier'}</button>
-                            <button type="button" onclick="deleteAnnouncement(${Number(announcement.id)})" class="rounded-xl bg-red-50 px-4 py-2.5 text-[10px] font-black uppercase text-red-600 hover:bg-red-100">Supprimer</button>
+                        <div class="announcement-card-actions">
+                            <button type="button" onclick="editAnnouncement(${Number(announcement.id)})" class="announcement-action-edit" aria-label="Modifier ${escapeUserCell(announcement.title)}"><i data-lucide="pencil" class="h-3.5 w-3.5"></i><span>Modifier</span></button>
+                            <button type="button" onclick="toggleAnnouncement(${Number(announcement.id)})" class="announcement-action-toggle" ${status === 'expired' ? 'disabled title="Modifiez la date d’expiration pour republier cette annonce."' : ''} aria-label="${status === 'published' ? 'Masquer' : 'Publier'} ${escapeUserCell(announcement.title)}"><i data-lucide="${status === 'published' ? 'eye-off' : 'send'}" class="h-3.5 w-3.5"></i><span>${status === 'expired' ? 'Expirée' : status === 'published' ? 'Masquer' : 'Publier'}</span></button>
+                            <button type="button" onclick="deleteAnnouncement(${Number(announcement.id)})" class="announcement-action-delete" aria-label="Supprimer ${escapeUserCell(announcement.title)}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i><span>Supprimer</span></button>
                         </div>
                     </article>`;
             }).join('');
@@ -6777,6 +6934,7 @@
             document.getElementById('announcement-form-title').innerText = 'Créer une annonce';
             document.getElementById('announcement-submit').innerText = 'Publier l’annonce';
             document.getElementById('announcement-cancel').classList.add('hidden');
+            updateAnnouncementContentCount();
         }
 
         function editAnnouncement(id) {
@@ -6787,6 +6945,7 @@
             document.getElementById('announcement-content').value = announcement.content;
             document.getElementById('announcement-type').value = announcement.type;
             document.getElementById('announcement-active').checked = announcement.is_active;
+            updateAnnouncementContentCount();
             if (announcement.expires_at) {
                 const expiresAt = new Date(announcement.expires_at);
                 expiresAt.setMinutes(expiresAt.getMinutes() - expiresAt.getTimezoneOffset());

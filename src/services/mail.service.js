@@ -1,6 +1,8 @@
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const config = require('../../config/config');
 const logger = require('../utils/logger');
+const appPublicUrl = (config.server.appUrl || '').replace(/\/+$/, '');
+const acemiaLogoUrl = `${appPublicUrl}/admin-portal/AcemiaLogo.png`;
 
 const defaultClient = SibApiV3Sdk.ApiClient.instance;
 const apiKey = defaultClient.authentications['api-key'];
@@ -50,7 +52,8 @@ class MailService {
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: ${bgColor}; color: ${textColor}; }
           .container { max-width: 600px; margin: 20px auto; background-color: ${containerBg}; border-radius: 12px; border: 1px solid #ddd; overflow: hidden; }
           .header { padding: 30px; text-align: center; border-bottom: 1px solid #f3f3f3; }
-          .logo { color: ${primaryColor}; font-size: 32px; font-weight: bold; text-decoration: none; letter-spacing: -1px; }
+          .brand { display: inline-flex; align-items: center; justify-content: center; gap: 12px; color: ${primaryColor}; font-size: 30px; font-weight: 800; text-decoration: none; letter-spacing: -1px; }
+          .brand img { width: 48px; height: 48px; object-fit: contain; vertical-align: middle; }
           .content { padding: 40px 35px; line-height: 1.7; min-height: 200px; font-size: 16px; }
           .content img { max-width: 100%; height: auto; border-radius: 8px; margin: 20px 0; display: block; }
           .title { font-size: 26px; font-weight: 700; margin-bottom: 25px; color: ${textColor}; }
@@ -70,7 +73,7 @@ class MailService {
         <div style="display:none;font-size:1px;color:#333;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${preheader}</div>
         <div class="container">
           <div class="header">
-            <a href="#" class="logo">Together Tech Community</a>
+            <a href="${appPublicUrl}" class="brand"><img src="${acemiaLogoUrl}" alt="Logo Acemia"><span>Acemia</span></a>
           </div>
           <div class="content">
             <div class="title">${title}</div>
@@ -86,11 +89,11 @@ class MailService {
               </a>
             </div>
             <div class="footer-links">
-              <a href="https://meet-me-backend-sg5c.onrender.com/privacy">Confidentialité</a>
-              <a href="https://meet-me-backend-sg5c.onrender.com/support/helpdesk">Support</a>
+              <a href="${appPublicUrl}/privacy">Confidentialité</a>
+              <a href="${appPublicUrl}/support/helpdesk">Support</a>
             </div>
             <div class="address">
-              © 2026 Together Tech Community. TOGETHE Tech Solutions.<br>
+              © 2026 Acemia. Tous droits réservés.<br>
               Kinshasa, République Démocratique du Congo.
             </div>
           </div>
@@ -124,7 +127,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = "Bienvenue sur Acemia !";
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre aventure Acemia commence ici.");
-    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Acemia", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
     try {
@@ -155,7 +158,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = `${otp} est votre code Acemia`;
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Votre code de sécurité Acemia.");
-    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Acemia", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email }];
 
     try {
@@ -269,7 +272,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = personalizedBody.includes(title) ? title : title; // title is usually plain text
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, title, theme);
-    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Acemia", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
     if (attachment && attachment.url) {
@@ -312,7 +315,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = title;
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, 'Avis de sécurité de votre compte Acemia.');
-    sendSmtpEmail.sender = { name: 'Together Tech community official', email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: 'Acemia', email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email, name: name || 'Utilisateur' }];
 
     try {
@@ -349,7 +352,7 @@ class MailService {
       </ol>
 
       <div style="text-align: center; margin-top: 35px;">
-        <a href="https://meet-me-backend-sg5c.onrender.com/admin-portal" class="btn">ACCÉDER AU PANEL ADMIN</a>
+        <a href="${appPublicUrl}/admin-portal" class="btn">ACCÉDER AU PANEL ADMIN</a>
       </div>
 
       <p style="margin-top: 35px; font-size: 11px; color: #777; line-height: 1.5;">
@@ -364,7 +367,7 @@ class MailService {
    * Envoyer une invitation officielle Together Tech
    */
   async sendCollabInvitationEmail(email, name, teamName, teamId) {
-    const applyUrl = `https://meet-me-backend-sg5c.onrender.com/collab-apply?teamId=${teamId}&email=${encodeURIComponent(email)}`;
+    const applyUrl = `${appPublicUrl}/collab-apply?teamId=${teamId}&email=${encodeURIComponent(email)}`;
 
     const content = `
       <div style="text-align: center; margin-bottom: 30px;">
@@ -391,7 +394,7 @@ class MailService {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = "OFFICIEL : Invitation à rejoindre Together Tech community";
     sendSmtpEmail.htmlContent = this._getBaseTemplate("Invitation Collaboration", content, "Rejoignez l'élite technologique d’Acemia.", "minimal");
-    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Acemia", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email, name: name }];
 
     try {
@@ -462,7 +465,7 @@ class MailService {
    */
   async sendPasswordResetEmail(email, name, tempPassword) {
     const title = `Réinitialisation de votre mot de passe Acemia`;
-    const dashboardUrl = `https://meet-me-backend-sg5c.onrender.com/admin-portal`;
+    const dashboardUrl = `${appPublicUrl}/admin-portal`;
 
     const content = `
       <p>Bonjour <strong>${name}</strong>,</p>
@@ -577,8 +580,8 @@ class MailService {
    * Envoyer un email d'approbation Portfolio SaaS
    */
   async sendPortfolioApprovalEmail(email, name, portfolioTitle, slug, themeColor, tempPassword = null) {
-    const portfolioUrl = `https://meet-me-backend-sg5c.onrender.com/p/${slug}`;
-    const dashboardUrl = `https://meet-me-backend-sg5c.onrender.com/admin-portal`;
+    const portfolioUrl = `${appPublicUrl}/p/${slug}`;
+    const dashboardUrl = `${appPublicUrl}/admin-portal`;
 
     const content = `
       <div style="text-align: center; margin-bottom: 30px;">
@@ -631,18 +634,18 @@ class MailService {
   async sendTrackingCodeEmail(email, code) {
     const title = "Votre code de suivi de projet";
     const content = `
-      <p>Vous avez demandé à accéder au suivi de vos devis et projets sur <strong>Together Tech</strong>.</p>
+      <p>Vous avez demandé à accéder au suivi de vos devis et projets sur <strong>Acemia</strong>.</p>
       <p>Veuillez utiliser le code de vérification ci-dessous pour confirmer votre identité :</p>
       <div class="otp-box" style="font-size: 32px; letter-spacing: 8px;">${code}</div>
       <p>Ce code est <strong>valable pendant 30 minutes</strong>.</p>
       <p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.</p>
-      <p>À bientôt,<br>L'équipe Together Tech</p>
+      <p>À bientôt,<br>L'équipe Acemia</p>
     `;
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = `${code} est votre code de suivi Together Tech`;
+    sendSmtpEmail.subject = `${code} est votre code de suivi Acemia`;
     sendSmtpEmail.htmlContent = this._getBaseTemplate(title, content, "Code d'accès sécurisé à vos devis.");
-    sendSmtpEmail.sender = { name: "Together Tech community official", email: config.email.emailFrom };
+    sendSmtpEmail.sender = { name: "Acemia", email: config.email.emailFrom };
     sendSmtpEmail.to = [{ email: email }];
 
     try {

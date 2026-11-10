@@ -6,6 +6,7 @@ const config = {
     port: Number.parseInt(process.env.PORT || '3000', 10),
     nodeEnv: process.env.NODE_ENV || 'development',
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:8081',
+    appUrl: process.env.APP_PUBLIC_URL || 'https://meet-me-backend-sg5c.onrender.com',
   },
 
   // Database Configuration

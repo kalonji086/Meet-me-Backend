@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
+const announcementController = require('../controllers/announcement.controller');
 const { authenticate, isAdmin } = require('../middleware/auth.middleware');
 
 router.use(authenticate);
@@ -44,6 +45,11 @@ router.post('/campaigns/:id/resend', adminController.resendCampaign);
 router.get('/audit-logs', adminController.getAuditLogs);
 
 router.post('/broadcast', adminController.broadcastMessage);
+
+router.get('/announcements', announcementController.getAnnouncements);
+router.post('/announcements', announcementController.createAnnouncement);
+router.put('/announcements/:id', announcementController.updateAnnouncement);
+router.delete('/announcements/:id', announcementController.deleteAnnouncement);
 
 router.get('/app-config', adminController.getAppConfig);
 router.post('/app-config', adminController.updateAppConfig);

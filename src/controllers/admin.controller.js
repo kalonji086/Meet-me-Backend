@@ -1243,6 +1243,41 @@ const handlePendingAction = asyncHandler(async (req, res) => {
         case 'delete_campaign':
           await query('DELETE FROM public.notification_campaigns WHERE id = $1', [action.target_id]);
           break;
+        case 'create_announcement':
+        case 'update_announcement': {
+          const announcementController = require('./announcement.controller');
+          await announcementController.ensureAnnouncementsTable();
+          const { title, content, type, isActive, expiresAt } = action.details;
+          const announcementResult = action.action_type === 'create_announcement'
+            ? await query(`
+                INSERT INTO public.app_announcements (title, content, type, is_active, expires_at, created_by)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id, title, content, type, is_active, expires_at, created_at, updated_at
+              `, [title, content, type, isActive, expiresAt || null, action.requested_by])
+            : await query(`
+                UPDATE public.app_announcements
+                SET title = $1, content = $2, type = $3, is_active = $4, expires_at = $5, updated_at = NOW()
+                WHERE id = $6
+                RETURNING id, title, content, type, is_active, expires_at, created_at, updated_at
+              `, [title, content, type, isActive, expiresAt || null, action.target_id]);
+          if (!announcementResult.rows[0]) throw new Error('Annonce introuvable.');
+          socketService.broadcast('announcement_updated', {
+            action: action.action_type === 'create_announcement' ? 'created' : 'updated',
+            announcement: announcementResult.rows[0],
+          });
+          break;
+        }
+        case 'delete_announcement': {
+          const announcementController = require('./announcement.controller');
+          await announcementController.ensureAnnouncementsTable();
+          const deleted = await query(
+            'DELETE FROM public.app_announcements WHERE id = $1 RETURNING id',
+            [action.target_id]
+          );
+          if (!deleted.rows[0]) throw new Error('Annonce introuvable.');
+          socketService.broadcast('announcement_updated', { action: 'deleted', id: deleted.rows[0].id });
+          break;
+        }
         case 'delete_config':
           await query('DELETE FROM public.app_configs WHERE id = $1', [action.target_id]);
           break;

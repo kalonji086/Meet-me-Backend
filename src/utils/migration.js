@@ -56,6 +56,8 @@ const runMigrations = async () => {
     const adminController = require('../controllers/admin.controller');
     await adminController.ensureAdminTables();
     await adminController.ensureScheduledUserDeletionsTable();
+    const announcementController = require('../controllers/announcement.controller');
+    await announcementController.ensureAnnouncementsTable();
     const employerController = require('../controllers/employer.controller');
     await employerController.ensureEmployerTables();
 

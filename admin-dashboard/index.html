@@ -551,6 +551,9 @@
                 <a href="#" onclick="showSection('campaigns')" id="nav-campaigns" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="send" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Campagnes Push</span>
                 </a>
+                <a href="#" onclick="showSection('announcements')" id="nav-announcements" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="megaphone" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Annonces Acemia</span>
+                </a>
                 <a href="#" onclick="showSection('legal')" id="nav-legal" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="file-text" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Légal (CGU/Privacy)</span>
                 </a>
@@ -1579,6 +1582,60 @@
                             <button onclick="loadCampaigns()" class="p-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all" title="Actualiser"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
                         </div>
                         <div id="campaigns-list" class="divide-y divide-gray-100"></div>
+                    </div>
+                </div>
+
+                <div id="section-announcements" class="hidden animate-fade-in max-w-5xl mx-auto space-y-6 pb-20">
+                    <header class="admin-control-hero">
+                        <div class="admin-control-hero-copy">
+                            <span class="admin-control-hero-icon"><i data-lucide="megaphone" class="h-5 w-5"></i></span>
+                            <div class="min-w-0"><h3>Annonces Acemia</h3><p>Publiez en temps réel les nouveautés, mises à jour et changements visibles en haut de l’accueil.</p></div>
+                        </div>
+                        <button type="button" class="admin-module-refresh" onclick="loadAnnouncements()"><i data-lucide="refresh-cw" class="h-4 w-4"></i><span>Actualiser</span></button>
+                    </header>
+                    <form id="announcement-form" class="admin-campaign-form bg-white shadow-xl border border-gray-100" onsubmit="saveAnnouncement(event)">
+                        <input type="hidden" id="announcement-id">
+                        <div class="admin-campaign-form-heading">
+                            <h3 id="announcement-form-title" class="admin-campaign-title text-gray-800 font-black uppercase">Créer une annonce</h3>
+                            <p class="admin-campaign-form-description">Les utilisateurs connectés la verront immédiatement sur la page d’accueil.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="admin-campaign-field">
+                                <label for="announcement-title">Titre</label>
+                                <input id="announcement-title" type="text" maxlength="160" required placeholder="Ex. : Une nouvelle version est disponible" class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm">
+                            </div>
+                            <div class="admin-campaign-field">
+                                <label for="announcement-type">Type d’annonce</label>
+                                <select id="announcement-type" class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm">
+                                    <option value="info">Information</option>
+                                    <option value="update">Mise à jour</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="important">Important</option>
+                                </select>
+                            </div>
+                            <div class="admin-campaign-field md:col-span-2">
+                                <label for="announcement-content">Message</label>
+                                <textarea id="announcement-content" maxlength="4000" rows="5" required placeholder="Décrivez clairement la nouveauté ou le changement..." class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm p-4"></textarea>
+                            </div>
+                            <div class="admin-campaign-field">
+                                <label for="announcement-expires">Expiration facultative</label>
+                                <input id="announcement-expires" type="datetime-local" class="w-full border border-gray-200 rounded-xl outline-none font-semibold text-sm">
+                            </div>
+                            <label class="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                <input id="announcement-active" type="checkbox" checked class="h-5 w-5 accent-purple-600">
+                                Publier immédiatement
+                            </label>
+                        </div>
+                        <div class="mt-5 flex flex-wrap gap-3">
+                            <button id="announcement-submit" type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg transition-all">Publier l’annonce</button>
+                            <button id="announcement-cancel" type="button" onclick="resetAnnouncementForm()" class="hidden bg-gray-100 text-gray-600 px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest">Annuler la modification</button>
+                        </div>
+                    </form>
+                    <div class="admin-campaign-history bg-white shadow-xl border border-gray-100 overflow-hidden">
+                        <div class="admin-campaign-history-head border-b border-gray-100 flex items-center justify-between">
+                            <div><h3 class="text-xl font-black text-gray-800 uppercase tracking-tighter">Historique des annonces</h3><p class="text-[10px] font-bold text-gray-400 uppercase mt-1">Activation et modifications diffusées en temps réel</p></div>
+                        </div>
+                        <div id="announcements-list" class="divide-y divide-gray-100"></div>
                     </div>
                 </div>
 
@@ -2713,7 +2770,7 @@
         function continueDashboardLoad(user) {
             if (user.isGlobalAdmin) {
                 // Ensure allowedModules is full for Global Admin
-                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'portfolio'];
+                user.allowedModules = ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'announcements', 'legal', 'config', 'delegations', 'approvals', 'collaboration', 'moderation', 'portfolio'];
                 localStorage.setItem('admin_user', JSON.stringify(user));
 
                 document.getElementById('login-container').classList.add('hidden');
@@ -2865,7 +2922,7 @@
                 'support': 'nav-appeals', 'reports': 'nav-appeals',
                 'market-requests': 'nav-market-requests', 'school-requests': 'nav-school-requests', 'school-account-requests': 'nav-school-account-requests', 'employer-requests': 'nav-employer-requests',
                 'verifications': 'nav-verifications',
-                'audit': 'nav-audit', 'campaigns': 'nav-campaigns', 'legal': 'nav-legal',
+                'audit': 'nav-audit', 'campaigns': 'nav-campaigns', 'announcements': 'nav-announcements', 'legal': 'nav-legal',
                 'config': 'nav-config', 'delegations': 'nav-delegations', 'approvals': 'nav-approvals',
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration',
                 'moderation': 'nav-moderation',
@@ -2885,6 +2942,7 @@
                 if (myReqNav) myReqNav.classList.remove('hidden');
 
                 allowed.forEach(m => { const navId = sidebarMapping[m]; if (navId) { const nav = document.getElementById(navId); if (nav) nav.classList.remove('hidden'); } });
+                if (allowed.includes('campaigns')) document.getElementById('nav-announcements')?.classList.remove('hidden');
 
                 const adminTools = document.getElementById('admin-only-tools');
                 if (adminTools) adminTools.classList.add('hidden');
@@ -3406,6 +3464,7 @@
                 verifications: ['Vérifications', 'Examinez les demandes de vérification des comptes.'],
                 audit: ['Journal d’audit', 'Consultez les opérations administratives enregistrées.'],
                 campaigns: ['Campagnes', 'Rédigez et planifiez les notifications aux utilisateurs.'],
+                announcements: ['Annonces Acemia', 'Publiez les informations et mises à jour visibles dans l’application.'],
                 legal: ['Documents légaux', 'Gérez les conditions d’utilisation et la confidentialité.'],
                 config: ['Configuration de l’application', 'Publiez les versions et suivez leur adoption.'],
                 moderation: ['Modération', 'Gérez les contenus et leur visibilité.'],
@@ -3416,7 +3475,7 @@
                 approvals: ['Approbations', 'Examinez les actions en attente d’approbation.'],
                 'my-requests': ['Mes requêtes', 'Suivez le statut de vos demandes administratives.'],
             };
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'announcements', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
                 const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'school-account-requests' ? 'nav-school-account-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s))))));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
@@ -3433,6 +3492,7 @@
 
             if (name === 'stats') loadStats();
             if (name === 'campaigns') loadCampaigns();
+            if (name === 'announcements') loadAnnouncements();
             if (name === 'users') loadUsers();
             if (name === 'portfolios-saas') loadPortfolioSaas();
             if (name === 'market-requests') loadMarket();
@@ -6650,6 +6710,153 @@
             } else {
                 nameEl.innerText = "Aucun fichier sélectionné";
                 preview.classList.add('hidden');
+            }
+        }
+
+        let loadedAnnouncements = [];
+
+        async function loadAnnouncements() {
+            const container = document.getElementById('announcements-list');
+            if (!container) return;
+            container.innerHTML = '<div class="p-8 text-center text-sm font-bold text-gray-400">Chargement des annonces…</div>';
+            try {
+                const res = await axios.get(`${API_URL}/admin/announcements`, {
+                    headers: { Authorization: `****** }
+                });
+                loadedAnnouncements = Array.isArray(res.data.data) ? res.data.data : [];
+                renderAnnouncements();
+            } catch (error) {
+                container.innerHTML = `<div class="p-8 text-center text-sm font-bold text-red-500">${escapeUserCell(error.response?.data?.error || 'Impossible de charger les annonces.')}</div>`;
+            }
+        }
+
+        function renderAnnouncements() {
+            const container = document.getElementById('announcements-list');
+            if (!container) return;
+            if (!loadedAnnouncements.length) {
+                container.innerHTML = '<div class="p-10 text-center text-sm font-bold text-gray-400">Aucune annonce publiée.</div>';
+                return;
+            }
+
+            const types = {
+                info: 'Information',
+                update: 'Mise à jour',
+                maintenance: 'Maintenance',
+                important: 'Important'
+            };
+            container.innerHTML = loadedAnnouncements.map(announcement => {
+                const active = announcement.is_active && (!announcement.expires_at || new Date(announcement.expires_at) > new Date());
+                const expiration = announcement.expires_at
+                    ? ` · Expire le ${new Date(announcement.expires_at).toLocaleString('fr-FR')}`
+                    : '';
+                return `
+                    <article class="p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-4">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2 mb-2">
+                                <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}">${active ? 'Publiée' : 'Masquée'}</span>
+                                <span class="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-[9px] font-black uppercase tracking-wider">${types[announcement.type] || 'Information'}</span>
+                                <span class="text-[10px] text-gray-400">${new Date(announcement.created_at).toLocaleString('fr-FR')}${expiration}</span>
+                            </div>
+                            <h4 class="text-base font-black text-gray-800">${escapeUserCell(announcement.title)}</h4>
+                            <p class="mt-1 text-sm leading-relaxed text-gray-500 whitespace-pre-wrap">${escapeUserCell(announcement.content)}</p>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap gap-2">
+                            <button type="button" onclick="editAnnouncement(${Number(announcement.id)})" class="rounded-xl bg-purple-50 px-4 py-2.5 text-[10px] font-black uppercase text-purple-700 hover:bg-purple-100">Modifier</button>
+                            <button type="button" onclick="toggleAnnouncement(${Number(announcement.id)})" class="rounded-xl ${active ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-green-50 text-green-700 hover:bg-green-100'} px-4 py-2.5 text-[10px] font-black uppercase">${active ? 'Masquer' : 'Publier'}</button>
+                            <button type="button" onclick="deleteAnnouncement(${Number(announcement.id)})" class="rounded-xl bg-red-50 px-4 py-2.5 text-[10px] font-black uppercase text-red-600 hover:bg-red-100">Supprimer</button>
+                        </div>
+                    </article>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function resetAnnouncementForm() {
+            document.getElementById('announcement-form').reset();
+            document.getElementById('announcement-id').value = '';
+            document.getElementById('announcement-active').checked = true;
+            document.getElementById('announcement-form-title').innerText = 'Créer une annonce';
+            document.getElementById('announcement-submit').innerText = 'Publier l’annonce';
+            document.getElementById('announcement-cancel').classList.add('hidden');
+        }
+
+        function editAnnouncement(id) {
+            const announcement = loadedAnnouncements.find(item => Number(item.id) === Number(id));
+            if (!announcement) return toast('Annonce introuvable. Actualisez la liste.', 'error');
+            document.getElementById('announcement-id').value = announcement.id;
+            document.getElementById('announcement-title').value = announcement.title;
+            document.getElementById('announcement-content').value = announcement.content;
+            document.getElementById('announcement-type').value = announcement.type;
+            document.getElementById('announcement-active').checked = announcement.is_active;
+            if (announcement.expires_at) {
+                const expiresAt = new Date(announcement.expires_at);
+                expiresAt.setMinutes(expiresAt.getMinutes() - expiresAt.getTimezoneOffset());
+                document.getElementById('announcement-expires').value = expiresAt.toISOString().slice(0, 16);
+            } else {
+                document.getElementById('announcement-expires').value = '';
+            }
+            document.getElementById('announcement-form-title').innerText = 'Modifier une annonce';
+            document.getElementById('announcement-submit').innerText = 'Enregistrer et diffuser';
+            document.getElementById('announcement-cancel').classList.remove('hidden');
+            document.getElementById('announcement-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        async function saveAnnouncement(event) {
+            event.preventDefault();
+            const id = document.getElementById('announcement-id').value;
+            const payload = {
+                title: document.getElementById('announcement-title').value.trim(),
+                content: document.getElementById('announcement-content').value.trim(),
+                type: document.getElementById('announcement-type').value,
+                isActive: document.getElementById('announcement-active').checked,
+                expiresAt: document.getElementById('announcement-expires').value
+                    ? new Date(document.getElementById('announcement-expires').value).toISOString()
+                    : null
+            };
+            const button = document.getElementById('announcement-submit');
+            button.disabled = true;
+            try {
+                const url = `${API_URL}/admin/announcements${id ? `/${encodeURIComponent(id)}` : ''}`;
+                const response = id
+                    ? await axios.put(url, payload, { headers: { Authorization: `****** } })
+                    : await axios.post(url, payload, { headers: { Authorization: `****** } });
+                toast(response.data.pending ? response.data.message : (id ? 'Annonce modifiée et diffusée.' : 'Annonce publiée et diffusée.'), response.data.pending ? 'info' : 'success');
+                if (!response.data.pending) resetAnnouncementForm();
+                await loadAnnouncements();
+            } catch (error) {
+                toast(error.response?.data?.error || 'Impossible d’enregistrer cette annonce.', 'error');
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        async function toggleAnnouncement(id) {
+            const announcement = loadedAnnouncements.find(item => Number(item.id) === Number(id));
+            if (!announcement) return;
+            try {
+                const response = await axios.put(`${API_URL}/admin/announcements/${encodeURIComponent(id)}`, {
+                    title: announcement.title,
+                    content: announcement.content,
+                    type: announcement.type,
+                    isActive: !announcement.is_active,
+                    expiresAt: announcement.expires_at
+                }, { headers: { Authorization: `****** } });
+                toast(response.data.pending ? response.data.message : 'Visibilité de l’annonce mise à jour.', response.data.pending ? 'info' : 'success');
+                await loadAnnouncements();
+            } catch (error) {
+                toast(error.response?.data?.error || 'Impossible de modifier la visibilité.', 'error');
+            }
+        }
+
+        async function deleteAnnouncement(id) {
+            if (!confirm('Supprimer définitivement cette annonce ?')) return;
+            try {
+                const response = await axios.delete(`${API_URL}/admin/announcements/${encodeURIComponent(id)}`, {
+                    headers: { Authorization: `****** }
+                });
+                toast(response.data.pending ? response.data.message : 'Annonce supprimée.', response.data.pending ? 'info' : 'success');
+                await loadAnnouncements();
+            } catch (error) {
+                toast(error.response?.data?.error || 'Impossible de supprimer cette annonce.', 'error');
             }
         }
 

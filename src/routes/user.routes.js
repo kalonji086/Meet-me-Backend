@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
+const announcementController = require('../controllers/announcement.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 
 // Toutes les routes utilisateur sont protégées
@@ -10,6 +11,7 @@ router.use(authenticate);
  * @route   GET /api/users/profile/current
  */
 router.get('/profile/current', userController.getMe);
+router.get('/announcements', announcementController.getActiveAnnouncements);
 
 /**
  * @route   GET /api/users/search

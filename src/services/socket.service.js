@@ -1,6 +1,46 @@
 const logger = require('../utils/logger');
 const { query } = require('../config/db');
 const config = require('../../config/config');
+const notificationService = require('./notification.service');
+
+const ADMIN_NOTIFICATION_EVENTS = new Set([
+  'admin:new_audit',
+  'admin:new_verification',
+  'admin:new_school_account_request',
+  'admin:new_web_quote',
+  'admin:new_pending_action',
+  'admin_new_user',
+  'admin_user_login',
+  'admin:new_appeal',
+  'admin:new_market',
+  'admin:new_employer_request',
+  'admin:new_school_request',
+  'admin:new_group',
+  'admin:collaborator_login',
+  'admin_new_report',
+]);
+
+const describeAdminEvent = (event, data = {}) => {
+  const name = data.name || data.fullName || data.full_name || 'Un utilisateur';
+  const organization = data.business_name || data.company_name || data.school_name;
+  const descriptions = {
+    'admin:new_audit': ['Action administrative', `${data.actor_name || 'Un administrateur'} : ${data.action_type || 'action enregistrée'}`],
+    'admin:new_verification': ['Nouvelle demande de vérification', `${name} a soumis ses documents d’identité.`],
+    'admin:new_school_account_request': ['Nouvelle demande de compte École', `${name} — ${data.role || 'compte scolaire'}${data.schoolName ? ` · ${data.schoolName}` : ''}`],
+    'admin:new_web_quote': ['Nouvelle demande de devis', `Demande de ${data.client_name || name} reçue via le portfolio.`],
+    'admin:new_pending_action': ['Action en attente d’approbation', `${data.requestedBy || name} demande ${data.actionType || 'une action'}${data.targetName ? ` sur ${data.targetName}` : ''}.`],
+    'admin_new_user': ['Nouveau membre', `${data.user?.name || name} a rejoint Acemia.`],
+    'admin_user_login': ['Connexion utilisateur', `${name} vient de se connecter.`],
+    'admin:new_appeal': ['Nouvelle demande de support', `${data.type || 'Demande'}${data.reason ? ` : ${data.reason}` : ''}`],
+    'admin:new_market': ['Nouvelle demande Market', organization ? `Demande reçue pour ${organization}.` : 'Une demande Market a été reçue.'],
+    'admin:new_employer_request': ['Nouvelle demande Emploi', organization ? `Demande reçue pour ${organization}.` : 'Une demande employeur a été reçue.'],
+    'admin:new_school_request': ['Nouvelle demande École', organization ? `Demande reçue pour ${organization}.` : 'Une demande École a été reçue.'],
+    'admin:new_group': ['Nouveau groupe', `Le groupe ${data.name || 'sans nom'} vient d’être créé.`],
+    'admin:collaborator_login': ['Connexion collaborateur', `${name} vient d’entrer dans le panneau Admin.`],
+    'admin_new_report': ['Nouveau signalement', `${data.report_type || 'Contenu'}${data.reason ? ` : ${data.reason}` : ''}`],
+  };
+  return descriptions[event];
+};
 
 class SocketService {
   constructor() {
@@ -620,7 +660,9 @@ class SocketService {
    * Envoyer un message à un utilisateur spécifique (alias pour emitToUser)
    */
   sendToUser(userId, event, data) {
-    return this.emitToUser(userId, event, data);
+    const sent = this.emitToUser(userId, event, data);
+    this.persistAdminEvent(event, data);
+    return sent;
   }
 
   /**
@@ -651,6 +693,61 @@ class SocketService {
    */
   broadcast(event, data) {
     this.io.emit(event, data);
+    this.persistAdminEvent(event, data);
+  }
+
+  persistAdminEvent(event, data) {
+    if (!ADMIN_NOTIFICATION_EVENTS.has(event)) return;
+    const description = describeAdminEvent(event, data);
+    if (!description) return;
+
+    const [title, body] = description;
+    this.persistAdminNotification(event, title, body).catch(error => {
+      logger.error(`Unable to persist Admin notification (${event}):`, error);
+    });
+  }
+
+  async persistAdminNotification(sourceType, title, body) {
+    const inserted = await query(
+      `WITH inserted AS (
+         INSERT INTO public.admin_notifications (admin_id, source_type, title, body, metadata)
+         SELECT id, $1, $2, $3, $4::jsonb
+         FROM public.profiles
+         WHERE is_global_admin = TRUE
+         RETURNING id, admin_id
+       )
+       SELECT i.id, i.admin_id, p.push_token,
+         (SELECT COUNT(*) FROM public.admin_notifications n
+          WHERE n.admin_id = i.admin_id AND n.read_at IS NULL)::int AS unread_count
+       FROM inserted i
+       JOIN public.profiles p ON p.id = i.admin_id`,
+      [sourceType, title, body, JSON.stringify({ event: sourceType })]
+    );
+
+    for (const notification of inserted.rows) {
+      const data = {
+        adminNotificationId: notification.id,
+        type: 'admin_event',
+        sourceType,
+      };
+      this.sendToUser(notification.admin_id, 'admin_notification', {
+        id: notification.id,
+        title,
+        body,
+        data,
+        createdAt: new Date(),
+        unreadCount: notification.unread_count,
+      });
+
+      if (notification.push_token) {
+        await notificationService.sendNotification(notification.push_token, {
+          title,
+          body,
+          data,
+          badge: notification.unread_count,
+        });
+      }
+    }
   }
 }
 

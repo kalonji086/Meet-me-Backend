@@ -357,7 +357,23 @@ const getBadges = asyncHandler(async (req, res) => {
        AND (m.deleted_for_users IS NULL OR NOT ($1 = ANY(m.deleted_for_users)))`,
     [req.userId]
   );
-  res.json({ success: true, data: { messages: parseInt(msgRes.rows[0].count), calls: 0, status: 0 } });
+  let notifications = 0;
+  if (req.user?.is_global_admin) {
+    const notificationRes = await query(
+      'SELECT COUNT(*) FROM public.admin_notifications WHERE admin_id = $1 AND read_at IS NULL',
+      [req.userId]
+    );
+    notifications = Number.parseInt(notificationRes.rows[0].count, 10);
+  }
+  res.json({
+    success: true,
+    data: {
+      messages: Number.parseInt(msgRes.rows[0].count, 10),
+      notifications,
+      calls: 0,
+      status: 0,
+    },
+  });
 });
 
 const submitVerification = asyncHandler(async (req, res) => {

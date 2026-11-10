@@ -642,6 +642,10 @@
                 </a>
                 <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
                     <p class="admin-nav-label">Administration</p>
+                    <a href="#" onclick="showSection('admin-notifications')" id="nav-admin-notifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                        <i data-lucide="bell" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Boîte de réception</span>
+                        <span id="admin-notifications-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                    </a>
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
                         <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Délégations</span>
                     </a>
@@ -1569,6 +1573,22 @@
                             </thead>
                             <tbody id="audit-table-body"></tbody>
                         </table>
+                    </div>
+                </div>
+
+                <div id="section-admin-notifications" class="hidden animate-fade-in space-y-6 pb-20">
+                    <header class="admin-control-hero">
+                        <div class="admin-control-hero-copy">
+                            <span class="admin-control-hero-icon"><i data-lucide="bell" class="h-5 w-5"></i></span>
+                            <div class="min-w-0"><h3>Boîte de réception Admin</h3><p>Notifications de messages conservées jusqu’à leur lecture.</p></div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" class="admin-module-refresh" onclick="markAllAdminNotificationsRead()">Tout marquer comme lu</button>
+                            <button type="button" class="admin-module-refresh" onclick="loadAdminNotifications()"><i data-lucide="refresh-cw" class="h-4 w-4"></i><span>Actualiser</span></button>
+                        </div>
+                    </header>
+                    <div id="admin-notifications-list" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="p-8 text-center text-sm font-medium text-slate-400">Chargement des notifications…</div>
                     </div>
                 </div>
 
@@ -3114,6 +3134,7 @@
             const user = JSON.parse(localStorage.getItem('admin_user'));
             if (!user) return;
 
+            if (user.isGlobalAdmin) loadAdminNotifications();
             socket = io(BASE_URL, { query: { token } });
             socket.on('connect', () => {
                 console.log("Socket connected");
@@ -3190,6 +3211,12 @@
             });
             socket.on('admin_user_deleted', () => scheduleAdminStatsRefresh());
             socket.on('admin:new_message', () => scheduleAdminStatsRefresh());
+            socket.on('admin_notification', (data) => {
+                updateAdminNotificationsBadge(data?.unreadCount);
+                if (!document.getElementById('section-admin-notifications').classList.contains('hidden')) {
+                    loadAdminNotifications();
+                }
+            });
 
             socket.on('admin:new_appeal', (data) => {
                 addNotification('support', 'Nouveau Ticket', `Une demande support de type ${data.type} reçue`, 'life-buoy');
@@ -3578,6 +3605,7 @@
                 'employer-requests': ['Demandes employeur', 'Traitez les demandes des entreprises.'],
                 verifications: ['Vérifications', 'Examinez les demandes de vérification des comptes.'],
                 audit: ['Journal d’audit', 'Consultez les opérations administratives enregistrées.'],
+                'admin-notifications': ['Boîte de réception Admin', 'Consultez les notifications persistantes de messages reçus.'],
                 campaigns: ['Campagnes', 'Rédigez et planifiez les notifications aux utilisateurs.'],
                 announcements: ['Annonces Acemia', 'Publiez les informations et mises à jour visibles dans l’application.'],
                 legal: ['Documents légaux', 'Gérez les conditions d’utilisation et la confidentialité.'],
@@ -3590,7 +3618,7 @@
                 approvals: ['Approbations', 'Examinez les actions en attente d’approbation.'],
                 'my-requests': ['Mes requêtes', 'Suivez le statut de vos demandes administratives.'],
             };
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'announcements', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
+            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'admin-notifications', 'announcements', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
                 const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'school-account-requests' ? 'nav-school-account-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s))))));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
@@ -3606,6 +3634,7 @@
             if (window.innerWidth <= 1024 && document.getElementById('sidebar').classList.contains('sidebar-open')) toggleSidebar();
 
             if (name === 'stats') loadStats();
+            if (name === 'admin-notifications') loadAdminNotifications();
             if (name === 'campaigns') loadCampaigns();
             if (name === 'announcements') loadAnnouncements();
             if (name === 'users') loadUsers();
@@ -7080,6 +7109,107 @@
                 const isScheduled = document.getElementById('campaign-send-mode').value === 'scheduled';
                 document.getElementById('campaign-schedule-container').classList.toggle('hidden', !isScheduled);
                 document.getElementById('campaign-btn').innerText = isScheduled ? 'PROGRAMMER LA CAMPAGNE' : 'DIFFUSER LA CAMPAGNE';
+            }
+
+            let adminNotificationsOffset = 0;
+            const adminNotificationsPageSize = 50;
+
+            function updateAdminNotificationsBadge(count) {
+                const badge = document.getElementById('admin-notifications-badge');
+                if (!badge || !Number.isFinite(Number(count))) return;
+                const unreadCount = Number(count);
+                badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+                badge.classList.toggle('hidden', unreadCount <= 0);
+            }
+
+            async function loadAdminNotifications(append = false) {
+                const container = document.getElementById('admin-notifications-list');
+                if (!container) return;
+                const offset = append ? adminNotificationsOffset : 0;
+
+                try {
+                    const response = await axios.get(`${API_URL}/admin/notifications`, {
+                        params: { limit: adminNotificationsPageSize, offset },
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const data = response.data?.data;
+                    if (!response.data?.success || !data || !Array.isArray(data.notifications)) {
+                        throw new Error(response.data?.error || 'Réponse de notifications invalide.');
+                    }
+
+                    updateAdminNotificationsBadge(data.unreadCount);
+                    if (!append) {
+                        adminNotificationsOffset = 0;
+                        container.innerHTML = '';
+                    }
+
+                    const notifications = data.notifications;
+                    const markup = notifications.map(notification => {
+                        const unread = !notification.read_at;
+                        const body = escapeUserCell(notification.body || '').replace(/\r?\n/g, '<br>');
+                        const date = notification.created_at
+                            ? escapeUserCell(new Date(notification.created_at).toLocaleString())
+                            : '';
+                        return `<article class="border-b border-slate-100 p-5 sm:p-6 ${unread ? 'bg-purple-50/50' : 'bg-white'}">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h4 class="font-bold text-slate-800">${escapeUserCell(notification.title || 'Nouveau message')}</h4>
+                                        ${unread ? '<span class="rounded-full bg-purple-100 px-2 py-1 text-[10px] font-bold uppercase text-purple-700">Non lu</span>' : '<span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-500">Lu</span>'}
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-500">${date}</p>
+                                    <p class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">${body}</p>
+                                </div>
+                                ${unread ? `<button type="button" onclick="markAdminNotificationRead('${escapeUserCell(notification.id)}')" class="shrink-0 rounded-lg border border-purple-200 bg-white px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-50">Marquer comme lu</button>` : ''}
+                            </div>
+                        </article>`;
+                    }).join('');
+
+                    if (append) container.insertAdjacentHTML('beforeend', markup);
+                    else container.innerHTML = markup;
+                    adminNotificationsOffset = offset + notifications.length;
+
+                    const loadMore = data.totalCount > adminNotificationsOffset
+                        ? '<button id="admin-notifications-load-more" type="button" onclick="loadAdminNotifications(true)" class="w-full px-5 py-4 text-sm font-semibold text-purple-700 hover:bg-purple-50">Charger les notifications plus anciennes</button>'
+                        : '';
+                    container.querySelector('#admin-notifications-load-more')?.remove();
+                    if (loadMore) container.insertAdjacentHTML('beforeend', loadMore);
+                    if (!notifications.length && !append) {
+                        container.innerHTML = '<div class="p-10 text-center text-sm text-slate-500">Aucune notification reçue pour le moment.</div>';
+                    }
+                    lucide.createIcons();
+                } catch (error) {
+                    console.error('Unable to load persistent admin notifications:', error);
+                    if (!append) {
+                        container.innerHTML = '<div class="p-8 text-center text-sm font-semibold text-red-600">Impossible de charger les notifications. Réessayez.</div>';
+                    }
+                }
+            }
+
+            async function markAdminNotificationRead(id) {
+                try {
+                    const response = await axios.put(`${API_URL}/admin/notifications/${encodeURIComponent(id)}/read`, {}, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    updateAdminNotificationsBadge(response.data?.data?.unreadCount);
+                    await loadAdminNotifications();
+                } catch (error) {
+                    console.error('Unable to mark the admin notification as read:', error);
+                    alert(error.response?.data?.error || 'Impossible de marquer cette notification comme lue.');
+                }
+            }
+
+            async function markAllAdminNotificationsRead() {
+                try {
+                    const response = await axios.put(`${API_URL}/admin/notifications/read-all`, {}, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    updateAdminNotificationsBadge(response.data?.data?.unreadCount);
+                    await loadAdminNotifications();
+                } catch (error) {
+                    console.error('Unable to mark all admin notifications as read:', error);
+                    alert(error.response?.data?.error || 'Impossible de marquer toutes les notifications comme lues.');
+                }
             }
 
             let loadedCampaigns = [];

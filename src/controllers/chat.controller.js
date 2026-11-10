@@ -216,7 +216,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   // Envoyer une notification push aux autres participants
   const participantsResult = await query(
-    `SELECT p.push_token, p.full_name as sender_name
+    `SELECT p.id, p.push_token, p.full_name as sender_name
      FROM public.chat_participants cp
      JOIN public.profiles p ON cp.user_id = p.id
      WHERE cp.chat_id = $1 AND cp.user_id != $2`,
@@ -232,20 +232,68 @@ const sendMessage = asyncHandler(async (req, res) => {
       const unreadResult = await query(
         `SELECT COUNT(*) as count FROM public.messages m
          JOIN public.chat_participants cp ON m.chat_id = cp.chat_id
-         JOIN public.profiles p ON cp.user_id = p.id
-         WHERE p.push_token = $1
-           AND m.sender_id != p.id
+         WHERE cp.user_id = $1
+           AND m.sender_id != cp.user_id
            AND m.status != 'read'
-           AND (m.deleted_for_users IS NULL OR NOT (p.id = ANY(m.deleted_for_users)))`,
-        [row.push_token]
+           AND (m.deleted_for_users IS NULL OR NOT ($1 = ANY(m.deleted_for_users)))`,
+        [row.id]
       );
-      const badgeCount = parseInt(unreadResult.rows[0].count);
+      const badgeCount = Number.parseInt(unreadResult.rows[0].count, 10);
 
       notificationService.sendNotification(row.push_token, {
         title: senderName,
         body: type === 'text' ? content : `📷 Image`,
-        data: { chatId, type: 'new_message' },
+        data: { chatId, type: 'new_message', badge: badgeCount },
         badge: badgeCount
+      });
+    }
+  }
+
+  const adminNotifications = await query(
+    `WITH inserted AS (
+       INSERT INTO public.admin_notifications
+         (admin_id, source_type, source_id, title, body, metadata)
+       SELECT p.id, 'message', $1, $2, $3, $4::jsonb
+       FROM public.profiles p
+       WHERE p.is_global_admin = TRUE AND p.id != $5
+       ON CONFLICT (admin_id, source_type, source_id) DO NOTHING
+       RETURNING id, admin_id
+     )
+     SELECT i.id, i.admin_id, p.push_token,
+       (SELECT COUNT(*) FROM public.admin_notifications n
+        WHERE n.admin_id = i.admin_id AND n.read_at IS NULL)::int AS unread_count
+     FROM inserted i
+     JOIN public.profiles p ON p.id = i.admin_id`,
+    [
+      message.id,
+      senderName,
+      content,
+      JSON.stringify({ chatId, messageType: type }),
+      userId,
+    ]
+  );
+
+  for (const notification of adminNotifications.rows) {
+    const data = {
+      adminNotificationId: notification.id,
+      chatId,
+      type: 'admin_message',
+    };
+    socketService.sendToUser(notification.admin_id, 'admin_notification', {
+      id: notification.id,
+      title: senderName,
+      body: content,
+      data,
+      createdAt: message.created_at,
+      unreadCount: notification.unread_count,
+    });
+
+    if (notification.push_token) {
+      notificationService.sendNotification(notification.push_token, {
+        title: `Message reçu — ${senderName}`,
+        body: content,
+        data,
+        badge: notification.unread_count,
       });
     }
   }
@@ -279,16 +327,35 @@ const markAsRead = asyncHandler(async (req, res) => {
 
   const settings = userResult.rows[0]?.privacy_settings || {};
 
+  const membership = await query(
+    'SELECT 1 FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2',
+    [chatId, userId]
+  );
+  if (membership.rows.length === 0) {
+    return res.status(403).json({ success: false, error: 'Accès interdit à cette conversation.' });
+  }
+
   if (settings.read_receipts === false) {
     return res.json({ success: true, message: 'Lecture non marquée (confidentialité active)' });
   }
 
-  await query(
+  const updatedMessages = await query(
     `UPDATE public.messages
      SET status = 'read'
-     WHERE chat_id = $1 AND sender_id != $2 AND status != 'read'`,
+     WHERE chat_id = $1 AND sender_id != $2 AND status != 'read'
+     RETURNING id`,
     [chatId, userId]
   );
+
+  if (updatedMessages.rowCount > 0) {
+    const participants = await query(
+      'SELECT user_id FROM public.chat_participants WHERE chat_id = $1',
+      [chatId]
+    );
+    for (const participant of participants.rows) {
+      socketService.sendToUser(participant.user_id, 'message_read', { chatId, readBy: userId });
+    }
+  }
 
   res.json({ success: true, message: 'Messages marqués comme lus' });
 });

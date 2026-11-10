@@ -37,6 +37,9 @@ router.get('/analytics', adminController.getAnalytics);
 router.get('/analytics/usage', adminController.getUsageAnalytics);
 
 router.get('/campaigns', adminController.getCampaigns);
+router.get('/notifications', adminController.getAdminNotifications);
+router.put('/notifications/read-all', adminController.markAllAdminNotificationsRead);
+router.put('/notifications/:id/read', adminController.markAdminNotificationRead);
 router.post('/campaigns', adminController.createCampaign);
 router.put('/campaigns/:id', adminController.updateCampaign);
 router.delete('/campaigns/:id', adminController.deleteCampaign);

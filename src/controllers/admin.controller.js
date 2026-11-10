@@ -318,6 +318,31 @@ const initializeAdminTables = async () => {
     );
   `);
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.admin_notifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      admin_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+      source_type TEXT NOT NULL DEFAULT 'message',
+      source_id UUID NOT NULL DEFAULT gen_random_uuid(),
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      read_at TIMESTAMP WITH TIME ZONE,
+      UNIQUE (admin_id, source_type, source_id)
+    );
+  `);
+  await query('ALTER TABLE public.admin_notifications ALTER COLUMN source_id SET DEFAULT gen_random_uuid()');
+  await query(`
+    CREATE INDEX IF NOT EXISTS admin_notifications_inbox_idx
+    ON public.admin_notifications (admin_id, created_at DESC)
+  `);
+  await query(`
+    CREATE INDEX IF NOT EXISTS admin_notifications_unread_idx
+    ON public.admin_notifications (admin_id, created_at DESC)
+    WHERE read_at IS NULL
+  `);
+
   // Migration pour ajouter scheduled_at si la table existe déjà
   try {
     await query('ALTER TABLE public.notification_campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
@@ -2256,6 +2281,80 @@ const getCampaigns = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 
+const getAdminNotifications = asyncHandler(async (req, res) => {
+  if (!req.user?.is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Accès réservé à l’administrateur principal.' });
+  }
+
+  await ensureAdminTables();
+  const parsedLimit = Number.parseInt(req.query.limit, 10);
+  const parsedOffset = Number.parseInt(req.query.offset, 10);
+  const limit = Number.isInteger(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+  const offset = Number.isInteger(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
+  const result = await query(
+    `SELECT id, source_type, source_id, title, body, metadata, created_at, read_at
+     FROM public.admin_notifications
+     WHERE admin_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [req.userId, limit, offset]
+  );
+  const countsResult = await query(
+    `SELECT COUNT(*) AS total_count,
+       COUNT(*) FILTER (WHERE read_at IS NULL) AS unread_count
+     FROM public.admin_notifications
+     WHERE admin_id = $1`,
+    [req.userId]
+  );
+
+  res.json({
+    success: true,
+    data: {
+      notifications: result.rows,
+      totalCount: Number.parseInt(countsResult.rows[0].total_count, 10),
+      unreadCount: Number.parseInt(countsResult.rows[0].unread_count, 10),
+    },
+  });
+});
+
+const markAdminNotificationRead = asyncHandler(async (req, res) => {
+  if (!req.user?.is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Accès réservé à l’administrateur principal.' });
+  }
+
+  const result = await query(
+    `UPDATE public.admin_notifications
+     SET read_at = COALESCE(read_at, NOW())
+     WHERE id = $1 AND admin_id = $2
+     RETURNING id`,
+    [req.params.id, req.userId]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ success: false, error: 'Notification introuvable.' });
+  }
+
+  const unreadResult = await query(
+    'SELECT COUNT(*) FROM public.admin_notifications WHERE admin_id = $1 AND read_at IS NULL',
+    [req.userId]
+  );
+  const unreadCount = Number.parseInt(unreadResult.rows[0].count, 10);
+  socketService.sendToUser(req.userId, 'admin_notifications_read', { unreadCount });
+  res.json({ success: true, data: { unreadCount } });
+});
+
+const markAllAdminNotificationsRead = asyncHandler(async (req, res) => {
+  if (!req.user?.is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Accès réservé à l’administrateur principal.' });
+  }
+
+  await query(
+    'UPDATE public.admin_notifications SET read_at = NOW() WHERE admin_id = $1 AND read_at IS NULL',
+    [req.userId]
+  );
+  socketService.sendToUser(req.userId, 'admin_notifications_read', { unreadCount: 0 });
+  res.json({ success: true, data: { unreadCount: 0 } });
+});
+
 const createCampaign = asyncHandler(async (req, res) => {
   const { title, message, target = 'all', targetValue, scheduledAt, theme = 'amazon', ctaText, ctaUrl, fileUrl, fileName } = req.body;
   if (!title || !message) {
@@ -3667,6 +3766,9 @@ module.exports = {
   getAnalytics,
   getUsageAnalytics,
   getCampaigns,
+  getAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
   createCampaign,
   updateCampaign,
   deleteCampaign,

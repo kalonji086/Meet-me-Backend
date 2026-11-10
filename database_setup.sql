@@ -372,6 +372,25 @@ CREATE TABLE IF NOT EXISTS public.notification_campaigns (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.admin_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  source_type TEXT NOT NULL DEFAULT 'message',
+  source_id UUID NOT NULL DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  read_at TIMESTAMP WITH TIME ZONE,
+  UNIQUE (admin_id, source_type, source_id)
+);
+
+CREATE INDEX IF NOT EXISTS admin_notifications_inbox_idx
+  ON public.admin_notifications (admin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS admin_notifications_unread_idx
+  ON public.admin_notifications (admin_id, created_at DESC)
+  WHERE read_at IS NULL;
+
 -- Table pour les médias (Images, Audio, Documents)
 CREATE TABLE IF NOT EXISTS public.media (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

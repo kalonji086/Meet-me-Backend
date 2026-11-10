@@ -6721,7 +6721,7 @@
             container.innerHTML = '<div class="p-8 text-center text-sm font-bold text-gray-400">Chargement des annonces…</div>';
             try {
                 const res = await axios.get(`${API_URL}/admin/announcements`, {
-                    headers: { Authorization: `****** }
+                    headers: { Authorization: `Bearer ${token}` }
                 });
                 loadedAnnouncements = Array.isArray(res.data.data) ? res.data.data : [];
                 renderAnnouncements();
@@ -6817,8 +6817,8 @@
             try {
                 const url = `${API_URL}/admin/announcements${id ? `/${encodeURIComponent(id)}` : ''}`;
                 const response = id
-                    ? await axios.put(url, payload, { headers: { Authorization: `****** } })
-                    : await axios.post(url, payload, { headers: { Authorization: `****** } });
+                    ? await axios.put(url, payload, { headers: { Authorization: `Bearer ${token}` } })
+                    : await axios.post(url, payload, { headers: { Authorization: `Bearer ${token}` } });
                 toast(response.data.pending ? response.data.message : (id ? 'Annonce modifiée et diffusée.' : 'Annonce publiée et diffusée.'), response.data.pending ? 'info' : 'success');
                 if (!response.data.pending) resetAnnouncementForm();
                 await loadAnnouncements();
@@ -6839,7 +6839,7 @@
                     type: announcement.type,
                     isActive: !announcement.is_active,
                     expiresAt: announcement.expires_at
-                }, { headers: { Authorization: `****** } });
+                }, { headers: { Authorization: `Bearer ${token}` } });
                 toast(response.data.pending ? response.data.message : 'Visibilité de l’annonce mise à jour.', response.data.pending ? 'info' : 'success');
                 await loadAnnouncements();
             } catch (error) {
@@ -6851,7 +6851,7 @@
             if (!confirm('Supprimer définitivement cette annonce ?')) return;
             try {
                 const response = await axios.delete(`${API_URL}/admin/announcements/${encodeURIComponent(id)}`, {
-                    headers: { Authorization: `****** }
+                    headers: { Authorization: `Bearer ${token}` }
                 });
                 toast(response.data.pending ? response.data.message : 'Annonce supprimée.', response.data.pending ? 'info' : 'success');
                 await loadAnnouncements();

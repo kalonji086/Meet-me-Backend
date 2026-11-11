@@ -495,7 +495,6 @@
             #section-portfolios-saas > .flex.items-center.justify-between { padding: .95rem; }
             #section-portfolios-saas > .grid { grid-template-columns: minmax(0, 1fr); }
             #admin-name { max-width: 7rem; font-size: .65rem; padding-inline: .65rem; }
-            #notif-dropdown { position: fixed; top: 4.25rem; right: .75rem; left: .75rem; width: auto; }
         }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -651,10 +650,6 @@
                 </a>
                 <div id="admin-only-tools" class="border-t border-gray-800 my-4 pt-4">
                     <p class="admin-nav-label">Administration</p>
-                    <a href="#" onclick="showSection('admin-notifications')" id="nav-admin-notifications" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
-                        <i data-lucide="bell" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Boîte de réception</span>
-                        <span id="admin-notifications-badge" class="hidden ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                    </a>
                     <a href="#" onclick="showSection('delegations')" id="nav-delegations" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 text-orange-400 transition-all">
                         <i data-lucide="shield-plus" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Délégations</span>
                     </a>
@@ -702,22 +697,11 @@
                         <input type="file" id="admin-avatar-input" class="hidden" onchange="updateAdminAvatar(this)">
                     </div>
 
-                    <!-- Notification Bell -->
-                    <div class="relative group">
-                        <button onclick="toggleNotificationDropdown()" class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-purple-50 hover:text-purple-600 transition-all relative">
-                            <i data-lucide="bell" class="w-5 h-5"></i>
-                            <span id="notif-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-18 bg-red-500 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center px-1">0</span>
-                        </button>
-                        <div id="notif-dropdown" class="hidden absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[200] overflow-hidden animate-pop-in">
-                            <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                                <span class="text-xs font-black text-gray-400 uppercase tracking-widest">Activités</span>
-                                <button onclick="clearNotifications()" class="text-[10px] font-bold text-purple-600 hover:underline">Effacer</button>
-                            </div>
-                            <div id="notif-list" class="max-h-[400px] overflow-y-auto custom-scrollbar">
-                                <div class="p-8 text-center text-gray-400"><p class="text-xs">Aucune notification</p></div>
-                            </div>
-                        </div>
-                    </div>
+                    <button type="button" id="admin-inbox-shortcut" onclick="showSection('admin-notifications')" aria-label="Ouvrir la boîte de réception Admin" class="hidden relative flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-all">
+                        <i data-lucide="inbox" class="w-5 h-5"></i>
+                        <span class="hidden sm:inline text-xs font-bold">Boîte de réception</span>
+                        <span id="admin-notifications-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center px-1">0</span>
+                    </button>
 
                     <p id="admin-name" class="text-sm font-black text-purple-600 bg-purple-50 px-4 py-1.5 rounded-full uppercase">Admin</p>
                 </div>
@@ -1612,7 +1596,7 @@
                 <div id="section-admin-notifications" class="hidden animate-fade-in space-y-6 pb-20">
                     <header class="admin-control-hero">
                         <div class="admin-control-hero-copy">
-                            <span class="admin-control-hero-icon"><i data-lucide="bell" class="h-5 w-5"></i></span>
+                            <span class="admin-control-hero-icon"><i data-lucide="inbox" class="h-5 w-5"></i></span>
                             <div class="min-w-0"><h3>Boîte de réception Admin</h3><p>Notifications de messages conservées jusqu’à leur lecture.</p></div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
@@ -2439,9 +2423,6 @@
         let statsSchoolRows = [];
         let statsSchoolMobileMode = null;
         let statsSchoolResizeTimer = null;
-        let notifications_list = [];
-        let unread_notif_count = 0;
-
         async function refreshAdminAccessToken() {
             const refreshToken = localStorage.getItem('admin_refresh_token');
             if (!refreshToken) throw new Error('Votre session Admin a expiré. Veuillez vous reconnecter.');
@@ -3115,9 +3096,11 @@
                 Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.remove('hidden'); });
                 const adminTools = document.getElementById('admin-only-tools');
                 if (adminTools) adminTools.classList.remove('hidden');
+                document.getElementById('admin-inbox-shortcut')?.classList.remove('hidden');
                 const delegateTools = document.getElementById('delegate-tools');
                 if (delegateTools) delegateTools.classList.add('hidden');
             } else {
+                document.getElementById('admin-inbox-shortcut')?.classList.add('hidden');
                 const myReqNav = document.getElementById('nav-my-requests');
                 if (myReqNav) myReqNav.classList.remove('hidden');
 
@@ -3459,8 +3442,6 @@
         }
 
         function addNotification(type, title, message, icon = 'bell') {
-            notifications_list.unshift({ id: Date.now(), type, title, message, icon, time: new Date() });
-            unread_notif_count++; updateNotifBadge(); renderNotifications();
             showToast(title, message, icon);
         }
 
@@ -3488,25 +3469,6 @@
                 }
             }, 6000);
         }
-
-        function updateNotifBadge() {
-            const badge = document.getElementById('notif-badge');
-            if (unread_notif_count > 0) { badge.innerText = unread_notif_count; badge.classList.remove('hidden'); } else badge.classList.add('hidden');
-        }
-
-        function renderNotifications() {
-            const list = document.getElementById('notif-list');
-            if (notifications_list.length === 0) { list.innerHTML = '<div class="p-8 text-center text-gray-400 text-xs">Rien pour le moment</div>'; return; }
-            list.innerHTML = notifications_list.map(n => `
-                <div class="p-4 border-b border-gray-50 flex items-start">
-                    <div class="w-8 h-8 rounded-lg flex items-center justify-center mr-3 bg-purple-50 text-purple-600 shrink-0"><i data-lucide="${n.icon}" class="w-4 h-4"></i></div>
-                    <div class="flex-1"><p class="text-[11px] font-black text-gray-900 uppercase">${n.title}</p><p class="text-[10px] text-gray-500">${n.message}</p></div>
-                </div>
-            `).join(''); lucide.createIcons();
-        }
-
-        function toggleNotificationDropdown() { document.getElementById('notif-dropdown').classList.toggle('hidden'); unread_notif_count = 0; updateNotifBadge(); }
-        function clearNotifications() { notifications_list = []; unread_notif_count = 0; updateNotifBadge(); renderNotifications(); }
 
         function initRichEditors() {
             if (!campaignEditor && document.getElementById('campaign-editor')) {

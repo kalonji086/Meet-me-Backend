@@ -694,7 +694,7 @@
                                 <i data-lucide="camera" class="w-4 h-4 text-white"></i>
                             </div>
                         </button>
-                        <input type="file" id="admin-avatar-input" class="hidden" onchange="updateAdminAvatar(this)">
+                        <input type="file" id="admin-avatar-input" accept="image/*" class="hidden" onchange="updateAdminAvatar(this)">
                     </div>
 
                     <button type="button" id="admin-inbox-shortcut" onclick="showSection('admin-notifications')" aria-label="Ouvrir la boîte de réception Admin" class="hidden relative flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-all">
@@ -2735,14 +2735,23 @@
             }
         });
 
-        window.onload = () => {
+        window.onload = async () => {
             if (token) {
                 try {
+                    const user = JSON.parse(localStorage.getItem('admin_user'));
+                    if (!user) return logout();
+                    await syncAdminProfile(user);
                     showDashboard();
                 } catch (e) {
-                    console.error("Auto-login failed", e);
-                    localStorage.clear();
-                    if (window.lucide) lucide.createIcons();
+                    console.error("Unable to synchronize the Admin profile:", e);
+                    if (adminSessionExpiredHandled) return;
+                    const user = JSON.parse(localStorage.getItem('admin_user'));
+                    if (user) {
+                        showDashboard();
+                        showToast('Profil non synchronisé', 'Impossible de charger votre photo de profil depuis le serveur.', 'triangle-alert');
+                    } else {
+                        logout();
+                    }
                 }
             } else {
                 if (window.lucide) lucide.createIcons();
@@ -2857,24 +2866,55 @@
         }
 
         async function updateAdminAvatar(input) {
-            if (!input.files[0]) return;
-            const file = input.files[0];
+            const file = input.files?.[0];
+            if (!file) return;
             try {
                 const uploadRes = await apiService_upload(file);
-                if (uploadRes.success) {
-                    const avatar_url = uploadRes.data.fileUrl;
-                    await axios.put(`${API_URL}/users/profile`, { avatar_url }, { headers: { Authorization: `Bearer ${token}` } });
-
-                    // Update UI and LocalStorage
-                    const user = JSON.parse(localStorage.getItem('admin_user'));
-                    user.avatar_url = avatar_url;
-                    user.avatar = avatar_url;
-                    localStorage.setItem('admin_user', JSON.stringify(user));
-
-                    document.getElementById('admin-header-avatar').src = getFullUrl(avatar_url);
-                    alert("Photo de profil mise à jour !");
+                if (!uploadRes?.success || !uploadRes.data?.fileUrl) {
+                    throw new Error(uploadRes?.error || 'Le téléversement de la photo a échoué.');
                 }
-            } catch (e) { alert("Erreur lors de la mise à jour de l'avatar."); }
+                let avatar_url = uploadRes.data.fileUrl;
+                const updateRes = await axios.put(`${API_URL}/users/profile`, { avatar_url }, { headers: { Authorization: `Bearer ${token}` } });
+                if (!updateRes.data?.success || !updateRes.data?.data?.avatar_url) {
+                    throw new Error(updateRes.data?.error || 'La photo n’a pas pu être enregistrée dans votre profil.');
+                }
+                avatar_url = updateRes.data.data.avatar_url;
+
+                const user = JSON.parse(localStorage.getItem('admin_user'));
+                user.avatar_url = avatar_url;
+                user.avatar = avatar_url;
+                localStorage.setItem('admin_user', JSON.stringify(user));
+
+                document.getElementById('admin-header-avatar').src = getFullUrl(avatar_url);
+                alert('Photo de profil mise à jour sur tous vos appareils !');
+            } catch (e) {
+                console.error('Unable to update the Admin profile photo:', e);
+                alert(e.response?.data?.error || e.message || "Erreur lors de la mise à jour de l'avatar.");
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function syncAdminProfile(user) {
+            const response = await axios.get(`${API_URL}/users/profile/current`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const profile = response.data?.data;
+            if (!response.data?.success || !profile) {
+                throw new Error(response.data?.error || 'Impossible de charger le profil Admin.');
+            }
+
+            const profileName = profile.full_name || user.full_name || user.name;
+            const avatarUrl = profile.avatar_url || null;
+            const updatedUser = {
+                ...user,
+                full_name: profileName,
+                name: profileName,
+                avatar_url: avatarUrl,
+                avatar: avatarUrl,
+            };
+            localStorage.setItem('admin_user', JSON.stringify(updatedUser));
+            return updatedUser;
         }
 
         function showDashboard() {

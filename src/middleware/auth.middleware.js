@@ -40,7 +40,7 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     req.userId = user.id;
     req.sessionId = decoded.sid || null;
-    if (decoded.sid) await deviceSessionService.touchSession(decoded.sid);
+    if (decoded.sid) await deviceSessionService.touchSession(decoded.sid, user.id, req.ip);
     next();
   } catch (error) {
     return res.status(401).json({ success: false, error: 'Session invalide ou expirée.' });

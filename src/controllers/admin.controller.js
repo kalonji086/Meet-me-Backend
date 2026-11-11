@@ -985,12 +985,18 @@ const getLoginTracking = asyncHandler(async (req, res) => {
   }
 
   await deviceSessionService.ensureDeviceSessionsTable();
+  await deviceSessionService.clearStaleLocations();
   const result = await query(
     `WITH tracked_sessions AS (
        SELECT ds.id AS session_id, ds.user_id, p.full_name, p.email, p.avatar_url, p.status,
               ds.created_at AS last_login_at, ds.last_seen_at, ds.device_info,
               COALESCE(ds.app_version, p.app_version) AS app_version,
               COALESCE(ds.country, p.country) AS country, COALESCE(ds.city, p.city) AS city,
+              ds.ip_address, ds.ip_anonymized, ds.ip_anonymized_at,
+              ds.latitude, ds.longitude, ds.location_accuracy_m, ds.location_updated_at,
+              (ds.location_consent_at IS NOT NULL AND ds.location_revoked_at IS NULL
+                AND ds.ended_at IS NULL AND ds.revoked_at IS NULL
+                AND (ds.expires_at IS NULL OR ds.expires_at > NOW())) AS location_sharing_enabled,
               p.is_locked, (ds.ended_at IS NULL AND ds.revoked_at IS NULL
                 AND (ds.expires_at IS NULL OR ds.expires_at > NOW())) AS session_active,
               TRUE AS session_managed
@@ -1002,7 +1008,11 @@ const getLoginTracking = asyncHandler(async (req, res) => {
      ), legacy_sessions AS (
        SELECT NULL::uuid AS session_id, p.id AS user_id, p.full_name, p.email, p.avatar_url, p.status,
               p.last_login_at, p.last_seen AS last_seen_at, p.device_info, p.app_version,
-              p.country, p.city, p.is_locked, FALSE AS session_active, FALSE AS session_managed
+              p.country, p.city, NULL::text AS ip_address, NULL::text AS ip_anonymized,
+              NULL::timestamptz AS ip_anonymized_at, NULL::double precision AS latitude,
+              NULL::double precision AS longitude, NULL::double precision AS location_accuracy_m,
+              NULL::timestamptz AS location_updated_at, FALSE AS location_sharing_enabled,
+              p.is_locked, FALSE AS session_active, FALSE AS session_managed
        FROM public.profiles p
        WHERE p.is_global_admin = FALSE
          AND p.last_login_at > NOW() - INTERVAL '365 days'
@@ -1036,7 +1046,9 @@ const revokeDeviceSession = asyncHandler(async (req, res) => {
   }
   const result = await query(
     `UPDATE public.user_device_sessions ds
-     SET revoked_at = NOW(), ended_at = COALESCE(ds.ended_at, NOW()), revoked_by = $2
+     SET revoked_at = NOW(), ended_at = COALESCE(ds.ended_at, NOW()), revoked_by = $2,
+         latitude = NULL, longitude = NULL, location_accuracy_m = NULL,
+         location_updated_at = NULL, location_revoked_at = COALESCE(ds.location_revoked_at, NOW())
      FROM public.profiles p
      WHERE ds.id = $1 AND ds.user_id = p.id AND p.is_global_admin = FALSE
        AND ds.ended_at IS NULL AND ds.revoked_at IS NULL

@@ -1489,7 +1489,7 @@
 
                 <div id="section-login-tracking" class="hidden animate-fade-in space-y-5">
                     <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-                        Les appareils sont suivis séparément à partir des informations déclarées par l’application au moment de la connexion. Le pays et la ville proviennent du profil, pas d’une géolocalisation. Aucune géolocalisation précise, IMEI ou donnée cachée n’est collectée. Les sessions antérieures au déploiement apparaissent comme anciennes et ne peuvent pas être révoquées individuellement.
+                        Le GPS précis n’est reçu que si l’utilisateur l’active dans l’application et autorise la position. Le suivi s’arrête lorsque l’application passe en arrière-plan ou que l’utilisateur retire son accord. L’IP de connexion est conservée au maximum 30 jours, puis anonymisée au niveau du réseau. L’accès aux coordonnées et IP est réservé à l’administrateur principal. Aucune géolocalisation cachée, IMEI ou donnée d’arrière-plan n’est collectée.
                     </div>
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <input id="login-tracking-search" type="search" oninput="filterLoginTracking()" placeholder="Rechercher un nom, e-mail, pays ou appareil…" class="w-full sm:max-w-md p-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-purple-400">
@@ -1503,7 +1503,7 @@
                         <table class="w-full text-left min-w-[1050px]">
                             <thead class="bg-gray-50 border-b border-gray-100">
                                 <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                    <th class="px-5 py-4">Compte</th><th class="px-5 py-4">État / dernière connexion</th><th class="px-5 py-4">Appareil / système</th><th class="px-5 py-4">Pays / ville du profil</th><th class="px-5 py-4 text-right">Actions</th>
+                                    <th class="px-5 py-4">Compte</th><th class="px-5 py-4">État / dernière connexion</th><th class="px-5 py-4">Appareil / système</th><th class="px-5 py-4">Réseau / GPS partagé</th><th class="px-5 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="login-tracking-table-body"></tbody>
@@ -3238,8 +3238,12 @@
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
                 if (!document.getElementById('section-login-tracking').classList.contains('hidden')) loadLoginTracking();
             });
+            let loginTrackingRefreshTimer;
             socket.on('admin:login_tracking_updated', () => {
-                if (!document.getElementById('section-login-tracking').classList.contains('hidden')) loadLoginTracking();
+                if (!document.getElementById('section-login-tracking').classList.contains('hidden')) {
+                    clearTimeout(loginTrackingRefreshTimer);
+                    loginTrackingRefreshTimer = setTimeout(() => loadLoginTracking(), 1000);
+                }
             });
             socket.on('admin_user_deleted', () => scheduleAdminStatsRefresh());
             socket.on('admin:new_message', () => scheduleAdminStatsRefresh());
@@ -5893,6 +5897,7 @@
                     : (user.device_info || {});
                 const searchable = [
                     user.full_name, user.email, user.country, user.city,
+                    user.ip_address, user.ip_anonymized, user.latitude, user.longitude,
                     device.brand, device.model, device.os, device.version
                 ].join(' ').toLowerCase();
                 return searchable.includes(search);
@@ -5910,6 +5915,21 @@
                 const accountName = escapeUserCell(user.full_name || 'Utilisateur');
                 const email = escapeUserCell(user.email || '');
                 const location = [user.city, user.country].filter(Boolean).map(escapeUserCell).join(', ') || 'Non renseigné';
+                const hasSharedLocation = Boolean(user.location_sharing_enabled)
+                    && user.latitude !== null && user.latitude !== undefined
+                    && user.longitude !== null && user.longitude !== undefined
+                    && Number.isFinite(Number(user.latitude)) && Number.isFinite(Number(user.longitude));
+                const sharedCoordinates = hasSharedLocation
+                    ? `${Number(user.latitude).toFixed(5)}, ${Number(user.longitude).toFixed(5)}`
+                    : '';
+                const locationUpdated = user.location_updated_at
+                    ? new Date(user.location_updated_at).toLocaleString()
+                    : '';
+                const ipLabel = user.ip_address
+                    ? `IP : ${escapeUserCell(user.ip_address)}`
+                    : user.ip_anonymized
+                        ? `IP anonymisée : ${escapeUserCell(user.ip_anonymized)}`
+                        : 'IP : non renseignée';
                 const lastLogin = user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Jamais renseignée';
                 const userNameArg = encodeURIComponent(user.full_name || 'Utilisateur').replace(/'/g, '%27');
                 const onlineClass = isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600';
@@ -5917,7 +5937,7 @@
                     <td class="px-5 py-4"><p class="font-bold text-sm text-gray-800">${accountName}</p><p class="text-xs text-gray-500">${email}</p></td>
                     <td class="px-5 py-4"><span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold ${onlineClass}"><span class="w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}"></span>${isOnline ? 'EN LIGNE' : 'HORS LIGNE'}</span><p class="mt-2 text-[10px] text-gray-500">Connexion : ${escapeUserCell(lastLogin)}</p><p class="text-[10px] text-gray-500">Activité : ${escapeUserCell(user.last_seen_at ? new Date(user.last_seen_at).toLocaleString() : '—')}</p><p class="text-[10px] ${user.is_locked ? 'text-red-600 font-bold' : 'text-gray-500'}">${user.is_locked ? 'Compte bloqué' : user.session_active ? 'Session valide' : 'Session terminée / expirée'}</p></td>
                     <td class="px-5 py-4"><p class="text-xs font-bold text-gray-700">${escapeUserCell(deviceName)}</p><p class="text-[10px] text-gray-500">${escapeUserCell(osName)}</p><p class="text-[10px] text-gray-400">Application ${escapeUserCell(user.app_version || '—')}</p></td>
-                    <td class="px-5 py-4"><p class="text-xs font-semibold text-gray-700">${location}</p><p class="text-[10px] text-gray-400">Profil au moment de la connexion</p></td>
+                    <td class="px-5 py-4"><p class="text-xs font-semibold text-gray-700">${location}</p><p class="text-[10px] text-gray-400">Ville et pays du profil</p><p class="mt-2 text-[10px] ${hasSharedLocation ? 'font-bold text-green-700' : 'text-gray-500'}">${hasSharedLocation ? `GPS partagé avec accord : ${escapeUserCell(sharedCoordinates)}` : user.location_sharing_enabled ? 'GPS autorisé, position en attente' : 'GPS non partagé'}</p>${locationUpdated && hasSharedLocation ? `<p class="text-[10px] text-gray-500">Position actualisée : ${escapeUserCell(locationUpdated)}</p>` : ''}<p class="mt-2 text-[10px] text-gray-600">${ipLabel}</p>${user.ip_anonymized_at ? `<p class="text-[10px] text-gray-400">IP anonymisée le ${escapeUserCell(new Date(user.ip_anonymized_at).toLocaleDateString())}</p>` : ''}</td>
                     <td class="px-5 py-4"><div class="flex justify-end gap-2">
                         <button type="button" onclick="setTrackedUserLock('${user.id}', ${!user.is_locked})" class="rounded-lg px-3 py-2 text-xs font-bold ${user.is_locked ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}">${user.is_locked ? 'Débloquer' : 'Bloquer'}</button>
                         <button type="button" onclick="notifyUserSecurity('${user.id}', '${userNameArg}')" class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">Avertir</button>

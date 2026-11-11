@@ -42,6 +42,10 @@ router.put('/privacy', userController.updatePrivacy);
  * @route   PUT /api/users/push-token
  */
 router.put('/push-token', userController.updatePushToken);
+router.get('/location-sharing', userController.getLocationSharing);
+router.put('/location-sharing', userController.updateLocationSharing);
+router.put('/location', userController.updateCurrentLocation);
+router.delete('/location', userController.clearCurrentLocation);
 
 /**
  * @route   GET /api/users/badges

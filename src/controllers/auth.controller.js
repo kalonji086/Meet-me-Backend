@@ -261,8 +261,9 @@ const login = asyncHandler(async (req, res) => {
     const refreshToken = jwt.sign({ userId: user.id, sid: sessionId }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
     const refreshClaims = jwt.decode(refreshToken);
     await query(
-      `INSERT INTO public.user_device_sessions (id, user_id, device_info, app_version, country, city, expires_at)
-       VALUES ($1, $2, $3::jsonb, $4, $5, $6, to_timestamp($7))`,
+      `INSERT INTO public.user_device_sessions
+         (id, user_id, device_info, app_version, country, city, expires_at, ip_address, ip_last_seen_at)
+       VALUES ($1, $2, $3::jsonb, $4, $5, $6, to_timestamp($7), $8, CASE WHEN $8 IS NOT NULL THEN NOW() END)`,
       [
         sessionId,
         user.id,
@@ -271,6 +272,7 @@ const login = asyncHandler(async (req, res) => {
         user.country || null,
         user.city || null,
         refreshClaims.exp,
+        deviceSessionService.normalizeIpAddress(req.ip),
       ]
     );
     let profileUpdate;
@@ -423,7 +425,9 @@ const logout = asyncHandler(async (req, res) => {
     await deviceSessionService.ensureDeviceSessionsTable();
     await query(
       `UPDATE public.user_device_sessions
-       SET ended_at = COALESCE(ended_at, NOW()), revoked_at = COALESCE(revoked_at, NOW())
+       SET ended_at = COALESCE(ended_at, NOW()), revoked_at = COALESCE(revoked_at, NOW()),
+           latitude = NULL, longitude = NULL, location_accuracy_m = NULL,
+           location_updated_at = NULL, location_revoked_at = COALESCE(location_revoked_at, NOW())
        WHERE id = $1 AND user_id = $2`,
       [req.sessionId, userId]
     );

@@ -2,6 +2,7 @@ const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const logger = require('../utils/logger');
 const socketService = require('../services/socket.service');
+const deviceSessionService = require('../services/device-session.service');
 const bcrypt = require('bcryptjs');
 
 /**
@@ -347,6 +348,87 @@ const updatePushToken = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
+const getLocationSharing = asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    enabled: await deviceSessionService.getLocationSharing(req.sessionId, req.userId),
+  });
+});
+
+const updateLocationSharing = asyncHandler(async (req, res) => {
+  const { enabled, latitude, longitude, accuracy } = req.body;
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ success: false, error: 'Le choix de partage de position est invalide.' });
+  }
+  if (enabled && (
+    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+    !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
+    (accuracy !== undefined && accuracy !== null && (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 100000))
+  )) {
+    return res.status(400).json({ success: false, error: 'Les coordonnées GPS sont invalides.' });
+  }
+  if (!req.sessionId) {
+    return res.status(409).json({ success: false, error: 'Reconnectez-vous pour gérer le partage de position sur cet appareil.' });
+  }
+
+  const updated = await deviceSessionService.setLocationSharing(
+    req.sessionId,
+    req.userId,
+    enabled,
+    enabled ? { latitude, longitude, accuracy: accuracy ?? null } : null,
+    req.ip
+  );
+  if (!updated) {
+    return res.status(409).json({ success: false, error: 'La session de cet appareil n’est plus active.' });
+  }
+
+  socketService.broadcast('admin:login_tracking_updated', {
+    userId: req.userId,
+    sessionId: req.sessionId,
+    action: enabled ? 'location_sharing_enabled' : 'location_sharing_disabled',
+  });
+  res.json({ success: true, enabled });
+});
+
+const updateCurrentLocation = asyncHandler(async (req, res) => {
+  const { latitude, longitude, accuracy } = req.body;
+  if (
+    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+    !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
+    (accuracy !== undefined && accuracy !== null && (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 100000))
+  ) {
+    return res.status(400).json({ success: false, error: 'Les coordonnées GPS sont invalides.' });
+  }
+  const updated = await deviceSessionService.updateCurrentLocation(
+    req.sessionId,
+    req.userId,
+    { latitude, longitude, accuracy: accuracy ?? null },
+    req.ip
+  );
+  if (!updated) {
+    return res.status(403).json({ success: false, error: 'Le partage de position n’est pas actif pour cette session.' });
+  }
+
+  socketService.broadcast('admin:login_tracking_updated', {
+    userId: req.userId,
+    sessionId: req.sessionId,
+    action: 'location_updated',
+  });
+  res.json({ success: true });
+});
+
+const clearCurrentLocation = asyncHandler(async (req, res) => {
+  const cleared = await deviceSessionService.clearCurrentLocation(req.sessionId, req.userId);
+  if (cleared) {
+    socketService.broadcast('admin:login_tracking_updated', {
+      userId: req.userId,
+      sessionId: req.sessionId,
+      action: 'location_cleared',
+    });
+  }
+  res.json({ success: true });
+});
+
 const getBadges = asyncHandler(async (req, res) => {
   const msgRes = await query(
     `SELECT COUNT(*) FROM public.messages m
@@ -438,4 +520,24 @@ const checkContact = asyncHandler(async (req, res) => {
   res.json({ success: true, isContact: result.rows.length > 0 });
 });
 
-module.exports = { getMe, updateProfile, searchUsers, syncContacts, updatePrivacy, updatePushToken, getBadges, submitVerification, getUserById, blockUser, reportUser, addContact, checkContact, deleteAccount, checkUserByPhone };
+module.exports = {
+  getMe,
+  updateProfile,
+  searchUsers,
+  syncContacts,
+  updatePrivacy,
+  updatePushToken,
+  getLocationSharing,
+  updateLocationSharing,
+  updateCurrentLocation,
+  clearCurrentLocation,
+  getBadges,
+  submitVerification,
+  getUserById,
+  blockUser,
+  reportUser,
+  addContact,
+  checkContact,
+  deleteAccount,
+  checkUserByPhone,
+};

@@ -29,9 +29,16 @@ const loginSchema = Joi.object({
   password: Joi.string().required()
 });
 
+const googleLoginSchema = Joi.object({
+  idToken: Joi.string().max(8192).required(),
+  device_info: Joi.object().unknown(true).default({}),
+  appVersion: Joi.string().allow(null, '')
+});
+
 router.get('/check-availability', authController.checkAvailability);
 router.post('/register', rateLimitAuth, validate(registerSchema), authController.register);
 router.post('/login', rateLimitAuth, validate(loginSchema), authController.login);
+router.post('/google', rateLimitAuth, validate(googleLoginSchema), authController.loginWithGoogle);
 router.post('/refresh', authController.refreshToken);
 router.post('/logout', authenticate, authController.logout);
 router.post('/forgot-password', authController.forgotPassword);

@@ -7,6 +7,8 @@ const logger = require('../utils/logger');
 const config = require('../../config/config');
 const { asyncHandler } = require('../middleware/error.middleware');
 const deviceSessionService = require('../services/device-session.service');
+const { OAuth2Client } = require('google-auth-library');
+const googleOAuthClient = new OAuth2Client();
 
 /**
  * @desc    Vérifier si un email, téléphone ou pseudo existe déjà
@@ -217,6 +219,82 @@ const register = asyncHandler(async (req, res) => {
  * @route   POST /api/auth/login
  * @access  Public
  */
+const createAuthenticatedSession = async ({ user, req, deviceInfo, appVersion }) => {
+  await deviceSessionService.ensureDeviceSessionsTable();
+  const sessionId = crypto.randomUUID();
+  const refreshToken = jwt.sign({ userId: user.id, sid: sessionId }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
+  const refreshClaims = jwt.decode(refreshToken);
+  await query(
+    `INSERT INTO public.user_device_sessions
+       (id, user_id, device_info, app_version, country, city, expires_at, ip_address, ip_last_seen_at)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6, to_timestamp($7), $8::text,
+             CASE WHEN $8::text IS NOT NULL THEN NOW() END)`,
+    [
+      sessionId,
+      user.id,
+      JSON.stringify(deviceInfo),
+      appVersion,
+      user.country || null,
+      user.city || null,
+      refreshClaims.exp,
+      deviceSessionService.normalizeIpAddress(req.ip),
+    ]
+  );
+
+  let profileUpdate;
+  try {
+    profileUpdate = await query(
+      `UPDATE public.profiles
+       SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(),
+           device_info = $1, app_version = COALESCE($2, app_version)
+       WHERE id = $3 AND (COALESCE(is_locked, FALSE) = FALSE OR is_global_admin = TRUE)
+       RETURNING id`,
+      [JSON.stringify(deviceInfo), appVersion, user.id]
+    );
+  } catch (error) {
+    try {
+      await query('UPDATE public.user_device_sessions SET ended_at = NOW() WHERE id = $1', [sessionId]);
+    } catch (cleanupError) {
+      logger.error('Impossible de fermer la session créée après un échec de mise à jour du profil:', cleanupError);
+    }
+    throw error;
+  }
+
+  if (profileUpdate.rows.length === 0) {
+    await query(
+      'UPDATE public.user_device_sessions SET ended_at = NOW() WHERE id = $1',
+      [sessionId]
+    );
+    return null;
+  }
+
+  const token = jwt.sign({ userId: user.id, email: user.email, sid: sessionId }, config.jwt.secret, { expiresIn: config.jwt.expire });
+  require('../services/socket.service').broadcast('admin_user_login', {
+    userId: user.id,
+    name: user.full_name,
+    email: user.email,
+    sessionId,
+    time: new Date()
+  });
+
+  const safeUser = normalizeProfileUser(user);
+  return {
+    token,
+    refreshToken,
+    user: {
+      ...safeUser,
+      status: 'online',
+      isGlobalAdmin: user.is_global_admin,
+      push_token: user.push_token,
+      mustChangePassword: user.must_change_password,
+      name: user.full_name,
+      full_name: user.full_name,
+      avatar: user.avatar_url,
+      avatar_url: user.avatar_url,
+    },
+  };
+};
+
 const login = asyncHandler(async (req, res) => {
   const { email, password, isReauth = false, device_info } = req.body;
 
@@ -254,84 +332,16 @@ const login = asyncHandler(async (req, res) => {
       await resetFailedLogin([emailLower]);
     }
 
-    const appVersion = req.body.appVersion || null;
-    const deviceInfo = device_info || user.device_info || {};
-    await deviceSessionService.ensureDeviceSessionsTable();
-    const sessionId = crypto.randomUUID();
-    const refreshToken = jwt.sign({ userId: user.id, sid: sessionId }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
-    const refreshClaims = jwt.decode(refreshToken);
-    await query(
-      `INSERT INTO public.user_device_sessions
-         (id, user_id, device_info, app_version, country, city, expires_at, ip_address, ip_last_seen_at)
-       VALUES ($1, $2, $3::jsonb, $4, $5, $6, to_timestamp($7), $8::text,
-               CASE WHEN $8::text IS NOT NULL THEN NOW() END)`,
-      [
-        sessionId,
-        user.id,
-        JSON.stringify(deviceInfo),
-        appVersion,
-        user.country || null,
-        user.city || null,
-        refreshClaims.exp,
-        deviceSessionService.normalizeIpAddress(req.ip),
-      ]
-    );
-    let profileUpdate;
-    try {
-      profileUpdate = await query(
-        `UPDATE public.profiles
-         SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(),
-             device_info = $1, app_version = COALESCE($2, app_version)
-         WHERE id = $3 AND (COALESCE(is_locked, FALSE) = FALSE OR is_global_admin = TRUE)
-         RETURNING id`,
-        [JSON.stringify(deviceInfo), appVersion, user.id]
-      );
-    } catch (error) {
-      try {
-        await query('UPDATE public.user_device_sessions SET ended_at = NOW() WHERE id = $1', [sessionId]);
-      } catch (cleanupError) {
-        logger.error('Impossible de fermer la session créée après un échec de mise à jour du profil:', cleanupError);
-      }
-      throw error;
-    }
-    if (profileUpdate.rows.length === 0) {
-      await query(
-        'UPDATE public.user_device_sessions SET ended_at = NOW() WHERE id = $1',
-        [sessionId]
-      );
+    const authSession = await createAuthenticatedSession({
+      user,
+      req,
+      deviceInfo: device_info || user.device_info || {},
+      appVersion: req.body.appVersion || null
+    });
+    if (!authSession) {
       return res.status(403).json({ success: false, error: 'Compte bloqué' });
     }
-    const token = jwt.sign({ userId: user.id, email: user.email, sid: sessionId }, config.jwt.secret, { expiresIn: config.jwt.expire });
-
-    const socketService = require('../services/socket.service');
-    socketService.broadcast('admin_user_login', {
-      userId: user.id,
-      name: user.full_name,
-      email: user.email,
-      sessionId,
-      time: new Date()
-    });
-
-    const safeUser = normalizeProfileUser(user);
-
-    return res.json({
-      success: true,
-      data: {
-        token,
-        refreshToken,
-        user: {
-          ...safeUser,
-          status: 'online',
-          isGlobalAdmin: user.is_global_admin,
-          push_token: user.push_token,
-          mustChangePassword: user.must_change_password,
-          name: user.full_name,
-          full_name: user.full_name,
-          avatar: user.avatar_url,
-          avatar_url: user.avatar_url,
-        },
-      }
-    });
+    return res.json({ success: true, data: authSession });
   } else {
     // ÉCHEC : On applique la sécurité (Sauf pour l'Admin Principal)
     if (!isGlobalAdmin) {
@@ -366,6 +376,62 @@ const login = asyncHandler(async (req, res) => {
       message: isGlobalAdmin ? 'Mot de passe ou email incorrect.' : 'Email ou mot de passe incorrect. Attention : une deuxième erreur bloquera cet accès pendant 1 heure.'
     });
   }
+});
+
+const loginWithGoogle = asyncHandler(async (req, res) => {
+  const { idToken, device_info, appVersion } = req.body;
+  if (!config.google.webClientId) {
+    return res.status(503).json({ success: false, error: 'La connexion Google n’est pas encore configurée.' });
+  }
+
+  let googleUser;
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken,
+      audience: config.google.webClientId,
+    });
+    googleUser = ticket.getPayload();
+  } catch (error) {
+    logger.warn('Google sign-in token verification failed:', error.message);
+    return res.status(401).json({ success: false, error: 'Le jeton Google est invalide ou expiré.' });
+  }
+
+  const email = googleUser?.email?.trim().toLowerCase();
+  if (!email || googleUser.email_verified !== true) {
+    return res.status(401).json({ success: false, error: 'Google n’a pas confirmé cette adresse e-mail.' });
+  }
+
+  const result = await query(
+    'SELECT * FROM public.profiles WHERE LOWER(email) = $1',
+    [email]
+  );
+  const user = result.rows[0];
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Aucun compte Acemia existant ne correspond à cette adresse Google. Créez d’abord un compte avec le formulaire d’inscription.'
+    });
+  }
+  if (user.is_locked && !user.is_global_admin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Compte banni',
+      isLocked: true,
+      message: 'Votre accès a été révoqué par l’administrateur.'
+    });
+  }
+
+  if (!user.is_global_admin) await resetFailedLogin([email]);
+  const authSession = await createAuthenticatedSession({
+    user,
+    req,
+    deviceInfo: device_info || {},
+    appVersion: appVersion || null
+  });
+  if (!authSession) {
+    return res.status(403).json({ success: false, error: 'Compte bloqué' });
+  }
+  return res.json({ success: true, data: authSession });
 });
 
 /**
@@ -517,4 +583,4 @@ const verifyToken = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: req.user } });
 });
 
-module.exports = { register, login, refreshToken, logout, forgotPassword, verifyOTP, resetPassword, changePassword, verifyToken, checkAvailability };
+module.exports = { register, login, loginWithGoogle, refreshToken, logout, forgotPassword, verifyOTP, resetPassword, changePassword, verifyToken, checkAvailability };

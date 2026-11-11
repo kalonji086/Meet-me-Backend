@@ -31,6 +31,10 @@ const config = {
     refreshExpire: process.env.JWT_REFRESH_EXPIRE || '30d',
   },
 
+  google: {
+    webClientId: process.env.GOOGLE_WEB_CLIENT_ID,
+  },
+
   // Translation APIs
   translation: {
     googleApiKey: process.env.GOOGLE_TRANSLATE_API_KEY,

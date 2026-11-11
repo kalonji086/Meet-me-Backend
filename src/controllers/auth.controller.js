@@ -263,7 +263,8 @@ const login = asyncHandler(async (req, res) => {
     await query(
       `INSERT INTO public.user_device_sessions
          (id, user_id, device_info, app_version, country, city, expires_at, ip_address, ip_last_seen_at)
-       VALUES ($1, $2, $3::jsonb, $4, $5, $6, to_timestamp($7), $8, CASE WHEN $8 IS NOT NULL THEN NOW() END)`,
+       VALUES ($1, $2, $3::jsonb, $4, $5, $6, to_timestamp($7), $8::text,
+               CASE WHEN $8::text IS NOT NULL THEN NOW() END)`,
       [
         sessionId,
         user.id,

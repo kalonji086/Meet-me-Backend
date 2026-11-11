@@ -183,6 +183,9 @@ class Server {
     this.app.get('/privacy', (req, res) => {
       res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'privacy.html'));
     });
+    this.app.get('/terms', (req, res) => {
+      res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'terms.html'));
+    });
     this.app.get('/support/helpdesk', (req, res) => {
       res.sendFile(path.join(__dirname, '..', 'admin-dashboard', 'support.html'));
     });

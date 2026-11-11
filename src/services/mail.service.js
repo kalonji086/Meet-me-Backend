@@ -89,6 +89,7 @@ class MailService {
               </a>
             </div>
             <div class="footer-links">
+              <a href="${appPublicUrl}/terms">Conditions d’utilisation</a>
               <a href="${appPublicUrl}/privacy">Confidentialité</a>
               <a href="${appPublicUrl}/support/helpdesk">Support</a>
             </div>

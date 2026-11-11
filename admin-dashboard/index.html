@@ -266,6 +266,12 @@
         #section-campaigns .admin-campaign-options input,
         #section-campaigns .admin-campaign-options select { min-height: 2.9rem; padding: .7rem .85rem; background: #f8f9fc; }
         #section-campaigns .admin-campaign-options { padding: 1rem; border: 1px solid #e8eaf1; border-radius: 1rem; background: #fafbfe; }
+        #section-campaigns .campaign-legal-links { padding: 1rem; border: 1px solid #e6e1f7; border-radius: 1rem; background: #fff; }
+        #section-campaigns .campaign-legal-links h4 { margin: 0; color: #30394c; font-size: .82rem; font-weight: 800; }
+        #section-campaigns .campaign-legal-links > p { margin: .35rem 0 .85rem; color: #69758a; font-size: .72rem; line-height: 1.5; }
+        #section-campaigns .campaign-legal-item { padding: .7rem 0; border-top: 1px solid #eff0f4; }
+        #section-campaigns .campaign-legal-item a { display: block; overflow-wrap: anywhere; color: #6546c4; font-size: .7rem; font-weight: 650; }
+        #section-campaigns .campaign-legal-item button { margin-top: .45rem; color: #6546c4; font-size: .68rem; font-weight: 750; }
         #section-campaigns .admin-campaign-attachment { padding: 1rem; border: 1px dashed #d9deea; border-radius: 1rem; background: #fafbfe; }
         #section-campaigns .admin-campaign-attachment-row { display: flex; min-width: 0; align-items: center; gap: .85rem; }
         #section-campaigns .admin-campaign-attachment-row > div:last-child { min-width: 0; }
@@ -1690,6 +1696,18 @@
                                     <div class="flex items-start gap-3">
                                         <i data-lucide="info" class="w-4 h-4 text-purple-600 shrink-0 mt-0.5"></i>
                                         <p class="text-xs leading-relaxed text-purple-900">Vérifiez le titre et le contenu avant de diffuser. Les campagnes programmées peuvent être modifiées avant leur envoi.</p>
+                                    </div>
+                                </div>
+                                <div class="campaign-legal-links">
+                                    <h4>Liens officiels à partager</h4>
+                                    <p>Les e-mails incluent automatiquement ces liens en pied de page. Vous pouvez aussi les ajouter au message de campagne.</p>
+                                    <div class="campaign-legal-item">
+                                        <a id="campaign-terms-url" href="/terms" target="_blank" rel="noopener noreferrer">/terms</a>
+                                        <button type="button" onclick="insertCampaignLegalLink('Conditions d’utilisation', '/terms')">Ajouter les conditions au message</button>
+                                    </div>
+                                    <div class="campaign-legal-item">
+                                        <a id="campaign-privacy-url" href="/privacy" target="_blank" rel="noopener noreferrer">/privacy</a>
+                                        <button type="button" onclick="insertCampaignLegalLink('Politique de confidentialité', '/privacy')">Ajouter la confidentialité au message</button>
                                     </div>
                                 </div>
                                 <button onclick="sendCampaign()" id="campaign-btn" class="admin-campaign-send w-full bg-purple-600 hover:bg-purple-700 text-white px-5 py-4 font-black shadow-lg uppercase text-xs tracking-widest transition-all">DIFFUSER LA CAMPAGNE</button>
@@ -3494,6 +3512,32 @@
             if (!campaignEditor && document.getElementById('campaign-editor')) {
                 campaignEditor = new Quill('#campaign-editor', { theme: 'snow', modules: { toolbar: [['bold', 'italic'], ['link', 'image'], [{ 'list': 'bullet' }]] } });
             }
+        }
+
+        function updateCampaignLegalUrls() {
+            [['campaign-terms-url', '/terms'], ['campaign-privacy-url', '/privacy']].forEach(([id, path]) => {
+                const link = document.getElementById(id);
+                if (!link) return;
+                link.href = new URL(path, window.location.origin).href;
+                link.textContent = link.href;
+            });
+        }
+
+        updateCampaignLegalUrls();
+
+        function insertCampaignLegalLink(label, path) {
+            initRichEditors();
+            if (!campaignEditor) {
+                toast('L’éditeur de campagne n’est pas disponible.', 'error');
+                return;
+            }
+            const url = new URL(path, window.location.origin).href;
+            const range = campaignEditor.getSelection(true) || { index: campaignEditor.getLength() - 1, length: 0 };
+            if (range.length) campaignEditor.deleteText(range.index, range.length, 'user');
+            campaignEditor.insertText(range.index, label, 'user');
+            campaignEditor.formatText(range.index, label.length, 'link', url, 'user');
+            campaignEditor.insertText(range.index + label.length, '\n', 'user');
+            campaignEditor.setSelection(range.index + label.length + 1, 0, 'user');
         }
 
         const adminModuleLayouts = {

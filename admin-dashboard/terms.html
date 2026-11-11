@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f5ff">
+    <meta name="description" content="Consultez les conditions d’utilisation des services et fonctionnalités Acemia.">
+    <title>Conditions d’utilisation · Acemia</title>
+    <style>
+        :root { color-scheme: light; --ink: #182033; --muted: #647087; --purple: #6546c4; --line: #e7e8f0; --paper: #fff; --canvas: #f7f5ff; }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+        body { margin: 0; background: var(--canvas); color: var(--ink); font: 16px/1.75 Inter, "Segoe UI", Arial, sans-serif; }
+        a { color: var(--purple); }
+        .shell { width: min(1120px, calc(100% - 36px)); margin: 0 auto; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 0; }
+        .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--ink); font-size: 19px; font-weight: 800; text-decoration: none; }
+        .brand img { width: 46px; height: 46px; object-fit: contain; }
+        .nav { display: flex; flex-wrap: wrap; gap: 9px; }
+        .nav a { padding: 8px 13px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #414b61; font-size: 13px; font-weight: 700; text-decoration: none; }
+        .nav a[aria-current="page"], .nav a:hover { border-color: #d7cdf8; background: #f0ebff; color: var(--purple); }
+        .hero { position: relative; overflow: hidden; margin: 18px 0 30px; padding: clamp(30px, 6vw, 64px); border-radius: 28px; background: linear-gradient(125deg, #251753, #6546c4 58%, #9276e5); color: #fff; box-shadow: 0 20px 50px #39276c26; }
+        .hero:after { position: absolute; right: -80px; bottom: -180px; width: 390px; height: 390px; border: 1px solid #ffffff25; border-radius: 50%; content: ""; box-shadow: 0 0 0 38px #ffffff0b, 0 0 0 78px #ffffff08; }
+        .eyebrow { margin: 0 0 12px; color: #e0d7ff; font-size: 12px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+        h1 { max-width: 720px; margin: 0; font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: -.045em; }
+        .hero-copy { max-width: 700px; margin: 18px 0 0; color: #f1edff; font-size: 17px; }
+        .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 28px; padding-bottom: 48px; }
+        .toc { position: sticky; top: 20px; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: #ffffffd9; box-shadow: 0 8px 28px #20243b08; }
+        .toc h2 { margin: 0 0 12px; font-size: 14px; letter-spacing: .02em; }
+        .toc ol { display: grid; gap: 5px; margin: 0; padding-left: 19px; color: #a4a9b5; }
+        .toc a { color: #525d73; font-size: 13px; line-height: 1.45; text-decoration: none; }
+        .toc a:hover { color: var(--purple); text-decoration: underline; }
+        .document { min-width: 0; padding: clamp(24px, 5vw, 54px); border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: 0 12px 36px #20243b08; }
+        .intro { margin: 0 0 26px; padding: 18px 20px; border-left: 4px solid var(--purple); border-radius: 0 12px 12px 0; background: #f5f1ff; color: #414b61; }
+        .document section { padding-top: 25px; border-top: 1px solid #eff0f4; }
+        .document section + section { margin-top: 24px; }
+        h2 { margin: 0 0 12px; color: #30215f; font-size: clamp(20px, 3vw, 24px); line-height: 1.3; letter-spacing: -.025em; }
+        p { margin: 0 0 13px; }
+        ul { margin: 10px 0 16px; padding-left: 22px; }
+        li { margin: 6px 0; padding-left: 3px; }
+        .callout { margin-top: 16px; padding: 16px 18px; border: 1px solid #e8e1ff; border-radius: 12px; background: #fbfaff; color: #4a4264; }
+        .footer { padding: 28px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+        .footer-links { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 12px; font-weight: 700; }
+        @media (max-width: 760px) {
+            .shell { width: min(100% - 24px, 640px); }
+            .topbar { align-items: flex-start; flex-direction: column; padding: 15px 0; }
+            .hero { margin: 10px 0 18px; border-radius: 20px; }
+            .hero-copy { font-size: 15px; }
+            .layout { grid-template-columns: 1fr; gap: 14px; }
+            .toc { position: static; padding: 17px 19px; }
+            .toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; }
+            .document { padding: 23px 20px; border-radius: 17px; font-size: 15px; }
+        }
+        @media (max-width: 420px) { .toc ol { grid-template-columns: 1fr; } .nav a { padding: 7px 10px; } }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="Acemia, accueil">
+                <img src="/admin-portal/AcemiaLogo.png" alt="Logo Acemia">
+                <span>Acemia</span>
+            </a>
+            <nav class="nav" aria-label="Documents juridiques">
+                <a href="/terms" aria-current="page">Conditions d’utilisation</a>
+                <a href="/privacy">Confidentialité</a>
+            </nav>
+        </header>
+
+        <section class="hero" aria-labelledby="page-title">
+            <p class="eyebrow">Bienvenue sur Acemia</p>
+            <h1 id="page-title">Conditions d’utilisation</h1>
+            <p class="hero-copy">Ces conditions expliquent les règles applicables lorsque vous créez un compte ou utilisez les services et fonctionnalités proposés par Acemia.</p>
+        </section>
+
+        <main class="layout">
+            <nav class="toc" aria-label="Sommaire des conditions">
+                <h2>Sommaire</h2>
+                <ol>
+                    <li><a href="#acceptation">Acceptation</a></li>
+                    <li><a href="#compte">Compte et sécurité</a></li>
+                    <li><a href="#utilisation">Utilisation du service</a></li>
+                    <li><a href="#contenu">Contenus publiés</a></li>
+                    <li><a href="#communications">Communications et Market</a></li>
+                    <li><a href="#disponibilite">Disponibilité</a></li>
+                    <li><a href="#suspension">Suspension et fermeture</a></li>
+                    <li><a href="#responsabilite">Responsabilité</a></li>
+                    <li><a href="#modifications">Modifications</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ol>
+            </nav>
+
+            <article class="document">
+                <p class="intro">En créant un compte ou en utilisant Acemia, vous acceptez ces conditions. Si vous ne les acceptez pas, veuillez ne pas utiliser le service. La <a href="/privacy">Politique de confidentialité</a> décrit le traitement de vos informations personnelles.</p>
+
+                <section id="acceptation">
+                    <h2>1. Acceptation et admissibilité</h2>
+                    <p>Acemia fournit des outils de communication et des espaces communautaires, notamment les modules Chat, Emploi, Market et École. Vous devez être autorisé à conclure un accord contraignant selon les lois qui vous sont applicables. Si vous utilisez Acemia pour une organisation, vous confirmez être habilité à l’engager.</p>
+                </section>
+
+                <section id="compte">
+                    <h2>2. Votre compte et sa sécurité</h2>
+                    <p>Fournissez des informations exactes et maintenez-les à jour. Vous êtes responsable de la confidentialité de vos identifiants et des activités effectuées depuis votre compte. Informez-nous sans délai si vous suspectez un accès non autorisé.</p>
+                    <p>Vous pouvez gérer vos sessions depuis les options disponibles dans l’application. Certaines vérifications peuvent être nécessaires avant d’autoriser une action sensible.</p>
+                </section>
+
+                <section id="utilisation">
+                    <h2>3. Utilisation du service</h2>
+                    <p>Vous acceptez d’utiliser Acemia conformément aux lois applicables et de respecter les autres utilisateurs. Il est notamment interdit de :</p>
+                    <ul>
+                        <li>harceler, menacer, usurper l’identité d’autrui ou diffuser des contenus illégaux ou trompeurs ;</li>
+                        <li>perturber le fonctionnement ou la sécurité du service, ou tenter d’accéder sans autorisation à un compte ou à un système ;</li>
+                        <li>utiliser le service pour envoyer des communications non sollicitées, frauduleuses ou malveillantes ;</li>
+                        <li>contourner les limites d’accès ou les mesures de modération mises en place.</li>
+                    </ul>
+                </section>
+
+                <section id="contenu">
+                    <h2>4. Contenus que vous publiez</h2>
+                    <p>Vous conservez vos droits sur les contenus que vous publiez. Vous déclarez disposer des droits et autorisations nécessaires pour les partager. Vous accordez à Acemia une autorisation limitée, non exclusive et révocable selon les présentes conditions, afin d’héberger, reproduire et transmettre ces contenus uniquement pour fournir et sécuriser les fonctionnalités que vous utilisez.</p>
+                    <p>Vous êtes responsable de vos contenus et de leur conformité. Ne publiez pas d’informations confidentielles ou personnelles concernant une autre personne sans base légale ou autorisation appropriée.</p>
+                </section>
+
+                <section id="communications">
+                    <h2>5. Communications et annonces Market, Emploi et École</h2>
+                    <p>Les messages et contenus que vous choisissez de partager sont transmis ou rendus visibles aux destinataires et audiences correspondants. Vérifiez les destinataires et les informations avant publication.</p>
+                    <p>Les annonces, offres, produits, établissements et opportunités présentés par d’autres utilisateurs sont publiés sous leur responsabilité. Acemia ne garantit pas leur exactitude, leur disponibilité ni la conclusion d’une transaction. Toute relation ou transaction est conclue directement entre les personnes concernées, qui doivent vérifier les informations pertinentes.</p>
+                </section>
+
+                <section id="disponibilite">
+                    <h2>6. Disponibilité et évolutions</h2>
+                    <p>Nous pouvons faire évoluer, suspendre temporairement ou retirer certaines fonctionnalités pour des raisons opérationnelles, de sécurité ou de conformité. Nous nous efforçons de maintenir le service disponible, sans garantir un fonctionnement ininterrompu ni exempt d’erreurs.</p>
+                </section>
+
+                <section id="suspension">
+                    <h2>7. Suspension ou fermeture d’un compte</h2>
+                    <p>Nous pouvons restreindre ou suspendre l’accès lorsqu’une activité semble enfreindre ces conditions, compromettre la sécurité ou porter atteinte aux utilisateurs, ou lorsque la loi l’exige. Dans la mesure du possible, nous vous informerons du motif et des options de recours.</p>
+                    <p>Vous pouvez cesser d’utiliser Acemia et demander la suppression de votre compte via les options disponibles ou en nous contactant. Certaines données peuvent être conservées lorsque la loi l’exige ou pour traiter un litige, conformément à la <a href="/privacy">Politique de confidentialité</a>.</p>
+                </section>
+
+                <section id="responsabilite">
+                    <h2>8. Responsabilité</h2>
+                    <p>Dans les limites permises par la loi, Acemia est fourni « en l’état ». Rien dans ces conditions n’exclut une responsabilité qui ne peut légalement être exclue ni ne limite vos droits impératifs de consommateur. Vous restez responsable de l’utilisation de votre compte et des contenus que vous partagez.</p>
+                </section>
+
+                <section id="modifications">
+                    <h2>9. Modifications des conditions</h2>
+                    <p>Nous pouvons actualiser ces conditions pour tenir compte de changements du service ou des règles applicables. La version en vigueur est publiée sur cette page. En cas de changement important, nous chercherons à vous en informer par un moyen approprié. La poursuite de l’utilisation après l’entrée en vigueur des modifications vaut acceptation, dans la mesure permise par la loi.</p>
+                </section>
+
+                <section id="contact">
+                    <h2>10. Nous contacter</h2>
+                    <p>Pour toute question concernant ces conditions, contactez-nous à <a href="mailto:wecanconcept@gmail.com">wecanconcept@gmail.com</a>.</p>
+                    <div class="callout">Ces conditions ne remplacent pas les règles impératives applicables dans votre pays.</div>
+                </section>
+            </article>
+        </main>
+
+        <footer class="footer">
+            <nav class="footer-links" aria-label="Liens juridiques">
+                <a href="/terms">Conditions d’utilisation</a>
+                <a href="/privacy">Politique de confidentialité</a>
+                <a href="/support/helpdesk">Assistance</a>
+            </nav>
+            <span>© 2026 Acemia · TOGETHE Tech Solutions</span>
+        </footer>
+    </div>
+</body>
+</html>

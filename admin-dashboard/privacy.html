@@ -2,67 +2,180 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Politique de Confidentialité - Acemia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f5ff">
+    <meta name="description" content="Consultez la politique de confidentialité d’Acemia : données collectées, utilisation, sécurité et vos droits.">
+    <title>Politique de confidentialité · Acemia</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
-        .container { background-color: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1 { color: #673AB7; border-bottom: 2px solid #673AB7; padding-bottom: 10px; }
-        h2 { color: #512DA8; margin-top: 30px; }
-        p { margin-bottom: 15px; }
-        .last-updated { font-style: italic; color: #666; margin-bottom: 30px; }
-        .footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #888; }
-        ul { margin-bottom: 15px; }
-        li { margin-bottom: 8px; }
+        :root { color-scheme: light; --ink: #182033; --muted: #647087; --purple: #6546c4; --line: #e7e8f0; --paper: #fff; --canvas: #f7f5ff; }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+        body { margin: 0; background: var(--canvas); color: var(--ink); font: 16px/1.75 Inter, "Segoe UI", Arial, sans-serif; }
+        a { color: var(--purple); }
+        .shell { width: min(1120px, calc(100% - 36px)); margin: 0 auto; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 0; }
+        .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--ink); font-size: 19px; font-weight: 800; text-decoration: none; }
+        .brand img { width: 46px; height: 46px; object-fit: contain; }
+        .nav { display: flex; flex-wrap: wrap; gap: 9px; }
+        .nav a { padding: 8px 13px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #414b61; font-size: 13px; font-weight: 700; text-decoration: none; }
+        .nav a[aria-current="page"], .nav a:hover { border-color: #d7cdf8; background: #f0ebff; color: var(--purple); }
+        .hero { position: relative; overflow: hidden; margin: 18px 0 30px; padding: clamp(30px, 6vw, 64px); border-radius: 28px; background: linear-gradient(125deg, #251753, #6546c4 58%, #9276e5); color: #fff; box-shadow: 0 20px 50px #39276c26; }
+        .hero:after { position: absolute; right: -80px; bottom: -180px; width: 390px; height: 390px; border: 1px solid #ffffff25; border-radius: 50%; content: ""; box-shadow: 0 0 0 38px #ffffff0b, 0 0 0 78px #ffffff08; }
+        .eyebrow { margin: 0 0 12px; color: #e0d7ff; font-size: 12px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+        h1 { max-width: 720px; margin: 0; font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: -.045em; }
+        .hero-copy { max-width: 700px; margin: 18px 0 0; color: #f1edff; font-size: 17px; }
+        .updated { margin: 22px 0 0; color: #ded5ff; font-size: 13px; }
+        .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 28px; padding-bottom: 48px; }
+        .toc { position: sticky; top: 20px; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: #ffffffd9; box-shadow: 0 8px 28px #20243b08; }
+        .toc h2 { margin: 0 0 12px; font-size: 14px; letter-spacing: .02em; }
+        .toc ol { display: grid; gap: 5px; margin: 0; padding-left: 19px; color: #a4a9b5; }
+        .toc a { color: #525d73; font-size: 13px; line-height: 1.45; text-decoration: none; }
+        .toc a:hover { color: var(--purple); text-decoration: underline; }
+        .document { min-width: 0; padding: clamp(24px, 5vw, 54px); border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: 0 12px 36px #20243b08; }
+        .intro { margin: 0 0 26px; padding: 18px 20px; border-left: 4px solid var(--purple); border-radius: 0 12px 12px 0; background: #f5f1ff; color: #414b61; }
+        .document section { padding-top: 25px; border-top: 1px solid #eff0f4; }
+        .document section + section { margin-top: 24px; }
+        h2 { margin: 0 0 12px; color: #30215f; font-size: clamp(20px, 3vw, 24px); line-height: 1.3; letter-spacing: -.025em; }
+        p { margin: 0 0 13px; }
+        ul { margin: 10px 0 16px; padding-left: 22px; }
+        li { margin: 6px 0; padding-left: 3px; }
+        .callout { margin-top: 16px; padding: 16px 18px; border: 1px solid #e8e1ff; border-radius: 12px; background: #fbfaff; color: #4a4264; }
+        .footer { padding: 28px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+        .footer-links { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 12px; font-weight: 700; }
+        @media (max-width: 760px) {
+            .shell { width: min(100% - 24px, 640px); }
+            .topbar { align-items: flex-start; flex-direction: column; padding: 15px 0; }
+            .hero { margin: 10px 0 18px; border-radius: 20px; }
+            .hero-copy { font-size: 15px; }
+            .layout { grid-template-columns: 1fr; gap: 14px; }
+            .toc { position: static; padding: 17px 19px; }
+            .toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; }
+            .document { padding: 23px 20px; border-radius: 17px; font-size: 15px; }
+        }
+        @media (max-width: 420px) { .toc ol { grid-template-columns: 1fr; } .nav a { padding: 7px 10px; } }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Politique de Confidentialité</h1>
-        <p class="last-updated">Dernière mise à jour : 11 novembre 2026</p>
+    <div class="shell">
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="Acemia, accueil">
+                <img src="/admin-portal/AcemiaLogo.png" alt="Logo Acemia">
+                <span>Acemia</span>
+            </a>
+            <nav class="nav" aria-label="Documents juridiques">
+                <a href="/terms">Conditions d’utilisation</a>
+                <a href="/privacy" aria-current="page">Confidentialité</a>
+            </nav>
+        </header>
 
-        <p>Bienvenue sur <strong>Acemia</strong>. Votre vie privée est notre priorité absolue. Cette politique de confidentialité explique comment nous collectons, utilisons et protégeons vos informations personnelles.</p>
+        <section class="hero" aria-labelledby="page-title">
+            <p class="eyebrow">Transparence et confiance</p>
+            <h1 id="page-title">Politique de confidentialité</h1>
+            <p class="hero-copy">Cette page explique quelles informations Acemia utilise, pourquoi elles le sont, comment elles sont protégées et quels choix vous pouvez exercer.</p>
+            <p class="updated">Dernière mise à jour : 11 novembre 2026</p>
+        </section>
 
-        <h2>1. Collecte des données</h2>
-        <p>Nous collectons les informations suivantes pour assurer le bon fonctionnement de notre service de messagerie :</p>
-        <ul>
-            <li><strong>Informations de profil :</strong> Votre nom, adresse e-mail, numéro de téléphone et photo de profil.</li>
-            <li><strong>Contacts :</strong> Avec votre autorisation, nous synchronisons vos contacts pour vous permettre de trouver facilement vos amis sur Acemia.</li>
-            <li><strong>Messages :</strong> Vos messages sont chiffrés. Nous ne les lisons pas et ne les stockons que le temps nécessaire à leur livraison.</li>
-        </ul>
+        <main class="layout">
+            <nav class="toc" aria-label="Sommaire de la politique">
+                <h2>Sommaire</h2>
+                <ol>
+                    <li><a href="#donnees">Données utilisées</a></li>
+                    <li><a href="#utilisation">Utilisation</a></li>
+                    <li><a href="#partage">Partage</a></li>
+                    <li><a href="#conservation">Conservation</a></li>
+                    <li><a href="#securite">Sécurité des comptes</a></li>
+                    <li><a href="#position">Position et GPS</a></li>
+                    <li><a href="#droits">Vos choix et vos droits</a></li>
+                    <li><a href="#enfants">Mineurs</a></li>
+                    <li><a href="#modifications">Modifications</a></li>
+                    <li><a href="#contact">Nous contacter</a></li>
+                </ol>
+            </nav>
 
-        <h2>2. Utilisation des données</h2>
-        <p>Vos données sont utilisées exclusivement pour :</p>
-        <ul>
-            <li>Fournir et améliorer les fonctionnalités de l'application.</li>
-            <li>Traduire vos messages en temps réel (via nos partenaires de traduction sécurisés).</li>
-            <li>Assurer la sécurité de votre compte via des codes de vérification (OTP).</li>
-        </ul>
+            <article class="document">
+                <p class="intro">Nous cherchons à limiter l’utilisation de vos informations à ce qui est nécessaire au fonctionnement, à l’assistance et à la sécurité d’Acemia. Les paramètres de confidentialité et les autorisations de votre appareil restent sous votre contrôle.</p>
 
-        <h2>3. Partage des données</h2>
-        <p><strong>Nous ne vendons jamais vos données personnelles à des tiers.</strong> Vos informations ne sont partagées que dans les cas suivants :</p>
-        <ul>
-            <li>Respect des obligations légales.</li>
-            <li>Services tiers essentiels (comme l'envoi d'e-mails via Brevo ou la traduction via Google/DeepL) qui respectent des normes de sécurité strictes.</li>
-        </ul>
+                <section id="donnees">
+                    <h2>1. Données utilisées</h2>
+                    <p>Selon les fonctionnalités que vous utilisez, Acemia peut traiter :</p>
+                    <ul>
+                        <li>les données de compte et de profil que vous fournissez, comme votre nom, votre adresse e-mail, votre numéro et votre photo de profil ;</li>
+                        <li>les messages, pièces jointes et informations nécessaires à leur transmission et à l’utilisation des fonctions de chat ;</li>
+                        <li>les contacts uniquement si vous accordez l’autorisation correspondante et utilisez la synchronisation des contacts ;</li>
+                        <li>des informations techniques de session, comme le type d’appareil, la version de l’application, les heures de connexion et l’adresse IP ;</li>
+                        <li>les informations que vous choisissez de publier dans les espaces Emploi, Market, École et autres modules.</li>
+                    </ul>
+                </section>
 
-        <h2>4. Vos droits</h2>
-        <p>Conformément au RGPD et aux lois sur la protection des données, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Vous pouvez supprimer votre compte à tout moment depuis les paramètres de l'application.</p>
+                <section id="utilisation">
+                    <h2>2. Comment les données sont utilisées</h2>
+                    <p>Ces informations servent à créer et gérer votre compte, fournir les fonctions de communication et les modules choisis, afficher vos contenus, vous assister, prévenir les abus et sécuriser les sessions.</p>
+                    <p>Lorsque vous utilisez une fonction dépendant d’un fournisseur externe — par exemple l’envoi d’e-mails, les notifications ou la traduction — les informations requises peuvent être transmises à ce fournisseur pour exécuter la fonction demandée.</p>
+                </section>
 
-        <h2>5. Sécurité</h2>
-        <p>Nous utilisons des protocoles de sécurité avancés et le chiffrement de bout en bout pour protéger vos communications contre tout accès non autorisé.</p>
+                <section id="partage">
+                    <h2>3. Partage avec des tiers</h2>
+                    <p>Acemia ne vend pas vos informations personnelles. L’accès peut être accordé, dans la mesure nécessaire :</p>
+                    <ul>
+                        <li>aux prestataires techniques qui hébergent ou font fonctionner les services sollicités ;</li>
+                        <li>aux personnes avec lesquelles vous échangez ou aux destinataires auxquels vous choisissez de rendre un contenu visible ;</li>
+                        <li>aux autorités lorsque la loi l’exige ou qu’une demande valide l’impose.</li>
+                    </ul>
+                    <p>Les autorisations d’accès aux données de l’appareil sont demandées au moment où une fonctionnalité en a besoin.</p>
+                </section>
 
-        <h2>6. Sécurité des connexions, IP et position</h2>
-        <p>Lors d’une connexion, nous conservons une session associée au compte, les informations générales de l’appareil fournies par l’application (marque/modèle, système d’exploitation et version de l’application), le pays et la ville du profil, ainsi que les dates de connexion et d’activité. L’adresse IP réseau est collectée lors des connexions, indépendamment du partage GPS, et accessible à l’administrateur principal pour la sécurité du compte. L’IP brute est conservée au maximum 30 jours, puis anonymisée en ne gardant qu’un préfixe réseau.</p>
-        <p>La position GPS précise est désactivée par défaut. Elle n’est transmise que si l’utilisateur active le partage dans les paramètres, accorde l’autorisation de localisation « pendant l’utilisation » du système, et uniquement lorsque l’application est au premier plan. La position partagée est accessible à l’administrateur principal pour la sécurité du compte. Le partage peut être arrêté à tout moment; la position enregistrée est effacée à la désactivation, à la déconnexion ou à la révocation de la session. Aucune localisation en arrière-plan, IMEI, liste d’applications, contact ou fichier n’est collecté à cette fin.</p>
-        <p>Les sessions terminées sont supprimées après 12 mois. Une session peut être révoquée par l’administration; l’utilisateur doit alors se reconnecter sur l’appareil concerné. Cette révocation ne permet pas d’effacer à distance les données stockées sur le téléphone.</p>
+                <section id="conservation">
+                    <h2>4. Conservation</h2>
+                    <p>Les informations sont conservées le temps nécessaire au service, à la sécurité et au respect des obligations applicables. Une adresse IP brute associée à une session est conservée au maximum 30 jours, puis anonymisée en ne gardant qu’un préfixe réseau.</p>
+                    <p>Les contenus de compte peuvent être supprimés avec le compte, sous réserve des sauvegardes temporaires, des obligations légales et des données qui doivent être conservées pour résoudre un litige ou protéger le service.</p>
+                </section>
 
-        <h2>7. Contact</h2>
-        <p>Pour toute question concernant cette politique, contactez-nous à : <a href="mailto:wecanconcept@gmail.com">wecanconcept@gmail.com</a></p>
+                <section id="securite">
+                    <h2>5. Sécurité des comptes et des appareils</h2>
+                    <p>Les informations de session et d’appareil sont utilisées pour protéger les comptes et permettre à l’administrateur principal de révoquer une session. La révocation déconnecte l’appareil d’Acemia; elle n’efface pas à distance les fichiers personnels ou les données déjà enregistrées localement sur le téléphone.</p>
+                    <p>Acemia ne collecte pas l’IMEI ni la liste des applications installées à des fins de suivi de connexion.</p>
+                </section>
 
-        <div class="footer">
-            © 2026 Acemia Team - TOGETHE Tech Solutions
-        </div>
+                <section id="position">
+                    <h2>6. Position et GPS</h2>
+                    <p>Le GPS précis est désactivé par défaut. Il n’est transmis que si vous activez le partage dans les paramètres, accordez l’autorisation « pendant l’utilisation » du système, et uniquement lorsque l’application est au premier plan. La position partagée est accessible à l’administrateur principal pour la sécurité du compte.</p>
+                    <p>Vous pouvez désactiver le partage à tout moment. La position enregistrée est effacée lorsque vous retirez votre accord, vous déconnectez ou la session est révoquée. Aucune localisation GPS en arrière-plan n’est collectée par cette fonction.</p>
+                </section>
+
+                <section id="droits">
+                    <h2>7. Vos choix et vos droits</h2>
+                    <p>Vous pouvez corriger les informations de profil dans l’application, modifier les paramètres de confidentialité et retirer les autorisations de l’appareil depuis ses réglages. Vous pouvez également demander l’accès, la correction ou la suppression des informations associées à votre compte, sous réserve des règles applicables.</p>
+                    <p>Pour exercer un droit ou demander la suppression de votre compte, contactez-nous à l’adresse indiquée ci-dessous. Une vérification raisonnable de votre identité peut être nécessaire pour protéger votre compte.</p>
+                </section>
+
+                <section id="enfants">
+                    <h2>8. Mineurs</h2>
+                    <p>Acemia n’est pas destinée aux personnes qui ne sont pas autorisées à utiliser le service selon les lois applicables dans leur pays. Si vous pensez qu’un mineur nous a transmis des informations sans autorisation requise, contactez-nous afin que nous puissions examiner la demande.</p>
+                </section>
+
+                <section id="modifications">
+                    <h2>9. Modifications de cette politique</h2>
+                    <p>Nous pouvons mettre cette page à jour pour refléter l’évolution du service ou des exigences applicables. La date de mise à jour apparaît en haut de la page. Lorsque la loi l’exige, les changements importants seront portés à votre attention.</p>
+                    <p>Consultez également nos <a href="/terms">Conditions d’utilisation</a>.</p>
+                </section>
+
+                <section id="contact">
+                    <h2>10. Nous contacter</h2>
+                    <p>Pour toute question relative à cette politique ou à vos informations, écrivez à <a href="mailto:wecanconcept@gmail.com">wecanconcept@gmail.com</a>.</p>
+                    <div class="callout">Pour votre sécurité, n’envoyez jamais votre mot de passe ni un code de vérification par e-mail.</div>
+                </section>
+            </article>
+        </main>
+
+        <footer class="footer">
+            <nav class="footer-links" aria-label="Liens juridiques">
+                <a href="/terms">Conditions d’utilisation</a>
+                <a href="/privacy">Politique de confidentialité</a>
+                <a href="/support/helpdesk">Assistance</a>
+            </nav>
+            <span>© 2026 Acemia · TOGETHE Tech Solutions</span>
+        </footer>
     </div>
 </body>
 </html>

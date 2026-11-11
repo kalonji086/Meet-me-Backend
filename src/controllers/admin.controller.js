@@ -6,6 +6,7 @@ const socketService = require('../services/socket.service');
 const mailService = require('../services/mail.service');
 const logger = require('../utils/logger');
 const employerController = require('./employer.controller');
+const deviceSessionService = require('../services/device-session.service');
 
 /**
  * Helper: Log admin action to Audit Logs
@@ -101,6 +102,8 @@ const ensureAdminTables = () => {
 };
 
 const initializeAdminTables = async () => {
+  await deviceSessionService.ensureDeviceSessionsTable();
+
   // SÉCURITÉ : Forcer les colonnes critiques si elles manquent
   try {
     await query('ALTER TABLE public.web_portfolio_requests ADD COLUMN IF NOT EXISTS logo_url TEXT');
@@ -974,6 +977,80 @@ const getUsers = asyncHandler(async (req, res) => {
       },
     }),
   });
+});
+
+const getLoginTracking = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Ce module est réservé à l’administrateur principal.' });
+  }
+
+  await deviceSessionService.ensureDeviceSessionsTable();
+  const result = await query(
+    `WITH tracked_sessions AS (
+       SELECT ds.id AS session_id, ds.user_id, p.full_name, p.email, p.avatar_url, p.status,
+              ds.created_at AS last_login_at, ds.last_seen_at, ds.device_info,
+              COALESCE(ds.app_version, p.app_version) AS app_version,
+              COALESCE(ds.country, p.country) AS country, COALESCE(ds.city, p.city) AS city,
+              p.is_locked, (ds.ended_at IS NULL AND ds.revoked_at IS NULL
+                AND (ds.expires_at IS NULL OR ds.expires_at > NOW())) AS session_active,
+              TRUE AS session_managed
+       FROM public.user_device_sessions ds
+       JOIN public.profiles p ON p.id = ds.user_id
+       WHERE p.is_global_admin = FALSE
+         AND (ds.created_at > NOW() - INTERVAL '365 days'
+           OR (ds.ended_at IS NULL AND ds.revoked_at IS NULL AND (ds.expires_at IS NULL OR ds.expires_at > NOW())))
+     ), legacy_sessions AS (
+       SELECT NULL::uuid AS session_id, p.id AS user_id, p.full_name, p.email, p.avatar_url, p.status,
+              p.last_login_at, p.last_seen AS last_seen_at, p.device_info, p.app_version,
+              p.country, p.city, p.is_locked, FALSE AS session_active, FALSE AS session_managed
+       FROM public.profiles p
+       WHERE p.is_global_admin = FALSE
+         AND p.last_login_at > NOW() - INTERVAL '365 days'
+         AND NOT EXISTS (SELECT 1 FROM public.user_device_sessions ds WHERE ds.user_id = p.id)
+     )
+     SELECT * FROM tracked_sessions
+     UNION ALL
+     SELECT * FROM legacy_sessions
+     ORDER BY session_active DESC, last_login_at DESC NULLS LAST
+     LIMIT 1000`
+  );
+
+  const data = result.rows.map((session) => ({
+    ...session,
+    is_online: session.session_managed
+      ? socketService.isSessionOnline(session.session_id)
+      : session.status === 'online',
+  }));
+  res.json({ success: true, data });
+});
+
+const revokeDeviceSession = asyncHandler(async (req, res) => {
+  if (!req.user.is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Cette action est réservée à l’administrateur principal.' });
+  }
+
+  await deviceSessionService.ensureDeviceSessionsTable();
+  const { sessionId } = req.params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+    return res.status(400).json({ success: false, error: 'Identifiant de session invalide.' });
+  }
+  const result = await query(
+    `UPDATE public.user_device_sessions ds
+     SET revoked_at = NOW(), ended_at = COALESCE(ds.ended_at, NOW()), revoked_by = $2
+     FROM public.profiles p
+     WHERE ds.id = $1 AND ds.user_id = p.id AND p.is_global_admin = FALSE
+       AND ds.ended_at IS NULL AND ds.revoked_at IS NULL
+       AND (ds.expires_at IS NULL OR ds.expires_at > NOW())
+     RETURNING ds.user_id`,
+    [sessionId, req.userId]
+  );
+  const session = result.rows[0];
+  if (!session) return res.status(404).json({ success: false, error: 'Session introuvable, déjà terminée ou déjà révoquée.' });
+
+  await logAdminAction(req, 'revoke_device_session', 'device_session', sessionId, { userId: session.user_id });
+  socketService.disconnectSession(sessionId);
+  socketService.broadcast('admin:login_tracking_updated', { userId: session.user_id, sessionId, action: 'session_revoked' });
+  res.json({ success: true, message: 'L’appareil a été déconnecté et sa session révoquée.' });
 });
 
 const getReports = asyncHandler(async (req, res) => {
@@ -1956,15 +2033,29 @@ const sendUserSecurityNotice = asyncHandler(async (req, res) => {
 const toggleUserLock = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { isLocked } = req.body;
-  const user = await query('SELECT full_name FROM public.profiles WHERE id = $1', [userId]);
+  const user = await query('SELECT full_name, is_global_admin FROM public.profiles WHERE id = $1', [userId]);
   if (!user.rows[0]) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+  if (user.rows[0].is_global_admin) {
+    return res.status(403).json({ success: false, error: 'Le compte administrateur principal ne peut pas être bloqué depuis ce module.' });
+  }
 
   // Security check for delegate
   const canExecute = await processSensitiveAction(req, 'toggle_user_lock', userId, user.rows[0].full_name, { isLocked }, 'users', 'lock');
   if (!canExecute) return res.json({ success: true, pending: true, message: `Action de ${isLocked ? 'blocage' : 'déblocage'} mise en attente.` });
 
   await query('UPDATE public.profiles SET is_locked = $1, login_attempts = $2 WHERE id = $3', [isLocked, isLocked ? 3 : 0, userId]);
+  if (isLocked) {
+    await deviceSessionService.ensureDeviceSessionsTable();
+    await query(
+      `UPDATE public.user_device_sessions
+       SET revoked_at = COALESCE(revoked_at, NOW()), ended_at = COALESCE(ended_at, NOW())
+       WHERE user_id = $1 AND ended_at IS NULL AND revoked_at IS NULL`,
+      [userId]
+    );
+  }
   await logAdminAction(req, isLocked ? 'lock_user' : 'unlock_user', 'user', userId, { isLocked });
+  if (isLocked) socketService.disconnectUser(userId);
+  socketService.broadcast('admin:login_tracking_updated', { userId, action: isLocked ? 'account_locked' : 'account_unlocked' });
   res.json({ success: true });
 });
 
@@ -3744,6 +3835,8 @@ const handleEmployerRequest = asyncHandler(async (req, res) => {
 module.exports = {
   getStats,
   getUsers,
+  getLoginTracking,
+  revokeDeviceSession,
   getReports,
   resolveReport,
   deleteUser,

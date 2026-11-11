@@ -6,6 +6,7 @@ const mailService = require('../services/mail.service');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
 const { asyncHandler } = require('../middleware/error.middleware');
+const deviceSessionService = require('../services/device-session.service');
 
 /**
  * @desc    Vérifier si un email, téléphone ou pseudo existe déjà
@@ -254,21 +255,59 @@ const login = asyncHandler(async (req, res) => {
     }
 
     const appVersion = req.body.appVersion || null;
+    const deviceInfo = device_info || user.device_info || {};
+    await deviceSessionService.ensureDeviceSessionsTable();
+    const sessionId = crypto.randomUUID();
+    const refreshToken = jwt.sign({ userId: user.id, sid: sessionId }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
+    const refreshClaims = jwt.decode(refreshToken);
     await query(
-      "UPDATE public.profiles SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(), device_info = $1, app_version = COALESCE($2, app_version) WHERE id = $3",
-      [JSON.stringify(device_info || user.device_info || {}), appVersion, user.id]
+      `INSERT INTO public.user_device_sessions (id, user_id, device_info, app_version, country, city, expires_at)
+       VALUES ($1, $2, $3::jsonb, $4, $5, $6, to_timestamp($7))`,
+      [
+        sessionId,
+        user.id,
+        JSON.stringify(deviceInfo),
+        appVersion,
+        user.country || null,
+        user.city || null,
+        refreshClaims.exp,
+      ]
     );
+    let profileUpdate;
+    try {
+      profileUpdate = await query(
+        `UPDATE public.profiles
+         SET status = 'online', last_seen = NOW(), login_attempts = 0, last_login_at = NOW(),
+             device_info = $1, app_version = COALESCE($2, app_version)
+         WHERE id = $3 AND (COALESCE(is_locked, FALSE) = FALSE OR is_global_admin = TRUE)
+         RETURNING id`,
+        [JSON.stringify(deviceInfo), appVersion, user.id]
+      );
+    } catch (error) {
+      try {
+        await query('UPDATE public.user_device_sessions SET ended_at = NOW() WHERE id = $1', [sessionId]);
+      } catch (cleanupError) {
+        logger.error('Impossible de fermer la session créée après un échec de mise à jour du profil:', cleanupError);
+      }
+      throw error;
+    }
+    if (profileUpdate.rows.length === 0) {
+      await query(
+        'UPDATE public.user_device_sessions SET ended_at = NOW() WHERE id = $1',
+        [sessionId]
+      );
+      return res.status(403).json({ success: false, error: 'Compte bloqué' });
+    }
+    const token = jwt.sign({ userId: user.id, email: user.email, sid: sessionId }, config.jwt.secret, { expiresIn: config.jwt.expire });
 
     const socketService = require('../services/socket.service');
     socketService.broadcast('admin_user_login', {
       userId: user.id,
       name: user.full_name,
       email: user.email,
+      sessionId,
       time: new Date()
     });
-
-    const token = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
-    const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpire });
 
     const safeUser = normalizeProfileUser(user);
 
@@ -366,8 +405,12 @@ const refreshToken = asyncHandler(async (req, res) => {
     const isGlobalAdmin = user?.is_global_admin || false;
 
     if (!user || (user.is_locked && !isGlobalAdmin)) return res.status(401).json({ success: false, error: 'Session invalide' });
+    if (decoded.sid && !(await deviceSessionService.isSessionValid(decoded.sid, user.id))) {
+      return res.status(401).json({ success: false, error: 'Cette session a été révoquée.' });
+    }
 
-    const newAccessToken = jwt.sign({ userId: user.id, email: user.email }, config.jwt.secret, { expiresIn: config.jwt.expire });
+    const newAccessToken = jwt.sign({ userId: user.id, email: user.email, ...(decoded.sid ? { sid: decoded.sid } : {}) }, config.jwt.secret, { expiresIn: config.jwt.expire });
+    if (decoded.sid) await deviceSessionService.touchSession(decoded.sid);
     res.json({ success: true, data: { token: newAccessToken, user } });
   } catch (error) {
     return res.status(401).json({ success: false, error: 'Session expirée' });
@@ -376,9 +419,20 @@ const refreshToken = asyncHandler(async (req, res) => {
 
 const logout = asyncHandler(async (req, res) => {
   const userId = req.userId;
-  await query("UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1", [userId]);
-
+  if (req.sessionId) {
+    await deviceSessionService.ensureDeviceSessionsTable();
+    await query(
+      `UPDATE public.user_device_sessions
+       SET ended_at = COALESCE(ended_at, NOW()), revoked_at = COALESCE(revoked_at, NOW())
+       WHERE id = $1 AND user_id = $2`,
+      [req.sessionId, userId]
+    );
+    require('../services/socket.service').disconnectSession(req.sessionId);
+  }
   const socketService = require('../services/socket.service');
+  if (!socketService.isUserOnline(userId)) {
+    await query("UPDATE public.profiles SET status = 'offline', last_seen = NOW() WHERE id = $1", [userId]);
+  }
   socketService.broadcast('admin_user_logout', { userId, time: new Date() });
 
   res.json({ success: true, message: 'Déconnexion réussie' });

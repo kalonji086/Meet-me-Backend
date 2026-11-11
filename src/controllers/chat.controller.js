@@ -7,6 +7,7 @@ const { asyncHandler } = require('../middleware/error.middleware');
 const notificationService = require('../services/notification.service');
 const translationService = require('../services/translation.service');
 const socketService = require('../services/socket.service');
+const storageService = require('../services/storage.service');
 
 /**
  * @desc    Obtenir la liste des conversations
@@ -33,6 +34,10 @@ const getChats = asyncHandler(async (req, res) => {
               'full_name', p.full_name,
               'avatar_url', p.avatar_url,
               'status', p.status,
+              'last_seen', CASE
+                WHEN p.privacy_settings->>'last_seen' = 'nobody' THEN NULL
+                ELSE p.last_seen
+              END,
               'is_verified', p.is_verified
             )
             FROM public.chat_participants cp2
@@ -192,6 +197,30 @@ const sendMessage = asyncHandler(async (req, res) => {
     });
   }
 
+  const clientMessageId = req.body.client_message_id || req.body.metadata?.client_message_id;
+  if (typeof clientMessageId === 'string' && clientMessageId.length <= 120) {
+    const existingMessage = await query(
+      `SELECT * FROM public.messages
+       WHERE chat_id = $1 AND sender_id = $2
+         AND metadata->>'client_message_id' = $3
+       LIMIT 1`,
+      [chatId, userId, clientMessageId]
+    );
+    if (existingMessage.rows.length > 0) {
+      const participants = await query(
+        'SELECT user_id FROM public.chat_participants WHERE chat_id = $1 AND user_id != $2',
+        [chatId, userId]
+      );
+      participants.rows.forEach((participant) => {
+        socketService.sendToUser(participant.user_id, 'new_message', {
+          ...existingMessage.rows[0],
+          chat_id: chatId,
+        });
+      });
+      return res.json({ success: true, data: existingMessage.rows[0] });
+    }
+  }
+
   const result = await query(
     `INSERT INTO public.messages (chat_id, sender_id, content, type, file_url, metadata)
      VALUES ($1, $2, $3, $4, $5, $6)
@@ -305,6 +334,13 @@ const sendMessage = asyncHandler(async (req, res) => {
     time: new Date()
   });
 
+  participantsResult.rows.forEach((participant) => {
+    socketService.sendToUser(participant.id, 'new_message', {
+      ...message,
+      chat_id: chatId,
+    });
+  });
+
   res.status(201).json({
     success: true,
     data: message,
@@ -409,32 +445,40 @@ const deleteMessage = asyncHandler(async (req, res) => {
   const { deleteType = 'everyone' } = req.query; // 'everyone' or 'me'
   const userId = req.userId;
 
-  // Récupérer le message
+  if (!['everyone', 'me'].includes(deleteType)) {
+    return res.status(400).json({ success: false, error: 'Type de suppression invalide' });
+  }
+
   const messageResult = await query(
-    'SELECT * FROM public.messages WHERE id = $1',
-    [messageId]
+    `SELECT m.*
+     FROM public.messages m
+     JOIN public.chat_participants cp ON cp.chat_id = m.chat_id AND cp.user_id = $2
+     WHERE m.id = $1`,
+    [messageId, userId]
   );
 
   if (messageResult.rows.length === 0) {
-    return res.status(404).json({ success: false, error: 'Message non trouvé' });
+    return res.status(404).json({ success: false, error: 'Message non trouvé dans vos conversations' });
   }
 
   const message = messageResult.rows[0];
 
   if (deleteType === 'me') {
     // Supprimer uniquement pour l'utilisateur actuel
-    const updatedMessage = await query(
+    await query(
       `UPDATE public.messages
-       SET deleted_for_users = array_append(COALESCE(deleted_for_users, '{}'), $1)
+       SET deleted_for_users = CASE
+         WHEN $1 = ANY(COALESCE(deleted_for_users, '{}')) THEN COALESCE(deleted_for_users, '{}')
+         ELSE array_append(COALESCE(deleted_for_users, '{}'), $1)
+       END
        WHERE id = $2
-       RETURNING *`,
+       RETURNING id`,
       [userId, messageId]
     );
 
     return res.json({
       success: true,
       message: 'Message masqué pour vous',
-      data: updatedMessage.rows[0]
     });
   }
 
@@ -446,17 +490,32 @@ const deleteMessage = asyncHandler(async (req, res) => {
   // Au lieu de supprimer physiquement, on met à jour le contenu (Style WhatsApp)
   const deleteMention = "🚫 Ce message a été supprimé";
   const updatedMessage = await query(
-    `UPDATE public.messages
-     SET content = $1,
-         type = 'text',
-         file_url = NULL,
-         status = 'read',
-         translated_content = NULL,
-         source_language = NULL
-     WHERE id = $2
-     RETURNING *`,
+    `WITH updated_message AS (
+       UPDATE public.messages
+       SET content = $1,
+           type = 'text',
+           file_url = NULL,
+           metadata = '{}'::jsonb,
+           translated_content = NULL,
+           source_language = NULL
+       WHERE id = $2
+       RETURNING *
+     ),
+     deleted_media AS (
+       DELETE FROM public.media WHERE message_id = $2 RETURNING message_id
+     )
+     SELECT * FROM updated_message`,
     [deleteMention, messageId]
   );
+  if (message.file_url) {
+    void storageService.deleteFile(message.file_url).then((result) => {
+      if (!result.success) {
+        logger.warn(`Unable to remove media for deleted message ${messageId}`);
+      }
+    }).catch((error) => {
+      logger.error(`Unable to remove media for deleted message ${messageId}: ${error.message}`);
+    });
+  }
 
   // Mettre à jour le last_message du chat si c'était le dernier message
   const chatRes = await query(
@@ -470,6 +529,18 @@ const deleteMessage = asyncHandler(async (req, res) => {
       [deleteMention, message.chat_id]
     );
   }
+
+  const participants = await query(
+    'SELECT user_id FROM public.chat_participants WHERE chat_id = $1',
+    [message.chat_id]
+  );
+  participants.rows.forEach((participant) => {
+    socketService.sendToUser(participant.user_id, 'message_deleted', {
+      chatId: message.chat_id,
+      messageId,
+      message: updatedMessage.rows[0],
+    });
+  });
 
   res.json({
     success: true,
@@ -501,7 +572,12 @@ const getChatDetails = asyncHandler(async (req, res) => {
 
   // Récupérer les participants
   const participantsResult = await query(
-    `SELECT p.id, p.full_name, p.avatar_url, p.status, p.is_verified, cp.role, cp.joined_at
+    `SELECT p.id, p.full_name, p.avatar_url, p.status,
+            CASE
+              WHEN p.privacy_settings->>'last_seen' = 'nobody' THEN NULL
+              ELSE p.last_seen
+            END AS last_seen,
+            p.is_verified, cp.role, cp.joined_at
      FROM public.chat_participants cp
      JOIN public.profiles p ON cp.user_id = p.id
      WHERE cp.chat_id = $1

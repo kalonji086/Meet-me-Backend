@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
+const deviceSessionService = require('../services/device-session.service');
 
 /**
  * Middleware d'authentification JWT avec vérification de blocage
@@ -14,6 +15,9 @@ const authenticate = async (req, res, next) => {
     }
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, config.jwt.secret);
+    if (decoded.sid && !(await deviceSessionService.isSessionValid(decoded.sid, decoded.userId))) {
+      return res.status(401).json({ success: false, error: 'Cette session a été révoquée.' });
+    }
 
     const result = await query(
       'SELECT id, email, full_name, username, is_global_admin, is_locked FROM public.profiles WHERE id = $1',
@@ -35,6 +39,8 @@ const authenticate = async (req, res, next) => {
 
     req.user = user;
     req.userId = user.id;
+    req.sessionId = decoded.sid || null;
+    if (decoded.sid) await deviceSessionService.touchSession(decoded.sid);
     next();
   } catch (error) {
     return res.status(401).json({ success: false, error: 'Session invalide ou expirée.' });

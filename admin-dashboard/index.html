@@ -582,6 +582,9 @@
                 <a href="#" onclick="showSection('users')" id="nav-users" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="users" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Utilisateurs</span>
                 </a>
+                <a href="#" onclick="showSection('login-tracking')" id="nav-login-tracking" class="admin-only hidden sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
+                    <i data-lucide="smartphone" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Suivi de connexion</span>
+                </a>
                 <a href="#" onclick="showSection('groups')" id="nav-groups" class="sidebar-item flex items-center px-4 py-3 rounded-lg mb-1 transition-all">
                     <i data-lucide="users-2" class="w-5 h-5 mr-4"></i><span class="font-medium text-sm">Groupes Chat</span>
                 </a>
@@ -1480,6 +1483,30 @@
                                 </tr>
                             </thead>
                             <tbody id="users-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="section-login-tracking" class="hidden animate-fade-in space-y-5">
+                    <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+                        Les appareils sont suivis séparément à partir des informations déclarées par l’application au moment de la connexion. Le pays et la ville proviennent du profil, pas d’une géolocalisation. Aucune géolocalisation précise, IMEI ou donnée cachée n’est collectée. Les sessions antérieures au déploiement apparaissent comme anciennes et ne peuvent pas être révoquées individuellement.
+                    </div>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <input id="login-tracking-search" type="search" oninput="filterLoginTracking()" placeholder="Rechercher un nom, e-mail, pays ou appareil…" class="w-full sm:max-w-md p-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-purple-400">
+                        <div class="flex items-center gap-3">
+                            <span id="login-tracking-count" class="text-xs text-gray-500" aria-live="polite"></span>
+                            <button type="button" onclick="loadLoginTracking()" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold">Actualiser</button>
+                        </div>
+                    </div>
+                    <div id="login-tracking-error" class="hidden rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert"></div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+                        <table class="w-full text-left min-w-[1050px]">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th class="px-5 py-4">Compte</th><th class="px-5 py-4">État / dernière connexion</th><th class="px-5 py-4">Appareil / système</th><th class="px-5 py-4">Pays / ville du profil</th><th class="px-5 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="login-tracking-table-body"></tbody>
                         </table>
                     </div>
                 </div>
@@ -3062,7 +3089,7 @@
                 'my-requests': 'nav-my-requests', 'collaboration': 'nav-collaboration',
                 'moderation': 'nav-moderation',
                 'portfolio': 'nav-portfolio', 'portfolios-saas': 'nav-portfolios-saas',
-                'accounts': 'nav-accounts'
+                'accounts': 'nav-accounts', 'login-tracking': 'nav-login-tracking'
             };
             Object.values(sidebarMapping).forEach(id => { const nav = document.getElementById(id); if (nav) nav.classList.add('hidden'); });
 
@@ -3203,11 +3230,16 @@
                 }
                 scheduleAdminStatsRefresh();
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
+                if (!document.getElementById('section-login-tracking').classList.contains('hidden')) loadLoginTracking();
             });
 
             socket.on('admin_user_logout', () => {
                 scheduleAdminStatsRefresh();
                 if (!document.getElementById('section-users').classList.contains('hidden')) loadUsers();
+                if (!document.getElementById('section-login-tracking').classList.contains('hidden')) loadLoginTracking();
+            });
+            socket.on('admin:login_tracking_updated', () => {
+                if (!document.getElementById('section-login-tracking').classList.contains('hidden')) loadLoginTracking();
             });
             socket.on('admin_user_deleted', () => scheduleAdminStatsRefresh());
             socket.on('admin:new_message', () => scheduleAdminStatsRefresh());
@@ -3596,6 +3628,7 @@
             const sectionDetails = {
                 stats: ['Vue d’ensemble', 'Indicateurs et activité de la plateforme.'],
                 users: ['Utilisateurs', 'Consultez et gérez les comptes de la communauté.'],
+                'login-tracking': ['Suivi de connexion', 'Consultez les connexions récentes et appliquez des mesures de sécurité.'],
                 groups: ['Groupes de discussion', 'Gérez les groupes et leurs membres.'],
                 collaboration: ['Collaboration', 'Suivez les demandes et les accès de collaboration.'],
                 appeals: ['Support & recours', 'Examinez les demandes et répondez aux utilisateurs.'],
@@ -3618,7 +3651,7 @@
                 approvals: ['Approbations', 'Examinez les actions en attente d’approbation.'],
                 'my-requests': ['Mes requêtes', 'Suivez le statut de vos demandes administratives.'],
             };
-            ['stats', 'users', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'admin-notifications', 'announcements', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
+            ['stats', 'users', 'login-tracking', 'groups', 'appeals', 'market-requests', 'school-requests', 'school-account-requests', 'employer-requests', 'accounts', 'verifications', 'audit', 'campaigns', 'admin-notifications', 'announcements', 'legal', 'config', 'delegations', 'approvals', 'my-requests', 'collaboration', 'moderation', 'portfolio', 'portfolios-saas'].forEach(s => {
                 const el = document.getElementById('section-' + s); if (el) el.classList.add('hidden');
                 const navId = (s === 'market-requests') ? 'nav-market-requests' : (s === 'school-requests' ? 'nav-school-requests' : (s === 'school-account-requests' ? 'nav-school-account-requests' : (s === 'employer-requests' ? 'nav-employer-requests' : (s === 'accounts' ? 'nav-accounts' : (s === 'portfolio' ? 'nav-portfolio' : (s === 'portfolios-saas' ? 'nav-portfolios-saas' : 'nav-' + s))))));
                 const nav = document.getElementById(navId); if (nav) nav.classList.remove('active');
@@ -3638,6 +3671,7 @@
             if (name === 'campaigns') loadCampaigns();
             if (name === 'announcements') loadAnnouncements();
             if (name === 'users') loadUsers();
+            if (name === 'login-tracking') loadLoginTracking();
             if (name === 'portfolios-saas') loadPortfolioSaas();
             if (name === 'market-requests') loadMarket();
             if (name === 'school-requests') loadSchools();
@@ -5815,6 +5849,110 @@
                 if (!token) return;
                 document.getElementById('admin-users-page-info').textContent = '';
                 renderAdminTableError('users-table-body', e, USER_COLUMNS.filter(column => visibleColumns.includes(column.id)).length, 'loadUsers()');
+            }
+        }
+
+        let loginTrackingUsers = [];
+        let loginTrackingRequestId = 0;
+        async function loadLoginTracking() {
+            const body = document.getElementById('login-tracking-table-body');
+            const errorBox = document.getElementById('login-tracking-error');
+            if (!body) return;
+            const requestId = ++loginTrackingRequestId;
+            body.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-sm text-gray-400">Chargement du suivi de connexion…</td></tr>';
+            errorBox?.classList.add('hidden');
+            try {
+                const response = await axios.get(`${API_URL}/admin/login-tracking`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (requestId !== loginTrackingRequestId) return;
+                loginTrackingUsers = Array.isArray(response.data?.data) ? response.data.data : [];
+                renderLoginTracking();
+            } catch (error) {
+                if (requestId !== loginTrackingRequestId) return;
+                const message = error.response?.data?.error || error.message || 'Impossible de charger le suivi de connexion.';
+                if (errorBox) {
+                    errorBox.textContent = message;
+                    errorBox.classList.remove('hidden');
+                }
+                body.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-sm text-red-500">Le suivi n’a pas pu être chargé.</td></tr>';
+            }
+        }
+
+        function filterLoginTracking() {
+            renderLoginTracking();
+        }
+
+        function renderLoginTracking() {
+            const body = document.getElementById('login-tracking-table-body');
+            if (!body) return;
+            const search = (document.getElementById('login-tracking-search')?.value || '').trim().toLowerCase();
+            const users = loginTrackingUsers.filter(user => {
+                const device = typeof user.device_info === 'string'
+                    ? (() => { try { return JSON.parse(user.device_info); } catch { return {}; } })()
+                    : (user.device_info || {});
+                const searchable = [
+                    user.full_name, user.email, user.country, user.city,
+                    device.brand, device.model, device.os, device.version
+                ].join(' ').toLowerCase();
+                return searchable.includes(search);
+            });
+            document.getElementById('login-tracking-count').textContent = `${users.length} compte${users.length === 1 ? '' : 's'} affiché${users.length === 1 ? '' : 's'} · actualisé en direct`;
+            body.innerHTML = users.map(user => {
+                let device = user.device_info || {};
+                if (typeof device === 'string') {
+                    try { device = JSON.parse(device); } catch { device = {}; }
+                }
+                if (!device || typeof device !== 'object' || Array.isArray(device)) device = {};
+                const deviceName = [device.brand, device.model].filter(value => value && value !== 'Unknown').join(' ') || 'Appareil non renseigné';
+                const osName = [device.os, device.version].filter(value => value && value !== 'Unknown').join(' ') || 'Système non renseigné';
+                const isOnline = Boolean(user.is_online);
+                const accountName = escapeUserCell(user.full_name || 'Utilisateur');
+                const email = escapeUserCell(user.email || '');
+                const location = [user.city, user.country].filter(Boolean).map(escapeUserCell).join(', ') || 'Non renseigné';
+                const lastLogin = user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Jamais renseignée';
+                const userNameArg = encodeURIComponent(user.full_name || 'Utilisateur').replace(/'/g, '%27');
+                const onlineClass = isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600';
+                return `<tr class="border-b border-gray-50 hover:bg-gray-50">
+                    <td class="px-5 py-4"><p class="font-bold text-sm text-gray-800">${accountName}</p><p class="text-xs text-gray-500">${email}</p></td>
+                    <td class="px-5 py-4"><span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold ${onlineClass}"><span class="w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}"></span>${isOnline ? 'EN LIGNE' : 'HORS LIGNE'}</span><p class="mt-2 text-[10px] text-gray-500">Connexion : ${escapeUserCell(lastLogin)}</p><p class="text-[10px] text-gray-500">Activité : ${escapeUserCell(user.last_seen_at ? new Date(user.last_seen_at).toLocaleString() : '—')}</p><p class="text-[10px] ${user.is_locked ? 'text-red-600 font-bold' : 'text-gray-500'}">${user.is_locked ? 'Compte bloqué' : user.session_active ? 'Session valide' : 'Session terminée / expirée'}</p></td>
+                    <td class="px-5 py-4"><p class="text-xs font-bold text-gray-700">${escapeUserCell(deviceName)}</p><p class="text-[10px] text-gray-500">${escapeUserCell(osName)}</p><p class="text-[10px] text-gray-400">Application ${escapeUserCell(user.app_version || '—')}</p></td>
+                    <td class="px-5 py-4"><p class="text-xs font-semibold text-gray-700">${location}</p><p class="text-[10px] text-gray-400">Profil au moment de la connexion</p></td>
+                    <td class="px-5 py-4"><div class="flex justify-end gap-2">
+                        <button type="button" onclick="setTrackedUserLock('${user.id}', ${!user.is_locked})" class="rounded-lg px-3 py-2 text-xs font-bold ${user.is_locked ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}">${user.is_locked ? 'Débloquer' : 'Bloquer'}</button>
+                        <button type="button" onclick="notifyUserSecurity('${user.id}', '${userNameArg}')" class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">Avertir</button>
+                        ${user.session_managed && user.session_active ? `<button type="button" onclick="revokeTrackedDevice('${user.session_id}', '${userNameArg}')" class="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700">Déconnecter l’appareil</button>` : '<span class="rounded-lg bg-gray-50 px-3 py-2 text-[10px] text-gray-400">Ancienne session</span>'}
+                    </div></td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="5" class="px-5 py-8 text-center text-sm text-gray-400">Aucun compte correspondant.</td></tr>';
+        }
+
+        async function setTrackedUserLock(userId, isLocked) {
+            const action = isLocked ? 'bloquer' : 'débloquer';
+            if (!confirm(`Confirmer le ${action} de ce compte ? ${isLocked ? 'Les requêtes et connexions actives seront interrompues.' : ''}`)) return;
+            try {
+                const response = await axios.put(`${API_URL}/admin/users/${userId}/lock`, { isLocked }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (response.data?.pending) alert(response.data.message);
+                else toast(`Compte ${isLocked ? 'bloqué' : 'débloqué'}.`, 'success');
+                await loadLoginTracking();
+            } catch (error) {
+                alert(error.response?.data?.error || `Impossible de ${action} ce compte.`);
+            }
+        }
+
+        async function revokeTrackedDevice(sessionId, encodedName) {
+            const name = decodeURIComponent(encodedName);
+            if (!confirm(`Déconnecter l’appareil de ${name} et révoquer sa session ? L’appareil ne sera pas effacé et devra se reconnecter pour accéder au compte.`)) return;
+            try {
+                const response = await axios.delete(`${API_URL}/admin/device-sessions/${sessionId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                toast(response.data?.message || 'Appareil déconnecté.', 'success');
+                await loadLoginTracking();
+            } catch (error) {
+                alert(error.response?.data?.error || 'Impossible de déconnecter cet appareil.');
             }
         }
 

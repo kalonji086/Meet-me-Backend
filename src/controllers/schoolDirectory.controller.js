@@ -11,7 +11,12 @@ const directoryCache = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 600 });
 const geocodeCache = new NodeCache({ stdTTL: 24 * 60 * 60, checkperiod: 3600 });
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const nominatimUrl = 'https://nominatim.openstreetmap.org/search';
-const overpassUrl = 'https://overpass-api.de/api/interpreter';
+const photonUrl = 'https://photon.komoot.io/api/';
+const overpassUrls = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter'
+];
 const searchRadiusMeters = 12000;
 const maxResults = 80;
 let nominatimQueue = Promise.resolve();
@@ -36,14 +41,42 @@ const searchLocation = async (location) => {
   const params = { q: location, format: 'jsonv2', addressdetails: 1, limit: 1 };
   if (process.env.OSM_CONTACT_EMAIL) params.email = process.env.OSM_CONTACT_EMAIL;
   const contact = process.env.OSM_CONTACT_EMAIL ? `; contact: ${process.env.OSM_CONTACT_EMAIL}` : '';
-  const response = await withNominatimRateLimit(() => axios.get(nominatimUrl, {
-    params,
-    timeout: 10000,
-    headers: {
-      'User-Agent': `TogetherTechMeetMe/1.0 (school directory${contact})`
+  const userAgent = `TogetherTechMeetMe/1.0 (school directory${contact})`;
+  let place;
+  try {
+    const response = await withNominatimRateLimit(() => axios.get(nominatimUrl, {
+      params,
+      timeout: 8000,
+      headers: { 'User-Agent': userAgent }
+    }));
+    place = response.data?.[0];
+  } catch (error) {
+    logger.warn(`Nominatim lookup failed for "${location}", trying Photon: ${error.message}`);
+  }
+
+  if (!place) {
+    const response = await axios.get(photonUrl, {
+      params: { q: location, limit: 1 },
+      timeout: 5000,
+      headers: { 'User-Agent': userAgent }
+    });
+    const feature = response.data?.features?.[0];
+    if (feature) {
+      const properties = feature.properties || {};
+      place = {
+        lat: feature.geometry?.coordinates?.[1],
+        lon: feature.geometry?.coordinates?.[0],
+        display_name: [properties.name, properties.city || properties.town || properties.village, properties.country]
+          .filter(Boolean)
+          .join(', '),
+        address: {
+          city: properties.city || properties.town || properties.village || properties.municipality || properties.county,
+          country: properties.country
+        }
+      };
     }
-  }));
-  const place = response.data?.[0];
+  }
+
   if (!place || !Number.isFinite(Number(place.lat)) || !Number.isFinite(Number(place.lon))) return null;
 
   const result = {
@@ -56,6 +89,30 @@ const searchLocation = async (location) => {
   };
   geocodeCache.set(cacheKey, result);
   return result;
+};
+
+const fetchOverpassElements = async (query, userAgent) => {
+  let lastError;
+  for (const url of overpassUrls) {
+    try {
+      const response = await axios.post(url, `data=${encodeURIComponent(query)}`, {
+        timeout: 5000,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': userAgent
+        }
+      });
+      if (response.data?.remark) throw new Error(response.data.remark);
+      if (!Array.isArray(response.data?.elements)) {
+        throw new Error('Invalid response from the Overpass API.');
+      }
+      return response.data.elements;
+    } catch (error) {
+      lastError = error;
+      logger.warn(`Overpass endpoint ${url} failed: ${error.message}`);
+    }
+  }
+  throw lastError || new Error('No Overpass endpoint is available.');
 };
 
 const getSchoolType = (tags) => {
@@ -173,15 +230,9 @@ const searchSchools = asyncHandler(async (req, res) => {
     if (place) {
       const lat = place.latitude.toFixed(5);
       const lon = place.longitude.toFixed(5);
-      const query = `[out:json][timeout:20];(node(around:${searchRadiusMeters},${lat},${lon})["amenity"~"^(school|university|college|kindergarten|language_school|driving_school)$"];way(around:${searchRadiusMeters},${lat},${lon})["amenity"~"^(school|university|college|kindergarten|language_school|driving_school)$"];relation(around:${searchRadiusMeters},${lat},${lon})["amenity"~"^(school|university|college|kindergarten|language_school|driving_school)$"];node(around:${searchRadiusMeters},${lat},${lon})["office"="educational_institution"];way(around:${searchRadiusMeters},${lat},${lon})["office"="educational_institution"];relation(around:${searchRadiusMeters},${lat},${lon})["office"="educational_institution"];);out tags center ${maxResults};`;
-      const response = await axios.post(overpassUrl, `data=${encodeURIComponent(query)}`, {
-        timeout: 25000,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': `TogetherTechMeetMe/1.0 (school directory${process.env.OSM_CONTACT_EMAIL ? `; contact: ${process.env.OSM_CONTACT_EMAIL}` : ''})`
-        }
-      });
-      elements = Array.isArray(response.data?.elements) ? response.data.elements : [];
+      const query = `[out:json][timeout:15];(node(around:${searchRadiusMeters},${lat},${lon})["amenity"~"^(school|university|college|kindergarten|language_school|driving_school)$"];way(around:${searchRadiusMeters},${lat},${lon})["amenity"~"^(school|university|college|kindergarten|language_school|driving_school)$"];relation(around:${searchRadiusMeters},${lat},${lon})["amenity"~"^(school|university|college|kindergarten|language_school|driving_school)$"];node(around:${searchRadiusMeters},${lat},${lon})["office"="educational_institution"];way(around:${searchRadiusMeters},${lat},${lon})["office"="educational_institution"];relation(around:${searchRadiusMeters},${lat},${lon})["office"="educational_institution"];);out tags center ${maxResults};`;
+      const userAgent = `TogetherTechMeetMe/1.0 (school directory${process.env.OSM_CONTACT_EMAIL ? `; contact: ${process.env.OSM_CONTACT_EMAIL}` : ''})`;
+      elements = await fetchOverpassElements(query, userAgent);
     }
   } catch (error) {
     logger.warn(`School directory provider request failed for "${location}": ${error.message}`);

@@ -2,6 +2,8 @@ const logger = require('../utils/logger');
 const { query } = require('../config/db');
 const config = require('../../config/config');
 const notificationService = require('./notification.service');
+const jwt = require('jsonwebtoken');
+const deviceSessionService = require('./device-session.service');
 
 const ADMIN_NOTIFICATION_EVENTS = new Set([
   'admin:new_audit',
@@ -47,6 +49,8 @@ class SocketService {
     this.io = null;
     this.connectedUsers = new Map(); // socketId -> userId
     this.userSockets = new Map(); // userId -> Set of socketIds
+    this.socketSessions = new Map(); // socketId -> sessionId
+    this.sessionSockets = new Map(); // sessionId -> Set of socketIds
   }
 
   initialize(io) {
@@ -61,8 +65,8 @@ class SocketService {
       });
 
       // Rejoindre une conversation
-      socket.on('join_chat', (chatId) => {
-        this.handleJoinChat(socket, chatId);
+      socket.on('join_chat', async (chatId) => {
+        await this.handleJoinChat(socket, chatId);
       });
 
       // Quitter une conversation
@@ -139,9 +143,21 @@ class SocketService {
         return;
       }
 
+      const decoded = jwt.verify(token, config.jwt.secret);
+      if (String(decoded.userId) !== String(userId)) {
+        socket.emit('authentication_error', { error: 'Session invalide' });
+        socket.disconnect(true);
+        return;
+      }
+      if (decoded.sid && !(await deviceSessionService.isSessionValid(decoded.sid, userId))) {
+        socket.emit('authentication_error', { error: 'Cette session a été révoquée.' });
+        socket.disconnect(true);
+        return;
+      }
+
       // Vérifier l'utilisateur dans Postgres
       const result = await query(
-        'SELECT id, full_name, email, avatar_url, status FROM public.profiles WHERE id = $1',
+        'SELECT id, full_name, email, avatar_url, status, is_locked, is_global_admin FROM public.profiles WHERE id = $1',
         [userId]
       );
 
@@ -151,9 +167,20 @@ class SocketService {
         socket.emit('authentication_error', { error: 'Utilisateur non trouvé' });
         return;
       }
+      if (user.is_locked && !user.is_global_admin) {
+        socket.emit('authentication_error', { error: 'Compte bloqué' });
+        socket.disconnect(true);
+        return;
+      }
+      if (decoded.sid) await deviceSessionService.touchSession(decoded.sid);
 
       // Stocker la connexion
       this.connectedUsers.set(socket.id, userId);
+      if (decoded.sid) {
+        this.socketSessions.set(socket.id, decoded.sid);
+        if (!this.sessionSockets.has(decoded.sid)) this.sessionSockets.set(decoded.sid, new Set());
+        this.sessionSockets.get(decoded.sid).add(socket.id);
+      }
 
       const userIdStr = userId.toString();
       if (!this.userSockets.has(userIdStr)) {
@@ -172,6 +199,7 @@ class SocketService {
 
       // Notifier les autres utilisateurs
       this.notifyUserStatusChange(userId, 'online');
+      this.broadcast('admin:login_tracking_updated', { userId, sessionId: decoded.sid || null, status: 'online' });
 
       logger.socket('authenticated', socket.id, { userId: user.id, email: user.email });
 
@@ -193,13 +221,14 @@ class SocketService {
     } catch (error) {
       logger.error('Erreur d\'authentification Socket.IO:', error);
       socket.emit('authentication_error', { error: 'Erreur d\'authentification' });
+      socket.disconnect(true);
     }
   }
 
   /**
    * Gérer la connexion à une conversation
    */
-  handleJoinChat(socket, chatId) {
+  async handleJoinChat(socket, chatId) {
     const userId = this.connectedUsers.get(socket.id);
     
     if (!userId) {
@@ -207,8 +236,22 @@ class SocketService {
       return;
     }
 
-    socket.join(`chat:${chatId}`);
-    logger.socket('join_chat', socket.id, { chatId, userId });
+    try {
+      const participant = await query(
+        'SELECT 1 FROM public.chat_participants WHERE chat_id = $1 AND user_id = $2',
+        [chatId, userId]
+      );
+      if (participant.rows.length === 0) {
+        socket.emit('error', { error: 'Conversation non trouvée ou accès refusé' });
+        return;
+      }
+
+      socket.join(`chat:${chatId}`);
+      logger.socket('join_chat', socket.id, { chatId, userId });
+    } catch (error) {
+      logger.error('Erreur lors de la connexion à une conversation:', error);
+      socket.emit('error', { error: 'Impossible de rejoindre cette conversation' });
+    }
   }
 
   /**
@@ -536,7 +579,8 @@ class SocketService {
    */
   handleTyping(socket, data) {
     const userId = this.connectedUsers.get(socket.id);
-    const { chatId } = data;
+    const chatId = data?.chatId;
+    if (!userId || !chatId || !socket.rooms.has(`chat:${chatId}`)) return;
     socket.to(`chat:${chatId}`).emit('user_typing', { chatId, userId });
   }
 
@@ -545,7 +589,8 @@ class SocketService {
    */
   handleStopTyping(socket, data) {
     const userId = this.connectedUsers.get(socket.id);
-    const { chatId } = data;
+    const chatId = data?.chatId;
+    if (!userId || !chatId || !socket.rooms.has(`chat:${chatId}`)) return;
     socket.to(`chat:${chatId}`).emit('user_stopped_typing', { chatId, userId });
   }
 
@@ -555,6 +600,16 @@ class SocketService {
   async handleDisconnect(socket) {
     try {
       const userId = this.connectedUsers.get(socket.id);
+      const sessionId = this.socketSessions.get(socket.id);
+      if (sessionId) {
+        const sessionSockets = this.sessionSockets.get(sessionId);
+        if (sessionSockets) {
+          sessionSockets.delete(socket.id);
+          if (sessionSockets.size === 0) this.sessionSockets.delete(sessionId);
+        }
+        this.socketSessions.delete(socket.id);
+        this.broadcast('admin:login_tracking_updated', { userId, sessionId, status: 'offline' });
+      }
       
       if (userId) {
         const userIdStr = userId.toString();
@@ -570,6 +625,7 @@ class SocketService {
               [userId]
             );
             this.notifyUserStatusChange(userId, 'offline');
+            this.broadcast('admin_user_logout', { userId, time: new Date() });
           }
         }
 
@@ -654,6 +710,30 @@ class SocketService {
       totalSockets: this.connectedUsers ? this.connectedUsers.size : 0,
       totalConnections: this.io ? this.io.engine.clientsCount : 0,
     };
+  }
+
+  isSessionOnline(sessionId) {
+    return Boolean(this.sessionSockets.get(String(sessionId))?.size);
+  }
+
+  isUserOnline(userId) {
+    return Boolean(this.userSockets.get(String(userId))?.size);
+  }
+
+  disconnectSession(sessionId) {
+    const socketIds = this.sessionSockets.get(String(sessionId));
+    if (!socketIds || socketIds.size === 0) return;
+    for (const socketId of [...socketIds]) {
+      this.io.sockets.sockets.get(socketId)?.disconnect(true);
+    }
+  }
+
+  disconnectUser(userId) {
+    const socketIds = this.userSockets.get(userId.toString());
+    if (!socketIds || socketIds.size === 0) return;
+    for (const socketId of [...socketIds]) {
+      this.io.sockets.sockets.get(socketId)?.disconnect(true);
+    }
   }
 
   /**

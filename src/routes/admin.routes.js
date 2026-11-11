@@ -9,6 +9,8 @@ router.use(isAdmin);
 
 router.get('/stats', adminController.getStats);
 router.get('/users', adminController.getUsers);
+router.get('/login-tracking', adminController.getLoginTracking);
+router.delete('/device-sessions/:sessionId', adminController.revokeDeviceSession);
 router.delete('/users/:userId', adminController.deleteUser);
 router.post('/users/:userId/schedule-deletion', adminController.scheduleUserDeletion);
 router.delete('/users/:userId/schedule-deletion', adminController.cancelScheduledUserDeletion);

@@ -378,10 +378,10 @@ const login = asyncHandler(async (req, res) => {
   }
 });
 
-const loginWithGoogle = asyncHandler(async (req, res) => {
-  const { idToken, device_info, appVersion } = req.body;
+const verifyGoogleIdentity = async (idToken, res) => {
   if (!config.google.webClientId) {
-    return res.status(503).json({ success: false, error: 'La connexion Google n’est pas encore configurée.' });
+    res.status(503).json({ success: false, error: 'La connexion Google n’est pas encore configurée.' });
+    return null;
   }
 
   let googleUser;
@@ -393,14 +393,25 @@ const loginWithGoogle = asyncHandler(async (req, res) => {
     googleUser = ticket.getPayload();
   } catch (error) {
     logger.warn('Google sign-in token verification failed:', error.message);
-    return res.status(401).json({ success: false, error: 'Le jeton Google est invalide ou expiré.' });
+    res.status(401).json({ success: false, error: 'Le jeton Google est invalide ou expiré.' });
+    return null;
   }
 
   const email = googleUser?.email?.trim().toLowerCase();
   if (!email || googleUser.email_verified !== true) {
-    return res.status(401).json({ success: false, error: 'Google n’a pas confirmé cette adresse e-mail.' });
+    res.status(401).json({ success: false, error: 'Google n’a pas confirmé cette adresse e-mail.' });
+    return null;
   }
 
+  return { googleUser, email };
+};
+
+const loginWithGoogle = asyncHandler(async (req, res) => {
+  const { idToken, device_info, appVersion } = req.body;
+  const identity = await verifyGoogleIdentity(idToken, res);
+  if (!identity) return;
+
+  const { email } = identity;
   const result = await query(
     'SELECT * FROM public.profiles WHERE LOWER(email) = $1',
     [email]
@@ -432,6 +443,129 @@ const loginWithGoogle = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, error: 'Compte bloqué' });
   }
   return res.json({ success: true, data: authSession });
+});
+
+const registerWithGoogle = asyncHandler(async (req, res) => {
+  const {
+    idToken, name, phone_number, username, gender, country, province, city, commune,
+    birth_date, device_info, appVersion, accepted_legal_version,
+    accepted_tos_version, accepted_privacy_version,
+  } = req.body;
+  const identity = await verifyGoogleIdentity(idToken, res);
+  if (!identity) return;
+
+  const email = identity.email;
+  const normalizedName = name.trim();
+  if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(normalizedName)) {
+    return res.status(400).json({ success: false, error: 'Format du nom invalide. Seuls les lettres et espaces sont autorisés.' });
+  }
+
+  const birthDate = new Date(`${birth_date}T00:00:00Z`);
+  if (!Number.isFinite(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== birth_date) {
+    return res.status(400).json({ success: false, error: 'Date de naissance invalide.' });
+  }
+  const today = new Date();
+  let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+  if (today.getUTCMonth() < birthDate.getUTCMonth()
+    || (today.getUTCMonth() === birthDate.getUTCMonth() && today.getUTCDate() < birthDate.getUTCDate())) {
+    age -= 1;
+  }
+  if (age < 10) {
+    return res.status(400).json({ success: false, error: 'Date de naissance invalide.' });
+  }
+
+  const existingUser = await query(
+    'SELECT id FROM public.profiles WHERE LOWER(email) = $1 OR (phone_number IS NOT NULL AND phone_number = $2)',
+    [email, phone_number]
+  );
+  if (existingUser.rows.length > 0) {
+    return res.status(409).json({
+      success: false,
+      error: 'Un compte Acemia existe déjà avec cette adresse Google ou ce numéro. Connectez-vous plutôt.',
+    });
+  }
+
+  const normalizedUsername = username ? username.trim().toLowerCase() : '';
+  if (normalizedUsername) {
+    const existingUsername = await query(
+      'SELECT id FROM public.profiles WHERE LOWER(username) = $1',
+      [normalizedUsername]
+    );
+    if (existingUsername.rows.length > 0) {
+      return res.status(409).json({ success: false, error: 'Identifiant non disponible. Veuillez en choisir un autre.' });
+    }
+  }
+
+  const usernameBase = email.split('@')[0].replace(/[^a-z0-9_.]/g, '').slice(0, 20) || 'user';
+  const finalUsername = normalizedUsername || `${usernameBase}${crypto.randomInt(1000, 10000)}`;
+  const hashedPassword = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), 10);
+  const userId = crypto.randomUUID();
+
+  let result;
+  try {
+    result = await query(
+      `INSERT INTO public.profiles (
+         id, full_name, email, password, username, phone_number, last_login_at,
+         device_info, app_version, gender, country, province, city, commune, birth_date,
+         accepted_legal_version, accepted_tos_version, accepted_privacy_version
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       RETURNING id, full_name, email, username, avatar_url, status, phone_number, app_version,
+         gender, country, province, city, commune, birth_date,
+         accepted_legal_version, accepted_tos_version, accepted_privacy_version`,
+      [
+        userId,
+        normalizedName,
+        email,
+        hashedPassword,
+        finalUsername,
+        phone_number,
+        JSON.stringify(device_info || {}),
+        appVersion || null,
+        gender,
+        country,
+        province,
+        city,
+        commune || null,
+        birth_date,
+        accepted_legal_version,
+        accepted_tos_version,
+        accepted_privacy_version,
+      ]
+    );
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        error: 'Un compte ou un identifiant existe déjà avec ces informations.',
+      });
+    }
+    throw error;
+  }
+
+  const user = normalizeProfileUser(result.rows[0]);
+  const socketService = require('../services/socket.service');
+  socketService.broadcast('admin_new_user', {
+    user: {
+      ...user,
+      name: user.full_name,
+      avatar: user.avatar_url,
+      created_at: new Date(),
+    },
+  });
+
+  const authSession = await createAuthenticatedSession({
+    user,
+    req,
+    deviceInfo: device_info || {},
+    appVersion: appVersion || null,
+  });
+  if (!authSession) {
+    return res.status(403).json({ success: false, error: 'Impossible d’ouvrir une session pour ce compte.' });
+  }
+
+  await mailService.sendWelcomeEmail(user.email, user.full_name);
+  return res.status(201).json({ success: true, data: authSession });
 });
 
 /**
@@ -583,4 +717,4 @@ const verifyToken = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: req.user } });
 });
 
-module.exports = { register, login, loginWithGoogle, refreshToken, logout, forgotPassword, verifyOTP, resetPassword, changePassword, verifyToken, checkAvailability };
+module.exports = { register, login, loginWithGoogle, registerWithGoogle, refreshToken, logout, forgotPassword, verifyOTP, resetPassword, changePassword, verifyToken, checkAvailability };

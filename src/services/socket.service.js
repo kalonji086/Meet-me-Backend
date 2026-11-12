@@ -51,10 +51,12 @@ class SocketService {
     this.userSockets = new Map(); // userId -> Set of socketIds
     this.socketSessions = new Map(); // socketId -> sessionId
     this.sessionSockets = new Map(); // sessionId -> Set of socketIds
+    this.legalNamespace = null;
   }
 
   initialize(io) {
     this.io = io;
+    this.legalNamespace = io.of('/legal');
 
     io.on('connection', (socket) => {
       logger.socket('connection', socket.id);
@@ -774,6 +776,10 @@ class SocketService {
   broadcast(event, data) {
     this.io.emit(event, data);
     this.persistAdminEvent(event, data);
+  }
+
+  broadcastLegal(event, data) {
+    this.legalNamespace?.emit(event, data);
   }
 
   persistAdminEvent(event, data) {

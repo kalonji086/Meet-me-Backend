@@ -5,9 +5,6 @@
   const type = article.dataset.legalType;
   const toc = document.querySelector('[data-legal-toc]');
   const versionLabel = document.querySelector('[data-legal-version]');
-  const defaultArticle = article.innerHTML;
-  const defaultToc = toc?.innerHTML || '';
-  const defaultVersion = versionLabel?.textContent || '';
   let lastRenderedDocument = '';
 
   function escapeHtml(value) {
@@ -119,13 +116,19 @@
     lastRenderedDocument = `${doc.version}:${content}`;
   }
 
-  function restoreDefaultDocument() {
-    if (!lastRenderedDocument) return;
-    article.innerHTML = defaultArticle;
-    if (toc) toc.innerHTML = defaultToc;
-    if (versionLabel) versionLabel.textContent = defaultVersion;
-    article.removeAttribute('id');
-    lastRenderedDocument = '';
+  function renderUnavailable() {
+    article.replaceChildren();
+    const message = document.createElement('p');
+    message.textContent = 'Ce document n’est pas encore publié.';
+    article.appendChild(message);
+    if (toc) {
+      toc.replaceChildren();
+      const item = document.createElement('li');
+      item.textContent = 'Document non publié';
+      toc.appendChild(item);
+    }
+    if (versionLabel) versionLabel.textContent = 'Document non publié';
+    lastRenderedDocument = 'unavailable';
   }
 
   async function refreshPublishedDocument() {
@@ -137,12 +140,12 @@
       const doc = Array.isArray(result.data) ? result.data.find(item => item.type === type) : null;
       if (!result.success) throw new Error('The legal documents response was unsuccessful.');
       if (!doc || !doc.content) {
-        restoreDefaultDocument();
+        renderUnavailable();
         return;
       }
 
       const isUneditedDefault = /^\s*(?:Conditions Générales d['’]Utilisation|Politique de Confidentialité)\s*-\s*Version\s+\S+\s*$/i.test(doc.content);
-      if (isUneditedDefault) restoreDefaultDocument();
+      if (isUneditedDefault) renderUnavailable();
       else renderDocument(doc);
     } catch (error) {
       console.error(`Unable to refresh published ${type} document:`, error);
@@ -152,4 +155,19 @@
   refreshPublishedDocument();
   window.setInterval(refreshPublishedDocument, 30_000);
   document.addEventListener('visibilitychange', refreshPublishedDocument);
+
+  if (typeof window.io === 'function') {
+    const legalSocket = window.io(`${window.location.origin}/legal`, {
+      transports: ['websocket', 'polling'],
+      reconnection: true
+    });
+    legalSocket.on('legal_update', doc => {
+      if (doc?.type === type) renderDocument(doc);
+    });
+    legalSocket.on('legal_removed', data => {
+      if (data?.type === type) renderUnavailable();
+    });
+    legalSocket.on('connect', refreshPublishedDocument);
+    legalSocket.on('connect_error', error => console.warn('Live legal updates are unavailable.', error));
+  }
 })();

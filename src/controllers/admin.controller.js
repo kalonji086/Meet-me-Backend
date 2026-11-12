@@ -1,5 +1,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { query, pool } = require('../config/db');
 const { asyncHandler } = require('../middleware/error.middleware');
 const socketService = require('../services/socket.service');
@@ -7,6 +9,45 @@ const mailService = require('../services/mail.service');
 const logger = require('../utils/logger');
 const employerController = require('./employer.controller');
 const deviceSessionService = require('../services/device-session.service');
+
+const DEFAULT_LEGAL_VERSION = '93.0.0';
+const LEGAL_DOCUMENT_TYPES = ['tos', 'privacy'];
+
+const readDefaultLegalContent = (type) => {
+  const fileName = type === 'privacy' ? 'privacy.html' : 'terms.html';
+  const filePath = path.join(__dirname, '..', '..', 'admin-dashboard', fileName);
+  const html = fs.readFileSync(filePath, 'utf8');
+  const article = html.match(new RegExp(
+    `<article\\b[^>]*data-legal-type=["']${type}["'][^>]*>([\\s\\S]*?)<\\/article>`,
+    'i'
+  ));
+  const content = article?.[1]?.trim();
+  if (!content) throw new Error(`The default ${type} document could not be loaded from ${fileName}.`);
+  return content;
+};
+
+const ensureLegalDocuments = async () => {
+  for (const type of LEGAL_DOCUMENT_TYPES) {
+    const content = readDefaultLegalContent(type);
+    const placeholderTitle = type === 'privacy'
+      ? 'Politique de Confidentialité'
+      : 'Conditions Générales d\'Utilisation';
+    const placeholder = `${placeholderTitle} - Version ${DEFAULT_LEGAL_VERSION}`;
+
+    await query(
+      `INSERT INTO public.app_legal_docs (type, content, version, force_acceptance)
+       VALUES ($1, $2, $3, FALSE)
+       ON CONFLICT (type) DO NOTHING`,
+      [type, content, DEFAULT_LEGAL_VERSION]
+    );
+    await query(
+      `UPDATE public.app_legal_docs
+       SET content = $2, updated_at = NOW()
+       WHERE type = $1 AND content = $3`,
+      [type, content, placeholder]
+    );
+  }
+};
 
 /**
  * Helper: Log admin action to Audit Logs
@@ -146,14 +187,7 @@ const initializeAdminTables = async () => {
     await query(`INSERT INTO public.app_configs (current_version, force_update, active) VALUES ('93.0.0', false, true)`);
   }
 
-  // Create initial legal documents only on a fresh database; never replace administrator-published content.
-  const existingLegalDocs = await query('SELECT type, version FROM public.app_legal_docs');
-
-  if (existingLegalDocs.rows.length === 0) {
-    await query(`INSERT INTO public.app_legal_docs (type, content, version, force_acceptance) VALUES 
-      ('tos', 'Conditions Générales d''Utilisation - Version 93.0.0', '93.0.0', false),
-      ('privacy', 'Politique de Confidentialité - Version 93.0.0', '93.0.0', false)`);
-  }
+  await ensureLegalDocuments();
 
   // S'assurer que les colonnes nécessaires existent pour les approbations
   try {
@@ -3127,6 +3161,7 @@ const updateLegalDoc = asyncHandler(async (req, res) => {
 
   logger.info(`📢 Broadcasting legal_update: ${type} v${version} (Forced: ${broadcastData.force_acceptance})`);
   socketService.broadcast('legal_update', broadcastData);
+  socketService.broadcastLegal('legal_update', broadcastData);
 
   res.json({ success: true, data: result.rows[0] });
 });
@@ -3145,6 +3180,7 @@ const deleteLegalDoc = asyncHandler(async (req, res) => {
 
   // Notifier en temps réel pour retirer l'écran de blocage chez les clients
   socketService.broadcast('legal_removed', { type });
+  socketService.broadcastLegal('legal_removed', { type });
 
   res.json({ success: true, message: `Document ${type} supprimé.` });
 });

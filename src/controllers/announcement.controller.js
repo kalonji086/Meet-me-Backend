@@ -12,6 +12,7 @@ const ensureAnnouncementsTable = () => {
         id BIGSERIAL PRIMARY KEY,
         title VARCHAR(160) NOT NULL,
         content TEXT NOT NULL,
+        link_url TEXT,
         type VARCHAR(20) NOT NULL DEFAULT 'info'
           CHECK (type IN ('info', 'update', 'maintenance', 'important')),
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -21,6 +22,9 @@ const ensureAnnouncementsTable = () => {
         updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
       )
     `).then(() => query(`
+      ALTER TABLE public.app_announcements
+      ADD COLUMN IF NOT EXISTS link_url TEXT
+    `)).then(() => query(`
       CREATE INDEX IF NOT EXISTS app_announcements_active_updated_idx
       ON public.app_announcements (is_active, updated_at DESC)
     `)).catch((error) => {
@@ -46,12 +50,44 @@ const parseAnnouncementId = (id) => (/^[1-9]\d*$/.test(String(id)) ? id : null);
 const validateAnnouncement = (body) => {
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const content = typeof body.content === 'string' ? body.content.trim() : '';
+  const linkUrl = typeof body.linkUrl === 'string' ? body.linkUrl.trim() : '';
   const type = body.type || 'info';
   const validTypes = ['info', 'update', 'maintenance', 'important'];
 
   if (!title || title.length > 160) return { error: 'Le titre est requis et ne peut pas dépasser 160 caractères.' };
   if (!content || content.length > 4000) return { error: 'Le message est requis et ne peut pas dépasser 4 000 caractères.' };
   if (!validTypes.includes(type)) return { error: 'Le type d’annonce est invalide.' };
+  if (linkUrl.length > 2048) return { error: 'Le lien ne peut pas dépasser 2 048 caractères.' };
+
+  if (linkUrl) {
+    if (linkUrl.startsWith('/')) {
+      const path = linkUrl.split(/[?#]/, 1)[0].toLowerCase();
+      const internalPaths = new Set([
+        '/chats', '/settings', '/contacts', '/status/create', '/contacts/add',
+        '/profile/edit', '/privacy-policy', '/terms-of-service', '/groups/create',
+        '/business', '/emploi', '/employer-dashboard', '/school/request',
+        '/school/dashboard', '/school/students', '/school/schedule', '/school/fees',
+        '/school/accounts', '/school/classes', '/school/settings', '/school/login',
+        '/school/student-dashboard', '/school/parent-dashboard', '/school/grades',
+        '/school/attendance', '/school/reports',
+      ]);
+      const isInternalPath = internalPaths.has(path) ||
+        /^\/chat\/[^/]+$/.test(path) ||
+        /^\/status\/view\/[^/]+$/.test(path);
+      if (!isInternalPath || linkUrl.startsWith('//') || linkUrl.includes('\\') || /[\u0000-\u001f]/.test(linkUrl)) {
+        return { error: 'Le chemin interne de l’annonce n’est pas valide.' };
+      }
+    } else {
+      try {
+        const externalUrl = new URL(linkUrl);
+        if (externalUrl.protocol !== 'https:' || !externalUrl.hostname || externalUrl.username || externalUrl.password) {
+          return { error: 'Le lien externe doit être une URL HTTPS valide.' };
+        }
+      } catch {
+        return { error: 'Le lien doit être un chemin interne valide ou une URL HTTPS.' };
+      }
+    }
+  }
 
   let expiresAt = null;
   if (body.expiresAt) {
@@ -63,6 +99,7 @@ const validateAnnouncement = (body) => {
     value: {
       title,
       content,
+      linkUrl: linkUrl || null,
       type,
       isActive: body.isActive !== false,
       expiresAt,
@@ -73,7 +110,7 @@ const validateAnnouncement = (body) => {
 const getActiveAnnouncements = asyncHandler(async (req, res) => {
   await ensureAnnouncementsTable();
   const result = await query(`
-    SELECT id, title, content, type, updated_at, expires_at
+    SELECT id, title, content, link_url, type, updated_at, expires_at
     FROM public.app_announcements
     WHERE is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW())
     ORDER BY updated_at DESC
@@ -89,7 +126,7 @@ const getAnnouncements = asyncHandler(async (req, res) => {
 
   await ensureAnnouncementsTable();
   const result = await query(`
-    SELECT a.id, a.title, a.content, a.type, a.is_active, a.expires_at, a.created_at, a.updated_at,
+    SELECT a.id, a.title, a.content, a.link_url, a.type, a.is_active, a.expires_at, a.created_at, a.updated_at,
            p.full_name AS author_name
     FROM public.app_announcements a
     LEFT JOIN public.profiles p ON p.id = a.created_by
@@ -107,13 +144,13 @@ const createAnnouncement = asyncHandler(async (req, res) => {
   const validation = validateAnnouncement(req.body);
   if (validation.error) return res.status(400).json({ success: false, error: validation.error });
 
-  const { title, content, type, isActive, expiresAt } = validation.value;
+  const { title, content, linkUrl, type, isActive, expiresAt } = validation.value;
   const canExecute = await adminController.processSensitiveAction(
     req,
     'create_announcement',
     null,
     title,
-    { title, content, type, isActive, expiresAt },
+    { title, content, linkUrl, type, isActive, expiresAt },
     'campaigns',
     'create'
   );
@@ -123,10 +160,10 @@ const createAnnouncement = asyncHandler(async (req, res) => {
 
   await ensureAnnouncementsTable();
   const result = await query(`
-    INSERT INTO public.app_announcements (title, content, type, is_active, expires_at, created_by)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING id, title, content, type, is_active, expires_at, created_at, updated_at
-  `, [title, content, type, isActive, expiresAt, req.userId]);
+    INSERT INTO public.app_announcements (title, content, link_url, type, is_active, expires_at, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id, title, content, link_url, type, is_active, expires_at, created_at, updated_at
+  `, [title, content, linkUrl, type, isActive, expiresAt, req.userId]);
 
   const announcement = result.rows[0];
   socketService.broadcast('announcement_updated', { action: 'created', announcement });
@@ -143,13 +180,13 @@ const updateAnnouncement = asyncHandler(async (req, res) => {
   const validation = validateAnnouncement(req.body);
   if (validation.error) return res.status(400).json({ success: false, error: validation.error });
 
-  const { title, content, type, isActive, expiresAt } = validation.value;
+  const { title, content, linkUrl, type, isActive, expiresAt } = validation.value;
   const canExecute = await adminController.processSensitiveAction(
     req,
     'update_announcement',
     id,
     title,
-    { title, content, type, isActive, expiresAt },
+    { title, content, linkUrl, type, isActive, expiresAt },
     'campaigns',
     'create'
   );
@@ -160,10 +197,10 @@ const updateAnnouncement = asyncHandler(async (req, res) => {
   await ensureAnnouncementsTable();
   const result = await query(`
     UPDATE public.app_announcements
-    SET title = $1, content = $2, type = $3, is_active = $4, expires_at = $5, updated_at = NOW()
-    WHERE id = $6
-    RETURNING id, title, content, type, is_active, expires_at, created_at, updated_at
-  `, [title, content, type, isActive, expiresAt, id]);
+    SET title = $1, content = $2, link_url = $3, type = $4, is_active = $5, expires_at = $6, updated_at = NOW()
+    WHERE id = $7
+    RETURNING id, title, content, link_url, type, is_active, expires_at, created_at, updated_at
+  `, [title, content, linkUrl, type, isActive, expiresAt, id]);
 
   if (!result.rows.length) return res.status(404).json({ success: false, error: 'Annonce introuvable.' });
 
@@ -210,4 +247,5 @@ module.exports = {
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  validateAnnouncement,
 };

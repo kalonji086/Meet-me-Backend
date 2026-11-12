@@ -1759,6 +1759,11 @@
                                     <textarea id="announcement-content" maxlength="4000" rows="6" required placeholder="Décrivez clairement la nouveauté, le changement ou l’information à communiquer..." oninput="updateAnnouncementContentCount()"></textarea>
                                     <div class="announcement-field-foot"><span id="announcement-content-count">0 / 4 000 caractères</span></div>
                                 </div>
+                                <div class="announcement-field">
+                                    <label for="announcement-link-url">Lien de destination <span class="font-normal text-gray-400">(facultatif)</span></label>
+                                    <input id="announcement-link-url" type="text" maxlength="2048" placeholder="/privacy-policy ou https://exemple.com">
+                                    <p class="mt-1 text-[11px] leading-relaxed text-gray-500">Chemin interne de l’application (ex. /settings, /chats) ou adresse HTTPS d’un site externe.</p>
+                                </div>
                             </div>
                         </section>
 
@@ -7105,7 +7110,7 @@
             const announcements = loadedAnnouncements.filter(announcement => {
                 const status = getAnnouncementStatus(announcement);
                 const matchesStatus = statusFilter === 'all' || status === statusFilter;
-                const matchesQuery = !query || `${announcement.title} ${announcement.content}`.toLocaleLowerCase('fr-FR').includes(query);
+                const matchesQuery = !query || `${announcement.title} ${announcement.content} ${announcement.link_url || ''}`.toLocaleLowerCase('fr-FR').includes(query);
                 return matchesStatus && matchesQuery;
             });
             document.getElementById('announcement-list-count').innerText = `${announcements.length.toLocaleString('fr-FR')} ${announcements.length === 1 ? 'annonce' : 'annonces'}`;
@@ -7148,6 +7153,7 @@
                             </div>
                             <h4>${escapeUserCell(announcement.title)}</h4>
                             <p class="announcement-card-copy">${escapeUserCell(announcement.content)}</p>
+                            ${announcement.link_url ? `<p class="announcement-date mt-2">Lien : ${escapeUserCell(announcement.link_url)}</p>` : ''}
                             <p class="announcement-date mt-2">${announcement.expires_at ? `Expiration : ${expiration}` : expiration}</p>
                         </div>
                         <div class="announcement-card-actions">
@@ -7176,6 +7182,7 @@
             document.getElementById('announcement-id').value = announcement.id;
             document.getElementById('announcement-title').value = announcement.title;
             document.getElementById('announcement-content').value = announcement.content;
+            document.getElementById('announcement-link-url').value = announcement.link_url || '';
             document.getElementById('announcement-type').value = announcement.type;
             document.getElementById('announcement-active').checked = announcement.is_active;
             updateAnnouncementContentCount();
@@ -7198,6 +7205,7 @@
             const payload = {
                 title: document.getElementById('announcement-title').value.trim(),
                 content: document.getElementById('announcement-content').value.trim(),
+                linkUrl: document.getElementById('announcement-link-url').value.trim() || null,
                 type: document.getElementById('announcement-type').value,
                 isActive: document.getElementById('announcement-active').checked,
                 expiresAt: document.getElementById('announcement-expires').value
@@ -7228,6 +7236,7 @@
                 const response = await axios.put(`${API_URL}/admin/announcements/${encodeURIComponent(id)}`, {
                     title: announcement.title,
                     content: announcement.content,
+                    linkUrl: announcement.link_url || null,
                     type: announcement.type,
                     isActive: !announcement.is_active,
                     expiresAt: announcement.expires_at

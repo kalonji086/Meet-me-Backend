@@ -60,6 +60,7 @@ describe('loginWithGoogle', () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.body.success).toBe(false);
+    expect(response.body.error).toMatch(/Créez d’abord un compte/);
     expect(googleOAuthClient.verifyIdToken).toHaveBeenCalledWith({
       idToken: 'valid-id-token',
       audience: 'test-web-client',
@@ -68,6 +69,7 @@ describe('loginWithGoogle', () => {
       'SELECT * FROM public.profiles WHERE LOWER(email) = $1',
       ['new-user@example.com']
     );
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an unverified Google email before looking up an Acemia profile', async () => {

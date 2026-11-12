@@ -164,7 +164,7 @@ const getMessages = asyncHandler(async (req, res) => {
 
   const result = await query(
     `SELECT m.*, p.full_name as sender_name, p.avatar_url as sender_avatar, p.is_verified as sender_is_verified,
-            med.file_name, med.file_size, med.mime_type, med.metadata as media_metadata
+            med.file_url as media_file_url, med.file_name, med.file_size, med.mime_type, med.metadata as media_metadata
      FROM public.messages m
      JOIN public.profiles p ON m.sender_id = p.id
      LEFT JOIN public.media med ON m.id = med.message_id
@@ -517,18 +517,23 @@ const deleteMessage = asyncHandler(async (req, res) => {
     });
   }
 
-  // Mettre à jour le last_message du chat si c'était le dernier message
-  const chatRes = await query(
-    'SELECT id FROM public.chats WHERE id = $1 AND last_message_at = $2',
-    [message.chat_id, message.created_at]
+  // Compare timestamps in PostgreSQL so sub-millisecond precision is preserved.
+  await query(
+    `UPDATE public.chats AS chat
+     SET last_message = $1
+     WHERE chat.id = $2
+       AND NOT EXISTS (
+         SELECT 1
+         FROM public.messages AS newer
+         JOIN public.messages AS deleted ON deleted.id = $3
+         WHERE newer.chat_id = chat.id
+           AND (
+             newer.created_at > deleted.created_at
+             OR (newer.created_at = deleted.created_at AND newer.id > deleted.id)
+           )
+       )`,
+    [deleteMention, message.chat_id, messageId]
   );
-
-  if (chatRes.rows.length > 0) {
-    await query(
-      'UPDATE public.chats SET last_message = $1 WHERE id = $2',
-      [deleteMention, message.chat_id]
-    );
-  }
 
   const participants = await query(
     'SELECT user_id FROM public.chat_participants WHERE chat_id = $1',

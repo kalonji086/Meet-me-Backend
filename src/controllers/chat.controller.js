@@ -278,55 +278,6 @@ const sendMessage = asyncHandler(async (req, res) => {
     }
   }
 
-  const adminNotifications = await query(
-    `WITH inserted AS (
-       INSERT INTO public.admin_notifications
-         (admin_id, source_type, source_id, title, body, metadata)
-       SELECT p.id, 'message', $1, $2, $3, $4::jsonb
-       FROM public.profiles p
-       WHERE p.is_global_admin = TRUE AND p.id != $5
-       ON CONFLICT (admin_id, source_type, source_id) DO NOTHING
-       RETURNING id, admin_id
-     )
-     SELECT i.id, i.admin_id, p.push_token,
-       (SELECT COUNT(*) FROM public.admin_notifications n
-        WHERE n.admin_id = i.admin_id AND n.read_at IS NULL)::int AS unread_count
-     FROM inserted i
-     JOIN public.profiles p ON p.id = i.admin_id`,
-    [
-      message.id,
-      senderName,
-      content,
-      JSON.stringify({ chatId, messageType: type }),
-      userId,
-    ]
-  );
-
-  for (const notification of adminNotifications.rows) {
-    const data = {
-      adminNotificationId: notification.id,
-      chatId,
-      type: 'admin_message',
-    };
-    socketService.sendToUser(notification.admin_id, 'admin_notification', {
-      id: notification.id,
-      title: senderName,
-      body: content,
-      data,
-      createdAt: message.created_at,
-      unreadCount: notification.unread_count,
-    });
-
-    if (notification.push_token) {
-      notificationService.sendNotification(notification.push_token, {
-        title: `Message reçu — ${senderName}`,
-        body: content,
-        data,
-        badge: notification.unread_count,
-      });
-    }
-  }
-
   // Notifier le dashboard admin en temps réel pour les statistiques
   socketService.broadcast('admin:new_message', {
     id: message.id,

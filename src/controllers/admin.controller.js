@@ -346,7 +346,7 @@ const initializeAdminTables = async () => {
     CREATE TABLE IF NOT EXISTS public.admin_notifications (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       admin_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-      source_type TEXT NOT NULL DEFAULT 'message',
+      source_type TEXT NOT NULL DEFAULT 'system_event',
       source_id UUID NOT NULL DEFAULT gen_random_uuid(),
       title TEXT NOT NULL,
       body TEXT NOT NULL,
@@ -356,6 +356,7 @@ const initializeAdminTables = async () => {
       UNIQUE (admin_id, source_type, source_id)
     );
   `);
+  await query("ALTER TABLE public.admin_notifications ALTER COLUMN source_type SET DEFAULT 'system_event'");
   await query('ALTER TABLE public.admin_notifications ALTER COLUMN source_id SET DEFAULT gen_random_uuid()');
   await query(`
     CREATE INDEX IF NOT EXISTS admin_notifications_inbox_idx
@@ -2418,7 +2419,7 @@ const getAdminNotifications = asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT id, source_type, source_id, title, body, metadata, created_at, read_at
      FROM public.admin_notifications
-     WHERE admin_id = $1
+     WHERE admin_id = $1 AND source_type <> 'message'
      ORDER BY created_at DESC
      LIMIT $2 OFFSET $3`,
     [req.userId, limit, offset]
@@ -2427,7 +2428,7 @@ const getAdminNotifications = asyncHandler(async (req, res) => {
     `SELECT COUNT(*) AS total_count,
        COUNT(*) FILTER (WHERE read_at IS NULL) AS unread_count
      FROM public.admin_notifications
-     WHERE admin_id = $1`,
+     WHERE admin_id = $1 AND source_type <> 'message'`,
     [req.userId]
   );
 
@@ -2449,7 +2450,7 @@ const markAdminNotificationRead = asyncHandler(async (req, res) => {
   const result = await query(
     `UPDATE public.admin_notifications
      SET read_at = COALESCE(read_at, NOW())
-     WHERE id = $1 AND admin_id = $2
+     WHERE id = $1 AND admin_id = $2 AND source_type <> 'message'
      RETURNING id`,
     [req.params.id, req.userId]
   );
@@ -2458,7 +2459,7 @@ const markAdminNotificationRead = asyncHandler(async (req, res) => {
   }
 
   const unreadResult = await query(
-    'SELECT COUNT(*) FROM public.admin_notifications WHERE admin_id = $1 AND read_at IS NULL',
+    "SELECT COUNT(*) FROM public.admin_notifications WHERE admin_id = $1 AND source_type <> 'message' AND read_at IS NULL",
     [req.userId]
   );
   const unreadCount = Number.parseInt(unreadResult.rows[0].count, 10);
@@ -2472,7 +2473,7 @@ const markAllAdminNotificationsRead = asyncHandler(async (req, res) => {
   }
 
   await query(
-    'UPDATE public.admin_notifications SET read_at = NOW() WHERE admin_id = $1 AND read_at IS NULL',
+    "UPDATE public.admin_notifications SET read_at = NOW() WHERE admin_id = $1 AND source_type <> 'message' AND read_at IS NULL",
     [req.userId]
   );
   socketService.sendToUser(req.userId, 'admin_notifications_read', { unreadCount: 0 });

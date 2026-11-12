@@ -804,7 +804,7 @@ class SocketService {
        )
        SELECT i.id, i.admin_id, i.source_id, p.push_token,
          (SELECT COUNT(*) FROM public.admin_notifications n
-          WHERE n.admin_id = i.admin_id AND n.read_at IS NULL)::int AS unread_count
+          WHERE n.admin_id = i.admin_id AND n.source_type <> 'message' AND n.read_at IS NULL)::int AS unread_count
        FROM inserted i
        JOIN public.profiles p ON p.id = i.admin_id`,
       [sourceType, sourceId, title, body, JSON.stringify({ event: sourceType, ...metadata })]

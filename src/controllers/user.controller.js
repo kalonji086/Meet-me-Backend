@@ -442,7 +442,7 @@ const getBadges = asyncHandler(async (req, res) => {
   let notifications = 0;
   if (req.user?.is_global_admin) {
     const notificationRes = await query(
-      'SELECT COUNT(*) FROM public.admin_notifications WHERE admin_id = $1 AND read_at IS NULL',
+      "SELECT COUNT(*) FROM public.admin_notifications WHERE admin_id = $1 AND source_type <> 'message' AND read_at IS NULL",
       [req.userId]
     );
     notifications = Number.parseInt(notificationRes.rows[0].count, 10);
